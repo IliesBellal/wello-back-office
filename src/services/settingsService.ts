@@ -23,6 +23,7 @@ const mockEstablishmentSettings: EstablishmentSettings = {
   timings: {
     wait_time_min: 15,
     wait_time_max: 45,
+    auto_close_enabled: true,
     auto_close_delay: 30
   },
   ordering: {
