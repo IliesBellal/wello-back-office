@@ -20,6 +20,7 @@ export interface EstablishmentInfo {
 export interface EstablishmentTimings {
   wait_time_min: number;
   wait_time_max: number;
+  auto_close_enabled: boolean;
   auto_close_delay: number;
 }
 

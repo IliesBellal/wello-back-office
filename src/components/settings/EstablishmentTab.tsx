@@ -99,7 +99,9 @@ export const EstablishmentTab = () => {
           <div>
             <h4 className="text-sm font-semibold mb-3">Temps d'attente</h4>
             <SettingsSection
-              fields={establishmentTimingsFields}
+              fields={establishmentTimingsFields.filter(f => 
+                f.key !== 'auto_close_delay' || formData.timings.auto_close_enabled
+              )}
               values={formData.timings}
               onChange={(key, value) => handleFieldChange('timings', key, value)}
             />

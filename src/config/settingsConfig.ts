@@ -22,6 +22,7 @@ export const establishmentInfoFields: FieldConfig[] = [
 export const establishmentTimingsFields: FieldConfig[] = [
   { key: 'wait_time_min', label: 'Temps d\'attente minimum (min)', type: 'number', group: 'timings', min: 0, max: 120 },
   { key: 'wait_time_max', label: 'Temps d\'attente maximum (min)', type: 'number', group: 'timings', min: 0, max: 120 },
+  { key: 'auto_close_enabled', label: 'Fermeture automatique', type: 'switch', group: 'timings' },
   { key: 'auto_close_delay', label: 'Délai de fermeture auto (min)', type: 'number', group: 'timings', min: 0, max: 60 },
 ];
 
