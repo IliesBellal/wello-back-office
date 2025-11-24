@@ -6,7 +6,7 @@ const menuItems = [
   { title: 'Commandes', icon: ShoppingBag, path: '/commandes' },
   { title: 'Menu', icon: MenuIcon, path: '/menu' },
   { title: 'Clients', icon: Users, path: '/clients' },
-  { title: 'Paramètres', icon: Settings, path: '/parametres' },
+  { title: 'Paramètres', icon: Settings, path: '/settings' },
 ];
 
 export const Sidebar = () => {
