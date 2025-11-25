@@ -1,5 +1,5 @@
 import { config } from "@/config";
-import { TvaRateGroup, MenuData } from "@/types/menu";
+import { TvaRateGroup, MenuData, UnitOfMeasure, Component, Attribute } from "@/types/menu";
 
 const mockTvaRates: TvaRateGroup[] = [
   { 
@@ -24,6 +24,46 @@ const mockTvaRates: TvaRateGroup[] = [
     rates: [
       { id: 20, value: 20, label: "TVA 20%" }
     ] 
+  }
+];
+
+const mockUnitsOfMeasure: UnitOfMeasure[] = [
+  { id: 10, name: "Grammes (g)", compatible_with: ["10", "11", "12"] },
+  { id: 11, name: "Kilogrammes (kg)", compatible_with: ["10", "11", "12"] },
+  { id: 12, name: "Milligrammes (mg)", compatible_with: ["10", "11", "12"] },
+  { id: 20, name: "Litres (L)", compatible_with: ["20", "21"] },
+  { id: 21, name: "Centilitres (cL)", compatible_with: ["20", "21"] }
+];
+
+const mockComponents: Component[] = [
+  { id: "c1", name: "Farine", unit_id: 10, price_per_unit: 0.05 },
+  { id: "c2", name: "Sauce Tomate", unit_id: 20, price_per_unit: 2.00 },
+  { id: "c3", name: "Mozzarella", unit_id: 10, price_per_unit: 0.10 }
+];
+
+const mockAttributes: Attribute[] = [
+  { 
+    id: "attr_1", 
+    title: "Taille Pizza", 
+    type: "CHECK", 
+    min: 1, 
+    max: 1,
+    options: [
+      { id: "opt_1", title: "Junior", price: 0 },
+      { id: "opt_2", title: "Senior", price: 200 },
+      { id: "opt_3", title: "Mega", price: 500 }
+    ]
+  },
+  { 
+    id: "attr_2", 
+    title: "Suppléments", 
+    type: "CHECK", 
+    min: 0, 
+    max: 5,
+    options: [
+      { id: "opt_4", title: "Olive", price: 50 },
+      { id: "opt_5", title: "Oeuf", price: 100 }
+    ]
   }
 ];
 
@@ -122,6 +162,58 @@ export const menuService = {
       return;
     }
     await fetch(`${config.apiBaseUrl}/menu/products/${productId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getUnitsOfMeasure(): Promise<UnitOfMeasure[]> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return mockUnitsOfMeasure;
+    }
+    const response = await fetch(`${config.apiBaseUrl}/establishment/units_of_measures`);
+    return response.json();
+  },
+
+  async getComponents(): Promise<Component[]> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return mockComponents;
+    }
+    const response = await fetch(`${config.apiBaseUrl}/menu/components`);
+    return response.json();
+  },
+
+  async getAttributes(): Promise<Attribute[]> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return mockAttributes;
+    }
+    const response = await fetch(`${config.apiBaseUrl}/menu/attributes`);
+    return response.json();
+  },
+
+  async createAttribute(data: Partial<Attribute>): Promise<Attribute> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { ...data, id: `attr_${Date.now()}` } as Attribute;
+    }
+    const response = await fetch(`${config.apiBaseUrl}/menu/attributes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  },
+
+  async updateAttribute(attributeId: string, data: Partial<Attribute>): Promise<void> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return;
+    }
+    await fetch(`${config.apiBaseUrl}/menu/attributes/${attributeId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)

@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Product, TvaRateGroup } from '@/types/menu';
+import { Product, TvaRateGroup, UnitOfMeasure, Component, Attribute, ProductAttribute, ProductComposition } from '@/types/menu';
+import { ProductOptionsTab } from './ProductOptionsTab';
+import { ProductCompositionTab } from './ProductCompositionTab';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,9 @@ interface ProductEditModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tvaRates: TvaRateGroup[];
+  units: UnitOfMeasure[];
+  components: Component[];
+  attributes: Attribute[];
   onSave: (productId: string, data: Partial<Product>) => void;
 }
 
@@ -28,6 +33,9 @@ export const ProductEditModal = ({
   open,
   onOpenChange,
   tvaRates,
+  units,
+  components,
+  attributes,
   onSave
 }: ProductEditModalProps) => {
   const [formData, setFormData] = useState<Partial<Product>>({});
@@ -102,10 +110,12 @@ export const ProductEditModal = ({
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="pricing">Tarifs & TVA</TabsTrigger>
             <TabsTrigger value="availability">Disponibilité</TabsTrigger>
+            <TabsTrigger value="composition">Composition</TabsTrigger>
+            <TabsTrigger value="options">Options</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -366,6 +376,23 @@ export const ProductEditModal = ({
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="composition" className="space-y-4">
+            <ProductCompositionTab
+              composition={formData.composition || []}
+              components={components}
+              units={units}
+              onChange={(composition) => setFormData({ ...formData, composition })}
+            />
+          </TabsContent>
+
+          <TabsContent value="options" className="space-y-4">
+            <ProductOptionsTab
+              productAttributes={formData.attributes || []}
+              availableAttributes={attributes}
+              onChange={(attributes) => setFormData({ ...formData, attributes })}
+            />
           </TabsContent>
         </Tabs>
 
