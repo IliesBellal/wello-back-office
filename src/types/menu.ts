@@ -16,6 +16,48 @@ export interface SubProduct {
   price: number;
 }
 
+export interface UnitOfMeasure {
+  id: number;
+  name: string;
+  compatible_with: string[];
+}
+
+export interface Component {
+  id: string;
+  name: string;
+  unit_id: number;
+  price_per_unit: number;
+}
+
+export interface AttributeOption {
+  id: string;
+  title: string;
+  price: number;
+}
+
+export interface Attribute {
+  id: string;
+  title: string;
+  type: 'CHECK';
+  min: number;
+  max: number;
+  options: AttributeOption[];
+}
+
+export interface ProductComposition {
+  component_id: string;
+  quantity: number;
+  unit_id: number;
+}
+
+export interface ProductAttribute {
+  attribute_id: string;
+  options?: {
+    option_id: string;
+    price_override?: number;
+  }[];
+}
+
 export interface Product {
   id: string;
   category_id: string;
@@ -49,6 +91,8 @@ export interface Product {
     };
   };
   sub_products?: SubProduct[];
+  composition?: ProductComposition[];
+  attributes?: ProductAttribute[];
 }
 
 export interface Category {

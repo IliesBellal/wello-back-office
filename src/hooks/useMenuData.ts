@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { TvaRateGroup, MenuData, Product } from '@/types/menu';
+import { TvaRateGroup, MenuData, Product, UnitOfMeasure, Component, Attribute } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
   const [tvaRates, setTvaRates] = useState<TvaRateGroup[]>([]);
   const [menuData, setMenuData] = useState<MenuData>({ categories: [], products: [] });
+  const [units, setUnits] = useState<UnitOfMeasure[]>([]);
+  const [components, setComponents] = useState<Component[]>([]);
+  const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -16,12 +19,18 @@ export const useMenuData = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [rates, menu] = await Promise.all([
+      const [rates, menu, unitsData, componentsData, attributesData] = await Promise.all([
         menuService.getTvaRates(),
-        menuService.getMenuData()
+        menuService.getMenuData(),
+        menuService.getUnitsOfMeasure(),
+        menuService.getComponents(),
+        menuService.getAttributes()
       ]);
       setTvaRates(rates);
       setMenuData(menu);
+      setUnits(unitsData);
+      setComponents(componentsData);
+      setAttributes(attributesData);
     } catch (error) {
       toast({
         title: "Erreur",
@@ -68,11 +77,51 @@ export const useMenuData = () => {
     }
   };
 
+  const createAttribute = async (data: Partial<Attribute>) => {
+    try {
+      const newAttribute = await menuService.createAttribute(data);
+      setAttributes(prev => [...prev, newAttribute]);
+      toast({
+        title: "Succès",
+        description: "Attribut créé avec succès"
+      });
+      return newAttribute;
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer l'attribut",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateAttributeData = async (attributeId: string, data: Partial<Attribute>) => {
+    try {
+      await menuService.updateAttribute(attributeId, data);
+      setAttributes(prev => prev.map(a => a.id === attributeId ? { ...a, ...data } : a));
+      toast({
+        title: "Succès",
+        description: "Attribut mis à jour avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour l'attribut",
+        variant: "destructive"
+      });
+    }
+  };
+
   return {
     tvaRates,
     menuData,
+    units,
+    components,
+    attributes,
     loading,
     updateProductOrder,
-    updateProduct
+    updateProduct,
+    createAttribute,
+    updateAttributeData
   };
 };
