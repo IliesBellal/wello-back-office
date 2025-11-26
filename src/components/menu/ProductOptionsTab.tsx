@@ -15,12 +15,14 @@ interface ProductOptionsTabProps {
   productAttributes: ProductAttribute[];
   availableAttributes: Attribute[];
   onChange: (attributes: ProductAttribute[]) => void;
+  disabled?: boolean;
 }
 
 export const ProductOptionsTab = ({
   productAttributes,
   availableAttributes,
-  onChange
+  onChange,
+  disabled = false
 }: ProductOptionsTabProps) => {
   const [selectedAttributeId, setSelectedAttributeId] = useState<string>('');
 
@@ -49,7 +51,7 @@ export const ProductOptionsTab = ({
   return (
     <div className="space-y-4">
       <div className="flex gap-2">
-        <Select value={selectedAttributeId} onValueChange={setSelectedAttributeId}>
+        <Select value={selectedAttributeId} onValueChange={setSelectedAttributeId} disabled={disabled}>
           <SelectTrigger className="flex-1">
             <SelectValue placeholder="Sélectionner un groupe d'options" />
           </SelectTrigger>
@@ -65,7 +67,7 @@ export const ProductOptionsTab = ({
         </Select>
         <Button
           onClick={handleAddAttribute}
-          disabled={!selectedAttributeId}
+          disabled={disabled || !selectedAttributeId}
           className="bg-gradient-primary"
         >
           <Plus className="w-4 h-4 mr-2" />
@@ -93,6 +95,7 @@ export const ProductOptionsTab = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => handleRemoveAttribute(productAttr.attribute_id)}
+                    disabled={disabled}
                   >
                     <Trash2 className="w-4 h-4 text-destructive" />
                   </Button>

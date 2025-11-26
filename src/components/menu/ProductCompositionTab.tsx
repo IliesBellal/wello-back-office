@@ -25,13 +25,15 @@ interface ProductCompositionTabProps {
   components: Component[];
   units: UnitOfMeasure[];
   onChange: (composition: ProductComposition[]) => void;
+  disabled?: boolean;
 }
 
 export const ProductCompositionTab = ({
   composition,
   components,
   units,
-  onChange
+  onChange,
+  disabled = false
 }: ProductCompositionTabProps) => {
   const [newItem, setNewItem] = useState<Partial<ProductComposition>>({
     component_id: '',
@@ -101,6 +103,7 @@ export const ProductCompositionTab = ({
               <Select
                 value={newItem.component_id}
                 onValueChange={handleComponentChange}
+                disabled={disabled}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Sélectionner..." />
@@ -125,6 +128,7 @@ export const ProductCompositionTab = ({
                 value={newItem.quantity || ''}
                 onChange={(e) => setNewItem({ ...newItem, quantity: parseFloat(e.target.value) || 0 })}
                 placeholder="0"
+                disabled={disabled}
               />
             </div>
 
@@ -133,7 +137,7 @@ export const ProductCompositionTab = ({
               <Select
                 value={newItem.unit_id?.toString()}
                 onValueChange={(value) => setNewItem({ ...newItem, unit_id: parseInt(value) })}
-                disabled={!newItem.component_id}
+                disabled={disabled || !newItem.component_id}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Unité" />
@@ -150,7 +154,7 @@ export const ProductCompositionTab = ({
 
             <Button
               onClick={handleAddItem}
-              disabled={!newItem.component_id || !newItem.quantity || !newItem.unit_id}
+              disabled={disabled || !newItem.component_id || !newItem.quantity || !newItem.unit_id}
               className="bg-gradient-primary"
             >
               <Plus className="w-4 h-4" />
@@ -195,6 +199,7 @@ export const ProductCompositionTab = ({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveItem(item.component_id)}
+                      disabled={disabled}
                     >
                       <Trash2 className="w-4 h-4 text-destructive" />
                     </Button>
