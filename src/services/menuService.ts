@@ -218,5 +218,41 @@ export const menuService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+  },
+
+  async updateProductOrder(productIds: string[]): Promise<void> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return;
+    }
+    await fetch(`${config.apiBaseUrl}/menu/products/order`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ products: productIds.map(id => ({ product_id: id })) })
+    });
+  },
+
+  async updateCategoryOrder(categoryIds: string[]): Promise<void> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return;
+    }
+    await fetch(`${config.apiBaseUrl}/menu/categories/order`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categories: categoryIds.map(id => ({ category_id: id })) })
+    });
+  },
+
+  async updateExternalMenu(platform: 'uber_eats' | 'deliveroo'): Promise<void> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return;
+    }
+    await fetch(`${config.apiBaseUrl}/menu/${platform}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
   }
 };

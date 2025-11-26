@@ -42,17 +42,35 @@ export const useMenuData = () => {
     }
   };
 
-  const updateProductOrder = (categoryId: string, productIds: string[]) => {
-    setMenuData(prev => ({
-      ...prev,
-      products: prev.products.map(p => {
-        if (p.category_id === categoryId) {
-          const newOrder = productIds.indexOf(p.id);
-          return newOrder >= 0 ? { ...p, order: newOrder } : p;
-        }
-        return p;
-      })
-    }));
+  const saveOrder = async (categoryOrder: string[], productOrder: string[]) => {
+    try {
+      await Promise.all([
+        menuService.updateCategoryOrder(categoryOrder),
+        menuService.updateProductOrder(productOrder)
+      ]);
+      
+      setMenuData(prev => ({
+        categories: prev.categories.map(c => ({
+          ...c,
+          order: categoryOrder.indexOf(c.id)
+        })),
+        products: prev.products.map(p => ({
+          ...p,
+          order: productOrder.indexOf(p.id)
+        }))
+      }));
+
+      toast({
+        title: "Succès",
+        description: "Ordre sauvegardé avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de sauvegarder l'ordre",
+        variant: "destructive"
+      });
+    }
   };
 
   const updateProduct = async (productId: string, data: Partial<Product>) => {
@@ -119,9 +137,9 @@ export const useMenuData = () => {
     components,
     attributes,
     loading,
-    updateProductOrder,
     updateProduct,
     createAttribute,
-    updateAttributeData
+    updateAttributeData,
+    saveOrder
   };
 };
