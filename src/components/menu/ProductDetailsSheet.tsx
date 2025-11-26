@@ -7,6 +7,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -257,6 +258,114 @@ export const ProductDetailsSheet = ({
                       />
                     </div>
                   </div>
+                </div>
+
+                <div className="space-y-4 mt-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <div className="w-8 h-8 bg-black rounded flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">UE</span>
+                        </div>
+                        Uber Eats
+                      </CardTitle>
+                      <CardDescription>
+                        Configuration du prix pour Uber Eats
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Activer sur Uber Eats</Label>
+                        <Switch
+                          checked={formData.integrations?.uber_eats?.enabled || false}
+                          onCheckedChange={(checked) => setFormData({
+                            ...formData,
+                            integrations: {
+                              ...formData.integrations,
+                              uber_eats: {
+                                ...formData.integrations?.uber_eats,
+                                enabled: checked,
+                                id: formData.integrations?.uber_eats?.id || ''
+                              }
+                            }
+                          })}
+                        />
+                      </div>
+                      {formData.integrations?.uber_eats?.enabled && (
+                        <div>
+                          <Label>Prix Uber Eats (€)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={((formData.integrations?.uber_eats?.price_override || formData.price || 0) / 100).toFixed(2)}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              integrations: {
+                                ...formData.integrations,
+                                uber_eats: {
+                                  ...formData.integrations?.uber_eats!,
+                                  price_override: Math.round(parseFloat(e.target.value) * 100)
+                                }
+                              }
+                            })}
+                          />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <div className="w-8 h-8 bg-[#00CCBC] rounded flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">D</span>
+                        </div>
+                        Deliveroo
+                      </CardTitle>
+                      <CardDescription>
+                        Configuration du prix pour Deliveroo
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Activer sur Deliveroo</Label>
+                        <Switch
+                          checked={formData.integrations?.deliveroo?.enabled || false}
+                          onCheckedChange={(checked) => setFormData({
+                            ...formData,
+                            integrations: {
+                              ...formData.integrations,
+                              deliveroo: {
+                                ...formData.integrations?.deliveroo,
+                                enabled: checked,
+                                id: formData.integrations?.deliveroo?.id || ''
+                              }
+                            }
+                          })}
+                        />
+                      </div>
+                      {formData.integrations?.deliveroo?.enabled && (
+                        <div>
+                          <Label>Prix Deliveroo (€)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={((formData.integrations?.deliveroo?.price_override || formData.price || 0) / 100).toFixed(2)}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              integrations: {
+                                ...formData.integrations,
+                                deliveroo: {
+                                  ...formData.integrations?.deliveroo!,
+                                  price_override: Math.round(parseFloat(e.target.value) * 100)
+                                }
+                              }
+                            })}
+                          />
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
             )}

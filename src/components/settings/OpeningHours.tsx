@@ -1,7 +1,24 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Clock, Trash2, Plus } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const initialHours = [
@@ -14,8 +31,12 @@ const initialHours = [
   { id: 7, day: "Dimanche", hours: "Fermé" },
 ];
 
+const daysOfWeek = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+
 export const OpeningHours = () => {
   const [hours, setHours] = useState(initialHours);
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newHour, setNewHour] = useState({ day: "", startTime: "", endTime: "" });
 
   const handleDelete = (id: number) => {
     setHours(hours.filter(h => h.id !== id));
@@ -23,6 +44,32 @@ export const OpeningHours = () => {
       title: "Horaire supprimé",
       description: "L'horaire a été supprimé avec succès"
     });
+  };
+
+  const handleAddHour = () => {
+    if (!newHour.day || !newHour.startTime || !newHour.endTime) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez remplir tous les champs",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newId = Math.max(...hours.map(h => h.id), 0) + 1;
+    setHours([...hours, {
+      id: newId,
+      day: newHour.day,
+      hours: `${newHour.startTime} - ${newHour.endTime}`
+    }]);
+
+    toast({
+      title: "Horaire ajouté",
+      description: "L'horaire a été ajouté avec succès"
+    });
+
+    setNewHour({ day: "", startTime: "", endTime: "" });
+    setShowAddDialog(false);
   };
 
   return (
@@ -57,11 +104,68 @@ export const OpeningHours = () => {
               </div>
             </div>
           ))}
-          <Button variant="outline" className="w-full mt-4">
-            Modifier les horaires
+          <Button 
+            variant="outline" 
+            className="w-full mt-4"
+            onClick={() => setShowAddDialog(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter un horaire
           </Button>
         </div>
       </CardContent>
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Ajouter un horaire</DialogTitle>
+            <DialogDescription>
+              Définissez un nouvel horaire d'ouverture
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Jour</Label>
+              <Select value={newHour.day} onValueChange={(value) => setNewHour({ ...newHour, day: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Sélectionner un jour" />
+                </SelectTrigger>
+                <SelectContent>
+                  {daysOfWeek.map((day) => (
+                    <SelectItem key={day} value={day}>{day}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Heure de début</Label>
+                <Input
+                  type="time"
+                  value={newHour.startTime}
+                  onChange={(e) => setNewHour({ ...newHour, startTime: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Heure de fin</Label>
+                <Input
+                  type="time"
+                  value={newHour.endTime}
+                  onChange={(e) => setNewHour({ ...newHour, endTime: e.target.value })}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Annuler
+            </Button>
+            <Button onClick={handleAddHour}>
+              Ajouter
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 };
