@@ -8,6 +8,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { ChevronDown, LogOut, Building2 } from 'lucide-react';
 import { authService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +27,7 @@ export const Header = () => {
   const { authData, setAuthData, logout } = useAuth();
   const { toast } = useToast();
   const [isSwitching, setIsSwitching] = useState(false);
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   const handleMerchantSwitch = async (token: string, businessName: string) => {
     setIsSwitching(true);
@@ -88,13 +99,28 @@ export const Header = () => {
         <Button
           variant="outline"
           size="icon"
-          onClick={logout}
+          onClick={() => setShowLogoutDialog(true)}
           className="h-10 w-10 rounded-xl"
           title="Déconnexion"
         >
           <LogOut className="w-4 h-4" />
         </Button>
       </div>
+
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la déconnexion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir vous déconnecter ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={logout}>Se déconnecter</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </header>
   );
 };
