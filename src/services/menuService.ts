@@ -254,5 +254,58 @@ export const menuService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({})
     });
+  },
+
+  async createCategory(name: string): Promise<any> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { id: `cat_${Date.now()}`, name, order: 99 };
+    }
+    const response = await fetch(`${config.apiBaseUrl}/menu/categories`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name })
+    });
+    return response.json();
+  },
+
+  async createProduct(data: any): Promise<any> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { 
+        id: `p_${Date.now()}`, 
+        ...data,
+        order: 999,
+        integrations: {
+          uber_eats: { enabled: false },
+          deliveroo: { enabled: false }
+        }
+      };
+    }
+    const response = await fetch(`${config.apiBaseUrl}/menu/products`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return response.json();
+  },
+
+  async createComponent(data: any): Promise<any> {
+    if (config.useMockData) {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return { 
+        id: `comp_${Date.now()}`, 
+        name: data.name,
+        unit_id: data.unit_id,
+        price_per_unit: data.price / 100, // Convert back from cents for display
+        category_id: data.category_id
+      };
+    }
+    const response = await fetch(`${config.apiBaseUrl}/menu/components`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return response.json();
   }
 };
