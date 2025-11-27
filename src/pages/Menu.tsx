@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Settings, Folder, Globe, Grid3x3 } from 'lucide-react';
+import { Settings, Folder, Globe, Grid3x3, Plus } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { ProductCard } from '@/components/menu/ProductCard';
 import { ProductDetailsSheet } from '@/components/menu/ProductDetailsSheet';
@@ -9,6 +9,7 @@ import { CategoryManagementSheet } from '@/components/menu/CategoryManagementShe
 import { AttributesManager } from '@/components/menu/AttributesManager';
 import { OrganizeModal } from '@/components/menu/OrganizeModal';
 import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
+import { ProductCreateSheet } from '@/components/menu/ProductCreateSheet';
 import { Product } from '@/types/menu';
 
 export default function Menu() {
@@ -22,7 +23,9 @@ export default function Menu() {
     updateProduct,
     createAttribute,
     updateAttributeData,
-    saveOrder
+    saveOrder,
+    createCategory,
+    createProduct
   } = useMenuData();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -30,6 +33,7 @@ export default function Menu() {
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [organizeModalOpen, setOrganizeModalOpen] = useState(false);
   const [externalMenusOpen, setExternalMenusOpen] = useState(false);
+  const [productCreateOpen, setProductCreateOpen] = useState(false);
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
@@ -54,6 +58,10 @@ export default function Menu() {
             Menu de l'établissement
           </h1>
           <div className="flex gap-2">
+            <Button className="bg-gradient-primary" onClick={() => setProductCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nouveau Produit
+            </Button>
             <Button variant="outline" onClick={() => setCategoryManagerOpen(true)}>
               <Folder className="w-4 h-4 mr-2" />
               Catégories
@@ -66,7 +74,7 @@ export default function Menu() {
               <Globe className="w-4 h-4 mr-2" />
               Menus Externes
             </Button>
-            <Button className="bg-gradient-primary" onClick={() => setOrganizeModalOpen(true)}>
+            <Button variant="outline" onClick={() => setOrganizeModalOpen(true)}>
               <Grid3x3 className="w-4 h-4 mr-2" />
               Organiser (Mode Tablette)
             </Button>
@@ -131,6 +139,15 @@ export default function Menu() {
         <ExternalMenusSheet
           open={externalMenusOpen}
           onOpenChange={setExternalMenusOpen}
+        />
+
+        <ProductCreateSheet
+          open={productCreateOpen}
+          onOpenChange={setProductCreateOpen}
+          categories={menuData.categories}
+          tvaRates={tvaRates}
+          onCreateProduct={createProduct}
+          onCreateCategory={createCategory}
         />
       </div>
     </DashboardLayout>

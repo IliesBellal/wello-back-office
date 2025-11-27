@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import Menu from "./pages/Menu";
+import Components from "./pages/Components";
 import FinancialReports from "./pages/FinancialReports";
 import NotFound from "./pages/NotFound";
 
@@ -24,6 +25,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Index />} />
             <Route path="/menu" element={<Menu />} />
+            <Route path="/menu/components" element={<Components />} />
             <Route path="/reports/financial" element={<FinancialReports />} />
             <Route path="/settings/:section" element={<Settings />} />
             <Route path="/settings" element={<Settings />} />

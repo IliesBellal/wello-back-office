@@ -130,6 +130,64 @@ export const useMenuData = () => {
     }
   };
 
+  const createCategory = async (name: string) => {
+    try {
+      const newCategory = await menuService.createCategory(name);
+      setMenuData(prev => ({
+        ...prev,
+        categories: [...prev.categories, newCategory]
+      }));
+      toast({
+        title: "Succès",
+        description: "Catégorie créée avec succès"
+      });
+      return newCategory;
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la catégorie",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const createProduct = async (data: any) => {
+    try {
+      const newProduct = await menuService.createProduct(data);
+      setMenuData(prev => ({
+        ...prev,
+        products: [...prev.products, newProduct]
+      }));
+      toast({
+        title: "Succès",
+        description: "Produit créé avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer le produit",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const createComponent = async (data: any) => {
+    try {
+      const newComponent = await menuService.createComponent(data);
+      setComponents(prev => [...prev, newComponent]);
+      toast({
+        title: "Succès",
+        description: "Composant créé avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer le composant",
+        variant: "destructive"
+      });
+    }
+  };
+
   return {
     tvaRates,
     menuData,
@@ -140,6 +198,9 @@ export const useMenuData = () => {
     updateProduct,
     createAttribute,
     updateAttributeData,
-    saveOrder
+    saveOrder,
+    createCategory,
+    createProduct,
+    createComponent
   };
 };

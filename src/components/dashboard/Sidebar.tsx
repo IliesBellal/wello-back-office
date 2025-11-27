@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { NavLink } from '@/components/NavLink';
-import { Home, ShoppingBag, Menu as MenuIcon, Users, Settings, Store, User, ChevronDown, FileText } from 'lucide-react';
+import { Home, ShoppingBag, Menu as MenuIcon, Users, Settings, Store, User, ChevronDown, FileText, Package } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const menuItems = [
   { title: 'Dashboard', icon: Home, path: '/' },
   { title: 'Commandes', icon: ShoppingBag, path: '/commandes' },
   { title: 'Menu', icon: MenuIcon, path: '/menu' },
+  { title: 'Composants', icon: Package, path: '/menu/components' },
   { title: 'Clients', icon: Users, path: '/clients' },
   { title: 'Rapports & Comptabilité', icon: FileText, path: '/reports/financial' },
 ];
