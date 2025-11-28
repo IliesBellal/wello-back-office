@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Settings, Folder, Globe, Grid3x3, Plus } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { ProductCard } from '@/components/menu/ProductCard';
-import { ProductDetailsSheet } from '@/components/menu/ProductDetailsSheet';
+import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
+import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
 import { CategoryManagementSheet } from '@/components/menu/CategoryManagementSheet';
 import { AttributesManager } from '@/components/menu/AttributesManager';
 import { OrganizeModal } from '@/components/menu/OrganizeModal';
@@ -103,15 +104,26 @@ export default function Menu() {
             ))}
         </div>
 
-        <ProductDetailsSheet
-          product={selectedProduct}
-          open={sheetOpen}
+        <SimpleProductSheet
+          product={selectedProduct && !selectedProduct.is_group ? selectedProduct : null}
+          open={sheetOpen && selectedProduct !== null && !selectedProduct.is_group}
           onOpenChange={setSheetOpen}
           tvaRates={tvaRates}
           units={units}
           components={components}
           attributes={attributes}
+          categories={menuData.categories}
           onSave={updateProduct}
+          onCreateCategory={createCategory}
+        />
+
+        <GroupProductSheet
+          product={selectedProduct && selectedProduct.is_group ? selectedProduct : null}
+          open={sheetOpen && selectedProduct !== null && selectedProduct.is_group}
+          onOpenChange={setSheetOpen}
+          categories={menuData.categories}
+          onSave={updateProduct}
+          onCreateCategory={createCategory}
         />
 
         <CategoryManagementSheet
