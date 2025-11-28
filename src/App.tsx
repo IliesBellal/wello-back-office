@@ -10,6 +10,7 @@ import Settings from "./pages/Settings";
 import Menu from "./pages/Menu";
 import Components from "./pages/Components";
 import FinancialReports from "./pages/FinancialReports";
+import Orders from "./pages/Orders";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<Index />} />
+            <Route path="/orders" element={<Orders />} />
             <Route path="/menu" element={<Menu />} />
             <Route path="/menu/components" element={<Components />} />
             <Route path="/reports/financial" element={<FinancialReports />} />

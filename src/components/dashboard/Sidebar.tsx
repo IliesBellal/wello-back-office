@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 const menuItems = [
   { title: 'Dashboard', icon: Home, path: '/' },
-  { title: 'Commandes', icon: ShoppingBag, path: '/commandes' },
+  { title: 'Commandes', icon: ShoppingBag, path: '/orders' },
   { title: 'Menu', icon: MenuIcon, path: '/menu' },
   { title: 'Composants', icon: Package, path: '/menu/components' },
   { title: 'Clients', icon: Users, path: '/clients' },
