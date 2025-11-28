@@ -1,6 +1,14 @@
 import { config } from "@/config";
 import { TvaRateGroup, MenuData, UnitOfMeasure, Component, Attribute } from "@/types/menu";
 
+// API Logger
+const logAPI = (method: string, url: string, payload?: any) => {
+  console.log(`[API] ${method} ${url}`);
+  if (payload) {
+    console.log('Payload:', payload);
+  }
+};
+
 const mockTvaRates: TvaRateGroup[] = [
   { 
     id: 1, 
@@ -139,6 +147,7 @@ const mockMenuData: MenuData = {
 
 export const menuService = {
   async getTvaRates(): Promise<TvaRateGroup[]> {
+    logAPI('GET', '/establishment/tva_rates');
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return mockTvaRates;
@@ -148,6 +157,7 @@ export const menuService = {
   },
 
   async getMenuData(): Promise<MenuData> {
+    logAPI('GET', '/menu');
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return mockMenuData;
@@ -157,6 +167,7 @@ export const menuService = {
   },
 
   async updateProduct(productId: string, data: Partial<any>): Promise<void> {
+    logAPI('PATCH', `/menu/products/${productId}`, data);
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return;
@@ -169,6 +180,7 @@ export const menuService = {
   },
 
   async getUnitsOfMeasure(): Promise<UnitOfMeasure[]> {
+    logAPI('GET', '/establishment/units_of_measures');
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return mockUnitsOfMeasure;
@@ -178,6 +190,7 @@ export const menuService = {
   },
 
   async getComponents(): Promise<Component[]> {
+    logAPI('GET', '/menu/components');
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return mockComponents;
@@ -187,6 +200,7 @@ export const menuService = {
   },
 
   async getAttributes(): Promise<Attribute[]> {
+    logAPI('GET', '/menu/attributes');
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return mockAttributes;
@@ -196,6 +210,7 @@ export const menuService = {
   },
 
   async createAttribute(data: Partial<Attribute>): Promise<Attribute> {
+    logAPI('POST', '/menu/attributes', data);
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return { ...data, id: `attr_${Date.now()}` } as Attribute;
@@ -209,6 +224,7 @@ export const menuService = {
   },
 
   async updateAttribute(attributeId: string, data: Partial<Attribute>): Promise<void> {
+    logAPI('PATCH', `/menu/attributes/${attributeId}`, data);
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return;
@@ -221,6 +237,8 @@ export const menuService = {
   },
 
   async updateProductOrder(productIds: string[]): Promise<void> {
+    const payload = { products: productIds.map(id => ({ product_id: id })) };
+    logAPI('PATCH', '/menu/products/order', payload);
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return;
@@ -228,11 +246,13 @@ export const menuService = {
     await fetch(`${config.apiBaseUrl}/menu/products/order`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ products: productIds.map(id => ({ product_id: id })) })
+      body: JSON.stringify(payload)
     });
   },
 
   async updateCategoryOrder(categoryIds: string[]): Promise<void> {
+    const payload = { categories: categoryIds.map(id => ({ category_id: id })) };
+    logAPI('PATCH', '/menu/categories/order', payload);
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return;
@@ -240,11 +260,12 @@ export const menuService = {
     await fetch(`${config.apiBaseUrl}/menu/categories/order`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ categories: categoryIds.map(id => ({ category_id: id })) })
+      body: JSON.stringify(payload)
     });
   },
 
   async updateExternalMenu(platform: 'uber_eats' | 'deliveroo'): Promise<void> {
+    logAPI('PATCH', `/menu/${platform}`, {});
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return;
@@ -257,6 +278,7 @@ export const menuService = {
   },
 
   async createCategory(name: string): Promise<any> {
+    logAPI('POST', '/menu/categories', { name });
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return { id: `cat_${Date.now()}`, name, order: 99 };
@@ -270,6 +292,7 @@ export const menuService = {
   },
 
   async createProduct(data: any): Promise<any> {
+    logAPI('POST', '/menu/products', data);
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return { 
@@ -291,6 +314,7 @@ export const menuService = {
   },
 
   async createComponent(data: any): Promise<any> {
+    logAPI('POST', '/menu/components', data);
     if (config.useMockData) {
       await new Promise(resolve => setTimeout(resolve, 500));
       return { 

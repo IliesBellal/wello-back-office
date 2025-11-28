@@ -44,10 +44,6 @@ export default function Components() {
     ? componentsByCategory.get(selectedCategoryId) || []
     : components;
 
-  const getUnitName = (unitId: number) => {
-    return units.find(u => u.id === unitId)?.name || 'N/A';
-  };
-
   if (loading) {
     return (
       <DashboardLayout>
@@ -126,9 +122,8 @@ export default function Components() {
                   <h3 className="font-semibold text-foreground mb-2">
                     {component.name}
                   </h3>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <p>Unité: {getUnitName(component.unit_id)}</p>
-                    <p className="font-medium text-foreground">
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium text-primary">
                       {component.price_per_unit 
                         ? `+${(component.price_per_unit).toFixed(2)} €`
                         : 'Gratuit'}
