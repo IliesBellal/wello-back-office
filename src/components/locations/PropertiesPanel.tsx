@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Card } from '@/components/ui/card';
 import { Trash2, X } from 'lucide-react';
 import type { Location } from '@/services/locationsService';
 import {
@@ -45,15 +46,15 @@ export function PropertiesPanel({
 
   return (
     <>
-      <div className="w-80 border-l border-border bg-sidebar flex flex-col">
+      <Card className="absolute top-6 right-6 w-80 shadow-xl z-50 bg-card border-border">
         <div className="p-4 border-b border-border flex items-center justify-between">
-          <h2 className="font-semibold text-sidebar-foreground">Propriétés</h2>
+          <h2 className="font-semibold text-foreground">Propriétés</h2>
           <Button size="sm" variant="ghost" onClick={onClose}>
             <X className="w-4 h-4" />
           </Button>
         </div>
 
-        <div className="flex-1 p-4 space-y-6 overflow-auto">
+        <div className="p-4 space-y-6 max-h-[calc(100vh-200px)] overflow-auto">
           <div className="space-y-2">
             <Label>Nom de la table</Label>
             <Input
@@ -130,9 +131,7 @@ export function PropertiesPanel({
               onValueChange={([value]) => onUpdate({ angle: value })}
             />
           </div>
-        </div>
 
-        <div className="p-4 border-t border-border">
           <Button
             variant="destructive"
             className="w-full gap-2"
@@ -142,7 +141,7 @@ export function PropertiesPanel({
             Supprimer la table
           </Button>
         </div>
-      </div>
+      </Card>
 
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>

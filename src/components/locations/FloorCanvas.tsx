@@ -43,10 +43,10 @@ export function FloorCanvas({
   };
 
   return (
-    <div className="flex-1 p-6 bg-background overflow-auto">
+    <div className="flex-1 p-6 bg-background overflow-auto relative">
       <div
         ref={containerRef}
-        className="relative w-full h-full bg-muted/20 rounded-lg border border-border"
+        className="w-full h-full bg-muted/20 rounded-lg border border-border"
         style={{
           backgroundImage: `
             linear-gradient(to right, hsl(var(--border)) 1px, transparent 1px),
