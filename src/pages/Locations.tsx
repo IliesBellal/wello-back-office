@@ -100,24 +100,24 @@ export default function Locations() {
           </Button>
         </div>
 
-        <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex overflow-hidden relative">
           <FloorSidebar
             floors={floors}
-            locations={locations}
+            locations={filteredLocations}
             selectedFloorId={selectedFloorId}
+            selectedLocationId={selectedLocationId}
             onFloorSelect={setSelectedFloorId}
             onFloorsChange={setFloors}
             onLocationsChange={setLocations}
+            onLocationSelect={setSelectedLocationId}
           />
 
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <FloorCanvas
-              locations={filteredLocations}
-              selectedLocationId={selectedLocationId}
-              onLocationSelect={setSelectedLocationId}
-              onLocationUpdate={handleLocationUpdate}
-            />
-          </div>
+          <FloorCanvas
+            locations={filteredLocations}
+            selectedLocationId={selectedLocationId}
+            onLocationSelect={setSelectedLocationId}
+            onLocationUpdate={handleLocationUpdate}
+          />
 
           {selectedLocation && (
             <PropertiesPanel

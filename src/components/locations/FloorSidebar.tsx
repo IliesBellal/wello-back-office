@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { createFloor, updateFloor, deleteFloor, createLocation, type Floor, type Location } from '@/services/locationsService';
+import { createFloor, updateFloor, deleteFloor, createLocation, deleteLocation, type Floor, type Location } from '@/services/locationsService';
 import {
   Dialog,
   DialogContent,
@@ -26,18 +26,22 @@ interface FloorSidebarProps {
   floors: Floor[];
   locations: Location[];
   selectedFloorId: string | null;
+  selectedLocationId: string | null;
   onFloorSelect: (floorId: string) => void;
   onFloorsChange: (floors: Floor[]) => void;
   onLocationsChange: (locations: Location[]) => void;
+  onLocationSelect: (locationId: string) => void;
 }
 
 export function FloorSidebar({
   floors,
   locations,
   selectedFloorId,
+  selectedLocationId,
   onFloorSelect,
   onFloorsChange,
   onLocationsChange,
+  onLocationSelect,
 }: FloorSidebarProps) {
   const [showFloorDialog, setShowFloorDialog] = useState(false);
   const [showTableDialog, setShowTableDialog] = useState(false);
@@ -182,7 +186,57 @@ export function FloorSidebar({
           </div>
         </div>
 
-        <div className="p-4">
+        <div className="flex-1 overflow-auto p-4 border-t border-border">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-sidebar-foreground">Tables</h3>
+          </div>
+          {selectedFloorId && locations.length > 0 ? (
+            <div className="space-y-1">
+              {locations.map(location => (
+                <div
+                  key={location.location_id}
+                  className={`flex items-center justify-between p-2 rounded-lg transition-colors ${
+                    selectedLocationId === location.location_id
+                      ? 'bg-primary/10 text-primary'
+                      : 'hover:bg-sidebar-accent text-sidebar-foreground'
+                  }`}
+                >
+                  <span className="text-sm">{location.location_name}</span>
+                  <div className="flex gap-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0"
+                      onClick={() => onLocationSelect(location.location_id)}
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 w-6 p-0 text-destructive"
+                      onClick={async () => {
+                        try {
+                          await deleteLocation(location.location_id);
+                          onLocationsChange(locations.filter(l => l.location_id !== location.location_id));
+                          toast.success('Table supprimée');
+                        } catch (error) {
+                          toast.error('Erreur lors de la suppression');
+                        }
+                      }}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Aucune table</p>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-border">
           <Button
             className="w-full gap-2"
             onClick={() => setShowTableDialog(true)}
@@ -192,24 +246,6 @@ export function FloorSidebar({
             Nouvelle Table
           </Button>
         </div>
-
-        {unassignedTables.length > 0 && (
-          <div className="p-4 border-t border-border">
-            <h3 className="text-sm font-semibold text-sidebar-foreground mb-2">
-              Tables non assignées
-            </h3>
-            <div className="space-y-1">
-              {unassignedTables.map(table => (
-                <div
-                  key={table.location_id}
-                  className="p-2 rounded-lg bg-sidebar-accent text-sidebar-foreground text-sm"
-                >
-                  {table.location_name} ({table.seats} places)
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <Dialog open={showFloorDialog} onOpenChange={setShowFloorDialog}>
