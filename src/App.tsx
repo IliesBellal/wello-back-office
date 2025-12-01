@@ -8,10 +8,11 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import Menu from "./pages/Menu";
-import Components from "./pages/Components";
-import FinancialReports from "./pages/FinancialReports";
-import Orders from "./pages/Orders";
-import NotFound from "./pages/NotFound";
+import Components from './pages/Components';
+import FinancialReports from './pages/FinancialReports';
+import Orders from './pages/Orders';
+import Locations from './pages/Locations';
+import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/menu" element={<Menu />} />
             <Route path="/menu/components" element={<Components />} />
             <Route path="/reports/financial" element={<FinancialReports />} />
+            <Route path="/locations" element={<Locations />} />
             <Route path="/settings/:section" element={<Settings />} />
             <Route path="/settings" element={<Settings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
