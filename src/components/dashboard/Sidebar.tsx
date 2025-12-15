@@ -11,7 +11,7 @@ const menuItems = [
   { title: 'Plan de Salle', icon: LayoutGrid, path: '/locations' },
   { title: 'Utilisateurs', icon: Users2, path: '/users' },
   { title: 'Registres de Caisse', icon: Calculator, path: '/cash-registers' },
-  { title: 'Clients', icon: Users, path: '/clients' },
+  { title: 'Clients', icon: Users, path: '/customers' },
   { title: 'Rapports & Comptabilité', icon: FileText, path: '/reports/financial' },
 ];
 
