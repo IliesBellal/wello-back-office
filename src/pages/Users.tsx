@@ -36,7 +36,7 @@ export default function Users() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold text-foreground">Utilisateurs</h1>
           <Button onClick={() => setCreateOpen(true)}>

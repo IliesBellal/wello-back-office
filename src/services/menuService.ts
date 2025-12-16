@@ -269,5 +269,13 @@ export const menuService = {
       } as Component),
       () => apiClient.post<Component>('/menu/components', data)
     );
+  },
+
+  async deleteComponent(componentId: string): Promise<void> {
+    logAPI('DELETE', `/menu/components/${componentId}`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/components/${componentId}`)
+    );
   }
 };

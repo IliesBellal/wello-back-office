@@ -98,7 +98,7 @@ const CashRegisters = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Registres de Caisse</h1>

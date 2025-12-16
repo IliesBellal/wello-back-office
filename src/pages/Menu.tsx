@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Settings, Folder, Globe, Grid3x3, Plus } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Folder, MoreVertical, Plus, Settings, Globe, Grid3x3 } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { ProductCard } from '@/components/menu/ProductCard';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
@@ -53,7 +54,7 @@ export default function Menu() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-3xl font-bold text-foreground">
             Menu de l'établissement
@@ -67,18 +68,27 @@ export default function Menu() {
               <Folder className="w-4 h-4 mr-2" />
               Catégories
             </Button>
-            <Button variant="outline" onClick={() => setAttributesManagerOpen(true)}>
-              <Settings className="w-4 h-4 mr-2" />
-              Gérer les Attributs
-            </Button>
-            <Button variant="outline" onClick={() => setExternalMenusOpen(true)}>
-              <Globe className="w-4 h-4 mr-2" />
-              Menus Externes
-            </Button>
-            <Button variant="outline" onClick={() => setOrganizeModalOpen(true)}>
-              <Grid3x3 className="w-4 h-4 mr-2" />
-              Organiser (Mode Tablette)
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-popover">
+                <DropdownMenuItem onClick={() => setAttributesManagerOpen(true)}>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Gérer les Attributs
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setExternalMenusOpen(true)}>
+                  <Globe className="w-4 h-4 mr-2" />
+                  Menus Externes
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setOrganizeModalOpen(true)}>
+                  <Grid3x3 className="w-4 h-4 mr-2" />
+                  Organiser (Mode Tablette)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
