@@ -1,5 +1,6 @@
-import { config } from '@/config';
+import { apiClient, withMock, logAPI, API_BASE_URL } from "@/services/apiClient";
 
+// ============= Types =============
 export interface VATData {
   tva_title: string | null;
   tva_delivery_type_label?: string;
@@ -37,8 +38,8 @@ export interface PaymentReportResponse {
   calendar: PaymentDayData[];
 }
 
-const mockVATData = (dateFrom: string, dateTo: string): VATReportResponse => {
-  // Generate mock data for the date range
+// ============= Mock Data =============
+const mockVATData = (): VATReportResponse => {
   return {
     status: "1",
     calendar: [
@@ -76,7 +77,7 @@ const mockVATData = (dateFrom: string, dateTo: string): VATReportResponse => {
   };
 };
 
-const mockPaymentData = (dateFrom: string, dateTo: string): PaymentReportResponse => {
+const mockPaymentData = (): PaymentReportResponse => {
   return {
     status: "1",
     calendar: [
@@ -106,92 +107,95 @@ const mockPaymentData = (dateFrom: string, dateTo: string): PaymentReportRespons
   };
 };
 
+// ============= API Functions =============
 export const financialReportsService = {
   async getVATReport(dateFrom: string, dateTo: string): Promise<VATReportResponse> {
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockVATData(dateFrom, dateTo);
-    }
+    logAPI('POST', '/establishment/report/tva', { date_from: dateFrom, date_to: dateTo });
     
-    const response = await fetch(`${config.apiBaseUrl}/establishment/report/tva`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-    });
-    return response.json();
+    return withMock(
+      () => mockVATData(),
+      () => apiClient.post<VATReportResponse>('/establishment/report/tva', { date_from: dateFrom, date_to: dateTo })
+    );
   },
 
   async getPaymentReport(dateFrom: string, dateTo: string): Promise<PaymentReportResponse> {
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockPaymentData(dateFrom, dateTo);
-    }
+    logAPI('POST', '/establishment/report/payments', { date_from: dateFrom, date_to: dateTo });
     
-    const response = await fetch(`${config.apiBaseUrl}/establishment/report/payments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-    });
-    return response.json();
+    return withMock(
+      () => mockPaymentData(),
+      () => apiClient.post<PaymentReportResponse>('/establishment/report/payments', { date_from: dateFrom, date_to: dateTo })
+    );
   },
 
   async exportGlobal(dateFrom: string, dateTo: string): Promise<void> {
-    if (config.useMockData) {
-      console.log('Mock: Exporting global accounting data', { dateFrom, dateTo });
-      return;
-    }
+    logAPI('POST', '/establishment/accounting/export', { date_from: dateFrom, date_to: dateTo });
     
-    const response = await fetch(`${config.apiBaseUrl}/establishment/accounting/export`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-    });
-    
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `export-comptable-${dateFrom}-${dateTo}.xlsx`;
-    a.click();
+    return withMock(
+      () => {
+        console.log('Mock: Exporting global accounting data', { dateFrom, dateTo });
+      },
+      async () => {
+        const response = await fetch(`${API_BASE_URL}/establishment/accounting/export`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
+        });
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export-comptable-${dateFrom}-${dateTo}.xlsx`;
+        a.click();
+      }
+    );
   },
 
   async exportVAT(dateFrom: string, dateTo: string): Promise<void> {
-    if (config.useMockData) {
-      console.log('Mock: Exporting VAT data', { dateFrom, dateTo });
-      return;
-    }
+    logAPI('POST', '/establishment/report/tva/export', { date_from: dateFrom, date_to: dateTo });
     
-    const response = await fetch(`${config.apiBaseUrl}/establishment/report/tva/export`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-    });
-    
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `export-tva-${dateFrom}-${dateTo}.xlsx`;
-    a.click();
+    return withMock(
+      () => {
+        console.log('Mock: Exporting VAT data', { dateFrom, dateTo });
+      },
+      async () => {
+        const response = await fetch(`${API_BASE_URL}/establishment/report/tva/export`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
+        });
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export-tva-${dateFrom}-${dateTo}.xlsx`;
+        a.click();
+      }
+    );
   },
 
   async exportPayments(dateFrom: string, dateTo: string): Promise<void> {
-    if (config.useMockData) {
-      console.log('Mock: Exporting payment data', { dateFrom, dateTo });
-      return;
-    }
+    logAPI('POST', '/establishment/report/payments/export', { date_from: dateFrom, date_to: dateTo });
     
-    const response = await fetch(`${config.apiBaseUrl}/establishment/report/payments/export`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-    });
-    
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `export-paiements-${dateFrom}-${dateTo}.xlsx`;
-    a.click();
+    return withMock(
+      () => {
+        console.log('Mock: Exporting payment data', { dateFrom, dateTo });
+      },
+      async () => {
+        const response = await fetch(`${API_BASE_URL}/establishment/report/payments/export`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
+        });
+        
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `export-paiements-${dateFrom}-${dateTo}.xlsx`;
+        a.click();
+      }
+    );
   }
 };

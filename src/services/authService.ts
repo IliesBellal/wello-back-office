@@ -1,6 +1,7 @@
-import { config } from '@/config';
+import { apiClient, withMock, logAPI, API_BASE_URL } from "@/services/apiClient";
 import { AuthResponse, LoginCredentials } from '@/types/auth';
 
+// ============= Mock Data =============
 const mockAuthResponse: AuthResponse = {
   id: 99,
   data: {
@@ -19,60 +20,50 @@ const mockAuthResponse: AuthResponse = {
   }
 };
 
+// ============= API Functions =============
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    if (config.useMockData) {
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return mockAuthResponse;
-    } else {
-      // Real API call
-      const response = await fetch(`${config.apiBaseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(credentials),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Login failed');
-      }
-      
-      return response.json();
-    }
+    logAPI('POST', '/auth/login', credentials);
+    
+    return withMock(
+      () => ({ ...mockAuthResponse }),
+      () => apiClient.post<AuthResponse>('/auth/login', credentials, { skipAuth: true })
+    );
   },
 
   switchMerchant: async (token: string): Promise<AuthResponse> => {
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      // In mock mode, find the merchant by token and update the response
-      const merchant = mockAuthResponse.data.merchants.find(m => m.token === token);
-      if (merchant) {
-        return {
-          ...mockAuthResponse,
-          data: {
-            ...mockAuthResponse.data,
-            merchantId: merchant.merchant_id,
-            merchantName: merchant.business_name,
-          }
-        };
+    logAPI('POST', '/auth/login (switch merchant)');
+    
+    return withMock(
+      () => {
+        const merchant = mockAuthResponse.data.merchants.find(m => m.token === token);
+        if (merchant) {
+          return {
+            ...mockAuthResponse,
+            data: {
+              ...mockAuthResponse.data,
+              merchantId: merchant.merchant_id,
+              merchantName: merchant.business_name,
+            }
+          };
+        }
+        return { ...mockAuthResponse };
+      },
+      async () => {
+        const response = await fetch(`${API_BASE_URL}/auth/login`, {
+          method: 'POST',
+          headers: {
+            'Authorization': token,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error('Merchant switch failed');
+        }
+        
+        return response.json();
       }
-      return mockAuthResponse;
-    } else {
-      const response = await fetch(`${config.apiBaseUrl}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Authorization': token,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Merchant switch failed');
-      }
-      
-      return response.json();
-    }
+    );
   },
 };

@@ -1,13 +1,6 @@
-import { config } from "@/config";
+import { apiClient, USE_MOCK_DATA, withMock, logAPI } from "@/services/apiClient";
 
-// API Logger
-const logAPI = (method: string, url: string, payload?: any) => {
-  console.log(`[API] ${method} ${url}`);
-  if (payload) {
-    console.log('Payload:', payload);
-  }
-};
-
+// ============= Types =============
 export interface OrderCustomer {
   name: string;
   phone: string;
@@ -44,6 +37,7 @@ export interface Order {
   created_at: string;
 }
 
+// ============= Mock Data =============
 const mockPendingOrders: Order[] = [
   {
     id: "ord_001",
@@ -149,70 +143,43 @@ const mockHistoryOrders: Order[] = Array.from({ length: 50 }, (_, i) => ({
   created_at: new Date(2024, 0, Math.floor(Math.random() * 30) + 1).toISOString()
 }));
 
+// ============= API Functions =============
 export const ordersService = {
   getPendingOrders: async (): Promise<Order[]> => {
     logAPI('GET', '/orders/pending');
     
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockPendingOrders;
-    }
-
-    const response = await fetch(`${config.apiBaseUrl}/orders/pending`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-      }
-    });
-    return response.json();
+    return withMock(
+      () => [...mockPendingOrders],
+      () => apiClient.get<Order[]>('/orders/pending')
+    );
   },
 
   getOrderHistory: async (page: number = 1, limit: number = 20): Promise<Order[]> => {
     logAPI('POST', '/orders/history', { page, limit });
     
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const start = (page - 1) * limit;
-      const end = start + limit;
-      return mockHistoryOrders.slice(start, end);
-    }
-
-    const response = await fetch(`${config.apiBaseUrl}/orders/history`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
+    return withMock(
+      () => {
+        const start = (page - 1) * limit;
+        const end = start + limit;
+        return mockHistoryOrders.slice(start, end);
       },
-      body: JSON.stringify({ page, limit })
-    });
-    return response.json();
+      () => apiClient.post<Order[]>('/orders/history', { page, limit })
+    );
   },
 
   getOrderById: async (orderId: string): Promise<Order> => {
     logAPI('GET', `/orders/${orderId}`);
     
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const allOrders = [...mockPendingOrders, ...mockHistoryOrders];
-      const order = allOrders.find(o => o.id === orderId);
-      
-      if (!order) {
-        throw new Error('Order not found');
-      }
-      
-      return order;
-    }
-
-    const response = await fetch(`${config.apiBaseUrl}/orders/${orderId}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error('Order not found');
-    }
-    
-    return response.json();
+    return withMock(
+      () => {
+        const allOrders = [...mockPendingOrders, ...mockHistoryOrders];
+        const order = allOrders.find(o => o.id === orderId);
+        if (!order) {
+          throw new Error('Order not found');
+        }
+        return order;
+      },
+      () => apiClient.get<Order>(`/orders/${orderId}`)
+    );
   }
 };

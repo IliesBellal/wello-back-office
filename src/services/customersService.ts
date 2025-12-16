@@ -1,5 +1,6 @@
-import { config } from "@/config";
+import { apiClient, withMock, logAPI } from "@/services/apiClient";
 
+// ============= Types =============
 export interface CustomerAddress {
   street_number?: string;
   street?: string;
@@ -73,6 +74,7 @@ export interface CreateLoyaltyProgramPayload {
   reward_products?: string[];
 }
 
+// ============= Mock Data =============
 const mockCustomers: Customer[] = [
   {
     id: "c1",
@@ -186,126 +188,93 @@ const mockProducts = [
   { id: "p5", name: "Boisson" }
 ];
 
+// ============= API Functions =============
 export const getCustomersList = async (page: number = 1, limit: number = 20): Promise<{ data: Customer[]; hasMore: boolean }> => {
-  console.log(`[API] GET /customers/list?page=${page}&limit=${limit}`);
+  logAPI("GET", `/customers/list?page=${page}&limit=${limit}`);
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const start = (page - 1) * limit;
-    const end = start + limit;
-    const paginatedData = mockCustomers.slice(start, end);
-    return { data: paginatedData, hasMore: end < mockCustomers.length };
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/customers/list?page=${page}&limit=${limit}`);
-  return response.json();
+  return withMock(
+    () => {
+      const start = (page - 1) * limit;
+      const end = start + limit;
+      const paginatedData = mockCustomers.slice(start, end);
+      return { data: paginatedData, hasMore: end < mockCustomers.length };
+    },
+    () => apiClient.get<{ data: Customer[]; hasMore: boolean }>(`/customers/list?page=${page}&limit=${limit}`)
+  );
 };
 
 export const searchCustomers = async (terms: string): Promise<Customer[]> => {
-  console.log(`[API] GET /customers/search/${terms}`);
+  logAPI("GET", `/customers/search/${terms}`);
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const lowerTerms = terms.toLowerCase();
-    return mockCustomers
-      .filter(c => {
-        const name = c.first_name ? `${c.first_name} ${c.last_name}` : c.customer_name || "";
-        return name.toLowerCase().includes(lowerTerms) || c.phone?.includes(terms) || c.email?.toLowerCase().includes(lowerTerms);
-      })
-      .map((c, i) => ({ ...c, match_score: 100 - i * 10 }));
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/customers/search/${encodeURIComponent(terms)}`);
-  return response.json();
+  return withMock(
+    () => {
+      const lowerTerms = terms.toLowerCase();
+      return mockCustomers
+        .filter(c => {
+          const name = c.first_name ? `${c.first_name} ${c.last_name}` : c.customer_name || "";
+          return name.toLowerCase().includes(lowerTerms) || c.phone?.includes(terms) || c.email?.toLowerCase().includes(lowerTerms);
+        })
+        .map((c, i) => ({ ...c, match_score: 100 - i * 10 }));
+    },
+    () => apiClient.get<Customer[]>(`/customers/search/${encodeURIComponent(terms)}`)
+  );
 };
 
 export const getCustomerOrders = async (customerId: string): Promise<CustomerOrder[]> => {
-  console.log(`[API] GET /customers/${customerId}/orders`);
+  logAPI("GET", `/customers/${customerId}/orders`);
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    return mockOrders[customerId] || [];
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/customers/${customerId}/orders`);
-  return response.json();
+  return withMock(
+    () => mockOrders[customerId] || [],
+    () => apiClient.get<CustomerOrder[]>(`/customers/${customerId}/orders`)
+  );
 };
 
 export const getCustomerLoyalty = async (customerId: string): Promise<CustomerLoyalty> => {
-  console.log(`[API] GET /customer/${customerId}/loyalty`);
+  logAPI("GET", `/customer/${customerId}/loyalty`);
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    return mockLoyalty[customerId] || { programs: [], rewards: [] };
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/customer/${customerId}/loyalty`);
-  return response.json();
+  return withMock(
+    () => mockLoyalty[customerId] || { programs: [], rewards: [] },
+    () => apiClient.get<CustomerLoyalty>(`/customer/${customerId}/loyalty`)
+  );
 };
 
 export const updateLoyaltyProgress = async (customerId: string, programId: string, newValue: number): Promise<{ status: string }> => {
-  console.log(`[API] PATCH /customers/${customerId}/loyalty/${programId}`);
-  console.log("Payload:", { current_value: newValue });
+  logAPI("PATCH", `/customers/${customerId}/loyalty/${programId}`, { current_value: newValue });
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return { status: "ok" };
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/customers/${customerId}/loyalty/${programId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ current_value: newValue })
-  });
-  return response.json();
+  return withMock(
+    () => ({ status: "ok" }),
+    () => apiClient.patch<{ status: string }>(`/customers/${customerId}/loyalty/${programId}`, { current_value: newValue })
+  );
 };
 
 export const updateRewardStatus = async (customerId: string, rewardId: string, isUsed: boolean): Promise<{ status: string }> => {
-  console.log(`[API] PATCH /customers/${customerId}/rewards/${rewardId}`);
-  console.log("Payload:", { is_used: isUsed ? "1" : "0" });
+  logAPI("PATCH", `/customers/${customerId}/rewards/${rewardId}`, { is_used: isUsed ? "1" : "0" });
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return { status: "ok" };
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/customers/${customerId}/rewards/${rewardId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ is_used: isUsed ? "1" : "0" })
-  });
-  return response.json();
+  return withMock(
+    () => ({ status: "ok" }),
+    () => apiClient.patch<{ status: string }>(`/customers/${customerId}/rewards/${rewardId}`, { is_used: isUsed ? "1" : "0" })
+  );
 };
 
 export const createLoyaltyProgram = async (payload: CreateLoyaltyProgramPayload): Promise<{ status: string; id: string }> => {
-  console.log("[API] POST /customers/loyalty");
-  console.log("Payload:", payload);
+  logAPI("POST", "/customers/loyalty", payload);
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { status: "ok", id: `lp_${Date.now()}` };
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/customers/loyalty`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  return response.json();
+  return withMock(
+    () => ({ status: "ok", id: `lp_${Date.now()}` }),
+    () => apiClient.post<{ status: string; id: string }>("/customers/loyalty", payload)
+  );
 };
 
 export const getProducts = async (): Promise<{ id: string; name: string }[]> => {
-  console.log("[API] GET /menu/products (for loyalty selection)");
+  logAPI("GET", "/menu/products (for loyalty selection)");
   
-  if (config.useMockData) {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return mockProducts;
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/menu/products`);
-  return response.json();
+  return withMock(
+    () => [...mockProducts],
+    () => apiClient.get<{ id: string; name: string }[]>("/menu/products")
+  );
 };
 
+// ============= Constants =============
 export const acquisitionSourceLabels: Record<string, string> = {
   WELLO_RESTO_APPS: "Caisse",
   UBER_EATS: "Uber Eats",
