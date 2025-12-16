@@ -2,9 +2,21 @@ import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Plus } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Plus, Trash2 } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { ComponentCreateSheet } from '@/components/menu/ComponentCreateSheet';
+import { toast } from 'sonner';
+import { Component } from '@/types/menu';
 
 export default function Components() {
   const { 
@@ -13,11 +25,15 @@ export default function Components() {
     units,
     loading,
     createComponent,
-    createCategory
+    createCategory,
+    deleteComponent
   } = useMenuData();
   
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [componentToDelete, setComponentToDelete] = useState<Component | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Group components by category
   const componentsByCategory = useMemo(() => {
@@ -43,6 +59,28 @@ export default function Components() {
   const displayedComponents = selectedCategoryId
     ? componentsByCategory.get(selectedCategoryId) || []
     : components;
+
+  const handleDeleteClick = (e: React.MouseEvent, component: Component) => {
+    e.stopPropagation();
+    setComponentToDelete(component);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!componentToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      await deleteComponent(componentToDelete.id);
+      toast.success(`"${componentToDelete.name}" supprimé`);
+    } catch (error) {
+      toast.error("Erreur lors de la suppression");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setComponentToDelete(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -117,9 +155,17 @@ export default function Components() {
               {displayedComponents.map((component) => (
                 <Card 
                   key={component.id}
-                  className="p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  className="p-4 hover:shadow-md transition-shadow cursor-pointer group relative"
                 >
-                  <h3 className="font-semibold text-foreground mb-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={(e) => handleDeleteClick(e, component)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  <h3 className="font-semibold text-foreground mb-2 pr-8">
                     {component.name}
                   </h3>
                   <div className="space-y-1 text-sm">
@@ -144,6 +190,27 @@ export default function Components() {
         onCreateComponent={createComponent}
         onCreateCategory={createCategory}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce composant ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer "{componentToDelete?.name}" ? Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmDelete} 
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Suppression..." : "Supprimer"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

@@ -188,6 +188,15 @@ export const useMenuData = () => {
     }
   };
 
+  const deleteComponent = async (componentId: string) => {
+    try {
+      await menuService.deleteComponent(componentId);
+      setComponents(prev => prev.filter(c => c.id !== componentId));
+    } catch (error) {
+      throw error;
+    }
+  };
+
   return {
     tvaRates,
     menuData,
@@ -201,6 +210,7 @@ export const useMenuData = () => {
     saveOrder,
     createCategory,
     createProduct,
-    createComponent
+    createComponent,
+    deleteComponent
   };
 };

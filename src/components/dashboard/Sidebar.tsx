@@ -4,10 +4,10 @@ import { Home, ShoppingBag, Menu as MenuIcon, Users, Settings, Store, User, Chev
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const menuItems = [
-  { title: 'Dashboard', icon: Home, path: '/' },
-  { title: 'Commandes', icon: ShoppingBag, path: '/orders' },
-  { title: 'Menu', icon: MenuIcon, path: '/menu' },
-  { title: 'Composants', icon: Package, path: '/menu/components' },
+  { title: 'Dashboard', icon: Home, path: '/', end: true },
+  { title: 'Commandes', icon: ShoppingBag, path: '/orders', end: false },
+  { title: 'Menu', icon: MenuIcon, path: '/menu', end: true },
+  { title: 'Composants', icon: Package, path: '/menu/components', end: false },
   { title: 'Plan de Salle', icon: LayoutGrid, path: '/locations' },
   { title: 'Utilisateurs', icon: Users2, path: '/users' },
   { title: 'Registres de Caisse', icon: Calculator, path: '/cash-registers' },
@@ -36,7 +36,7 @@ export const Sidebar = () => {
           <NavLink
             key={item.path}
             to={item.path}
-            end={item.path === '/'}
+            end={item.end}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
             activeClassName="bg-gradient-primary text-white font-medium shadow-soft"
           >
