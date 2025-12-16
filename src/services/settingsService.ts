@@ -1,6 +1,7 @@
-import { config } from "@/config";
+import { apiClient, withMock, logAPI } from "@/services/apiClient";
 import { UserProfile, EstablishmentSettings } from "@/types/settings";
 
+// ============= Mock Data =============
 const mockUserProfile: UserProfile = {
   firstname: "Lucas",
   lastname: "Martinez",
@@ -45,48 +46,37 @@ const mockEstablishmentSettings: EstablishmentSettings = {
   }
 };
 
+// ============= API Functions =============
 export const settingsService = {
   async getUserProfile(): Promise<UserProfile> {
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockUserProfile;
-    }
-    const response = await fetch(`${config.apiBaseUrl}/api/user/profile`);
-    return response.json();
+    logAPI('GET', '/api/user/profile');
+    return withMock(
+      () => ({ ...mockUserProfile }),
+      () => apiClient.get<UserProfile>('/api/user/profile')
+    );
   },
 
   async updateUserProfile(data: Partial<UserProfile>): Promise<UserProfile> {
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return { ...mockUserProfile, ...data };
-    }
-    const response = await fetch(`${config.apiBaseUrl}/api/user/profile`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return response.json();
+    logAPI('PATCH', '/api/user/profile', data);
+    return withMock(
+      () => ({ ...mockUserProfile, ...data }),
+      () => apiClient.patch<UserProfile>('/api/user/profile', data)
+    );
   },
 
   async getEstablishmentSettings(): Promise<EstablishmentSettings> {
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return mockEstablishmentSettings;
-    }
-    const response = await fetch(`${config.apiBaseUrl}/api/establishment/settings`);
-    return response.json();
+    logAPI('GET', '/api/establishment/settings');
+    return withMock(
+      () => ({ ...mockEstablishmentSettings }),
+      () => apiClient.get<EstablishmentSettings>('/api/establishment/settings')
+    );
   },
 
   async updateEstablishmentSettings(data: Partial<EstablishmentSettings>): Promise<EstablishmentSettings> {
-    if (config.useMockData) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      return { ...mockEstablishmentSettings, ...data };
-    }
-    const response = await fetch(`${config.apiBaseUrl}/api/establishment/settings`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return response.json();
+    logAPI('PATCH', '/api/establishment/settings', data);
+    return withMock(
+      () => ({ ...mockEstablishmentSettings, ...data }),
+      () => apiClient.patch<EstablishmentSettings>('/api/establishment/settings', data)
+    );
   }
 };

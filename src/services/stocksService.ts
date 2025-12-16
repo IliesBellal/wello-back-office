@@ -1,4 +1,4 @@
-import { config } from "@/config";
+import { apiClient, USE_MOCK_DATA, withMock, logAPI } from "@/services/apiClient";
 
 export interface StockUnit {
   unit_name: string;
@@ -20,6 +20,7 @@ export interface StockMovementPayload {
   comment?: string;
 }
 
+// ============= Mock Data =============
 const mockStockComponents: StockComponent[] = [
   { component_id: "c1", name: "Farine", unit: { unit_name: "kg" }, quantity: 5.2, alert_threshold: 10, purchasing_price: 120 },
   { component_id: "c2", name: "Tomates", unit: { unit_name: "kg" }, quantity: 50, alert_threshold: 5, purchasing_price: 250 },
@@ -31,37 +32,27 @@ const mockStockComponents: StockComponent[] = [
   { component_id: "c8", name: "Oignons", unit: { unit_name: "kg" }, quantity: 25, alert_threshold: 10, purchasing_price: 150 },
 ];
 
+// ============= API Functions =============
 export const getStocksList = async (): Promise<StockComponent[]> => {
-  console.log("[API] GET /stocks/components/list");
+  logAPI("GET", "/stocks/components/list");
   
-  if (config.useMockData) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    return mockStockComponents;
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/stocks/components/list`);
-  return response.json();
+  return withMock(
+    () => [...mockStockComponents],
+    () => apiClient.get<StockComponent[]>("/stocks/components/list")
+  );
 };
 
 export const updateStockMovement = async (payload: StockMovementPayload): Promise<{ status: string }> => {
-  console.log("[API] PATCH /stocks/components/" + payload.component_id);
-  console.log("Payload:", payload);
+  logAPI("PATCH", `/stocks/components/${payload.component_id}`, payload);
   
-  if (config.useMockData) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    
-    const component = mockStockComponents.find((c) => c.component_id === payload.component_id);
-    if (component) {
-      component.quantity += payload.quantity;
-    }
-    
-    return { status: "ok" };
-  }
-  
-  const response = await fetch(`${config.apiBaseUrl}/stocks/components/${payload.component_id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  return response.json();
+  return withMock(
+    () => {
+      const component = mockStockComponents.find((c) => c.component_id === payload.component_id);
+      if (component) {
+        component.quantity += payload.quantity;
+      }
+      return { status: "ok" };
+    },
+    () => apiClient.patch<{ status: string }>(`/stocks/components/${payload.component_id}`, payload)
+  );
 };
