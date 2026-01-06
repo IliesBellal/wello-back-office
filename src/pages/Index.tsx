@@ -1,129 +1,134 @@
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { StatCard } from '@/components/dashboard/StatCard';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { DollarSign, ShoppingCart, TrendingUp, Users } from 'lucide-react';
+import { QuickActions } from '@/components/dashboard/QuickActions';
+import { RevenueCard } from '@/components/dashboard/RevenueCard';
+import { ServiceCard } from '@/components/dashboard/ServiceCard';
+import { CustomersCard } from '@/components/dashboard/CustomersCard';
+import { AlertsCard } from '@/components/dashboard/AlertsCard';
+import { HourlyChart } from '@/components/dashboard/HourlyChart';
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { QuickProductSheet } from '@/components/dashboard/QuickProductSheet';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  getDashboardRealtime,
+  getDashboardHourly,
+  getDashboardActivity,
+  type DashboardRealtime,
+  type HourlyData,
+  type ActivityEvent,
+} from '@/services/dashboardService';
 
 const Index = () => {
+  const [realtimeData, setRealtimeData] = useState<DashboardRealtime | null>(null);
+  const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
+  const [activityData, setActivityData] = useState<ActivityEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [productSheetOpen, setProductSheetOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [realtime, hourly, activity] = await Promise.all([
+          getDashboardRealtime(),
+          getDashboardHourly(),
+          getDashboardActivity(),
+        ]);
+        setRealtimeData(realtime);
+        setHourlyData(hourly);
+        setActivityData(activity);
+      } catch (error) {
+        console.error('Failed to fetch dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Bonjour';
+    if (hour < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  };
+
   return (
     <DashboardLayout>
-      <div className="p-8 space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">Tableau de bord</h1>
-          <p className="text-muted-foreground">
-            Vue d'ensemble de votre activité
-          </p>
+      <div className="p-6 lg:p-8 space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">
+              {getGreeting()} 👋
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Voici l'état de votre activité en temps réel
+            </p>
+          </div>
+          <QuickActions onNewProduct={() => setProductSheetOpen(true)} />
         </div>
 
-        <Tabs defaultValue="day" className="w-full">
-          <TabsList className="bg-card shadow-soft">
-            <TabsTrigger value="day">Aujourd'hui</TabsTrigger>
-            <TabsTrigger value="week">Cette semaine</TabsTrigger>
-            <TabsTrigger value="month">Ce mois</TabsTrigger>
-          </TabsList>
+        {/* KPI Cards Section */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-[200px] rounded-2xl" />
+            ))}
+          </div>
+        ) : realtimeData ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            <RevenueCard
+              current={realtimeData.revenue.current}
+              currency={realtimeData.revenue.currency}
+              trendPercentage={realtimeData.revenue.trend_percentage}
+              trendDirection={realtimeData.revenue.trend_direction}
+              comparisons={realtimeData.revenue.comparisons}
+              progressTarget={realtimeData.revenue.progress_target}
+            />
+            <ServiceCard
+              avgTimeMinutes={realtimeData.service.avg_time_minutes}
+              status={realtimeData.service.status}
+              ordersPerHour={realtimeData.service.orders_per_hour}
+            />
+            <CustomersCard
+              totalCovers={realtimeData.customers.total_covers}
+              newCustomers={realtimeData.customers.new_customers}
+              returningCustomers={realtimeData.customers.returning_customers}
+              satisfactionRate={realtimeData.customers.satisfaction_rate}
+            />
+            <AlertsCard
+              lowStockCount={realtimeData.alerts.low_stock_count}
+              voidedOrders={realtimeData.alerts.voided_orders}
+              pendingDeliveries={realtimeData.alerts.pending_deliveries}
+            />
+          </div>
+        ) : null}
 
-          <TabsContent value="day" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Chiffre d'affaires"
-                value="2 847€"
-                subtitle="Aujourd'hui"
-                icon={DollarSign}
-                trend="+12.5% vs hier"
-              />
-              <StatCard
-                title="Commandes"
-                value="67"
-                subtitle="Commandes du jour"
-                icon={ShoppingCart}
-                trend="+8 commandes"
-                isHighlighted
-              />
-              <StatCard
-                title="Panier moyen"
-                value="42.50€"
-                subtitle="Moyenne"
-                icon={TrendingUp}
-                trend="+5.2% vs hier"
-              />
-              <StatCard
-                title="Clients"
-                value="54"
-                subtitle="Clients servis"
-                icon={Users}
-                trend="12 nouveaux"
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="week" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Chiffre d'affaires"
-                value="18 425€"
-                subtitle="Cette semaine"
-                icon={DollarSign}
-                trend="+15.8% vs semaine dernière"
-              />
-              <StatCard
-                title="Commandes"
-                value="428"
-                subtitle="Commandes de la semaine"
-                icon={ShoppingCart}
-                trend="+42 commandes"
-                isHighlighted
-              />
-              <StatCard
-                title="Panier moyen"
-                value="43.04€"
-                subtitle="Moyenne"
-                icon={TrendingUp}
-                trend="+3.1% vs semaine dernière"
-              />
-              <StatCard
-                title="Clients"
-                value="312"
-                subtitle="Clients servis"
-                icon={Users}
-                trend="68 nouveaux"
-              />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="month" className="space-y-6 mt-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatCard
-                title="Chiffre d'affaires"
-                value="78 940€"
-                subtitle="Ce mois"
-                icon={DollarSign}
-                trend="+22.3% vs mois dernier"
-              />
-              <StatCard
-                title="Commandes"
-                value="1 847"
-                subtitle="Commandes du mois"
-                icon={ShoppingCart}
-                trend="+186 commandes"
-                isHighlighted
-              />
-              <StatCard
-                title="Panier moyen"
-                value="42.75€"
-                subtitle="Moyenne"
-                icon={TrendingUp}
-                trend="+4.8% vs mois dernier"
-              />
-              <StatCard
-                title="Clients"
-                value="1 284"
-                subtitle="Clients servis"
-                icon={Users}
-                trend="247 nouveaux"
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+        {/* Chart & Activity Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            {loading ? (
+              <Skeleton className="h-[360px] rounded-2xl" />
+            ) : (
+              <HourlyChart data={hourlyData} />
+            )}
+          </div>
+          <div className="lg:col-span-1">
+            {loading ? (
+              <Skeleton className="h-[360px] rounded-2xl" />
+            ) : (
+              <ActivityFeed events={activityData} />
+            )}
+          </div>
+        </div>
       </div>
+
+      {/* Quick Product Creation Sheet */}
+      <QuickProductSheet
+        open={productSheetOpen}
+        onOpenChange={setProductSheetOpen}
+      />
     </DashboardLayout>
   );
 };
