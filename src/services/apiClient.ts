@@ -1,8 +1,8 @@
 import { toast } from "@/hooks/use-toast";
 
 // ============= Configuration =============
-export const USE_MOCK_DATA = true;
-export const API_BASE_URL = import.meta.env.VITE_API_URL || "https://api.welloresto.fr";
+export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK !== 'false'; // Defaults to true if not set
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 
 // ============= Types =============
 export interface ApiRequestOptions {
