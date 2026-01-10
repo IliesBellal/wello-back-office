@@ -27,7 +27,7 @@ export const authService = {
     
     return withMock(
       () => ({ ...mockAuthResponse }),
-      () => apiClient.post<AuthResponse>('/auth/login', credentials, { skipAuth: true })
+      () => apiClient.get<AuthResponse>('/auth/login', credentials, { skipAuth: true })
     );
   },
 
