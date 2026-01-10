@@ -23,7 +23,7 @@ const mockAuthResponse: AuthResponse = {
 // ============= API Functions =============
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    logAPI('POST', '/auth/login', credentials);
+    logAPI('GET', '/auth/login', credentials);
     
     return withMock(
       () => ({ ...mockAuthResponse }),
