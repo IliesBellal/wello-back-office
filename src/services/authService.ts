@@ -32,7 +32,7 @@ export const authService = {
   },
 
   switchMerchant: async (token: string): Promise<AuthResponse> => {
-    logAPI('POST', '/auth/login (switch merchant)');
+    logAPI('GET', '/auth/login (switch merchant)');
     
     return withMock(
       () => {
@@ -51,7 +51,7 @@ export const authService = {
       },
       async () => {
         const response = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: 'POST',
+          method: 'GET',
           headers: {
             'Authorization': token,
             'Content-Type': 'application/json',
