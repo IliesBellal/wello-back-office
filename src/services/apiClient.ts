@@ -5,6 +5,7 @@ export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK !== 'false';
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
 export const ENABLE_LOGS = import.meta.env.VITE_ENABLE_LOGS === 'true';
 
+
 // ============= Types =============
 export interface ApiRequestOptions {
   method?: "GET" | "POST" | "PATCH" | "PUT" | "DELETE";
