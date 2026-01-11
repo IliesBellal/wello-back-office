@@ -245,6 +245,7 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     const data = text ? JSON.parse(text) as T : {} as T;
     
     endRequestLog(logContext, response.status, data);
+    if (ENABLE_LOGS) console.log(`📥 [API RESPONSE] ${method} ${endpoint}`, data);
     return data;
   } catch (error) {
     if (error instanceof TypeError && error.message === "Failed to fetch") {
@@ -253,6 +254,7 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     } else if (!(error instanceof Error && error.message.startsWith("HTTP error"))) {
       endRequestLogWithError(logContext, error);
     }
+    if (ENABLE_LOGS) console.error(`❌ [API ERROR] ${method} ${endpoint}`, error);
     throw error;
   } finally {
     decrementLoading();
