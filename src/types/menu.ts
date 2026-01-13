@@ -27,6 +27,7 @@ export interface Component {
   name: string;
   unit_id: number;
   price_per_unit: number;
+  category_id?: string;
 }
 
 export interface AttributeOption {
@@ -58,6 +59,30 @@ export interface ProductAttribute {
   }[];
 }
 
+export interface ProductAvailability {
+  on_site?: boolean;
+  takeaway?: boolean;
+  delivery?: boolean;
+  scan_order?: boolean;
+}
+
+export interface ProductIntegration {
+  enabled?: boolean;
+  id?: string;
+  price_override?: number;
+}
+
+export interface ProductIntegrations {
+  uber_eats?: ProductIntegration;
+  deliveroo?: ProductIntegration;
+}
+
+export interface ProductTvaIds {
+  on_site?: number;
+  takeaway?: number;
+  delivery?: number;
+}
+
 export interface Product {
   product_id: string;
   category_id?: string;
@@ -82,6 +107,8 @@ export interface Product {
   tva_rate_delivery?: number;
   tva_rate_take_away?: number;
   components?: ProductComposition[];
+  composition?: ProductComposition[];
+  attributes?: ProductAttribute[];
   configuration?: {
     attributes?: ProductAttribute[];
   };
@@ -100,20 +127,33 @@ export interface Product {
   without?: Record<string, unknown>;
   customers?: string[];
   comment?: string;
+  // Extended properties for forms
+  availability?: ProductAvailability;
+  integrations?: ProductIntegrations;
+  tva_ids?: ProductTvaIds;
 }
 
+// Category can come from API in two formats
 export interface Category {
+  // Primary format (from real API)
   category_id: string;
   category: string;
   category_name?: string;
+  // Alternate format (from mock/simplified API)
+  id?: string;
+  name?: string;
+  // Common
   order: number;
   bg_color?: string;
   products: Product[];
 }
 
 export interface Menu {
-  id: string;
-  data: MenuData;
+  id?: string;
+  data?: MenuData;
+  // Direct properties (mock data format)
+  products_types?: Category[];
+  products?: Product[];
 }
 
 export interface MenuData {

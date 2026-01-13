@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI } from "@/services/apiClient";
-import { TvaRateGroup, Menu, UnitOfMeasure, Component, Attribute, Product } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, Component, Attribute, Product, Category } from "@/types/menu";
 
 // ============= Mock Data =============
 const mockTvaRates: TvaRateGroup[] = [
@@ -68,74 +68,79 @@ const mockAttributes: Attribute[] = [
   }
 ];
 
-const mockMenuData: Menu = {
-  products_types: [
-    { id: "cat1", name: "Pizzas", order: 1 },
-    { id: "cat2", name: "Boissons", order: 2 }
-  ],
-  products: [
-    {
-      id: "p1", 
-      category_id: "cat1", 
-      name: "Margherita", 
-      description: "Tomate, Mozza", 
-      price: 1200, 
-      bg_color: "#ffffff",
-      is_group: false, 
-      order: 1,
-      tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
-      availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
-      integrations: { 
-        uber_eats: { enabled: true, price_override: 1350, id: "ue_123" },
-        deliveroo: { enabled: false }
-      }
-    },
-    {
-      id: "p1b", 
-      category_id: "cat1", 
-      name: "Regina", 
-      description: "Tomate, Mozza, Jambon, Champignons", 
-      price: 1400, 
-      bg_color: "#ffffff",
-      is_group: false, 
-      order: 2,
-      tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
-      availability: { on_site: true, takeaway: true, delivery: false, scan_order: true },
-      integrations: { 
-        uber_eats: { enabled: false },
-        deliveroo: { enabled: false }
-      }
-    },
-    {
-      id: "p2", 
-      category_id: "cat2", 
-      name: "Softs 33cl", 
-      is_group: true, 
-      order: 1,
-      bg_color: "#f0f9ff",
-      sub_products: [
-        { id: "p2_1", name: "Coca Cola", price: 200 },
-        { id: "p2_2", name: "Fanta", price: 200 },
-        { id: "p2_3", name: "Sprite", price: 200 }
-      ]
-    },
-    {
-      id: "p3", 
-      category_id: "cat2", 
-      name: "Eau Minérale", 
-      description: "50cl", 
-      price: 150, 
-      bg_color: "#ffffff",
-      is_group: false, 
-      order: 2,
-      tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
-      availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
-      integrations: { 
-        uber_eats: { enabled: false },
-        deliveroo: { enabled: false }
-      }
+const mockCategories: Category[] = [
+  { category_id: "cat1", category: "Pizzas", id: "cat1", name: "Pizzas", order: 1, products: [] },
+  { category_id: "cat2", category: "Boissons", id: "cat2", name: "Boissons", order: 2, products: [] }
+];
+
+const mockProducts: Product[] = [
+  {
+    product_id: "p1", 
+    category_id: "cat1", 
+    name: "Margherita", 
+    description: "Tomate, Mozza", 
+    price: 1200, 
+    bg_color: "#ffffff",
+    is_group: false, 
+    order: 1,
+    tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
+    availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
+    integrations: { 
+      uber_eats: { enabled: true, price_override: 1350, id: "ue_123" },
+      deliveroo: { enabled: false }
     }
-  ]
+  },
+  {
+    product_id: "p1b", 
+    category_id: "cat1", 
+    name: "Regina", 
+    description: "Tomate, Mozza, Jambon, Champignons", 
+    price: 1400, 
+    bg_color: "#ffffff",
+    is_group: false, 
+    order: 2,
+    tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
+    availability: { on_site: true, takeaway: true, delivery: false, scan_order: true },
+    integrations: { 
+      uber_eats: { enabled: false },
+      deliveroo: { enabled: false }
+    }
+  },
+  {
+    product_id: "p2", 
+    category_id: "cat2", 
+    name: "Softs 33cl", 
+    is_group: true,
+    is_product_group: true,
+    order: 1,
+    bg_color: "#f0f9ff",
+    sub_products: [
+      { id: "p2_1", name: "Coca Cola", price: 200 },
+      { id: "p2_2", name: "Fanta", price: 200 },
+      { id: "p2_3", name: "Sprite", price: 200 }
+    ]
+  },
+  {
+    product_id: "p3", 
+    category_id: "cat2", 
+    name: "Eau Minérale", 
+    description: "50cl", 
+    price: 150, 
+    bg_color: "#ffffff",
+    is_group: false, 
+    order: 2,
+    tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
+    availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
+    integrations: { 
+      uber_eats: { enabled: false },
+      deliveroo: { enabled: false }
+    }
+  }
+];
+
+const mockMenuData: Menu = {
+  products_types: mockCategories,
+  products: mockProducts
 };
 
 // ============= API Functions =============
@@ -151,7 +156,11 @@ export const menuService = {
   async getMenuData(): Promise<Menu> {
     logAPI('GET', '/menu');
     return withMock(
-      () => ({ ...mockMenuData, products_types: [...mockMenuData.products_types], products: [...mockMenuData.products] }),
+      () => ({ 
+        ...mockMenuData, 
+        products_types: [...mockMenuData.products_types!], 
+        products: [...mockMenuData.products!] 
+      }),
       () => apiClient.get<Menu>('/menu')
     );
   },

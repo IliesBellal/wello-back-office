@@ -9,8 +9,19 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone } from "lucide-react";
+import { Phone, Calendar, MapPin } from "lucide-react";
 import { ordersService, Order } from "@/services/ordersService";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import {
+  getOrderSource,
+  getOrderSourceConfig,
+  getOrderStateLabel,
+  getOrderStateClassName,
+  getOrderTypeLabel,
+  getMerchantApprovalLabel,
+  getMerchantApprovalClassName,
+} from "@/utils/orderUtils";
 
 export const OrderDetailsSheet = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -43,31 +54,14 @@ export const OrderDetailsSheet = () => {
     }).format(cents / 100);
   };
 
-  const getBrandColor = (brand: string) => {
-    switch (brand) {
-      case "UBER":
-        return "bg-black text-white";
-      case "DELIVEROO":
-        return "bg-[#00CCBC] text-white";
-      case "WELLO_RESTO":
-        return "bg-gradient-primary text-white";
-      default:
-        return "bg-gradient-primary text-white";
-    }
+  const formatDate = (timestamp: number) => {
+    return format(new Date(timestamp * 1000), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr });
   };
 
-  const getBrandLabel = (brand: string) => {
-    switch (brand) {
-      case "WELLO_RESTO":
-        return "Wello";
-      case "UBER":
-        return "Uber";
-      case "DELIVEROO":
-        return "Deliveroo";
-      default:
-        return brand;
-    }
-  };
+  if (!order && !loading) return null;
+
+  const source = order ? getOrderSource(order) : null;
+  const sourceConfig = source ? getOrderSourceConfig(source) : null;
 
   return (
     <Sheet open={!!orderId} onOpenChange={(open) => !open && handleClose()}>
@@ -80,17 +74,34 @@ export const OrderDetailsSheet = () => {
           </div>
         ) : order ? (
           <>
-            <SheetHeader>
+            <SheetHeader className="space-y-4">
               <div className="flex items-center justify-between">
                 <SheetTitle>Commande #{order.order_num}</SheetTitle>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap justify-end">
                   <Badge
-                    variant={order.state === "OPEN" ? "default" : "secondary"}
+                    variant="outline"
+                    className={getOrderStateClassName(order.state)}
                   >
-                    {order.state === "OPEN" ? "En cours" : "Fermée"}
+                    {getOrderStateLabel(order.state)}
                   </Badge>
-                  <Badge className={getBrandColor(order.brand)}>
-                    {getBrandLabel(order.brand)}
+                  {sourceConfig && (
+                    <Badge className={sourceConfig.className}>
+                      {sourceConfig.label}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              
+              {/* Order Date & Type */}
+              <div className="flex flex-col gap-1 text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Calendar className="w-4 h-4" />
+                  <span className="capitalize">{formatDate(order.creation_date)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  <Badge variant="secondary" className="font-normal">
+                    {getOrderTypeLabel(order.order_type || order.fulfillment_type)}
                   </Badge>
                 </div>
               </div>
@@ -142,22 +153,37 @@ export const OrderDetailsSheet = () => {
                   </div>
                 )}
 
-                {/* Order Info Section */}
+                {/* Products Section - MOVED ABOVE PAYMENTS */}
                 <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
-                  <h3 className="font-semibold text-foreground">Informations</h3>
-                  <div className="space-y-2 text-sm">
-                    <div>
-                      <span className="text-muted-foreground">État:</span>{" "}
-                      <span className="font-medium">{order.state}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Type:</span>{" "}
-                      <span className="font-medium">{order.fulfillment_type}</span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Statut Marchand:</span>{" "}
-                      <span className="font-medium">{order.merchant_approval}</span>
-                    </div>
+                  <h3 className="font-semibold text-foreground">
+                    Panier ({order.products.length} article{order.products.length > 1 ? 's' : ''})
+                  </h3>
+                  <div className="space-y-3">
+                    {order.products.map((product, idx) => (
+                      <div
+                        key={idx}
+                        className="flex justify-between items-start py-2 border-b border-border last:border-0"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-foreground">
+                              {product.name}
+                            </span>
+                            <Badge variant="secondary" className="text-xs">
+                              x{product.quantity}
+                            </Badge>
+                          </div>
+                          {product.description && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {product.description}
+                            </div>
+                          )}
+                        </div>
+                        <span className="font-medium text-foreground">
+                          {formatCurrency(product.price * product.quantity)}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -165,19 +191,47 @@ export const OrderDetailsSheet = () => {
                 <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
                   <h3 className="font-semibold text-foreground">Paiements</h3>
                   <div className="space-y-2">
-                    {order.payments.map((payment, idx) => (
-                      <div
-                        key={idx}
-                        className="flex justify-between text-sm items-center"
+                    {order.payments.map((payment, idx) => {
+                      const isCancelled = payment.enabled === 0;
+                      return (
+                        <div
+                          key={idx}
+                          className={`flex justify-between text-sm items-center ${
+                            isCancelled ? 'opacity-50' : ''
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`text-muted-foreground ${isCancelled ? 'line-through' : ''}`}>
+                              {payment.mop}
+                            </span>
+                            {isCancelled && (
+                              <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">
+                                Annulé
+                              </Badge>
+                            )}
+                          </div>
+                          <span className={`font-medium ${isCancelled ? 'line-through text-muted-foreground' : ''}`}>
+                            {formatCurrency(payment.amount)}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Order Info Section */}
+                <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
+                  <h3 className="font-semibold text-foreground">Informations</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground">Statut Marchand:</span>
+                      <Badge 
+                        variant="outline" 
+                        className={getMerchantApprovalClassName(order.merchant_approval)}
                       >
-                        <span className="text-muted-foreground">
-                          {payment.mop}
-                        </span>
-                        <span className="font-medium">
-                          {formatCurrency(payment.amount)}
-                        </span>
-                      </div>
-                    ))}
+                        {getMerchantApprovalLabel(order.merchant_approval)}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 

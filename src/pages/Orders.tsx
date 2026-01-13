@@ -9,6 +9,13 @@ import { ordersService, Order } from "@/services/ordersService";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { OrderDetailsSheet } from "@/components/orders/OrderDetailsSheet";
+import {
+  getOrderSource,
+  getOrderSourceConfig,
+  getOrderStateLabel,
+  getOrderStateClassName,
+  getOrderTypeLabel,
+} from "@/utils/orderUtils";
 
 export default function Orders() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -94,73 +101,57 @@ export default function Orders() {
     setSearchParams(searchParams);
   };
 
-  const getBrandColor = (brand: string) => {
-    switch (brand) {
-      case "UBER":
-        return "bg-black text-white";
-      case "DELIVEROO":
-        return "bg-[#00CCBC] text-white";
-      case "WELLO_RESTO":
-        return "bg-gradient-primary text-white";
-      default:
-        return "bg-gradient-primary text-white";
-    }
-  };
-
-  const getBrandLabel = (brand: string) => {
-    switch (brand) {
-      case "WELLO_RESTO":
-        return "Wello";
-      case "UBER":
-        return "Uber";
-      case "DELIVEROO":
-        return "Deliveroo";
-      default:
-        return brand;
-    }
-  };
-
-  const OrderCard = ({ order }: { order: Order }) => (
-    <Card
-      className="p-4 cursor-pointer hover:shadow-card transition-shadow"
-      onClick={() => openOrder(order.order_id)}
-    >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="font-semibold text-foreground">
-              Cmd #{order.order_num}
-            </span>
-            <Badge className={getBrandColor(order.brand)} variant="secondary">
-              {getBrandLabel(order.brand)}
-            </Badge>
+  const OrderCard = ({ order }: { order: Order }) => {
+    const source = getOrderSource(order);
+    const sourceConfig = getOrderSourceConfig(source);
+    
+    return (
+      <Card
+        className="p-4 cursor-pointer hover:shadow-card transition-shadow"
+        onClick={() => openOrder(order.order_id)}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span className="font-semibold text-foreground">
+                Cmd #{order.order_num}
+              </span>
+              <Badge className={sourceConfig.className}>
+                {sourceConfig.label}
+              </Badge>
+              {order.order_type && (
+                <Badge variant="outline" className="text-xs">
+                  {getOrderTypeLabel(order.order_type)}
+                </Badge>
+              )}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {formatDate(order.creation_date)}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {formatDate(order.creation_date)}
-          </p>
-        </div>
 
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">Montant TTC</p>
-          <p className="text-sm text-muted-foreground">
-            {order.products.length} article{order.products.length > 1 ? "s" : ""}
-          </p>
-        </div>
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">Montant TTC</p>
+            <p className="text-sm text-muted-foreground">
+              {order.products.length} article{order.products.length > 1 ? "s" : ""}
+            </p>
+          </div>
 
-        <div className="text-right">
-          <Badge
-            variant={order.state === "OPEN" ? "default" : "secondary"}
-            className="mb-1"
-          >
-            {order.state === "OPEN" ? "En cours" : "Fermée"}
-          </Badge>
-          <p className="font-bold text-primary">
-            {formatCurrency(order.TTC)}
-          </p>
+          <div className="text-right">
+            <Badge
+              variant="outline"
+              className={`mb-1 ${getOrderStateClassName(order.state)}`}
+            >
+              {getOrderStateLabel(order.state)}
+            </Badge>
+            <p className="font-bold text-primary">
+              {formatCurrency(order.TTC)}
+            </p>
+          </div>
         </div>
-      </div>
-    </Card>
-  );
+      </Card>
+    );
+  };
 
   return (
     <DashboardLayout>
