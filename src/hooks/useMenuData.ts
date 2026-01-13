@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { TvaRateGroup, Menu, Product, UnitOfMeasure, Component, Attribute, MenuData } from '@/types/menu';
+import { TvaRateGroup, Menu, Product, UnitOfMeasure, Component, Attribute, MenuData, Category } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
@@ -27,14 +27,23 @@ export const useMenuData = () => {
         menuService.getAttributes()
       ]);
 
-      // L'API retourne { id, data: { status, products_types, components_types, ... } }
-      const apiData = (menuResponse as unknown as { id: string; data: MenuData }).data || (menuResponse as MenuData);
+      // Handle both API formats: { id, data: { ... } } or direct { products_types, products }
+      let apiData: MenuData;
+      if (menuResponse.data) {
+        apiData = menuResponse.data;
+      } else if (menuResponse.products_types) {
+        apiData = menuResponse as unknown as MenuData;
+      } else {
+        apiData = { products_types: [], products: [] };
+      }
       
-      // Garder la structure API telle quelle, sans transformation inutile
+      // Normalize categories to have consistent properties
       const productsTypes = (apiData.products_types || []).map((cat: Category) => ({
-        category_id: cat.category_id,
-        category: cat.category,
-        category_name: cat.category_name || cat.category, // fallback pour compatibilité
+        category_id: cat.category_id || cat.id || '',
+        category: cat.category || cat.name || '',
+        category_name: cat.category_name || cat.category || cat.name || '',
+        id: cat.id || cat.category_id || '',
+        name: cat.name || cat.category || '',
         order: cat.order || 0,
         bg_color: cat.bg_color,
         products: (cat.products || [])
@@ -86,7 +95,7 @@ export const useMenuData = () => {
             order: productOrder.indexOf(p.product_id)
           }))
         })),
-        products: prev.products.map(p => ({
+        products: prev.products?.map(p => ({
           ...p,
           order: productOrder.indexOf(p.product_id)
         }))
@@ -110,7 +119,7 @@ export const useMenuData = () => {
       await menuService.updateProduct(productId, data);
       setMenuData(prev => ({
         ...prev,
-        products: prev.products.map(p => 
+        products: prev.products?.map(p => 
           p.product_id === productId ? { ...p, ...data } : p
         ),
         products_types: prev.products_types.map(c => ({
@@ -168,16 +177,18 @@ export const useMenuData = () => {
     }
   };
 
-  const createCategory = async (name: string) => {
+  const createCategory = async (name: string): Promise<Category> => {
     try {
       const newCategory = await menuService.createCategory(name);
-      // On s'assure d'avoir category_id et category corrects pour correspondre à l'API
-      const categoryWithProps = { 
-        ...newCategory, 
-        category_id: newCategory.category_id || newCategory.id,
-        category: newCategory.category || name,
-        category_name: newCategory.category || name,
-        products: newCategory.products || []
+      // Normalize to have all required properties
+      const categoryWithProps: Category = { 
+        category_id: newCategory.id,
+        category: name,
+        category_name: name,
+        id: newCategory.id,
+        name: name,
+        order: newCategory.order,
+        products: []
       };
       setMenuData(prev => ({
         ...prev,
@@ -187,13 +198,14 @@ export const useMenuData = () => {
         title: "Succès",
         description: "Catégorie créée avec succès"
       });
-      return newCategory;
+      return categoryWithProps;
     } catch (error) {
       toast({
         title: "Erreur",
         description: "Impossible de créer la catégorie",
         variant: "destructive"
       });
+      throw error;
     }
   };
 
@@ -203,7 +215,7 @@ export const useMenuData = () => {
       const productWithId = { ...newProduct, product_id: newProduct.product_id || newProduct.product_id };
       setMenuData(prev => ({
         ...prev,
-        products: [...prev.products, productWithId],
+        products: [...(prev.products || []), productWithId],
         products_types: prev.products_types.map(c => 
           c.category_id === productWithId.category ? {
             ...c,
@@ -224,7 +236,7 @@ export const useMenuData = () => {
     }
   };
 
-  const createComponent = async (data: Omit<Component, 'id'>) => {
+  const createComponent = async (data: { name: string; unit_id: number; price: number; category_id?: string }) => {
     try {
       const newComponent = await menuService.createComponent(data);
       setComponents(prev => [...prev, newComponent]);

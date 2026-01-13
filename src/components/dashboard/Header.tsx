@@ -34,9 +34,9 @@ export const Header = () => {
     try {
       const response = await authService.loginWithToken(token);
 
-      
+      const status = response.data?.status;
 
-      switch (response.data.status) {
+      switch (status) {
         case '0':
         case 'user_not_found':
           toast({
@@ -63,17 +63,18 @@ export const Header = () => {
           });
           break;
 
-          case '1':
-            setAuthData(response.data);
-            toast({
-              title: 'Établissement changé',
-              description: `Vous êtes maintenant connecté à ${businessName}`,
-            });
-            // Recharger la page avec un petit délai pour que le toast s'affiche
-            setTimeout(() => {
-              window.location.reload();
-            }, 500);
-            break;
+        case '1':
+        default:
+          setAuthData(response.data);
+          toast({
+            title: 'Établissement changé',
+            description: `Vous êtes maintenant connecté à ${businessName}`,
+          });
+          // Recharger la page avec un petit délai pour que le toast s'affiche
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+          break;
       }
       
     } catch (error) {
@@ -114,21 +115,32 @@ export const Header = () => {
               <ChevronDown className="w-4 h-4 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuContent align="end" className="w-72 bg-popover">
             <DropdownMenuLabel>Établissements</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {authData.merchants.map((merchant, index) => (
               <DropdownMenuItem
                 key={merchant.merchant_id || `merchant-${index}`}
                 onClick={() => handleMerchantSwitch(merchant.token, merchant.business_name)}
-                className={
+                className={`flex flex-col items-start gap-0.5 py-3 cursor-pointer ${
                   merchant.merchant_id === authData.merchantId
-                    ? 'bg-primary/10 font-medium'
+                    ? 'bg-primary/10'
                     : ''
-                }
+                }`}
               >
-                <Building2 className="w-4 h-4 mr-2" />
-                {merchant.business_name}
+                <div className="flex items-center gap-2 w-full">
+                  <Building2 className="w-4 h-4 flex-shrink-0" />
+                  <span className={`font-medium ${
+                    merchant.merchant_id === authData.merchantId ? 'text-primary' : ''
+                  }`}>
+                    {merchant.business_name}
+                  </span>
+                </div>
+                {merchant.address && (
+                  <span className="text-xs text-muted-foreground ml-6 line-clamp-1">
+                    {merchant.address}
+                  </span>
+                )}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

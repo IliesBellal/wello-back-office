@@ -53,7 +53,7 @@ export default function Components() {
     const usedCategoryIds = new Set(
       components.map((c: any) => c.category_id).filter(Boolean)
     );
-    return menuData.products_types.filter(cat => usedCategoryIds.has(cat.id));
+    return menuData.products_types.filter(cat => usedCategoryIds.has(cat.id || cat.category_id));
   }, [menuData.products_types, components]);
 
   const displayedComponents = selectedCategoryId
@@ -105,16 +105,20 @@ export default function Components() {
           >
             Tous les composants
           </Button>
-          {categories.map((category) => (
-            <Button
-              key={category.id}
-              variant={selectedCategoryId === category.id ? "default" : "ghost"}
-              className={`w-full justify-start ${selectedCategoryId === category.id ? 'bg-gradient-primary' : ''}`}
-              onClick={() => setSelectedCategoryId(category.id)}
-            >
-              {category.name}
-            </Button>
-          ))}
+          {categories.map((category) => {
+            const catId = category.id || category.category_id;
+            const catName = category.name || category.category;
+            return (
+              <Button
+                key={catId}
+                variant={selectedCategoryId === catId ? "default" : "ghost"}
+                className={`w-full justify-start ${selectedCategoryId === catId ? 'bg-gradient-primary' : ''}`}
+                onClick={() => setSelectedCategoryId(catId)}
+              >
+                {catName}
+              </Button>
+            );
+          })}
         </div>
 
         {/* Main Content - Components Grid */}
@@ -126,7 +130,7 @@ export default function Components() {
               </h1>
               <p className="text-muted-foreground mt-1">
                 {selectedCategoryId 
-                  ? categories.find(c => c.id === selectedCategoryId)?.name 
+                  ? categories.find(c => (c.id || c.category_id) === selectedCategoryId)?.name || categories.find(c => (c.id || c.category_id) === selectedCategoryId)?.category
                   : `${components.length} composant(s) au total`}
               </p>
             </div>

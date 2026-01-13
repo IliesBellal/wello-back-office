@@ -1,6 +1,7 @@
 export interface Merchant {
   merchant_id: string;
   business_name: string;
+  address?: string;
   token: string;
 }
 
@@ -13,6 +14,7 @@ export interface AuthData {
   merchantName: string;
   logo_url: string;
   merchants: Merchant[];
+  status?: string;
 }
 
 export interface AuthResponse {
