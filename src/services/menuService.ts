@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI } from "@/services/apiClient";
-import { TvaRateGroup, MenuData, UnitOfMeasure, Component, Attribute, Product } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, Component, Attribute, Product } from "@/types/menu";
 
 // ============= Mock Data =============
 const mockTvaRates: TvaRateGroup[] = [
@@ -68,8 +68,8 @@ const mockAttributes: Attribute[] = [
   }
 ];
 
-const mockMenuData: MenuData = {
-  categories: [
+const mockMenuData: Menu = {
+  products_types: [
     { id: "cat1", name: "Pizzas", order: 1 },
     { id: "cat2", name: "Boissons", order: 2 }
   ],
@@ -141,18 +141,18 @@ const mockMenuData: MenuData = {
 // ============= API Functions =============
 export const menuService = {
   async getTvaRates(): Promise<TvaRateGroup[]> {
-    logAPI('GET', '/establishment/tva_rates');
+    logAPI('GET', '/pos/tva_rates');
     return withMock(
       () => [...mockTvaRates],
-      () => apiClient.get<TvaRateGroup[]>('/establishment/tva_rates')
+      () => apiClient.get<TvaRateGroup[]>('/pos/tva_rates')
     );
   },
 
-  async getMenuData(): Promise<MenuData> {
+  async getMenuData(): Promise<Menu> {
     logAPI('GET', '/menu');
     return withMock(
-      () => ({ ...mockMenuData, categories: [...mockMenuData.categories], products: [...mockMenuData.products] }),
-      () => apiClient.get<MenuData>('/menu')
+      () => ({ ...mockMenuData, products_types: [...mockMenuData.products_types], products: [...mockMenuData.products] }),
+      () => apiClient.get<Menu>('/menu')
     );
   },
 
@@ -165,10 +165,10 @@ export const menuService = {
   },
 
   async getUnitsOfMeasure(): Promise<UnitOfMeasure[]> {
-    logAPI('GET', '/establishment/units_of_measures');
+    logAPI('GET', '/menu/units_of_measures');
     return withMock(
       () => [...mockUnitsOfMeasure],
-      () => apiClient.get<UnitOfMeasure[]>('/establishment/units_of_measures')
+      () => apiClient.get<UnitOfMeasure[]>('/menu/units_of_measures')
     );
   },
 
@@ -242,10 +242,10 @@ export const menuService = {
     logAPI('POST', '/menu/products', data);
     return withMock(
       () => ({ 
-        id: `p_${Date.now()}`, 
+        product_id: `p_${Date.now()}`, 
         category_id: data.category_id || '',
         name: data.name || '',
-        is_group: data.is_group || false,
+        is_product_group: data.is_product_group || false,
         order: 999,
         ...data,
         integrations: {

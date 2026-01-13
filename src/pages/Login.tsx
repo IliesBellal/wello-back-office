@@ -23,12 +23,43 @@ const Login = () => {
 
     try {
       const response = await authService.login({ email, password });
-      setAuthData(response.data);
-      toast({
-        title: 'Connexion réussie',
-        description: `Bienvenue ${response.data.first_name}!`,
-      });
-      navigate('/');
+
+      switch (response.data.status) {
+        case '0':
+        case 'user_not_found':
+          toast({
+            title: 'Compte introuvable',
+            description: 'Email ou mot de passe incorrect',
+            variant: 'destructive',
+          });
+          break;
+          
+        case '3':
+        case 'account_disabled':
+          toast({
+            title: 'Compte désactivé',
+            description: 'Votre compte a été désactivé.',
+            variant: 'destructive',
+          });
+          break;
+          
+        case 'user_not_allowed':
+          toast({
+            title: 'Accès refusé',
+            description: 'Vous n\'avez pas la permission d\'accéder à cette application.',
+            variant: 'destructive',
+          });
+          break;
+
+          case '1':
+            setAuthData(response.data);
+            toast({
+              title: 'Connexion réussie',
+              description: `Bienvenue ${response.data.first_name}!`,
+            });
+            navigate('/');
+            break;
+      }
     } catch (error) {
       toast({
         title: 'Erreur de connexion',

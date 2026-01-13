@@ -1,4 +1,4 @@
-import { apiClient, withMock, logAPI, API_BASE_URL } from "@/services/apiClient";
+import { apiClient, withMock, logAPI, API_BASE_URL, requestWithCustomToken } from "@/services/apiClient";
 import { AuthResponse, LoginCredentials } from '@/types/auth';
 
 // ============= Mock Data =============
@@ -23,16 +23,16 @@ const mockAuthResponse: AuthResponse = {
 // ============= API Functions =============
 export const authService = {
   login: async (credentials: LoginCredentials): Promise<AuthResponse> => {
-    logAPI('GET', '/auth/login', credentials);
+    logAPI('POST', '/auth/login', credentials);
     
     return withMock(
       () => ({ ...mockAuthResponse }),
-      () => apiClient.get<AuthResponse>('/auth/login', credentials, { skipAuth: true })
+      () => apiClient.post<AuthResponse>('/auth/login', credentials, { skipAuth: true })
     );
   },
 
   switchMerchant: async (token: string): Promise<AuthResponse> => {
-    logAPI('GET', '/auth/login (switch merchant)');
+    logAPI('POST', '/auth/login (switch merchant)');
     
     return withMock(
       () => {
@@ -49,21 +49,30 @@ export const authService = {
         }
         return { ...mockAuthResponse };
       },
-      async () => {
-        const response = await fetch(`${API_BASE_URL}/auth/login`, {
-          method: 'GET',
-          headers: {
-            'Authorization': token,
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (!response.ok) {
-          throw new Error('Merchant switch failed');
+      async () => apiClient.post<AuthResponse>('/auth/login', {}, { skipAuth: false })
+    );
+  },
+
+  loginWithToken: async (customToken: string): Promise<AuthResponse> => {
+    logAPI('POST', '/auth/login (with custom token)');
+    
+    return withMock(
+      () => {
+        // Mock: find the merchant by token
+        const merchant = mockAuthResponse.data.merchants.find(m => m.token === customToken);
+        if (merchant) {
+          return {
+            ...mockAuthResponse,
+            data: {
+              ...mockAuthResponse.data,
+              merchantId: merchant.merchant_id,
+              merchantName: merchant.business_name,
+            }
+          };
         }
-        
-        return response.json();
-      }
+        return { ...mockAuthResponse };
+      },
+      async () => requestWithCustomToken<AuthResponse>('/auth/login', customToken, { method: 'POST', body: {} })
     );
   },
 };

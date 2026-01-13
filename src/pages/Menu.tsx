@@ -93,18 +93,18 @@ export default function Menu() {
         </div>
 
         <div className="space-y-8">
-          {menuData.categories
+          {menuData.products_types
             .sort((a, b) => a.order - b.order)
             .map((category) => (
-              <div key={category.id} className="mb-8">
-                <h2 className="text-2xl font-bold text-foreground mb-4">{category.name}</h2>
+              <div key={category.category_id} className="mb-8">
+                <h2 className="text-2xl font-bold text-foreground mb-4">{category.category_name || category.category}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {menuData.products
-                    .filter((p) => p.category_id === category.id)
-                    .sort((a, b) => a.order - b.order)
+                  {category.products
+                    .filter((p) => p.category_id === category.category_id)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0))
                     .map((product) => (
                       <ProductCard
-                        key={product.id}
+                        key={product.product_id}
                         product={product}
                         onClick={() => handleProductClick(product)}
                       />
@@ -115,23 +115,23 @@ export default function Menu() {
         </div>
 
         <SimpleProductSheet
-          product={selectedProduct && !selectedProduct.is_group ? selectedProduct : null}
-          open={sheetOpen && selectedProduct !== null && !selectedProduct.is_group}
+          product={selectedProduct && !selectedProduct.is_product_group ? selectedProduct : null}
+          open={sheetOpen && selectedProduct !== null && !selectedProduct.is_product_group}
           onOpenChange={setSheetOpen}
           tvaRates={tvaRates}
           units={units}
           components={components}
           attributes={attributes}
-          categories={menuData.categories}
+          categories={menuData.products_types}
           onSave={updateProduct}
           onCreateCategory={createCategory}
         />
 
         <GroupProductSheet
-          product={selectedProduct && selectedProduct.is_group ? selectedProduct : null}
-          open={sheetOpen && selectedProduct !== null && selectedProduct.is_group}
+          product={selectedProduct && selectedProduct.is_product_group ? selectedProduct : null}
+          open={sheetOpen && selectedProduct !== null && selectedProduct.is_product_group}
           onOpenChange={setSheetOpen}
-          categories={menuData.categories}
+          categories={menuData.products_types}
           onSave={updateProduct}
           onCreateCategory={createCategory}
         />
@@ -139,7 +139,7 @@ export default function Menu() {
         <CategoryManagementSheet
           open={categoryManagerOpen}
           onOpenChange={setCategoryManagerOpen}
-          categories={menuData.categories}
+          categories={menuData.products_types}
         />
 
         <AttributesManager
@@ -153,7 +153,7 @@ export default function Menu() {
         <OrganizeModal
           open={organizeModalOpen}
           onOpenChange={setOrganizeModalOpen}
-          categories={menuData.categories}
+          categories={menuData.products_types}
           products={menuData.products}
           onSaveOrder={saveOrder}
         />
@@ -166,7 +166,7 @@ export default function Menu() {
         <ProductCreateSheet
           open={productCreateOpen}
           onOpenChange={setProductCreateOpen}
-          categories={menuData.categories}
+          categories={menuData.products_types}
           tvaRates={tvaRates}
           onCreateProduct={createProduct}
           onCreateCategory={createCategory}

@@ -49,7 +49,7 @@ export const ProductEditModal = ({
   if (!product) return null;
 
   const handleSave = () => {
-    onSave(product.id, formData);
+    onSave(product.product_id, formData);
     onOpenChange(false);
   };
 
@@ -70,7 +70,7 @@ export const ProductEditModal = ({
     return group?.rates || [];
   };
 
-  if (product.is_group) {
+  if (product.is_product_group) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-2xl">

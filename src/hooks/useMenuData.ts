@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { TvaRateGroup, MenuData, Product, UnitOfMeasure, Component, Attribute } from '@/types/menu';
+import { TvaRateGroup, Menu, Product, UnitOfMeasure, Component, Attribute, MenuData } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
   const [tvaRates, setTvaRates] = useState<TvaRateGroup[]>([]);
-  const [menuData, setMenuData] = useState<MenuData>({ categories: [], products: [] });
+  const [menuData, setMenuData] = useState<MenuData>({ products_types: [], products: [] });
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);
@@ -14,24 +14,51 @@ export const useMenuData = () => {
 
   useEffect(() => {
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const [rates, menu, unitsData, componentsData, attributesData] = await Promise.all([
+      const [rates, menuResponse, unitsData, attributesData] = await Promise.all([
         menuService.getTvaRates(),
         menuService.getMenuData(),
         menuService.getUnitsOfMeasure(),
-        menuService.getComponents(),
         menuService.getAttributes()
       ]);
+
+      // L'API retourne { id, data: { status, products_types, components_types, ... } }
+      const apiData = (menuResponse as unknown as { id: string; data: MenuData }).data || (menuResponse as MenuData);
+      
+      // Garder la structure API telle quelle, sans transformation inutile
+      const productsTypes = (apiData.products_types || []).map((cat: Category) => ({
+        category_id: cat.category_id,
+        category: cat.category,
+        category_name: cat.category_name || cat.category, // fallback pour compatibilité
+        order: cat.order || 0,
+        bg_color: cat.bg_color,
+        products: (cat.products || [])
+      }));
+
+      const allProducts = productsTypes.flatMap((cat: Category) => cat.products || []);
+
+      // Les composants sont déjà retournés par GET /menu dans components_types
+      const componentsFromMenu = (apiData.components_types || []) as Component[];
+
       setTvaRates(rates);
-      setMenuData(menu);
+      setMenuData({
+        status: apiData.status,
+        last_menu_update: apiData.last_menu_update,
+        products_types: productsTypes,
+        products: allProducts,
+        components_types: apiData.components_types,
+        delays: apiData.delays
+      });
       setUnits(unitsData);
-      setComponents(componentsData);
+      setComponents(componentsFromMenu);
       setAttributes(attributesData);
     } catch (error) {
+      console.error('Erreur lors du chargement du menu:', error);
       toast({
         title: "Erreur",
         description: "Impossible de charger les données du menu",
@@ -50,13 +77,18 @@ export const useMenuData = () => {
       ]);
       
       setMenuData(prev => ({
-        categories: prev.categories.map(c => ({
+        ...prev,
+        products_types: prev.products_types.map(c => ({
           ...c,
-          order: categoryOrder.indexOf(c.id)
+          order: categoryOrder.indexOf(c.category_id),
+          products: c.products?.map(p => ({
+            ...p,
+            order: productOrder.indexOf(p.product_id)
+          }))
         })),
         products: prev.products.map(p => ({
           ...p,
-          order: productOrder.indexOf(p.id)
+          order: productOrder.indexOf(p.product_id)
         }))
       }));
 
@@ -79,8 +111,14 @@ export const useMenuData = () => {
       setMenuData(prev => ({
         ...prev,
         products: prev.products.map(p => 
-          p.id === productId ? { ...p, ...data } : p
-        )
+          p.product_id === productId ? { ...p, ...data } : p
+        ),
+        products_types: prev.products_types.map(c => ({
+          ...c,
+          products: c.products?.map(p => 
+            p.product_id === productId ? { ...p, ...data } : p
+          )
+        }))
       }));
       toast({
         title: "Succès",
@@ -133,9 +171,17 @@ export const useMenuData = () => {
   const createCategory = async (name: string) => {
     try {
       const newCategory = await menuService.createCategory(name);
+      // On s'assure d'avoir category_id et category corrects pour correspondre à l'API
+      const categoryWithProps = { 
+        ...newCategory, 
+        category_id: newCategory.category_id || newCategory.id,
+        category: newCategory.category || name,
+        category_name: newCategory.category || name,
+        products: newCategory.products || []
+      };
       setMenuData(prev => ({
         ...prev,
-        categories: [...prev.categories, newCategory]
+        products_types: [...prev.products_types, categoryWithProps]
       }));
       toast({
         title: "Succès",
@@ -151,12 +197,19 @@ export const useMenuData = () => {
     }
   };
 
-  const createProduct = async (data: any) => {
+  const createProduct = async (data: Partial<Product>) => {
     try {
       const newProduct = await menuService.createProduct(data);
+      const productWithId = { ...newProduct, product_id: newProduct.product_id || newProduct.product_id };
       setMenuData(prev => ({
         ...prev,
-        products: [...prev.products, newProduct]
+        products: [...prev.products, productWithId],
+        products_types: prev.products_types.map(c => 
+          c.category_id === productWithId.category ? {
+            ...c,
+            products: [...(c.products || []), productWithId]
+          } : c
+        )
       }));
       toast({
         title: "Succès",
@@ -171,7 +224,7 @@ export const useMenuData = () => {
     }
   };
 
-  const createComponent = async (data: any) => {
+  const createComponent = async (data: Omit<Component, 'id'>) => {
     try {
       const newComponent = await menuService.createComponent(data);
       setComponents(prev => [...prev, newComponent]);
@@ -189,12 +242,8 @@ export const useMenuData = () => {
   };
 
   const deleteComponent = async (componentId: string) => {
-    try {
-      await menuService.deleteComponent(componentId);
-      setComponents(prev => prev.filter(c => c.id !== componentId));
-    } catch (error) {
-      throw error;
-    }
+    await menuService.deleteComponent(componentId);
+    setComponents(prev => prev.filter(c => c.id !== componentId));
   };
 
   return {

@@ -50,7 +50,7 @@ export const ProductDetailsSheet = ({
 
   const handleSave = async () => {
     if (!product) return;
-    await onSave(product.id, formData);
+    await onSave(product.product_id, formData);
     setIsEditMode(false);
   };
 

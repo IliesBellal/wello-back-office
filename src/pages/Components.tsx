@@ -53,8 +53,8 @@ export default function Components() {
     const usedCategoryIds = new Set(
       components.map((c: any) => c.category_id).filter(Boolean)
     );
-    return menuData.categories.filter(cat => usedCategoryIds.has(cat.id));
-  }, [menuData.categories, components]);
+    return menuData.products_types.filter(cat => usedCategoryIds.has(cat.id));
+  }, [menuData.products_types, components]);
 
   const displayedComponents = selectedCategoryId
     ? componentsByCategory.get(selectedCategoryId) || []
@@ -185,7 +185,7 @@ export default function Components() {
       <ComponentCreateSheet
         open={createSheetOpen}
         onOpenChange={setCreateSheetOpen}
-        categories={menuData.categories}
+        categories={menuData.products_types}
         units={units}
         onCreateComponent={createComponent}
         onCreateCategory={createCategory}

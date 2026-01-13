@@ -59,49 +59,68 @@ export interface ProductAttribute {
 }
 
 export interface Product {
-  id: string;
-  category_id: string;
+  product_id: string;
+  category_id?: string;
+  category?: string;
   name: string;
   description?: string;
   price?: number;
+  price_take_away?: number;
+  price_delivery?: number;
+  image_url?: string;
   bg_color?: string;
-  is_group: boolean;
-  order: number;
-  tva_ids?: {
-    on_site: number;
-    takeaway: number;
-    delivery: number;
-  };
-  availability?: {
-    on_site: boolean;
-    takeaway: boolean;
-    delivery: boolean;
-    scan_order: boolean;
-  };
-  integrations?: {
-    uber_eats?: {
-      enabled: boolean;
-      price_override?: number;
-      id?: string;
-    };
-    deliveroo?: {
-      enabled: boolean;
-      price_override?: number;
-      id?: string;
-    };
+  is_product_group?: boolean;
+  is_group?: boolean;
+  is_popular?: boolean;
+  is_available_on_sno?: boolean;
+  order?: number;
+  status?: number;
+  available_in?: boolean;
+  available_take_away?: boolean;
+  available_delivery?: boolean;
+  tva_rate_in?: number;
+  tva_rate_delivery?: number;
+  tva_rate_take_away?: number;
+  components?: ProductComposition[];
+  configuration?: {
+    attributes?: ProductAttribute[];
   };
   sub_products?: SubProduct[];
-  composition?: ProductComposition[];
-  attributes?: ProductAttribute[];
+  quantity?: number;
+  paid_quantity?: number;
+  distributed_quantity?: number;
+  ready_for_distribution_quantity?: number;
+  isPaid?: number;
+  isDistributed?: number;
+  discount_id?: string | null;
+  discount_name?: string | null;
+  discounted_price?: number;
+  production_color?: string | null;
+  extra?: Record<string, unknown>;
+  without?: Record<string, unknown>;
+  customers?: string[];
+  comment?: string;
 }
 
 export interface Category {
-  id: string;
-  name: string;
+  category_id: string;
+  category: string;
+  category_name?: string;
   order: number;
+  bg_color?: string;
+  products: Product[];
+}
+
+export interface Menu {
+  id: string;
+  data: MenuData;
 }
 
 export interface MenuData {
-  categories: Category[];
-  products: Product[];
+  status?: string;
+  last_menu_update?: number;
+  products_types: Category[];
+  products?: Product[];
+  components_types?: Component[];
+  delays?: Record<string, number>[];
 }

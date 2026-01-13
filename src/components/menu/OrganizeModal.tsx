@@ -32,7 +32,7 @@ interface OrganizeModalProps {
 }
 
 const SortableCategoryItem = ({ category, isActive }: { category: Category; isActive: boolean }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: category.id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: category.category_id });
   
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -50,13 +50,13 @@ const SortableCategoryItem = ({ category, isActive }: { category: Category; isAc
       {...listeners}
     >
       <GripVertical className="w-4 h-4 text-muted-foreground" />
-      <span className="font-medium">{category.name}</span>
+      <span className="font-medium">{category.category_name}</span>
     </div>
   );
 };
 
 const SortableProductItem = ({ product }: { product: Product }) => {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: product.id });
+  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: product.product_id });
   
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -90,7 +90,7 @@ export const OrganizeModal = ({
   onSaveOrder
 }: OrganizeModalProps) => {
   const [categories, setCategories] = useState(initialCategories);
-  const [activeCategory, setActiveCategory] = useState<string>(initialCategories[0]?.id || '');
+  const [activeCategory, setActiveCategory] = useState<string>(initialCategories[0]?.category_id || '');
   const [products, setProducts] = useState(initialProducts);
   const { toast } = useToast();
 
@@ -101,8 +101,8 @@ export const OrganizeModal = ({
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = categories.findIndex(c => c.id === active.id);
-    const newIndex = categories.findIndex(c => c.id === over.id);
+    const oldIndex = categories.findIndex(c => c.category_id === active.id);
+    const newIndex = categories.findIndex(c => c.category_id === over.id);
 
     const newCategories = [...categories];
     const [movedItem] = newCategories.splice(oldIndex, 1);
@@ -115,8 +115,8 @@ export const OrganizeModal = ({
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = categoryProducts.findIndex(p => p.id === active.id);
-    const newIndex = categoryProducts.findIndex(p => p.id === over.id);
+    const oldIndex = categoryProducts.findIndex(p => p.product_id === active.id);
+    const newIndex = categoryProducts.findIndex(p => p.product_id === over.id);
 
     const newOrder = [...categoryProducts];
     const [movedItem] = newOrder.splice(oldIndex, 1);
@@ -124,15 +124,15 @@ export const OrganizeModal = ({
 
     setProducts(prev => prev.map(p => {
       if (p.category_id !== activeCategory) return p;
-      const index = newOrder.findIndex(np => np.id === p.id);
+      const index = newOrder.findIndex(np => np.product_id === p.product_id);
       return index >= 0 ? { ...p, order: index } : p;
     }));
   };
 
   const handleSave = async () => {
     try {
-      const categoryOrder = categories.map(c => c.id);
-      const productOrder = products.map(p => p.id);
+      const categoryOrder = categories.map(c => c.category_id);
+      const productOrder = products.map(p => p.product_id);
       await onSaveOrder(categoryOrder, productOrder);
       toast({
         title: "Succès",
@@ -165,12 +165,12 @@ export const OrganizeModal = ({
           {/* Left Sidebar - Categories */}
           <div className="w-1/5 overflow-y-auto space-y-2">
             <DndContext collisionDetection={closestCenter} onDragEnd={handleCategoryDragEnd}>
-              <SortableContext items={categories.map(c => c.id)} strategy={verticalListSortingStrategy}>
+              <SortableContext items={categories.map(c => c.category_id)} strategy={verticalListSortingStrategy}>
                 {categories.map(category => (
-                  <div key={category.id} onClick={() => setActiveCategory(category.id)}>
+                  <div key={category.category_id} onClick={() => setActiveCategory(category.category_id)}>
                     <SortableCategoryItem 
                       category={category} 
-                      isActive={activeCategory === category.id}
+                      isActive={activeCategory === category.category_id}
                     />
                   </div>
                 ))}
@@ -181,10 +181,10 @@ export const OrganizeModal = ({
           {/* Main Area - Products Grid */}
           <div className="flex-1 overflow-y-auto">
             <DndContext collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
-              <SortableContext items={categoryProducts.map(p => p.id)} strategy={rectSortingStrategy}>
+              <SortableContext items={categoryProducts.map(p => p.product_id)} strategy={rectSortingStrategy}>
                 <div className="grid grid-cols-4 gap-4">
                   {categoryProducts.map(product => (
-                    <SortableProductItem key={product.id} product={product} />
+                    <SortableProductItem key={product.product_id} product={product} />
                   ))}
                 </div>
               </SortableContext>

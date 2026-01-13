@@ -32,12 +32,50 @@ export const Header = () => {
   const handleMerchantSwitch = async (token: string, businessName: string) => {
     setIsSwitching(true);
     try {
-      const response = await authService.switchMerchant(token);
-      setAuthData(response.data);
-      toast({
-        title: 'Établissement changé',
-        description: `Vous êtes maintenant connecté à ${businessName}`,
-      });
+      const response = await authService.loginWithToken(token);
+
+      
+
+      switch (response.data.status) {
+        case '0':
+        case 'user_not_found':
+          toast({
+            title: 'Compte introuvable',
+            description: 'Email ou mot de passe incorrect',
+            variant: 'destructive',
+          });
+          break;
+          
+        case '3':
+        case 'account_disabled':
+          toast({
+            title: 'Compte désactivé',
+            description: 'Votre compte a été désactivé.',
+            variant: 'destructive',
+          });
+          break;
+          
+        case 'user_not_allowed':
+          toast({
+            title: 'Accès refusé',
+            description: 'Vous n\'avez pas la permission d\'accéder à cette application.',
+            variant: 'destructive',
+          });
+          break;
+
+          case '1':
+            setAuthData(response.data);
+            toast({
+              title: 'Établissement changé',
+              description: `Vous êtes maintenant connecté à ${businessName}`,
+            });
+            // Recharger la page avec un petit délai pour que le toast s'affiche
+            setTimeout(() => {
+              window.location.reload();
+            }, 500);
+            break;
+      }
+      
     } catch (error) {
       toast({
         title: 'Erreur',
@@ -79,9 +117,9 @@ export const Header = () => {
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuLabel>Établissements</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {authData.merchants.map((merchant) => (
+            {authData.merchants.map((merchant, index) => (
               <DropdownMenuItem
-                key={merchant.merchant_id}
+                key={merchant.merchant_id || `merchant-${index}`}
                 onClick={() => handleMerchantSwitch(merchant.token, merchant.business_name)}
                 className={
                   merchant.merchant_id === authData.merchantId

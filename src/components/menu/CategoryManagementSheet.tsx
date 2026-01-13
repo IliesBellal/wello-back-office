@@ -116,16 +116,16 @@ export const CategoryManagementSheet = ({
             <Label>Catégories Existantes</Label>
             <div className="space-y-2">
               {categories.map((category) => (
-                <div key={category.id} className="flex items-center gap-2 p-2 rounded-lg border bg-card">
-                  {editingId === category.id ? (
+                <div key={category.category_id} className="flex items-center gap-2 p-2 rounded-lg border bg-card">
+                  {editingId === category.category_id ? (
                     <>
                       <Input
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleUpdate(category.id)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleUpdate(category.category_id)}
                         className="flex-1"
                       />
-                      <Button size="sm" onClick={() => handleUpdate(category.id)}>
+                      <Button size="sm" onClick={() => handleUpdate(category.category_id)}>
                         OK
                       </Button>
                       <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>
@@ -134,13 +134,13 @@ export const CategoryManagementSheet = ({
                     </>
                   ) : (
                     <>
-                      <span className="flex-1 text-foreground">{category.name}</span>
+                      <span className="flex-1 text-foreground">{category.category_name || category.category}</span>
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => {
-                          setEditingId(category.id);
-                          setEditingName(category.name);
+                          setEditingId(category.category_id);
+                          setEditingName(category.category_name || category.category);
                         }}
                       >
                         <Pencil className="w-4 h-4" />
@@ -148,7 +148,7 @@ export const CategoryManagementSheet = ({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDelete(category.id)}
+                        onClick={() => handleDelete(category.category_id)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>

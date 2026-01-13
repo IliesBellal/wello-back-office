@@ -1,9 +1,9 @@
 import { toast } from "@/hooks/use-toast";
 
 // ============= Configuration =============
-export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK !== 'false';
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:3000";
-export const ENABLE_LOGS = import.meta.env.VITE_ENABLE_LOGS === 'true';
+export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK == 'true';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://ib-welloresto-api.onrender.com";
+export const ENABLE_LOGS = import.meta.env.VITE_ENABLE_LOGS !== 'false';
 
 
 // ============= Types =============
@@ -245,7 +245,7 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     const data = text ? JSON.parse(text) as T : {} as T;
     
     endRequestLog(logContext, response.status, data);
-    if (ENABLE_LOGS) console.log(`📥 [API RESPONSE] ${method} ${endpoint}`, data);
+    console.log(`📥 [API RESPONSE] ${method} ${endpoint}`, data);
     return data;
   } catch (error) {
     if (error instanceof TypeError && error.message === "Failed to fetch") {
@@ -254,7 +254,63 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     } else if (!(error instanceof Error && error.message.startsWith("HTTP error"))) {
       endRequestLogWithError(logContext, error);
     }
-    if (ENABLE_LOGS) console.error(`❌ [API ERROR] ${method} ${endpoint}`, error);
+    console.error(`❌ [API ERROR] ${method} ${endpoint}`, error);
+    throw error;
+  } finally {
+    decrementLoading();
+  }
+}
+
+// ============= Request with Custom Token =============
+async function requestWithCustomToken<T>(endpoint: string, customToken: string, options: ApiRequestOptions = {}): Promise<T> {
+  const { method = "POST", body, headers = {} } = options;
+  const url = `${API_BASE_URL}${endpoint}`;
+
+  const logContext = startRequestLog(method, endpoint, url, body);
+
+  incrementLoading();
+
+  try {
+    const requestHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      "Authorization": customToken,
+      ...headers,
+    };
+
+    const response = await fetch(url, {
+      method,
+      headers: requestHeaders,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+
+    if (!response.ok) {
+      let errorMessage: string | undefined;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorData.error;
+      } catch {
+        // Response is not JSON
+      }
+      endRequestLog(logContext, response.status, errorMessage, true);
+      handleApiError(response.status, errorMessage);
+      throw new Error(errorMessage || `HTTP error ${response.status}`);
+    }
+
+    // Handle empty responses
+    const text = await response.text();
+    const data = text ? JSON.parse(text) as T : {} as T;
+    
+    endRequestLog(logContext, response.status, data);
+    console.log(`📥 [API RESPONSE] ${method} ${endpoint}`, data);
+    return data;
+  } catch (error) {
+    if (error instanceof TypeError && error.message === "Failed to fetch") {
+      endRequestLogWithError(logContext, "Network Error: Failed to fetch");
+      handleNetworkError();
+    } else if (!(error instanceof Error && error.message.startsWith("HTTP error"))) {
+      endRequestLogWithError(logContext, error);
+    }
+    console.error(`❌ [API ERROR] ${method} ${endpoint}`, error);
     throw error;
   } finally {
     decrementLoading();
@@ -263,6 +319,7 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
 
 export const apiClient = {
   request,
+  requestWithCustomToken,
   
   get<T>(endpoint: string, options?: Omit<ApiRequestOptions, "method" | "body">): Promise<T> {
     return request<T>(endpoint, { ...options, method: "GET" });
@@ -324,6 +381,8 @@ export const withMock = async <T>(
 // ============= Legacy Logging (for backward compatibility) =============
 export const logAPI = (method: string, endpoint: string, payload?: unknown) => {
   if (ENABLE_LOGS) {
-    console.log(`%c[API] ${method} ${endpoint}`, 'color: #6b7280;', payload ? maskSensitiveData(payload) : '');
+    console.log(`%c[API] ${method} ${endpoint}`, 'color: #6b7280;', payload ? maskSensitiveData(payload) : 'no payload');
   }
 };
+
+export { requestWithCustomToken };

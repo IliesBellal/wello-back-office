@@ -85,8 +85,8 @@ export default function Orders() {
     }).format(cents / 100);
   };
 
-  const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "PPp", { locale: fr });
+  const formatDate = (timestamp: number) => {
+    return format(new Date(timestamp * 1000), "PPp", { locale: fr });
   };
 
   const openOrder = (orderId: string) => {
@@ -96,37 +96,52 @@ export default function Orders() {
 
   const getBrandColor = (brand: string) => {
     switch (brand) {
-      case "Uber":
+      case "UBER":
         return "bg-black text-white";
-      case "Deliveroo":
+      case "DELIVEROO":
         return "bg-[#00CCBC] text-white";
+      case "WELLO_RESTO":
+        return "bg-gradient-primary text-white";
       default:
         return "bg-gradient-primary text-white";
+    }
+  };
+
+  const getBrandLabel = (brand: string) => {
+    switch (brand) {
+      case "WELLO_RESTO":
+        return "Wello";
+      case "UBER":
+        return "Uber";
+      case "DELIVEROO":
+        return "Deliveroo";
+      default:
+        return brand;
     }
   };
 
   const OrderCard = ({ order }: { order: Order }) => (
     <Card
       className="p-4 cursor-pointer hover:shadow-card transition-shadow"
-      onClick={() => openOrder(order.id)}
+      onClick={() => openOrder(order.order_id)}
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-semibold text-foreground">
-              {order.order_number}
+              Cmd #{order.order_num}
             </span>
             <Badge className={getBrandColor(order.brand)} variant="secondary">
-              {order.brand}
+              {getBrandLabel(order.brand)}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            {formatDate(order.created_at)}
+            {formatDate(order.creation_date)}
           </p>
         </div>
 
         <div className="text-center">
-          <p className="font-medium text-foreground">{order.customer.name}</p>
+          <p className="text-sm text-muted-foreground">Montant TTC</p>
           <p className="text-sm text-muted-foreground">
             {order.products.length} article{order.products.length > 1 ? "s" : ""}
           </p>
@@ -140,7 +155,7 @@ export default function Orders() {
             {order.state === "OPEN" ? "En cours" : "Fermée"}
           </Badge>
           <p className="font-bold text-primary">
-            {formatCurrency(order.totals.ttc)}
+            {formatCurrency(order.TTC)}
           </p>
         </div>
       </div>
@@ -176,7 +191,7 @@ export default function Orders() {
               </div>
             ) : (
               pendingOrders.map((order) => (
-                <OrderCard key={order.id} order={order} />
+                <OrderCard key={order.order_id} order={order} />
               ))
             )}
           </TabsContent>
@@ -193,7 +208,7 @@ export default function Orders() {
             ) : (
               <>
                 {historyOrders.map((order) => (
-                  <OrderCard key={order.id} order={order} />
+                  <OrderCard key={order.order_id} order={order} />
                 ))}
                 
                 {/* Infinite scroll trigger */}

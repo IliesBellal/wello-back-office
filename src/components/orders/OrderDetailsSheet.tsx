@@ -45,12 +45,27 @@ export const OrderDetailsSheet = () => {
 
   const getBrandColor = (brand: string) => {
     switch (brand) {
-      case "Uber":
+      case "UBER":
         return "bg-black text-white";
-      case "Deliveroo":
+      case "DELIVEROO":
         return "bg-[#00CCBC] text-white";
+      case "WELLO_RESTO":
+        return "bg-gradient-primary text-white";
       default:
         return "bg-gradient-primary text-white";
+    }
+  };
+
+  const getBrandLabel = (brand: string) => {
+    switch (brand) {
+      case "WELLO_RESTO":
+        return "Wello";
+      case "UBER":
+        return "Uber";
+      case "DELIVEROO":
+        return "Deliveroo";
+      default:
+        return brand;
     }
   };
 
@@ -67,7 +82,7 @@ export const OrderDetailsSheet = () => {
           <>
             <SheetHeader>
               <div className="flex items-center justify-between">
-                <SheetTitle>Commande {order.order_number}</SheetTitle>
+                <SheetTitle>Commande #{order.order_num}</SheetTitle>
                 <div className="flex gap-2">
                   <Badge
                     variant={order.state === "OPEN" ? "default" : "secondary"}
@@ -75,7 +90,7 @@ export const OrderDetailsSheet = () => {
                     {order.state === "OPEN" ? "En cours" : "Fermée"}
                   </Badge>
                   <Badge className={getBrandColor(order.brand)}>
-                    {order.brand}
+                    {getBrandLabel(order.brand)}
                   </Badge>
                 </div>
               </div>
@@ -93,31 +108,56 @@ export const OrderDetailsSheet = () => {
 
               <TabsContent value="resume" className="space-y-6 mt-4">
                 {/* Customer Section */}
+                {order.customer && (
+                  <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
+                    <h3 className="font-semibold text-foreground">Client</h3>
+                    <div className="space-y-2 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Nom:</span>{" "}
+                        <span className="font-medium">{order.customer.customer_name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Téléphone:</span>
+                        <a
+                          href={`tel:${order.customer.customer_tel}`}
+                          className="font-medium text-primary hover:underline flex items-center gap-1"
+                        >
+                          {order.customer.customer_tel}
+                          <Phone className="w-3 h-3" />
+                        </a>
+                      </div>
+                      {order.customer.customer_address && (
+                        <div>
+                          <span className="text-muted-foreground">Adresse:</span>{" "}
+                          <span className="font-medium">
+                            {order.customer.customer_address}
+                          </span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-muted-foreground">Nb de commandes:</span>{" "}
+                        <span className="font-medium">{order.customer.customer_nb_orders}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Order Info Section */}
                 <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
-                  <h3 className="font-semibold text-foreground">Client</h3>
+                  <h3 className="font-semibold text-foreground">Informations</h3>
                   <div className="space-y-2 text-sm">
                     <div>
-                      <span className="text-muted-foreground">Nom:</span>{" "}
-                      <span className="font-medium">{order.customer.name}</span>
+                      <span className="text-muted-foreground">État:</span>{" "}
+                      <span className="font-medium">{order.state}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">Téléphone:</span>
-                      <a
-                        href={`tel:${order.customer.phone}`}
-                        className="font-medium text-primary hover:underline flex items-center gap-1"
-                      >
-                        {order.customer.phone}
-                        <Phone className="w-3 h-3" />
-                      </a>
+                    <div>
+                      <span className="text-muted-foreground">Type:</span>{" "}
+                      <span className="font-medium">{order.fulfillment_type}</span>
                     </div>
-                    {order.customer.address && (
-                      <div>
-                        <span className="text-muted-foreground">Adresse:</span>{" "}
-                        <span className="font-medium">
-                          {order.customer.address}
-                        </span>
-                      </div>
-                    )}
+                    <div>
+                      <span className="text-muted-foreground">Statut Marchand:</span>{" "}
+                      <span className="font-medium">{order.merchant_approval}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -131,7 +171,7 @@ export const OrderDetailsSheet = () => {
                         className="flex justify-between text-sm items-center"
                       >
                         <span className="text-muted-foreground">
-                          {payment.label}
+                          {payment.mop}
                         </span>
                         <span className="font-medium">
                           {formatCurrency(payment.amount)}
@@ -148,19 +188,19 @@ export const OrderDetailsSheet = () => {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">HT:</span>
                       <span className="font-medium">
-                        {formatCurrency(order.totals.ht)}
+                        {formatCurrency(order.HT)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">TVA:</span>
                       <span className="font-medium">
-                        {formatCurrency(order.totals.tva)}
+                        {formatCurrency(order.TVA)}
                       </span>
                     </div>
                     <div className="flex justify-between border-t pt-2">
                       <span className="font-semibold">TTC:</span>
                       <span className="font-bold text-primary">
-                        {formatCurrency(order.totals.ttc)}
+                        {formatCurrency(order.TTC)}
                       </span>
                     </div>
                   </div>
@@ -183,9 +223,19 @@ export const OrderDetailsSheet = () => {
                             x{product.quantity}
                           </Badge>
                         </div>
-                        {product.options && product.options.length > 0 && (
+                        {product.description && (
                           <div className="mt-1 text-xs text-muted-foreground">
-                            {product.options.join(", ")}
+                            {product.description}
+                          </div>
+                        )}
+                        {product.components && product.components.length > 0 && (
+                          <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                            <div className="font-semibold">Composants:</div>
+                            {product.components.map((comp, compIdx) => (
+                              <div key={compIdx}>
+                                - {comp.name} ({comp.quantity} {comp.unit_of_measure})
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

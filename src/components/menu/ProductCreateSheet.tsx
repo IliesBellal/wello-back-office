@@ -81,19 +81,16 @@ export function ProductCreateSheet({
         name: data.name,
         description: data.description,
         price: Math.round(data.price * 100), // Convert to cents
+        price_take_away: Math.round(data.price * 100),
+        price_delivery: Math.round(data.price * 100),
         category_id: data.category_id,
-        tva_ids: {
-          on_site: data.tva_on_site,
-          takeaway: data.tva_takeaway,
-          delivery: data.tva_delivery,
-        },
-        availability: {
-          on_site: true,
-          takeaway: true,
-          delivery: true,
-          scan_order: true,
-        },
-        is_group: false,
+        tva_rate_in: parseInt(data.tva_on_site),
+        tva_rate_take_away: parseInt(data.tva_takeaway),
+        tva_rate_delivery: parseInt(data.tva_delivery),
+        available_in: true,
+        available_take_away: true,
+        available_delivery: true,
+        is_product_group: false,
       });
       form.reset();
       onOpenChange(false);

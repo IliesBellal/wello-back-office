@@ -44,7 +44,7 @@ export const GroupProductSheet = ({
 
   const handleSave = async () => {
     if (!product) return;
-    await onSave(product.id, formData);
+    await onSave(product.product_id, formData);
     setIsEditMode(false);
   };
 
@@ -133,7 +133,7 @@ export const GroupProductSheet = ({
                 <div>
                   <Label>Catégorie</Label>
                   <p className="mt-1 text-foreground">
-                    {categories.find(c => c.id === product.category_id)?.name || 'Non défini'}
+                    {categories.find(c => c.category_id === product.category_id)?.category_name || 'Non défini'}
                   </p>
                 </div>
               </div>

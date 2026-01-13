@@ -36,9 +36,9 @@ export function CategorySelector({
   const [search, setSearch] = useState('');
   const [isCreating, setIsCreating] = useState(false);
 
-  const selectedCategory = categories.find(c => c.id === value);
+  const selectedCategory = categories.find(c => c.category_id === value);
   const searchLower = search.toLowerCase();
-  const exactMatch = categories.some(c => c.name.toLowerCase() === searchLower);
+  const exactMatch = categories.some(c => c.category_name.toLowerCase() === searchLower);
 
   const handleCreateCategory = async () => {
     if (!search.trim() || isCreating) return;
@@ -48,7 +48,7 @@ export function CategorySelector({
     setIsCreating(false);
     
     if (newCategory) {
-      onValueChange(newCategory.id);
+      onValueChange(newCategory.category_id);
       setSearch('');
       setOpen(false);
     }
@@ -64,7 +64,7 @@ export function CategorySelector({
           className="w-full justify-between"
           disabled={isCreating}
         >
-          {selectedCategory ? selectedCategory.name : placeholder}
+          {selectedCategory ? selectedCategory.category_name : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -93,10 +93,10 @@ export function CategorySelector({
             <CommandGroup>
               {categories.map((category) => (
                 <CommandItem
-                  key={category.id}
-                  value={category.name}
+                  key={category.category_id}
+                  value={category.category_name}
                   onSelect={() => {
-                    onValueChange(category.id);
+                    onValueChange(category.category_id);
                     setOpen(false);
                     setSearch('');
                   }}
@@ -104,10 +104,10 @@ export function CategorySelector({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === category.id ? "opacity-100" : "opacity-0"
+                      value === category.category_id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  {category.name}
+                  {category.category_name}
                 </CommandItem>
               ))}
             </CommandGroup>
