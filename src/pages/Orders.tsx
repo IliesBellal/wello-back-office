@@ -16,6 +16,7 @@ import {
   getOrderStateClassName,
   getOrderTypeLabel,
 } from "@/utils/orderUtils";
+import { Loader2 } from "lucide-react";
 
 export default function Orders() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,7 +68,7 @@ export default function Orders() {
     }
   }, [historyPage, loadingMore, hasMoreHistory]);
 
-  // Intersection observer for infinite scroll
+  // Intersection observer for infinite scroll - triggers earlier for smoother UX
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -75,7 +76,10 @@ export default function Orders() {
           loadMoreHistory();
         }
       },
-      { threshold: 0.1 }
+      { 
+        threshold: 0,
+        rootMargin: "200px" // Trigger 200px before reaching the bottom
+      }
     );
 
     if (observerTarget.current) {
@@ -205,10 +209,9 @@ export default function Orders() {
                 {/* Infinite scroll trigger */}
                 <div ref={observerTarget} className="py-4">
                   {loadingMore && (
-                    <div className="space-y-3">
-                      {Array.from({ length: 3 }).map((_, i) => (
-                        <Skeleton key={i} className="h-24 w-full" />
-                      ))}
+                    <div className="flex items-center justify-center gap-2 py-4">
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <span className="text-sm text-muted-foreground">Chargement...</span>
                     </div>
                   )}
                   {!hasMoreHistory && historyOrders.length > 0 && (
