@@ -4,7 +4,6 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { ordersService, Order } from "@/services/ordersService";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -16,7 +15,8 @@ import {
   getOrderStateClassName,
   getOrderTypeLabel,
 } from "@/utils/orderUtils";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronRight } from "lucide-react";
+import { CardSkeleton } from "@/components/shared/CardSkeleton";
 
 export default function Orders() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,6 +27,7 @@ export default function Orders() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [activeTab, setActiveTab] = useState("pending");
   
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -68,8 +69,10 @@ export default function Orders() {
     }
   }, [historyPage, loadingMore, hasMoreHistory]);
 
-  // Intersection observer for infinite scroll - triggers earlier for smoother UX
+  // Intersection observer for infinite scroll - only on history tab
   useEffect(() => {
+    if (activeTab !== "history") return;
+
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && hasMoreHistory && !loadingMore) {
@@ -78,7 +81,7 @@ export default function Orders() {
       },
       { 
         threshold: 0,
-        rootMargin: "200px" // Trigger 200px before reaching the bottom
+        rootMargin: "200px"
       }
     );
 
@@ -87,7 +90,7 @@ export default function Orders() {
     }
 
     return () => observer.disconnect();
-  }, [loadMoreHistory, hasMoreHistory, loadingMore]);
+  }, [loadMoreHistory, hasMoreHistory, loadingMore, activeTab]);
 
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat("fr-FR", {
@@ -98,6 +101,10 @@ export default function Orders() {
 
   const formatDate = (timestamp: number) => {
     return format(new Date(timestamp * 1000), "PPp", { locale: fr });
+  };
+
+  const formatDateShort = (timestamp: number) => {
+    return format(new Date(timestamp * 1000), "dd/MM HH:mm", { locale: fr });
   };
 
   const openOrder = (orderId: string) => {
@@ -111,10 +118,54 @@ export default function Orders() {
     
     return (
       <Card
-        className="p-4 cursor-pointer hover:shadow-card transition-shadow"
+        className="p-3 md:p-4 cursor-pointer hover:shadow-card transition-shadow active:scale-[0.99] touch-target"
         onClick={() => openOrder(order.order_id)}
       >
-        <div className="flex items-center justify-between gap-4">
+        {/* Mobile Layout */}
+        <div className="md:hidden">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-foreground">
+                  #{order.order_num}
+                </span>
+                <Badge className={`${sourceConfig.className} text-xs`}>
+                  {sourceConfig.label}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {formatDateShort(order.creation_date)}
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="font-bold text-primary">
+                  {formatCurrency(order.TTC)}
+                </p>
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${getOrderStateClassName(order.state)}`}
+                >
+                  {getOrderStateLabel(order.state)}
+                </Badge>
+              </div>
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+          {order.order_type && (
+            <div className="mt-2 pt-2 border-t border-border">
+              <Badge variant="secondary" className="text-xs">
+                {getOrderTypeLabel(order.order_type)}
+              </Badge>
+              <span className="text-xs text-muted-foreground ml-2">
+                {order.products.length} article{order.products.length > 1 ? "s" : ""}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Desktop Layout */}
+        <div className="hidden md:flex items-center justify-between gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="font-semibold text-foreground">
@@ -159,25 +210,35 @@ export default function Orders() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
+      <div className="mobile-padding space-y-4 md:space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Commandes</h1>
-          <p className="text-muted-foreground mt-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">Commandes</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-1">
             Gérez vos commandes en cours et consultez l'historique
           </p>
         </div>
 
-        <Tabs defaultValue="pending" className="w-full">
-          <TabsList>
-            <TabsTrigger value="pending">En Cours</TabsTrigger>
-            <TabsTrigger value="history">Historique</TabsTrigger>
+        <Tabs 
+          defaultValue="pending" 
+          className="w-full"
+          onValueChange={setActiveTab}
+        >
+          <TabsList className="w-full md:w-auto">
+            <TabsTrigger value="pending" className="flex-1 md:flex-none min-h-[44px]">
+              En Cours
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex-1 md:flex-none min-h-[44px]">
+              Historique
+            </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="pending" className="space-y-3 mt-6">
+          <TabsContent value="pending" className="space-y-3 mt-4 md:mt-6">
             {loadingPending ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))
+              <div className="space-y-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <CardSkeleton key={i} lines={2} showBadge />
+                ))}
+              </div>
             ) : pendingOrders.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">
@@ -191,11 +252,13 @@ export default function Orders() {
             )}
           </TabsContent>
 
-          <TabsContent value="history" className="space-y-3 mt-6">
+          <TabsContent value="history" className="space-y-3 mt-4 md:mt-6">
             {loadingHistory ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-24 w-full" />
-              ))
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <CardSkeleton key={i} lines={2} showBadge />
+                ))}
+              </div>
             ) : historyOrders.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-muted-foreground">Aucun historique</p>
