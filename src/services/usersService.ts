@@ -84,7 +84,23 @@ const mockUsers: User[] = [
 export const usersService = {
   async getUsers(): Promise<User[]> {
     logAPI('GET', '/pos/users');
-    return withMock(() => [...mockUsers], () => apiClient.get<User[]>('/pos/users'));
+    return withMock(
+      () => [...mockUsers], 
+      async () => {
+        const response = await apiClient.get<{ data: { users: Array<{ user_id: string; first_name: string; last_name: string; lat: number | null; lng: number | null; status: string }> } }>('/pos/users');
+        // Transform API response to our User type
+        return response.data.users.map(u => ({
+          id: u.user_id,
+          first_name: u.first_name,
+          last_name: u.last_name,
+          email: '',
+          phone: '',
+          color: '#6366f1',
+          permissions: { enabled: u.status === 'AVAILABLE', is_admin: false },
+          address: {}
+        }));
+      }
+    );
   },
 
   async getUserActivity(userId: string): Promise<UserActivity[]> {
