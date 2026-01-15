@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  ResponsiveSheet,
+  ResponsiveSheetContent,
+  ResponsiveSheetHeader,
+  ResponsiveSheetTitle,
+} from "@/components/ui/responsive-sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Phone, Calendar, MapPin } from "lucide-react";
 import { ordersService, Order } from "@/services/ordersService";
 import { format } from "date-fns";
@@ -22,6 +21,7 @@ import {
   getMerchantApprovalLabel,
   getMerchantApprovalClassName,
 } from "@/utils/orderUtils";
+import { CardSkeleton } from "@/components/shared/CardSkeleton";
 
 export const OrderDetailsSheet = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -64,19 +64,19 @@ export const OrderDetailsSheet = () => {
   const sourceConfig = source ? getOrderSourceConfig(source) : null;
 
   return (
-    <Sheet open={!!orderId} onOpenChange={(open) => !open && handleClose()}>
-      <SheetContent className="sm:max-w-lg overflow-y-auto">
+    <ResponsiveSheet open={!!orderId} onOpenChange={(open) => !open && handleClose()}>
+      <ResponsiveSheetContent>
         {loading ? (
           <div className="space-y-4">
-            <Skeleton className="h-8 w-3/4" />
-            <Skeleton className="h-24 w-full" />
-            <Skeleton className="h-48 w-full" />
+            <CardSkeleton lines={2} />
+            <CardSkeleton lines={4} />
+            <CardSkeleton lines={3} />
           </div>
         ) : order ? (
           <>
-            <SheetHeader className="space-y-4">
-              <div className="flex items-center justify-between">
-                <SheetTitle>Commande #{order.order_num}</SheetTitle>
+            <ResponsiveSheetHeader className="space-y-3 md:space-y-4">
+              <div className="flex items-center justify-between pr-8">
+                <ResponsiveSheetTitle>Commande #{order.order_num}</ResponsiveSheetTitle>
                 <div className="flex gap-2 flex-wrap justify-end">
                   <Badge
                     variant="outline"
@@ -95,32 +95,32 @@ export const OrderDetailsSheet = () => {
               {/* Order Date & Type */}
               <div className="flex flex-col gap-1 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
-                  <Calendar className="w-4 h-4" />
+                  <Calendar className="w-4 h-4 flex-shrink-0" />
                   <span className="capitalize">{formatDate(order.creation_date)}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-muted-foreground" />
+                  <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <Badge variant="secondary" className="font-normal">
                     {getOrderTypeLabel(order.order_type || order.fulfillment_type)}
                   </Badge>
                 </div>
               </div>
-            </SheetHeader>
+            </ResponsiveSheetHeader>
 
-            <Tabs defaultValue="resume" className="mt-6">
+            <Tabs defaultValue="resume" className="mt-4 md:mt-6">
               <TabsList className="w-full">
-                <TabsTrigger value="resume" className="flex-1">
+                <TabsTrigger value="resume" className="flex-1 min-h-[44px]">
                   Résumé
                 </TabsTrigger>
-                <TabsTrigger value="panier" className="flex-1">
+                <TabsTrigger value="panier" className="flex-1 min-h-[44px]">
                   Panier
                 </TabsTrigger>
               </TabsList>
 
-              <TabsContent value="resume" className="space-y-6 mt-4">
+              <TabsContent value="resume" className="space-y-4 md:space-y-6 mt-4">
                 {/* Customer Section */}
                 {order.customer && (
-                  <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
+                  <div className="bg-card rounded-xl p-3 md:p-4 shadow-soft space-y-3">
                     <h3 className="font-semibold text-foreground">Client</h3>
                     <div className="space-y-2 text-sm">
                       <div>
@@ -131,10 +131,10 @@ export const OrderDetailsSheet = () => {
                         <span className="text-muted-foreground">Téléphone:</span>
                         <a
                           href={`tel:${order.customer.customer_tel}`}
-                          className="font-medium text-primary hover:underline flex items-center gap-1"
+                          className="font-medium text-primary hover:underline flex items-center gap-1 min-h-[44px] py-2"
                         >
                           {order.customer.customer_tel}
-                          <Phone className="w-3 h-3" />
+                          <Phone className="w-4 h-4" />
                         </a>
                       </div>
                       {order.customer.customer_address && (
@@ -153,8 +153,8 @@ export const OrderDetailsSheet = () => {
                   </div>
                 )}
 
-                {/* Products Section - MOVED ABOVE PAYMENTS */}
-                <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
+                {/* Products Section */}
+                <div className="bg-card rounded-xl p-3 md:p-4 shadow-soft space-y-3">
                   <h3 className="font-semibold text-foreground">
                     Panier ({order.products.length} article{order.products.length > 1 ? 's' : ''})
                   </h3>
@@ -165,7 +165,7 @@ export const OrderDetailsSheet = () => {
                         className="flex justify-between items-start py-2 border-b border-border last:border-0"
                       >
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-medium text-foreground">
                               {product.name}
                             </span>
@@ -179,7 +179,7 @@ export const OrderDetailsSheet = () => {
                             </div>
                           )}
                         </div>
-                        <span className="font-medium text-foreground">
+                        <span className="font-medium text-foreground ml-2">
                           {formatCurrency(product.price * product.quantity)}
                         </span>
                       </div>
@@ -188,7 +188,7 @@ export const OrderDetailsSheet = () => {
                 </div>
 
                 {/* Payment Section */}
-                <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
+                <div className="bg-card rounded-xl p-3 md:p-4 shadow-soft space-y-3">
                   <h3 className="font-semibold text-foreground">Paiements</h3>
                   <div className="space-y-2">
                     {order.payments.map((payment, idx) => {
@@ -196,7 +196,7 @@ export const OrderDetailsSheet = () => {
                       return (
                         <div
                           key={idx}
-                          className={`flex justify-between text-sm items-center ${
+                          className={`flex justify-between text-sm items-center min-h-[44px] ${
                             isCancelled ? 'opacity-50' : ''
                           }`}
                         >
@@ -220,10 +220,10 @@ export const OrderDetailsSheet = () => {
                 </div>
 
                 {/* Order Info Section */}
-                <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
+                <div className="bg-card rounded-xl p-3 md:p-4 shadow-soft space-y-3">
                   <h3 className="font-semibold text-foreground">Informations</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center min-h-[44px]">
                       <span className="text-muted-foreground">Statut Marchand:</span>
                       <Badge 
                         variant="outline" 
@@ -236,24 +236,24 @@ export const OrderDetailsSheet = () => {
                 </div>
 
                 {/* Totals Section */}
-                <div className="bg-card rounded-xl p-4 shadow-soft space-y-3">
+                <div className="bg-card rounded-xl p-3 md:p-4 shadow-soft space-y-3">
                   <h3 className="font-semibold text-foreground">Totaux</h3>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
+                    <div className="flex justify-between min-h-[44px] items-center">
                       <span className="text-muted-foreground">HT:</span>
                       <span className="font-medium">
                         {formatCurrency(order.HT)}
                       </span>
                     </div>
-                    <div className="flex justify-between">
+                    <div className="flex justify-between min-h-[44px] items-center">
                       <span className="text-muted-foreground">TVA:</span>
                       <span className="font-medium">
                         {formatCurrency(order.TVA)}
                       </span>
                     </div>
-                    <div className="flex justify-between border-t pt-2">
+                    <div className="flex justify-between border-t pt-2 min-h-[44px] items-center">
                       <span className="font-semibold">TTC:</span>
-                      <span className="font-bold text-primary">
+                      <span className="font-bold text-primary text-lg">
                         {formatCurrency(order.TTC)}
                       </span>
                     </div>
@@ -265,11 +265,11 @@ export const OrderDetailsSheet = () => {
                 {order.products.map((product, idx) => (
                   <div
                     key={idx}
-                    className="bg-card rounded-xl p-4 shadow-soft space-y-2"
+                    className="bg-card rounded-xl p-3 md:p-4 shadow-soft space-y-2"
                   >
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-medium text-foreground">
                             {product.name}
                           </span>
@@ -293,7 +293,7 @@ export const OrderDetailsSheet = () => {
                           </div>
                         )}
                       </div>
-                      <span className="font-semibold text-foreground">
+                      <span className="font-semibold text-foreground ml-2">
                         {formatCurrency(product.price * product.quantity)}
                       </span>
                     </div>
@@ -303,7 +303,7 @@ export const OrderDetailsSheet = () => {
             </Tabs>
           </>
         ) : null}
-      </SheetContent>
-    </Sheet>
+      </ResponsiveSheetContent>
+    </ResponsiveSheet>
   );
 };
