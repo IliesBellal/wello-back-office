@@ -83,8 +83,8 @@ const mockUsers: User[] = [
 // ============= API Functions =============
 export const usersService = {
   async getUsers(): Promise<User[]> {
-    logAPI('GET', '/users');
-    return withMock(() => [...mockUsers], () => apiClient.get<User[]>('/users'));
+    logAPI('GET', '/pos/users');
+    return withMock(() => [...mockUsers], () => apiClient.get<User[]>('/pos/users'));
   },
 
   async getUserActivity(userId: string): Promise<UserActivity[]> {
