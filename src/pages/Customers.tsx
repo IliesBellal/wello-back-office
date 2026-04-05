@@ -34,7 +34,7 @@ const Customers = () => {
     }
 
     try {
-      const result = await getCustomersList(pageNum, 20);
+      const result = await getCustomersList(pageNum, 40);
       if (append) {
         setCustomers(prev => [...prev, ...result.data]);
       } else {

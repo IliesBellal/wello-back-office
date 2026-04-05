@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -12,7 +12,8 @@ import { AttributesManager } from '@/components/menu/AttributesManager';
 import { OrganizeModal } from '@/components/menu/OrganizeModal';
 import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
 import { ProductCreateSheet } from '@/components/menu/ProductCreateSheet';
-import { Product } from '@/types/menu';
+import { Product, Tag, Allergen } from '@/types/menu';
+import { menuService } from '@/services/menuService';
 
 export default function Menu() {
   const { 
@@ -26,7 +27,9 @@ export default function Menu() {
     createAttribute,
     updateAttributeData,
     saveOrder,
-    createCategory,
+    createProductCategory,
+    updateCategory,
+    deleteCategory,
     createProduct
   } = useMenuData();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -36,6 +39,36 @@ export default function Menu() {
   const [organizeModalOpen, setOrganizeModalOpen] = useState(false);
   const [externalMenusOpen, setExternalMenusOpen] = useState(false);
   const [productCreateOpen, setProductCreateOpen] = useState(false);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [allergens, setAllergens] = useState<Allergen[]>([]);
+
+  // Load tags and allergens on mount
+  useEffect(() => {
+    const loadTagsAndAllergens = async () => {
+      try {
+        const [tagsData, allergensData] = await Promise.all([
+          menuService.getTags(),
+          menuService.getAllergens()
+        ]);
+        setTags(tagsData);
+        setAllergens(allergensData);
+      } catch (error) {
+        console.error('Error loading tags or allergens:', error);
+      }
+    };
+
+    loadTagsAndAllergens();
+  }, []);
+
+  const handleTagCreated = (newTag: { id: string; name: string }) => {
+    setTags(prevTags => {
+      // Check if tag already exists (prevent duplicates)
+      if (prevTags.some(t => t.id === newTag.id)) {
+        return prevTags;
+      }
+      return [...prevTags, newTag];
+    });
+  };
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
@@ -123,8 +156,11 @@ export default function Menu() {
           components={components}
           attributes={attributes}
           categories={menuData.products_types}
+          tags={tags}
+          allergens={allergens}
           onSave={updateProduct}
-          onCreateCategory={createCategory}
+          onCreateCategory={createProductCategory}
+          onTagCreated={handleTagCreated}
         />
 
         <GroupProductSheet
@@ -133,13 +169,16 @@ export default function Menu() {
           onOpenChange={setSheetOpen}
           categories={menuData.products_types}
           onSave={updateProduct}
-          onCreateCategory={createCategory}
+          onCreateCategory={createProductCategory}
         />
 
         <CategoryManagementSheet
           open={categoryManagerOpen}
           onOpenChange={setCategoryManagerOpen}
           categories={menuData.products_types}
+          onCreateCategory={createProductCategory}
+          onUpdateCategory={updateCategory}
+          onDeleteCategory={deleteCategory}
         />
 
         <AttributesManager
@@ -169,7 +208,7 @@ export default function Menu() {
           categories={menuData.products_types}
           tvaRates={tvaRates}
           onCreateProduct={createProduct}
-          onCreateCategory={createCategory}
+          onCreateCategory={createProductCategory}
         />
       </div>
     </DashboardLayout>

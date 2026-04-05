@@ -7,6 +7,7 @@ export interface TvaRate {
 export interface TvaRateGroup {
   id: number;
   name: string;
+  delivery_type: string;
   rates: TvaRate[];
 }
 
@@ -23,11 +24,23 @@ export interface UnitOfMeasure {
 }
 
 export interface Component {
-  id: string;
+  component_id: string;
   name: string;
-  unit_id: number;
-  price_per_unit: number;
+  category?: string;
   category_id?: string;
+  price?: number;
+  price_per_unit?: number;
+  unit_id?: number;
+  status?: string;
+  available?: boolean;
+}
+
+export interface ComponentCategory {
+  category_id: string;
+  category_name: string;
+  category?: string;
+  order: number;
+  components: Component[];
 }
 
 export interface AttributeOption {
@@ -83,6 +96,19 @@ export interface ProductTvaIds {
   delivery?: number;
 }
 
+export interface Allergen {
+  allergen_id: string;
+  name: string;
+  code: string;
+  icon?: string;
+}
+
+export interface Tag {
+  id: string;
+  merchant_id?: string;
+  name: string;
+}
+
 export interface Product {
   product_id: string;
   category_id?: string;
@@ -100,6 +126,7 @@ export interface Product {
   is_available_on_sno?: boolean;
   order?: number;
   status?: number;
+  available?: boolean;
   available_in?: boolean;
   available_take_away?: boolean;
   available_delivery?: boolean;
@@ -131,6 +158,8 @@ export interface Product {
   availability?: ProductAvailability;
   integrations?: ProductIntegrations;
   tva_ids?: ProductTvaIds;
+  tags?: string[]; // Array of tag IDs
+  allergens?: string[]; // Array of allergen IDs
 }
 
 // Category can come from API in two formats
@@ -148,6 +177,29 @@ export interface Category {
   products: Product[];
 }
 
+export interface ComponentCreatePayload {
+  name: string;
+  category_id: string;
+  unit_id: number;
+  price: number; // in cents
+}
+
+export interface ProductCreatePayload {
+  name: string;
+  description: string;
+  price: number; // in cents
+  price_take_away: number; // in cents
+  price_delivery: number; // in cents
+  category_id: string;
+  tva_rate_in: number;
+  tva_rate_take_away: number;
+  tva_rate_delivery: number;
+  available_in: boolean;
+  available_take_away: boolean;
+  available_delivery: boolean;
+  is_product_group: boolean;
+}
+
 export interface Menu {
   id?: string;
   data?: MenuData;
@@ -161,6 +213,6 @@ export interface MenuData {
   last_menu_update?: number;
   products_types: Category[];
   products?: Product[];
-  components_types?: Component[];
+  components_types?: ComponentCategory[];
   delays?: Record<string, number>[];
 }

@@ -2,7 +2,7 @@ import { toast } from "@/hooks/use-toast";
 
 // ============= Configuration =============
 export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK == 'true';
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://ib-welloresto-api.onrender.com";
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com";
 export const ENABLE_LOGS = import.meta.env.VITE_ENABLE_LOGS !== 'false';
 
 
@@ -18,6 +18,20 @@ export interface ApiResponse<T> {
   data: T;
   status: number;
 }
+
+/** Generic wrapper matching the backend envelope: { id: string; data: T } */
+export interface WelloApiResponse<T> {
+  id: string;
+  data: T;
+}
+
+// ============= MFA Interceptor =============
+type MFAHandler = () => Promise<void>;
+let mfaHandler: MFAHandler | null = null;
+
+export const registerMFAHandler = (handler: MFAHandler) => {
+  mfaHandler = handler;
+};
 
 // ============= Loading State Management =============
 type LoadingSubscriber = (isLoading: boolean) => void;
@@ -214,6 +228,7 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     const authToken = getAuthToken();
     const requestHeaders: Record<string, string> = {
       "Content-Type": "application/json",
+      "X-App-Source": "backoffice",
       ...headers,
     };
 
@@ -229,12 +244,30 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
 
     if (!response.ok) {
       let errorMessage: string | undefined;
+      let errorData: Record<string, unknown> | undefined;
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error;
+        errorData = await response.json() as Record<string, unknown>;
+        errorMessage = (errorData.message as string) || (errorData.error as string);
       } catch {
         // Response is not JSON
       }
+
+      // Handle MFA requirement (401 with status: "mfa_required")
+      if (response.status === 401 && errorData?.status === 'mfa_required' && mfaHandler) {
+        endRequestLog(logContext, response.status, 'MFA Required - Opening verification modal', true);
+        try {
+          // Wait for MFA completion
+          await mfaHandler();
+          // Retry the original request
+          decrementLoading(); // Decrease before retry
+          return await request<T>(endpoint, options);
+        } catch (mfaError) {
+          // MFA cancelled or failed
+          endRequestLog(logContext, response.status, 'MFA verification failed or cancelled', true);
+          throw new Error('MFA verification required but not completed');
+        }
+      }
+
       endRequestLog(logContext, response.status, errorMessage, true);
       handleApiError(response.status, errorMessage);
       throw new Error(errorMessage || `HTTP error ${response.status}`);
@@ -273,6 +306,7 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
   try {
     const requestHeaders: Record<string, string> = {
       "Content-Type": "application/json",
+      "X-App-Source": "backoffice",
       "Authorization": customToken,
       ...headers,
     };
@@ -285,12 +319,30 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
 
     if (!response.ok) {
       let errorMessage: string | undefined;
+      let errorData: Record<string, unknown> | undefined;
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error;
+        errorData = await response.json() as Record<string, unknown>;
+        errorMessage = (errorData.message as string) || (errorData.error as string);
       } catch {
         // Response is not JSON
       }
+
+      // Handle MFA requirement (401 with status: "mfa_required")
+      if (response.status === 401 && errorData?.status === 'mfa_required' && mfaHandler) {
+        endRequestLog(logContext, response.status, 'MFA Required - Opening verification modal', true);
+        try {
+          // Wait for MFA completion
+          await mfaHandler();
+          // Retry the original request
+          decrementLoading(); // Decrease before retry
+          return await requestWithCustomToken<T>(endpoint, customToken, options);
+        } catch (mfaError) {
+          // MFA cancelled or failed
+          endRequestLog(logContext, response.status, 'MFA verification failed or cancelled', true);
+          throw new Error('MFA verification required but not completed');
+        }
+      }
+
       endRequestLog(logContext, response.status, errorMessage, true);
       handleApiError(response.status, errorMessage);
       throw new Error(errorMessage || `HTTP error ${response.status}`);

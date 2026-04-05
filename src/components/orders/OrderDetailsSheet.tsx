@@ -10,8 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Calendar, MapPin } from "lucide-react";
 import { ordersService, Order } from "@/services/ordersService";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+import { formatDate } from "@/lib/utils";
 import {
   getOrderSource,
   getOrderSourceConfig,
@@ -54,9 +53,6 @@ export const OrderDetailsSheet = () => {
     }).format(cents / 100);
   };
 
-  const formatDate = (timestamp: number) => {
-    return format(new Date(timestamp * 1000), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr });
-  };
 
   if (!order && !loading) return null;
 

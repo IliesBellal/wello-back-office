@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CategorySelector } from '@/components/shared/CategorySelector';
-import { Category, UnitOfMeasure } from '@/types/menu';
+import { Category, UnitOfMeasure, ComponentCategory, ComponentCreatePayload } from '@/types/menu';
 
 const componentFormSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
@@ -41,10 +41,10 @@ type ComponentFormValues = z.infer<typeof componentFormSchema>;
 interface ComponentCreateSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  categories: Category[];
+  categories: Category[] | ComponentCategory[];
   units: UnitOfMeasure[];
-  onCreateComponent: (data: any) => Promise<void>;
-  onCreateCategory: (name: string) => Promise<Category | undefined>;
+  onCreateComponent: (data: ComponentCreatePayload) => Promise<void>;
+  onCreateCategory: (name: string) => Promise<{ category_id: string }>;
 }
 
 export function ComponentCreateSheet({

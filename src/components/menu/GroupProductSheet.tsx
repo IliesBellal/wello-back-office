@@ -21,7 +21,7 @@ interface GroupProductSheetProps {
   onOpenChange: (open: boolean) => void;
   categories: Category[];
   onSave: (productId: string, data: Partial<Product>) => Promise<void>;
-  onCreateCategory: (name: string) => Promise<any>;
+  onCreateCategory: (name: string) => Promise<{ category_id: string }>;
 }
 
 export const GroupProductSheet = ({

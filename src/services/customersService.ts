@@ -1,4 +1,4 @@
-import { apiClient, withMock, logAPI } from "@/services/apiClient";
+import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
 
 // ============= Types =============
 export interface CustomerAddress {
@@ -73,6 +73,41 @@ export interface CreateLoyaltyProgramPayload {
   reward_value: number;
   reward_products?: string[];
 }
+
+/** Raw shape returned by the real API */
+export interface RawApiCustomer {
+  customer_id: string;
+  customer_name?: string;
+  customer_tel?: string;
+  customer_email?: string | null;
+  customer_address?: string;
+  customer_lat?: number;
+  customer_lng?: number;
+  customer_total_spent?: number;
+  customer_nb_orders?: number;
+  acquisition_source?: string;
+  creation_date?: string | null;
+  match_score?: number;
+}
+
+/** Response envelope from GET /customer/list and /customer/search */
+interface CustomerListApiResponse {
+  result: RawApiCustomer[];
+  status: string;
+}
+
+/** Map raw API customer to the normalized Customer shape used by UI */
+const normalizeCustomer = (raw: RawApiCustomer): Customer => ({
+  id: raw.customer_id,
+  customer_name: raw.customer_name,
+  phone: raw.customer_tel,
+  email: raw.customer_email ?? undefined,
+  customer_total_spent: raw.customer_total_spent ?? 0,
+  customer_total_orders: raw.customer_nb_orders ?? 0,
+  acquisition_source: raw.acquisition_source ?? "",
+  created_at: raw.creation_date ?? "",
+  match_score: raw.match_score,
+});
 
 // ============= Mock Data =============
 const mockCustomers: Customer[] = [
@@ -189,8 +224,8 @@ const mockProducts = [
 ];
 
 // ============= API Functions =============
-export const getCustomersList = async (page: number = 1, limit: number = 20): Promise<{ data: Customer[]; hasMore: boolean }> => {
-  logAPI("GET", `/customers/list?page=${page}&limit=${limit}`);
+export const getCustomersList = async (page: number = 1, limit: number = 40): Promise<{ data: Customer[]; hasMore: boolean }> => {
+  logAPI("GET", `/customer/list?page=${page}&page_size=${limit}`);
   
   return withMock(
     () => {
@@ -199,12 +234,21 @@ export const getCustomersList = async (page: number = 1, limit: number = 20): Pr
       const paginatedData = mockCustomers.slice(start, end);
       return { data: paginatedData, hasMore: end < mockCustomers.length };
     },
-    () => apiClient.get<{ data: Customer[]; hasMore: boolean }>(`/customers/list?page=${page}&limit=${limit}`)
+    () =>
+      apiClient
+        .get<WelloApiResponse<CustomerListApiResponse>>(`/customer/list?page=${page}&page_size=${limit}`)
+        .then(res => {
+          const result = res.data.result ?? [];
+          return {
+            data: result.map(normalizeCustomer),
+            hasMore: result.length === limit,
+          };
+        })
   );
 };
 
 export const searchCustomers = async (terms: string): Promise<Customer[]> => {
-  logAPI("GET", `/customers/search/${terms}`);
+  logAPI("GET", `/customer/search?term=${terms}`);
   
   return withMock(
     () => {
@@ -216,7 +260,10 @@ export const searchCustomers = async (terms: string): Promise<Customer[]> => {
         })
         .map((c, i) => ({ ...c, match_score: 100 - i * 10 }));
     },
-    () => apiClient.get<Customer[]>(`/customers/search/${encodeURIComponent(terms)}`)
+    () =>
+      apiClient
+        .get<WelloApiResponse<CustomerListApiResponse>>(`/customer/search?term=${encodeURIComponent(terms)}`)
+        .then(res => (res.data.result ?? []).map(normalizeCustomer))
   );
 };
 

@@ -20,7 +20,7 @@ const CustomerCard = ({ customer, onClick }: CustomerCardProps) => {
 
   const isVIP = customer.customer_total_spent > 50000; // > 500€
   const sourceLabel = acquisitionSourceLabels[customer.acquisition_source] || customer.acquisition_source;
-  const hasHighMatchScore = customer.match_score && customer.match_score >= 80;
+  const hasHighMatchScore = customer.match_score && customer.match_score >= 200;
 
   return (
     <Card 

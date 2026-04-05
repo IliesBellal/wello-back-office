@@ -22,10 +22,11 @@ export default function Components() {
   const { 
     menuData,
     components, 
+    componentCategories,
     units,
     loading,
     createComponent,
-    createCategory,
+    createComponentCategory,
     deleteComponent
   } = useMenuData();
   
@@ -39,7 +40,7 @@ export default function Components() {
   const componentsByCategory = useMemo(() => {
     const grouped = new Map<string, typeof components>();
     components.forEach(comp => {
-      const catId = (comp as any).category_id || 'uncategorized';
+      const catId = comp.category_id || 'uncategorized';
       if (!grouped.has(catId)) {
         grouped.set(catId, []);
       }
@@ -48,13 +49,7 @@ export default function Components() {
     return grouped;
   }, [components]);
 
-  const categories = useMemo(() => {
-    // Get categories that have components
-    const usedCategoryIds = new Set(
-      components.map((c: any) => c.category_id).filter(Boolean)
-    );
-    return menuData.products_types.filter(cat => usedCategoryIds.has(cat.id || cat.category_id));
-  }, [menuData.products_types, components]);
+  const categories = componentCategories;
 
   const displayedComponents = selectedCategoryId
     ? componentsByCategory.get(selectedCategoryId) || []
@@ -71,7 +66,7 @@ export default function Components() {
     
     setIsDeleting(true);
     try {
-      await deleteComponent(componentToDelete.id);
+      await deleteComponent(componentToDelete.component_id);
       toast.success(`"${componentToDelete.name}" supprimé`);
     } catch (error) {
       toast.error("Erreur lors de la suppression");
@@ -105,20 +100,16 @@ export default function Components() {
           >
             Tous les composants
           </Button>
-          {categories.map((category) => {
-            const catId = category.id || category.category_id;
-            const catName = category.name || category.category;
-            return (
-              <Button
-                key={catId}
-                variant={selectedCategoryId === catId ? "default" : "ghost"}
-                className={`w-full justify-start ${selectedCategoryId === catId ? 'bg-gradient-primary' : ''}`}
-                onClick={() => setSelectedCategoryId(catId)}
-              >
-                {catName}
-              </Button>
-            );
-          })}
+          {categories.map((category) => (
+            <Button
+              key={category.category_id}
+              variant={selectedCategoryId === category.category_id ? "default" : "ghost"}
+              className={`w-full justify-start ${selectedCategoryId === category.category_id ? 'bg-gradient-primary' : ''}`}
+              onClick={() => setSelectedCategoryId(category.category_id)}
+            >
+              {category.category_name}
+            </Button>
+          ))}
         </div>
 
         {/* Main Content - Components Grid */}
@@ -129,8 +120,8 @@ export default function Components() {
                 Composants & Ingrédients
               </h1>
               <p className="text-muted-foreground mt-1">
-                {selectedCategoryId 
-                  ? categories.find(c => (c.id || c.category_id) === selectedCategoryId)?.name || categories.find(c => (c.id || c.category_id) === selectedCategoryId)?.category
+                {selectedCategoryId
+                  ? categories.find(c => c.category === selectedCategoryId)?.category
                   : `${components.length} composant(s) au total`}
               </p>
             </div>
@@ -158,7 +149,7 @@ export default function Components() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {displayedComponents.map((component) => (
                 <Card 
-                  key={component.id}
+                  key={component.component_id}
                   className="p-4 hover:shadow-md transition-shadow cursor-pointer group relative"
                 >
                   <Button
@@ -176,8 +167,13 @@ export default function Components() {
                     <p className="font-medium text-primary">
                       {component.price_per_unit 
                         ? `+${(component.price_per_unit).toFixed(2)} €`
+                        : component.price 
+                        ? `+${(component.price / 100).toFixed(2)} €`
                         : 'Gratuit'}
                     </p>
+                    {component.available === false && (
+                      <p className="text-xs text-muted-foreground">Non disponible</p>
+                    )}
                   </div>
                 </Card>
               ))}
@@ -189,10 +185,10 @@ export default function Components() {
       <ComponentCreateSheet
         open={createSheetOpen}
         onOpenChange={setCreateSheetOpen}
-        categories={menuData.products_types}
+        categories={categories}
         units={units}
         onCreateComponent={createComponent}
-        onCreateCategory={createCategory}
+        onCreateCategory={createComponentCategory}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

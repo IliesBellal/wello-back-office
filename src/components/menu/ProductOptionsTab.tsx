@@ -50,30 +50,32 @@ export const ProductOptionsTab = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
-        <Select value={selectedAttributeId} onValueChange={setSelectedAttributeId} disabled={disabled}>
-          <SelectTrigger className="flex-1">
-            <SelectValue placeholder="Sélectionner un groupe d'options" />
-          </SelectTrigger>
-          <SelectContent>
-            {availableAttributes
-              .filter(attr => !productAttributes.some(pa => pa.attribute_id === attr.id))
-              .map((attr) => (
-                <SelectItem key={attr.id} value={attr.id}>
-                  {attr.title}
-                </SelectItem>
-              ))}
-          </SelectContent>
-        </Select>
-        <Button
-          onClick={handleAddAttribute}
-          disabled={disabled || !selectedAttributeId}
-          className="bg-gradient-primary"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Ajouter
-        </Button>
-      </div>
+      {!disabled && (
+        <div className="flex gap-2">
+          <Select value={selectedAttributeId} onValueChange={setSelectedAttributeId} disabled={disabled}>
+            <SelectTrigger className="flex-1">
+              <SelectValue placeholder="Sélectionner un groupe d'options" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableAttributes
+                .filter(attr => !productAttributes.some(pa => pa.attribute_id === attr.id))
+                .map((attr) => (
+                  <SelectItem key={attr.id} value={attr.id}>
+                    {attr.title}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
+          <Button
+            onClick={handleAddAttribute}
+            disabled={disabled || !selectedAttributeId}
+            className="bg-gradient-primary"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Ajouter
+          </Button>
+        </div>
+      )}
 
       {productAttributes.length === 0 ? (
         <Card>

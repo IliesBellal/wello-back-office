@@ -23,11 +23,12 @@ export default function Orders() {
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
   const [loadingPending, setLoadingPending] = useState(true);
-  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
+  const [historyHasBeenLoaded, setHistoryHasBeenLoaded] = useState(false);
   
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -39,16 +40,20 @@ export default function Orders() {
       .finally(() => setLoadingPending(false));
   }, []);
 
-  // Fetch initial history
+  // Fetch history only when user clicks on History tab (lazy loading)
   useEffect(() => {
-    ordersService
-      .getOrderHistory(1, 20)
-      .then((orders) => {
-        setHistoryOrders(orders);
-        setHasMoreHistory(orders.length === 20);
-      })
-      .finally(() => setLoadingHistory(false));
-  }, []);
+    if (activeTab === "history" && !historyHasBeenLoaded) {
+      setLoadingHistory(true);
+      ordersService
+        .getOrderHistory(1, 20)
+        .then((orders) => {
+          setHistoryOrders(orders);
+          setHasMoreHistory(orders.length === 20);
+          setHistoryHasBeenLoaded(true);
+        })
+        .finally(() => setLoadingHistory(false));
+    }
+  }, [activeTab, historyHasBeenLoaded]);
 
   // Load more history
   const loadMoreHistory = useCallback(async () => {

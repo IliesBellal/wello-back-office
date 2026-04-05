@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { TvaRateGroup, Menu, Product, UnitOfMeasure, Component, Attribute, MenuData, Category } from '@/types/menu';
+import { TvaRateGroup, Menu, Product, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
@@ -8,6 +8,7 @@ export const useMenuData = () => {
   const [menuData, setMenuData] = useState<MenuData>({ products_types: [], products: [] });
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
+  const [componentCategories, setComponentCategories] = useState<ComponentCategory[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -20,10 +21,12 @@ export const useMenuData = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [rates, menuResponse, unitsData, attributesData] = await Promise.all([
+      const [rates, menuResponse, productsData, unitsData, componentsData, attributesData] = await Promise.all([
         menuService.getTvaRates(),
         menuService.getMenuData(),
+        menuService.getProducts(),
         menuService.getUnitsOfMeasure(),
+        menuService.getComponents(),
         menuService.getAttributes()
       ]);
 
@@ -38,21 +41,25 @@ export const useMenuData = () => {
       }
       
       // Normalize categories to have consistent properties
-      const productsTypes = (apiData.products_types || []).map((cat: Category) => ({
-        category_id: cat.category_id || cat.id || '',
-        category: cat.category || cat.name || '',
-        category_name: cat.category_name || cat.category || cat.name || '',
-        id: cat.id || cat.category_id || '',
-        name: cat.name || cat.category || '',
-        order: cat.order || 0,
-        bg_color: cat.bg_color,
-        products: (cat.products || [])
-      }));
+      const productsTypes = (apiData.products_types || []).map((cat: Category) => {
+        // Find products for this category from the products API callZ
+        const categoryProducts = productsData.filter(p => p.category_id === cat.category_id || p.category_id === cat.id);
+        return {
+          category_id: cat.category_id || cat.id || '',
+          category: cat.category || cat.name || '',
+          category_name: cat.category_name || cat.category || cat.name || '',
+          id: cat.id || cat.category_id || '',
+          name: cat.name || cat.category || '',
+          order: cat.order || 0,
+          bg_color: cat.bg_color,
+          products: categoryProducts.length > 0 ? categoryProducts : (cat.products || [])
+        };
+      });
 
       const allProducts = productsTypes.flatMap((cat: Category) => cat.products || []);
 
-      // Les composants sont déjà retournés par GET /menu dans components_types
-      const componentsFromMenu = (apiData.components_types || []) as Component[];
+      // Extract components and categories from the API response
+      const { components: flattenedComponents, categories: componentCategoriesFromApi } = componentsData;
 
       setTvaRates(rates);
       setMenuData({
@@ -64,7 +71,8 @@ export const useMenuData = () => {
         delays: apiData.delays
       });
       setUnits(unitsData);
-      setComponents(componentsFromMenu);
+      setComponents(flattenedComponents);
+      setComponentCategories(componentCategoriesFromApi);
       setAttributes(attributesData);
     } catch (error) {
       console.error('Erreur lors du chargement du menu:', error);
@@ -177,9 +185,9 @@ export const useMenuData = () => {
     }
   };
 
-  const createCategory = async (name: string): Promise<Category> => {
+  const createProductCategory = async (name: string): Promise<{ category_id: string }> => {
     try {
-      const newCategory = await menuService.createCategory(name);
+      const newCategory = await menuService.createProductCategory(name);
       // Normalize to have all required properties
       const categoryWithProps: Category = { 
         category_id: newCategory.id,
@@ -198,7 +206,33 @@ export const useMenuData = () => {
         title: "Succès",
         description: "Catégorie créée avec succès"
       });
-      return categoryWithProps;
+      return { category_id: newCategory.id };
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la catégorie",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const createComponentCategory = async (name: string): Promise<{ category_id: string }> => {
+    try {
+      const newCategory = await menuService.createComponentCategory(name);
+      // Create a normalized component category
+      const categoryWithProps: ComponentCategory = {
+        category_id: newCategory.id,
+        category_name: name,
+        order: newCategory.order,
+        components: []
+      };
+      setComponentCategories(prev => [...prev, categoryWithProps]);
+      toast({
+        title: "Succès",
+        description: "Catégorie créée avec succès"
+      });
+      return { category_id: newCategory.id };
     } catch (error) {
       toast({
         title: "Erreur",
@@ -255,7 +289,59 @@ export const useMenuData = () => {
 
   const deleteComponent = async (componentId: string) => {
     await menuService.deleteComponent(componentId);
-    setComponents(prev => prev.filter(c => c.id !== componentId));
+    setComponents(prev => prev.filter(c => c.component_id !== componentId));
+  };
+
+  const updateCategory = async (categoryId: string, name: string) => {
+    try {
+      await menuService.updateCategory(categoryId, name);
+      setMenuData(prev => ({
+        ...prev,
+        products_types: prev.products_types.map(c =>
+          c.category_id === categoryId
+            ? {
+                ...c,
+                category: name,
+                category_name: name,
+                name: name
+              }
+            : c
+        )
+      }));
+      toast({
+        title: "Succès",
+        description: "Catégorie mise à jour avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la catégorie",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const deleteCategory = async (categoryId: string) => {
+    try {
+      await menuService.deleteCategory(categoryId);
+      setMenuData(prev => ({
+        ...prev,
+        products_types: prev.products_types.filter(c => c.category_id !== categoryId),
+        products: prev.products?.filter(p => p.category_id !== categoryId)
+      }));
+      toast({
+        title: "Succès",
+        description: "Catégorie supprimée avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la catégorie",
+        variant: "destructive"
+      });
+      throw error;
+    }
   };
 
   return {
@@ -263,15 +349,19 @@ export const useMenuData = () => {
     menuData,
     units,
     components,
+    componentCategories,
     attributes,
     loading,
     updateProduct,
     createAttribute,
     updateAttributeData,
     saveOrder,
-    createCategory,
+    createProductCategory,
+    createComponentCategory,
+    updateCategory,
     createProduct,
     createComponent,
-    deleteComponent
+    deleteComponent,
+    deleteCategory
   };
 };

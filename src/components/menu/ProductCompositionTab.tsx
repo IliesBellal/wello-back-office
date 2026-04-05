@@ -42,7 +42,7 @@ export const ProductCompositionTab = ({
   });
 
   const getComponentDetails = (componentId: string) => {
-    return components.find(c => c.id === componentId);
+    return components.find(c => c.component_id === componentId);
   };
 
   const getUnitDetails = (unitId: number) => {
@@ -95,9 +95,10 @@ export const ProductCompositionTab = ({
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-[2fr,1fr,1fr,auto] gap-2 items-end">
+      {!disabled && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-[2fr,1fr,1fr,auto] gap-2 items-end">
             <div className="space-y-1">
               <label className="text-sm font-medium">Ingrédient</label>
               <Select
@@ -110,9 +111,9 @@ export const ProductCompositionTab = ({
                 </SelectTrigger>
                 <SelectContent>
                   {components
-                    .filter(c => !composition.some(comp => comp.component_id === c.id))
+                    .filter(c => !composition.some(comp => comp.component_id === c.component_id))
                     .map((component) => (
-                      <SelectItem key={component.id} value={component.id}>
+                      <SelectItem key={component.component_id} value={component.component_id}>
                         {component.name}
                       </SelectItem>
                     ))}
@@ -162,6 +163,7 @@ export const ProductCompositionTab = ({
           </div>
         </CardContent>
       </Card>
+      )}
 
       {composition.length === 0 ? (
         <Card>

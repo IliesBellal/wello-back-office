@@ -7,15 +7,65 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { authService } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { OTPVerification } from '@/components/auth';
+import { AuthData } from '@/types/auth';
 import { LogIn } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showMFAModal, setShowMFAModal] = useState(false);
+  const [pendingAuthData, setPendingAuthData] = useState<AuthData | null>(null);
   const navigate = useNavigate();
   const { setAuthData } = useAuth();
   const { toast } = useToast();
+
+  const handleMFASuccess = async () => {
+    // Après validation MFA réussie, appeler POST /auth/login avec le token pour récupérer le user
+    if (pendingAuthData?.token) {
+      try {
+        setIsLoading(true);
+        const response = await authService.loginWithToken(pendingAuthData.token);
+        
+        if (response.data.status === '1') {
+          setAuthData(response.data);
+          setShowMFAModal(false);
+          setPendingAuthData(null);
+          toast({
+            title: 'Connexion réussie',
+            description: `Bienvenue ${response.data.first_name}!`,
+          });
+          navigate('/');
+        } else {
+          toast({
+            title: 'Erreur de connexion',
+            description: 'Impossible de finaliser la connexion.',
+            variant: 'destructive',
+          });
+        }
+      } catch (error) {
+        toast({
+          title: 'Erreur de connexion',
+          description: 'Une erreur est survenue lors de la finalisation de la connexion.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  const handleMFACancel = () => {
+    // Annulation de la vérification MFA
+    setShowMFAModal(false);
+    setPendingAuthData(null);
+    toast({
+      title: 'Connexion annulée',
+      description: 'Veuillez vous reconnecter.',
+      variant: 'destructive',
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,12 +102,25 @@ const Login = () => {
           break;
 
           case '1':
-            setAuthData(response.data);
-            toast({
-              title: 'Connexion réussie',
-              description: `Bienvenue ${response.data.first_name}!`,
-            });
-            navigate('/');
+          case 'success':
+            // Vérifier le statut MFA
+            if (response.data.mfa_status === 'pending') {
+              // Stocker les données temporairement et ouvrir le modal MFA
+              setPendingAuthData(response.data);
+              setShowMFAModal(true);
+              toast({
+                title: 'Vérification requise',
+                description: 'Veuillez saisir le code de sécurité envoyé à votre email.',
+              });
+            } else {
+              // Connexion directe si MFA déjà validé ou non requis
+              setAuthData(response.data);
+              toast({
+                title: 'Connexion réussie',
+                description: `Bienvenue ${response.data.first_name}!`,
+              });
+              navigate('/');
+            }
             break;
       }
     } catch (error) {
@@ -119,6 +182,15 @@ const Login = () => {
           </form>
         </CardContent>
       </Card>
+
+      {/* Modal MFA */}
+      <OTPVerification
+        mode="mfa"
+        isOpen={showMFAModal}
+        onSuccess={handleMFASuccess}
+        onCancel={handleMFACancel}
+        token={pendingAuthData?.token}
+      />
     </div>
   );
 };

@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { MFAProvider } from "./contexts/MFAContext";
+import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import GlobalLoadingBar from "./components/GlobalLoadingBar";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -24,30 +26,32 @@ const queryClient = new QueryClient();
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <AuthProvider>
-        <GlobalLoadingBar />
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Index />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/menu" element={<Menu />} />
-            <Route path="/menu/components" element={<Components />} />
-            <Route path="/reports/financial" element={<FinancialReports />} />
-            <Route path="/locations" element={<Locations />} />
-            <Route path="/users" element={<Users />} />
-            <Route path="/cash-registers" element={<CashRegisters />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/stocks" element={<Stocks />} />
-            <Route path="/settings/:section" element={<Settings />} />
-            <Route path="/settings" element={<Settings />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
+      <MFAProvider>
+        <AuthProvider>
+          <GlobalLoadingBar />
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+              <Route path="/menu" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
+              <Route path="/menu/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
+              <Route path="/reports/financial" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
+              <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+              <Route path="/cash-registers" element={<ProtectedRoute><CashRegisters /></ProtectedRoute>} />
+              <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+              <Route path="/stocks" element={<ProtectedRoute><Stocks /></ProtectedRoute>} />
+              <Route path="/settings/:section" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </MFAProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

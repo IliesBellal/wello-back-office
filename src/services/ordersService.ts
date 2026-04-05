@@ -1,4 +1,4 @@
-import { apiClient, USE_MOCK_DATA, withMock, logAPI } from "@/services/apiClient";
+import { apiClient, USE_MOCK_DATA, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
 
 // ============= Types =============
 export interface OrderComponent {
@@ -142,12 +142,9 @@ export interface Order {
   last_update: number;
 }
 
-export interface PendingOrdersResponse {
-  id: string;
-  data: {
-    orders: Order[];
-  };
-}
+export type PendingOrdersResponse = WelloApiResponse<{ orders: Order[] }>;
+
+export type GetOrderResponse = WelloApiResponse<{ orders: Order[] }>;
 
 // ============= Mock Data =============
 const mockPendingOrders: Order[] = [
@@ -373,7 +370,13 @@ export const ordersService = {
         }
         return order;
       },
-      () => apiClient.get<Order>(`/orders/${orderId}`)
+      () => apiClient.get<GetOrderResponse>(`/orders/${orderId}`).then(res => {
+        const orders = res.data?.orders;
+        if (!orders || orders.length === 0) {
+          throw new Error('Commande non trouvée');
+        }
+        return orders[0];
+      })
     );
   }
 };

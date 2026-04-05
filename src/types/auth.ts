@@ -15,6 +15,8 @@ export interface AuthData {
   logo_url: string;
   merchants: Merchant[];
   status?: string;
+  mfa_status?: 'pending' | 'verified';
+  token?: string;
 }
 
 export interface AuthResponse {

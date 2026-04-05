@@ -15,13 +15,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Category } from '@/types/menu';
+import { Category, ComponentCategory } from '@/types/menu';
 
 interface CategorySelectorProps {
-  categories: Category[];
+  categories: Category[] | ComponentCategory[];
   value?: string;
   onValueChange: (categoryId: string) => void;
-  onCreateCategory: (name: string) => Promise<Category | undefined>;
+  onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   placeholder?: string;
 }
 

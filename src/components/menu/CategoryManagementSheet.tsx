@@ -11,12 +11,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 
 interface CategoryManagementSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categories: Category[];
-  onCreateCategory?: (name: string) => Promise<void>;
+  onCreateCategory?: (name: string) => Promise<{ category_id: string }>;
   onUpdateCategory?: (categoryId: string, name: string) => Promise<void>;
   onDeleteCategory?: (categoryId: string) => Promise<void>;
 }
@@ -32,6 +33,9 @@ export const CategoryManagementSheet = ({
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
 
   const handleCreate = async () => {
@@ -73,19 +77,30 @@ export const CategoryManagementSheet = ({
     }
   };
 
-  const handleDelete = async (categoryId: string) => {
+  const handleDelete = (categoryId: string) => {
+    setCategoryToDelete(categoryId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!categoryToDelete) return;
+    
+    setIsDeleting(true);
     try {
-      await onDeleteCategory?.(categoryId);
+      await onDeleteCategory?.(categoryToDelete);
       toast({
         title: "Succès",
         description: "Catégorie supprimée avec succès"
       });
+      setCategoryToDelete(null);
     } catch (error) {
       toast({
         title: "Erreur",
         description: "Impossible de supprimer la catégorie",
         variant: "destructive"
       });
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -160,6 +175,18 @@ export const CategoryManagementSheet = ({
           </div>
         </div>
       </SheetContent>
+
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Supprimer une catégorie"
+        description="Êtes-vous sûr de vouloir supprimer cette catégorie ? Tous les produits présents à l'intérieur seront également supprimés."
+        onConfirm={handleDeleteConfirm}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        isDangerous={true}
+        isLoading={isDeleting}
+      />
     </Sheet>
   );
 };

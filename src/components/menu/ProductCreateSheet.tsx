@@ -28,12 +28,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CategorySelector } from '@/components/shared/CategorySelector';
-import { Category, TvaRateGroup } from '@/types/menu';
+import { Category, TvaRateGroup, ProductCreatePayload } from '@/types/menu';
 
 const productFormSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
   description: z.string().optional(),
-  price: z.coerce.number().min(0, "Le prix doit être positif"),
+  price: z.coerce.number().min(0, "Le prix sur place doit être positif"),
+  price_take_away: z.coerce.number().min(0, "Le prix à emporter doit être positif"),
+  price_delivery: z.coerce.number().min(0, "Le prix livraison doit être positif"),
   category_id: z.string().min(1, "La catégorie est requise"),
   tva_on_site: z.coerce.number().min(1, "TVA sur place requise"),
   tva_takeaway: z.coerce.number().min(1, "TVA à emporter requise"),
@@ -47,8 +49,8 @@ interface ProductCreateSheetProps {
   onOpenChange: (open: boolean) => void;
   categories: Category[];
   tvaRates: TvaRateGroup[];
-  onCreateProduct: (data: any) => Promise<void>;
-  onCreateCategory: (name: string) => Promise<Category | undefined>;
+  onCreateProduct: (data: ProductCreatePayload) => Promise<void>;
+  onCreateCategory: (name: string) => Promise<{ category_id: string }>;
 }
 
 export function ProductCreateSheet({
@@ -67,6 +69,8 @@ export function ProductCreateSheet({
       name: '',
       description: '',
       price: 0,
+      price_take_away: 0,
+      price_delivery: 0,
       category_id: '',
       tva_on_site: undefined,
       tva_takeaway: undefined,
@@ -81,8 +85,8 @@ export function ProductCreateSheet({
         name: data.name,
         description: data.description,
         price: Math.round(data.price * 100), // Convert to cents
-        price_take_away: Math.round(data.price * 100),
-        price_delivery: Math.round(data.price * 100),
+        price_take_away: Math.round(data.price_take_away * 100),
+        price_delivery: Math.round(data.price_delivery * 100),
         category_id: data.category_id,
         tva_rate_in: data.tva_on_site,
         tva_rate_take_away: data.tva_takeaway,
@@ -102,9 +106,9 @@ export function ProductCreateSheet({
   };
 
   // Get TVA groups
-  const surPlace = tvaRates.find(g => g.name === "Sur Place")?.rates || [];
-  const emporter = tvaRates.find(g => g.name === "Emporter")?.rates || [];
-  const livraison = tvaRates.find(g => g.name === "Livraison")?.rates || [];
+  const surPlace = tvaRates.find(g => g.delivery_type === "IN")?.rates || [];
+  const emporter = tvaRates.find(g => g.delivery_type === "TAKE_AWAY")?.rates || [];
+  const livraison = tvaRates.find(g => g.delivery_type === "DELIVERY")?.rates || [];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -151,25 +155,6 @@ export function ProductCreateSheet({
 
             <FormField
               control={form.control}
-              name="price"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Prix (€)</FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      step="0.01"
-                      placeholder="12.00"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="category_id"
               render={({ field }) => (
                 <FormItem>
@@ -187,83 +172,149 @@ export function ProductCreateSheet({
               )}
             />
 
-            <div className="space-y-4">
-              <h3 className="text-sm font-medium">TVA par type de service</h3>
+            <div className="space-y-6">
+              <h3 className="text-sm font-medium">Prix par type de service</h3>
               
-              <FormField
-                control={form.control}
-                name="tva_on_site"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>TVA Sur Place</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString()}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {surPlace.map((rate) => (
-                          <SelectItem key={rate.id} value={rate.id.toString()}>
-                            {rate.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Sur Place */}
+              <div className="space-y-3 p-3 border rounded-lg bg-slate-50">
+                <FormField
+                  control={form.control}
+                  name="tva_on_site"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>TVA Sur Place</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {surPlace.map((rate) => (
+                            <SelectItem key={rate.id} value={rate.id.toString()}>
+                              {rate.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="tva_takeaway"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>TVA À Emporter</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prix Sur Place (€)</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner" />
-                        </SelectTrigger>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          placeholder="12.00"
+                          {...field}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {emporter.map((rate) => (
-                          <SelectItem key={rate.id} value={rate.id.toString()}>
-                            {rate.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              <FormField
-                control={form.control}
-                name="tva_delivery"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>TVA Livraison</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value?.toString()}>
+              {/* À Emporter */}
+              <div className="space-y-3 p-3 border rounded-lg bg-slate-50">
+                <FormField
+                  control={form.control}
+                  name="tva_takeaway"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>TVA À Emporter</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {emporter.map((rate) => (
+                            <SelectItem key={rate.id} value={rate.id.toString()}>
+                              {rate.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="price_take_away"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prix À Emporter (€)</FormLabel>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Sélectionner" />
-                        </SelectTrigger>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          placeholder="12.00"
+                          {...field}
+                        />
                       </FormControl>
-                      <SelectContent>
-                        {livraison.map((rate) => (
-                          <SelectItem key={rate.id} value={rate.id.toString()}>
-                            {rate.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Livraison */}
+              <div className="space-y-3 p-3 border rounded-lg bg-slate-50">
+                <FormField
+                  control={form.control}
+                  name="tva_delivery"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>TVA Livraison</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value?.toString()}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Sélectionner" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {livraison.map((rate) => (
+                            <SelectItem key={rate.id} value={rate.id.toString()}>
+                              {rate.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="price_delivery"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Prix Livraison (€)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          type="number" 
+                          step="0.01"
+                          placeholder="12.00"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
 
             <div className="flex gap-2 pt-4">

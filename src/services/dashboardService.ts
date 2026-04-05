@@ -106,7 +106,7 @@ export const getDashboardRealtime = (): Promise<DashboardRealtime> => {
       await mockDelay(400);
       return mockRealtimeData;
     },
-    () => apiClient.get<DashboardRealtime>('/stats/dashboard/realtime')
+    () => apiClient.get<DashboardRealtime>('/pos/stats/dashboard/realtime')
   );
 };
 
@@ -116,7 +116,7 @@ export const getDashboardHourly = (): Promise<HourlyData[]> => {
       await mockDelay(300);
       return mockHourlyData;
     },
-    () => apiClient.get<HourlyData[]>('/stats/dashboard/hourly')
+    () => apiClient.get<HourlyData[]>('/pos/stats/dashboard/hourly')
   );
 };
 
@@ -126,6 +126,6 @@ export const getDashboardActivity = (): Promise<ActivityEvent[]> => {
       await mockDelay(350);
       return mockActivityData;
     },
-    () => apiClient.get<ActivityEvent[]>('/stats/dashboard/activity')
+    () => apiClient.get<ActivityEvent[]>('/pos/stats/dashboard/activity')
   );
 };
