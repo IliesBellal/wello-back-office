@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Product, TvaRateGroup, UnitOfMeasure, Component, Attribute, Category, Tag, Allergen } from '@/types/menu';
+import { Product, TvaRateGroup, UnitOfMeasure, Component, Attribute, ProductAttribute, Category, Tag, Allergen } from '@/types/menu';
 import {
   Sheet,
   SheetContent,
@@ -10,11 +10,27 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Edit, Save, X, ImageIcon, Loader2, Plus } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Edit, Save, X, ImageIcon, Loader2, Plus, Eye, EyeOff, Trash2 } from 'lucide-react';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
 import { CategorySelector } from '@/components/shared/CategorySelector';
@@ -59,12 +75,87 @@ export const SimpleProductSheet = ({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [isCreatingTag, setIsCreatingTag] = useState(false);
+  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
 
+  // Helper function to convert configuration attributes to ProductAttribute format
+  const buildFormDataFromProduct = (prod: Product): Partial<Product> => {
+    const configurationAttributes: ProductAttribute[] = [];
+    // Check if configuration is an object with attributes property
+    if (
+      prod.configuration &&
+      typeof prod.configuration === 'object' &&
+      !Array.isArray(prod.configuration) &&
+      'attributes' in prod.configuration &&
+      Array.isArray(prod.configuration.attributes)
+    ) {
+      configurationAttributes.push(
+        ...prod.configuration.attributes.map((attr: Attribute) => ({
+          attribute_id: attr.id,
+          options: attr.options
+            ?.filter((opt) => {
+              // Handle both AttributeOption and AttributeOptionDetail types
+              const optWithSelected = opt as { selected?: boolean };
+              return optWithSelected.selected;
+            })
+            .map((opt) => {
+              // Get price from either extra_price (new format) or price (old format)
+              const price = 'extra_price' in opt && opt.extra_price !== undefined ? opt.extra_price : ('price' in opt && opt.price !== undefined ? opt.price : 0);
+              return {
+                option_id: opt.id,
+                price_override: price as number
+              };
+            }) || []
+        }))
+      );
+    }
+
+    return {
+      ...prod,
+      // Ensure composition is initialized (pre-fill with API data)
+      components: prod.components || [],
+      // Ensure attributes is initialized - use configuration attributes if available, fallback to attributes
+      attributes: configurationAttributes.length > 0 
+        ? configurationAttributes
+        : (prod.attributes || []),
+      // Normalize to string IDs in case the API returns full objects
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allergens: (prod.allergens || []).map((a: any) => typeof a === 'string' ? a : a?.allergen_id).filter(Boolean),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tags: (prod.tags || []).map((t: any) => typeof t === 'string' ? t : t?.id).filter(Boolean),
+    };
+  };
+
+  // Helper function to calculate food cost percentage and indicator color
+  const getFoodCostIndicator = (product: Product) => {
+    if (!product.cost_price || !product.price) {
+      return { color: 'text-gray-400', percentage: null, label: 'N/A' };
+    }
+
+    // cost_price is the food cost, price is the selling price
+    const foodCost = (product.cost_price / product.price) * 100;
+    
+    // Ideal range is 25-35%
+    let color = 'text-orange-500'; // Default: outside ideal range
+    if (foodCost >= 25 && foodCost <= 35) {
+      color = 'text-green-600'; // Ideal range
+    } else if (foodCost < 25) {
+      color = 'text-blue-600'; // Too low (good margin)
+    }
+
+    return {
+      color,
+      percentage: foodCost.toFixed(1),
+      label: `${foodCost.toFixed(1)}%`
+    };
+  };
+
   useEffect(() => {
     if (product) {
-      setFormData(product);
+      setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
       setSelectedImageFile(null);
       setImagePreviewUrl(null);
@@ -180,7 +271,7 @@ export const SimpleProductSheet = ({
 
   const handleCancel = () => {
     if (product) {
-      setFormData(product);
+      setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
       setSelectedImageFile(null);
       if (imagePreviewUrl) {
@@ -191,6 +282,62 @@ export const SimpleProductSheet = ({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleToggleAvailability = async () => {
+    if (!product) return;
+    
+    setIsProcessing(true);
+    try {
+      const newStatus = !product.available;
+      await menuService.updateProductAvailability(product.product_id, newStatus);
+      
+      // Update local product state
+      product.available = newStatus;
+      setShowAvailabilityDialog(false);
+      
+      toast({
+        title: "Succès",
+        description: newStatus 
+          ? "Produit réactivé avec succès. Il est maintenant commandable."
+          : "Produit désactivé. Il a été retiré de la carte."
+      });
+    } catch (error) {
+      console.error('Error updating availability:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de mettre à jour la disponibilité.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteProduct = async () => {
+    if (!product) return;
+    
+    setIsProcessing(true);
+    try {
+      await menuService.deleteProduct(product.product_id);
+      
+      setShowDeleteDialog(false);
+      onOpenChange(false);
+      
+      toast({
+        title: "Succès",
+        description: "Produit supprimé définitivement."
+      });
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer le produit.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -239,21 +386,54 @@ export const SimpleProductSheet = ({
           <div className="flex items-center justify-between">
             <div className="flex-1">
               <SheetTitle>{product.name}</SheetTitle>
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2 mt-2 flex-wrap">
                 <Badge variant={product.integrations?.uber_eats?.enabled ? "default" : "secondary"}>
                   Uber Eats
                 </Badge>
                 <Badge variant={product.integrations?.deliveroo?.enabled ? "default" : "secondary"}>
                   Deliveroo
                 </Badge>
+                {/* Cost and Food Cost Info */}
+                {product.cost_price && (
+                  <div className="flex items-center gap-3 ml-2 text-sm border-l pl-2">
+                    <span className="text-muted-foreground">
+                      Prix reviens: <span className="font-semibold">{(product.cost_price / 100).toFixed(2)} €</span>
+                    </span>
+                    <span className={`font-semibold ${getFoodCostIndicator(product).color}`}>
+                      FC: {getFoodCostIndicator(product).label}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
               {!isEditMode ? (
-                <Button variant="outline" onClick={() => setIsEditMode(true)}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Modifier
-                </Button>
+                <>
+                  {!product.available && (
+                    <Button 
+                      variant="destructive" 
+                      size="icon"
+                      onClick={() => setShowDeleteDialog(true)}
+                      disabled={isProcessing}
+                      title="Supprimer définitivement"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline" 
+                    size="icon"
+                    onClick={() => setShowAvailabilityDialog(true)}
+                    disabled={isProcessing}
+                    title={product.available ? "Désactiver le produit" : "Activer le produit"}
+                  >
+                    {product.available ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Modifier
+                  </Button>
+                </>
               ) : (
                 <>
                   <Button variant="outline" onClick={handleCancel}>
@@ -332,6 +512,24 @@ export const SimpleProductSheet = ({
                         style={{ backgroundColor: product.bg_color || '#ffffff' }}
                       />
                       <p className="text-foreground text-sm">{product.bg_color || '#ffffff'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Statut</Label>
+                    <p className="mt-1">
+                      <Badge variant={product.status === 'available' ? 'default' : product.status === 'out_of_stock' ? 'secondary' : 'destructive'}>
+                        {product.status === 'available' ? 'Disponible' : product.status === 'out_of_stock' ? 'Hors stock' : 'Indisponible'}
+                      </Badge>
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold">Couleur de production</Label>
+                    <div className="mt-1 flex items-center gap-2">
+                      <div 
+                        className="w-8 h-8 rounded-full border border-input"
+                        style={{ backgroundColor: product.production_color || '#ffffff' }}
+                      />
+                      <p className="text-foreground text-sm">{product.production_color || 'Non d\u00e9fini'}</p>
                     </div>
                   </div>
                 </div>
@@ -432,6 +630,38 @@ export const SimpleProductSheet = ({
                       />
                     </div>
                   </div>
+                  <div>
+                    <Label>Statut</Label>
+                    <Select 
+                      value={formData.status || 'available'}
+                      onValueChange={(value) => setFormData({ ...formData, status: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="available">Disponible</SelectItem>
+                        <SelectItem value="out_of_stock">Hors stock</SelectItem>
+                        <SelectItem value="not_available">Indisponible</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Couleur de production</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <input
+                        type="color"
+                        value={formData.production_color || '#ffffff'}
+                        onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
+                        className="w-12 h-10 rounded-full cursor-pointer"
+                      />
+                      <Input
+                        value={formData.production_color || '#ffffff'}
+                        onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
+                        className="flex-1 font-mono text-sm"
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -439,12 +669,16 @@ export const SimpleProductSheet = ({
 
           <TabsContent value="price" className="space-y-4">
             {/* Base Pricing - Always Visible */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label>Sur Place</Label>
-                <div className="flex items-center gap-4">
-                  {isEditMode ? (
-                    <>
+            <div className="space-y-4">
+              {/* On-Site / Restaurant */}
+              <Card className="border-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Sur Place</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Disponible</Label>
+                    {isEditMode ? (
                       <Switch
                         checked={formData.availability?.on_site || false}
                         onCheckedChange={(checked) => setFormData({
@@ -452,27 +686,40 @@ export const SimpleProductSheet = ({
                           availability: { ...formData.availability!, on_site: checked }
                         })}
                       />
+                    ) : (
+                      <span className="font-medium">{product.availability?.on_site ? '✓' : '✗'}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Prix (€)</Label>
+                    {isEditMode ? (
                       <Input
                         type="number"
                         step="0.01"
-                        className="w-24"
+                        className="w-28"
                         value={((formData.price || 0) / 100).toFixed(2)}
                         onChange={(e) => setFormData({ ...formData, price: Math.round(parseFloat(e.target.value) * 100) })}
                       />
-                    </>
-                  ) : (
-                    <>
-                      <span>{product.availability?.on_site ? '✓' : '✗'}</span>
+                    ) : (
                       <span className="font-medium">{((product.price || 0) / 100).toFixed(2)} €</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Emporter</Label>
-                <div className="flex items-center gap-4">
-                  {isEditMode ? (
-                    <>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <Label>TVA (%)</Label>
+                    <span className="text-muted-foreground">{product.tva_rate_in ? `${product.tva_rate_in}%` : '—'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Takeaway */}
+              <Card className="border-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Emporter</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Disponible</Label>
+                    {isEditMode ? (
                       <Switch
                         checked={formData.availability?.takeaway || false}
                         onCheckedChange={(checked) => setFormData({
@@ -480,27 +727,40 @@ export const SimpleProductSheet = ({
                           availability: { ...formData.availability!, takeaway: checked }
                         })}
                       />
+                    ) : (
+                      <span className="font-medium">{product.availability?.takeaway ? '✓' : '✗'}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Prix (€)</Label>
+                    {isEditMode ? (
                       <Input
                         type="number"
                         step="0.01"
-                        className="w-24"
-                        value={((formData.price || 0) / 100).toFixed(2)}
-                        onChange={(e) => setFormData({ ...formData, price: Math.round(parseFloat(e.target.value) * 100) })}
+                        className="w-28"
+                        value={((formData.price_take_away || 0) / 100).toFixed(2)}
+                        onChange={(e) => setFormData({ ...formData, price_take_away: Math.round(parseFloat(e.target.value) * 100) })}
                       />
-                    </>
-                  ) : (
-                    <>
-                      <span>{product.availability?.takeaway ? '✓' : '✗'}</span>
-                      <span className="font-medium">{((product.price || 0) / 100).toFixed(2)} €</span>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <Label>Livraison</Label>
-                <div className="flex items-center gap-4">
-                  {isEditMode ? (
-                    <>
+                    ) : (
+                      <span className="font-medium">{((product.price_take_away || 0) / 100).toFixed(2)} €</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <Label>TVA (%)</Label>
+                    <span className="text-muted-foreground">{product.tva_rate_take_away ? `${product.tva_rate_take_away}%` : '—'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Delivery */}
+              <Card className="border-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Livraison</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label>Disponible</Label>
+                    {isEditMode ? (
                       <Switch
                         checked={formData.availability?.delivery || false}
                         onCheckedChange={(checked) => setFormData({
@@ -508,22 +768,30 @@ export const SimpleProductSheet = ({
                           availability: { ...formData.availability!, delivery: checked }
                         })}
                       />
+                    ) : (
+                      <span className="font-medium">{product.availability?.delivery ? '✓' : '✗'}</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Label>Prix (€)</Label>
+                    {isEditMode ? (
                       <Input
                         type="number"
                         step="0.01"
-                        className="w-24"
-                        value={((formData.price || 0) / 100).toFixed(2)}
-                        onChange={(e) => setFormData({ ...formData, price: Math.round(parseFloat(e.target.value) * 100) })}
+                        className="w-28"
+                        value={((formData.price_delivery || 0) / 100).toFixed(2)}
+                        onChange={(e) => setFormData({ ...formData, price_delivery: Math.round(parseFloat(e.target.value) * 100) })}
                       />
-                    </>
-                  ) : (
-                    <>
-                      <span>{product.availability?.delivery ? '✓' : '✗'}</span>
-                      <span className="font-medium">{((product.price || 0) / 100).toFixed(2)} €</span>
-                    </>
-                  )}
-                </div>
-              </div>
+                    ) : (
+                      <span className="font-medium">{((product.price_delivery || 0) / 100).toFixed(2)} €</span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <Label>TVA (%)</Label>
+                    <span className="text-muted-foreground">{product.tva_rate_delivery ? `${product.tva_rate_delivery}%` : '—'}</span>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Uber Eats - Always Visible */}
@@ -649,14 +917,45 @@ export const SimpleProductSheet = ({
                 )}
               </CardContent>
             </Card>
+
+            {/* ScanNOrder - Always Visible */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">SN</span>
+                  </div>
+                  ScanNOrder
+                </CardTitle>
+                <CardDescription>
+                  Configuration ScanNOrder
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>Disponible sur ScanNOrder</Label>
+                  {isEditMode ? (
+                    <Switch
+                      checked={formData.is_available_on_sno || false}
+                      onCheckedChange={(checked) => setFormData({
+                        ...formData,
+                        is_available_on_sno: checked
+                      })}
+                    />
+                  ) : (
+                    <span className="font-medium">{product.is_available_on_sno ? '✓' : '✗'}</span>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="composition">
             <ProductCompositionTab
-              composition={formData.composition || []}
+              composition={formData.components || []}
               components={components}
               units={units}
-              onChange={(composition) => setFormData({ ...formData, composition })}
+              onChange={(composition) => setFormData({ ...formData, components: composition })}
               disabled={!isEditMode}
             />
           </TabsContent>
@@ -698,7 +997,7 @@ export const SimpleProductSheet = ({
                           <input
                             type="checkbox"
                             id={`allergen-${allergen.allergen_id}`}
-                            checked={product.allergens?.includes(allergen.allergen_id) || false}
+                            checked={formData.allergens?.includes(allergen.allergen_id) || false}
                             disabled
                             className="rounded"
                           />
@@ -775,7 +1074,7 @@ export const SimpleProductSheet = ({
                           <input
                             type="checkbox"
                             id={`tag-${tag.id}`}
-                            checked={product.tags?.includes(tag.id) || false}
+                            checked={formData.tags?.includes(tag.id) || false}
                             disabled
                             className="rounded"
                           />
@@ -794,6 +1093,54 @@ export const SimpleProductSheet = ({
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Availability Toggle Dialog */}
+        <AlertDialog open={showAvailabilityDialog} onOpenChange={setShowAvailabilityDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {product?.available ? "Désactiver le produit" : "Activer le produit"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {product?.available 
+                  ? "Êtes-vous sûr ? Le produit sera retiré de la carte et ne sera plus commandable par les clients."
+                  : "Êtes-vous sûr ? Le produit redeviendra commandable."
+                }
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-2 justify-end">
+              <AlertDialogCancel disabled={isProcessing}>Annuler</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleToggleAvailability}
+                disabled={isProcessing}
+              >
+                Confirmer
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete Product Dialog */}
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer le produit</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous absolument sûr ? La suppression est définitive et irréversible. Le produit sera complètement supprimé du système.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-2 justify-end">
+              <AlertDialogCancel disabled={isProcessing}>Annuler</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteProduct}
+                disabled={isProcessing}
+                className="bg-destructive"
+              >
+                Supprimer
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

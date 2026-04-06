@@ -38,6 +38,7 @@ export const ProductCompositionTab = ({
   const [newItem, setNewItem] = useState<Partial<ProductComposition>>({
     component_id: '',
     quantity: 0,
+    unit_of_measure_id: '',
     unit_id: 0
   });
 
@@ -45,7 +46,12 @@ export const ProductCompositionTab = ({
     return components.find(c => c.component_id === componentId);
   };
 
-  const getUnitDetails = (unitId: number) => {
+  const getUnitDetails = (unitId?: number | string) => {
+    if (typeof unitId === 'string') {
+      // Handle string unit IDs (new format: unit_of_measure_id)
+      return units.find(u => u.id.toString() === unitId || u.name === unitId);
+    }
+    // Handle numeric unit IDs (legacy format)
     return units.find(u => u.id === unitId);
   };
 
@@ -53,8 +59,19 @@ export const ProductCompositionTab = ({
     const component = getComponentDetails(componentId);
     if (!component) return [];
 
-    const baseUnit = getUnitDetails(component.unit_id);
-    if (!baseUnit) return [];
+    const baseUnit = getUnitDetails(component.unit_of_measure_id);
+    
+    if (!baseUnit) {
+      // If component has unit_of_measure directly, return as single option
+      if (component.unit_of_measure) {
+        return [{
+          id: 0,
+          name: component.unit_of_measure,
+          compatible_with: []
+        }];
+      }
+      return [];
+    }
 
     return units.filter(u => 
       baseUnit.compatible_with.includes(u.id.toString())
@@ -62,20 +79,26 @@ export const ProductCompositionTab = ({
   };
 
   const handleAddItem = () => {
-    if (!newItem.component_id || !newItem.quantity || !newItem.unit_id) return;
+    if (!newItem.component_id || !newItem.quantity) return;
+    
+    const component = getComponentDetails(newItem.component_id);
+    const unitOfMeasureId = newItem.unit_of_measure_id || component?.unit_of_measure_id;
+    
+    if (!unitOfMeasureId) return;
 
     onChange([
       ...composition,
       {
         component_id: newItem.component_id,
         quantity: newItem.quantity,
-        unit_id: newItem.unit_id
+        unit_of_measure_id: unitOfMeasureId
       }
     ]);
 
     setNewItem({
       component_id: '',
       quantity: 0,
+      unit_of_measure_id: '',
       unit_id: 0
     });
   };
@@ -85,11 +108,13 @@ export const ProductCompositionTab = ({
   };
 
   const handleComponentChange = (componentId: string) => {
-    const compatibleUnits = getCompatibleUnits(componentId);
+    const component = getComponentDetails(componentId);
+    
     setNewItem({
       component_id: componentId,
       quantity: newItem.quantity,
-      unit_id: compatibleUnits.length > 0 ? compatibleUnits[0].id : 0
+      unit_of_measure_id: component?.unit_of_measure_id || '',
+      unit_id: 0
     });
   };
 
@@ -136,12 +161,12 @@ export const ProductCompositionTab = ({
             <div className="space-y-1">
               <label className="text-sm font-medium">Unité</label>
               <Select
-                value={newItem.unit_id?.toString()}
-                onValueChange={(value) => setNewItem({ ...newItem, unit_id: parseInt(value) })}
+                value={newItem.unit_of_measure_id || ''}
+                onValueChange={(value) => setNewItem({ ...newItem, unit_of_measure_id: value })}
                 disabled={disabled || !newItem.component_id}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Unité" />
+                  <SelectValue placeholder="Sélectionner une unité" />
                 </SelectTrigger>
                 <SelectContent>
                   {getCompatibleUnits(newItem.component_id || '').map((unit) => (
@@ -155,7 +180,7 @@ export const ProductCompositionTab = ({
 
             <Button
               onClick={handleAddItem}
-              disabled={disabled || !newItem.component_id || !newItem.quantity || !newItem.unit_id}
+              disabled={disabled || !newItem.component_id || !newItem.quantity || !newItem.unit_of_measure_id}
               className="bg-gradient-primary"
             >
               <Plus className="w-4 h-4" />
@@ -185,16 +210,19 @@ export const ProductCompositionTab = ({
           <TableBody>
             {composition.map((item) => {
               const component = getComponentDetails(item.component_id);
-              const unit = getUnitDetails(item.unit_id);
+              const unit = item.unit_of_measure_id 
+                ? (item?.unit_of_measure || 'Inconnu')
+                : getUnitDetails(item.unit_id)?.name;
+              
               return (
                 <TableRow key={item.component_id}>
                   <TableCell className="font-medium">
-                    {component?.name || 'Inconnu'}
+                    {item.name || component?.name || 'Inconnu'}
                   </TableCell>
                   <TableCell>{item.quantity}</TableCell>
-                  <TableCell>{unit?.name || 'Inconnu'}</TableCell>
+                  <TableCell>{unit || 'Inconnu'}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {component ? `${component.price_per_unit.toFixed(2)} €` : '-'}
+                    {item.cost !== undefined ? `${item.cost.toFixed(2)} €` : '-'}
                   </TableCell>
                   <TableCell>
                     <Button

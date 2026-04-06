@@ -4,19 +4,24 @@ import { apiClient, withMock, logAPI } from "@/services/apiClient";
 export interface Floor {
   id: string;
   name: string;
+  enabled: boolean;
 }
+
+export type TableShape = 'circle' | 'rectangle' | 'square';
 
 export interface Location {
   location_id: string;
+  merchant_id?: string;
   location_name: string;
   seats: number;
   floor_id: string | null;
-  shape: 'Rectangle' | 'Ellipse';
+  shape: TableShape;
   angle: number;
-  current_x: number;
-  current_y: number;
-  current_width: number;
-  current_height: number;
+  x: number; // 0-1000 (canvas virtual coordinates)
+  y: number; // 0-1000
+  width: number; // diameter for circle, side for square, width for rectangle
+  height: number; // not used for circle/square
+  enabled: boolean;
 }
 
 export interface LocationsData {
@@ -32,45 +37,61 @@ const mockData: LocationsData = {
   id: 10,
   data: {
     floors: [
-      { id: "9", name: "RDC" },
-      { id: "10", name: "Terrasse" }
+      { id: "1", name: "RDC", enabled: true },
+      { id: "2", name: "Terrasse", enabled: true }
     ],
     locations: [
       {
-        location_id: "56",
-        location_name: "Table 30",
+        location_id: "1",
+        location_name: "Table 1",
         seats: 4,
-        floor_id: "9",
-        shape: "Ellipse" as const,
+        floor_id: "1",
+        shape: "circle",
         angle: 0,
-        current_x: 10,
-        current_y: 20,
-        current_width: 10,
-        current_height: 10
+        x: 200,
+        y: 250,
+        width: 80,
+        height: 80,
+        enabled: true
       },
       {
-        location_id: "57",
+        location_id: "2",
         location_name: "Table 2",
-        seats: 2,
-        floor_id: "9",
-        shape: "Rectangle" as const,
+        seats: 6,
+        floor_id: "1",
+        shape: "rectangle",
         angle: 45,
-        current_x: 40,
-        current_y: 40,
-        current_width: 12,
-        current_height: 12
+        x: 600,
+        y: 300,
+        width: 120,
+        height: 80,
+        enabled: true
       },
       {
-        location_id: "58",
-        location_name: "Table 5",
-        seats: 6,
-        floor_id: "10",
-        shape: "Ellipse" as const,
+        location_id: "3",
+        location_name: "Table 3",
+        seats: 4,
+        floor_id: "1",
+        shape: "square",
         angle: 0,
-        current_x: 30,
-        current_y: 30,
-        current_width: 15,
-        current_height: 15
+        x: 400,
+        y: 600,
+        width: 80,
+        height: 80,
+        enabled: true
+      },
+      {
+        location_id: "4",
+        location_name: "Table 4",
+        seats: 2,
+        floor_id: "2",
+        shape: "circle",
+        angle: 0,
+        x: 300,
+        y: 400,
+        width: 60,
+        height: 60,
+        enabled: true
       }
     ]
   }
@@ -99,7 +120,8 @@ export const createFloor = async (name: string): Promise<Floor> => {
     () => {
       const newFloor: Floor = {
         id: String(Math.floor(Math.random() * 10000)),
-        name
+        name,
+        enabled: true
       };
       mockData.data.floors.push(newFloor);
       return newFloor;
@@ -144,12 +166,13 @@ export const createLocation = async (data: Partial<Location>): Promise<Location>
         location_name: data.location_name || 'New Table',
         seats: data.seats || 2,
         floor_id: data.floor_id || null,
-        shape: data.shape || 'Rectangle',
+        shape: data.shape || 'rectangle',
         angle: data.angle || 0,
-        current_x: data.current_x || 50,
-        current_y: data.current_y || 50,
-        current_width: data.current_width || 10,
-        current_height: data.current_height || 10
+        x: data.x ?? 500,
+        y: data.y ?? 500,
+        width: data.width || 80,
+        height: data.height || 80,
+        enabled: true
       };
       mockData.data.locations.push(newLocation);
       return newLocation;

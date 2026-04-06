@@ -2,15 +2,16 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Folder, MoreVertical, Plus, Settings, Globe, Grid3x3 } from 'lucide-react';
+import { Folder, MoreVertical, Plus, Globe, Grid3x3, AlertCircle, Tag as TagIcon } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { ProductCard } from '@/components/menu/ProductCard';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
 import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
 import { CategoryManagementSheet } from '@/components/menu/CategoryManagementSheet';
-import { AttributesManager } from '@/components/menu/AttributesManager';
 import { OrganizeModal } from '@/components/menu/OrganizeModal';
 import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
+import { AllergensSheet } from '@/components/menu/AllergensSheet';
+import { TagsSheet } from '@/components/menu/TagsSheet';
 import { ProductCreateSheet } from '@/components/menu/ProductCreateSheet';
 import { Product, Tag, Allergen } from '@/types/menu';
 import { menuService } from '@/services/menuService';
@@ -34,11 +35,12 @@ export default function Menu() {
   } = useMenuData();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [attributesManagerOpen, setAttributesManagerOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [organizeModalOpen, setOrganizeModalOpen] = useState(false);
   const [externalMenusOpen, setExternalMenusOpen] = useState(false);
   const [productCreateOpen, setProductCreateOpen] = useState(false);
+  const [allergensSheetOpen, setAllergensSheetOpen] = useState(false);
+  const [tagsSheetOpen, setTagsSheetOpen] = useState(false);
   const [tags, setTags] = useState<Tag[]>([]);
   const [allergens, setAllergens] = useState<Allergen[]>([]);
 
@@ -108,10 +110,6 @@ export default function Menu() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover">
-                <DropdownMenuItem onClick={() => setAttributesManagerOpen(true)}>
-                  <Settings className="w-4 h-4 mr-2" />
-                  Gérer les Attributs
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setExternalMenusOpen(true)}>
                   <Globe className="w-4 h-4 mr-2" />
                   Menus Externes
@@ -120,6 +118,14 @@ export default function Menu() {
                   <Grid3x3 className="w-4 h-4 mr-2" />
                   Organiser (Mode Tablette)
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setAllergensSheetOpen(true)}>
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  Allergènes
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setTagsSheetOpen(true)}>
+                  <TagIcon className="w-4 h-4 mr-2" />
+                  Tags
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -127,14 +133,14 @@ export default function Menu() {
 
         <div className="space-y-8">
           {menuData.products_types
-            .sort((a, b) => a.order - b.order)
+            .sort((a, b) => (a.categ_order ?? a.order ?? 0) - (b.categ_order ?? b.order ?? 0))
             .map((category) => (
               <div key={category.category_id} className="mb-8">
                 <h2 className="text-2xl font-bold text-foreground mb-4">{category.category_name || category.category}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {category.products
                     .filter((p) => p.category_id === category.category_id)
-                    .sort((a, b) => (a.order || 0) - (b.order || 0))
+                    .sort((a, b) => (a.display_order ?? a.order ?? 0) - (b.display_order ?? b.order ?? 0))
                     .map((product) => (
                       <ProductCard
                         key={product.product_id}
@@ -181,13 +187,6 @@ export default function Menu() {
           onDeleteCategory={deleteCategory}
         />
 
-        <AttributesManager
-          open={attributesManagerOpen}
-          onOpenChange={setAttributesManagerOpen}
-          attributes={attributes}
-          onCreateAttribute={createAttribute}
-          onUpdateAttribute={updateAttributeData}
-        />
 
         <OrganizeModal
           open={organizeModalOpen}
@@ -209,6 +208,19 @@ export default function Menu() {
           tvaRates={tvaRates}
           onCreateProduct={createProduct}
           onCreateCategory={createProductCategory}
+        />
+
+        <AllergensSheet
+          open={allergensSheetOpen}
+          onOpenChange={setAllergensSheetOpen}
+          allergens={allergens}
+        />
+
+        <TagsSheet
+          open={tagsSheetOpen}
+          onOpenChange={setTagsSheetOpen}
+          tags={tags}
+          onTagCreated={(newTag) => setTags([...tags, newTag])}
         />
       </div>
     </DashboardLayout>

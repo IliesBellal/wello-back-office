@@ -9,9 +9,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { menuService } from '@/services/menuService';
 
 interface CategoryManagementSheetProps {
   open: boolean;
@@ -36,6 +37,11 @@ export const CategoryManagementSheet = ({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
+  const [deleteAvailabilityDialogOpen, setDeleteAvailabilityDialogOpen] = useState(false);
+  const [categoryToToggleAvailability, setCategoryToToggleAvailability] = useState<Category | null>(null);
+  const [categoryToDeleteFromAvailability, setCategoryToDeleteFromAvailability] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
 
   const handleCreate = async () => {
@@ -104,6 +110,71 @@ export const CategoryManagementSheet = ({
     }
   };
 
+  const handleToggleAvailability = (category: Category) => {
+    setCategoryToToggleAvailability(category);
+    setAvailabilityDialogOpen(true);
+  };
+
+  const handleToggleAvailabilityConfirm = async () => {
+    if (!categoryToToggleAvailability) return;
+
+    setIsProcessing(true);
+    try {
+      const newStatus = !categoryToToggleAvailability.availability;
+      await menuService.updateCategoryAvailability(categoryToToggleAvailability.category_id, newStatus);
+
+      // Update local category state
+      categoryToToggleAvailability.availability = newStatus;
+      setAvailabilityDialogOpen(false);
+
+      toast({
+        title: "Succès",
+        description: newStatus
+          ? "Catégorie réactivée avec succès. Elle est maintenant visible dans le menu."
+          : "Catégorie désactivée. Elle a été retirée du menu."
+      });
+    } catch (error) {
+      console.error('Error updating category availability:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de mettre à jour la disponibilité.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteFromAvailability = (categoryId: string) => {
+    setCategoryToDeleteFromAvailability(categoryId);
+    setDeleteAvailabilityDialogOpen(true);
+  };
+
+  const handleDeleteFromAvailabilityConfirm = async () => {
+    if (!categoryToDeleteFromAvailability) return;
+
+    setIsProcessing(true);
+    try {
+      await menuService.deleteCategory(categoryToDeleteFromAvailability);
+
+      setDeleteAvailabilityDialogOpen(false);
+
+      toast({
+        title: "Succès",
+        description: "Catégorie supprimée définitivement."
+      });
+    } catch (error) {
+      console.error('Error deleting category:', error);
+      toast({
+        title: "Erreur",
+        description: error instanceof Error ? error.message : "Impossible de supprimer la catégorie.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent>
@@ -163,10 +234,24 @@ export const CategoryManagementSheet = ({
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => handleDelete(category.category_id)}
+                        onClick={() => handleToggleAvailability(category)}
+                        disabled={isProcessing}
+                        title={category.availability ? "Retirer du menu" : "Ajouter au menu"}
                       >
-                        <Trash2 className="w-4 h-4" />
+                        {category.availability ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                       </Button>
+                      {!category.availability && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteFromAvailability(category.category_id)}
+                          disabled={isProcessing}
+                          className="text-destructive hover:text-destructive"
+                          title="Supprimer définitivement"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
@@ -186,6 +271,32 @@ export const CategoryManagementSheet = ({
         cancelText="Annuler"
         isDangerous={true}
         isLoading={isDeleting}
+      />
+
+      <ConfirmDialog
+        open={availabilityDialogOpen}
+        onOpenChange={setAvailabilityDialogOpen}
+        title={categoryToToggleAvailability?.availability ? "Retirer du menu" : "Ajouter au menu"}
+        description={categoryToToggleAvailability?.availability 
+          ? "La catégorie sera retirée du menu et ne sera plus visible pour les clients."
+          : "La catégorie sera ajoutée au menu et sera visible pour les clients."}
+        onConfirm={handleToggleAvailabilityConfirm}
+        confirmText={categoryToToggleAvailability?.availability ? "Retirer" : "Ajouter"}
+        cancelText="Annuler"
+        isDangerous={categoryToToggleAvailability?.availability}
+        isLoading={isProcessing}
+      />
+
+      <ConfirmDialog
+        open={deleteAvailabilityDialogOpen}
+        onOpenChange={setDeleteAvailabilityDialogOpen}
+        title="Supprimer une catégorie"
+        description="Êtes-vous sûr de vouloir supprimer définitivement cette catégorie ? Cette action est irréversible."
+        onConfirm={handleDeleteFromAvailabilityConfirm}
+        confirmText="Supprimer"
+        cancelText="Annuler"
+        isDangerous={true}
+        isLoading={isProcessing}
       />
     </Sheet>
   );

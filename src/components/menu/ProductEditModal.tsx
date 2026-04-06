@@ -380,10 +380,10 @@ export const ProductEditModal = ({
 
           <TabsContent value="composition" className="space-y-4">
             <ProductCompositionTab
-              composition={formData.composition || []}
+              composition={formData.components || []}
               components={components}
               units={units}
-              onChange={(composition) => setFormData({ ...formData, composition })}
+              onChange={(composition) => setFormData({ ...formData, components: composition })}
             />
           </TabsContent>
 

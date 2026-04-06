@@ -18,7 +18,7 @@ export interface SubProduct {
 }
 
 export interface UnitOfMeasure {
-  id: number;
+  id: string | number;  // String format from real API, number from legacy
   name: string;
   compatible_with: string[];
 }
@@ -29,8 +29,11 @@ export interface Component {
   category?: string;
   category_id?: string;
   price?: number;
-  price_per_unit?: number;
   unit_id?: number;
+  unit_of_measure?: string;  // e.g. "Grammes", "Millilitres"
+  unit_of_measure_id?: string;  // e.g. "2" (numeric ID from API)
+  quantity?: number;  // Quantity in the product composition
+  cost?: number;  // Cost of the component in the product
   status?: string;
   available?: boolean;
 }
@@ -46,22 +49,44 @@ export interface ComponentCategory {
 export interface AttributeOption {
   id: string;
   title: string;
-  price: number;
+  price?: number;  // Legacy format
+  extra_price?: number;  // New format from API
+  max_quantity?: number;
+}
+
+export interface AttributeOptionDetail {
+  id: string;
+  title: string;
+  extra_price: number;
+  max_quantity: number;
+  configurable_attribute_id?: string;
+  order_item_id?: string;
+  quantity: number;
+  selected: boolean;
 }
 
 export interface Attribute {
   id: string;
   title: string;
-  type: 'CHECK';
-  min: number;
-  max: number;
-  options: AttributeOption[];
+  type: 'CHECK' | 'QUANTITY';
+  min?: number;
+  max?: number;
+  min_options?: number;
+  max_options?: number;
+  attribute_type?: string;
+  options: AttributeOption[] | AttributeOptionDetail[];
+  product_id?: string;
+  order_item_id?: string;
 }
 
 export interface ProductComposition {
   component_id: string;
   quantity: number;
-  unit_id: number;
+  unit_id?: number;  // Deprecated: use unit_of_measure_id
+  unit_of_measure?: string;  // e.g. "Grammes", "Millilitres"
+  unit_of_measure_id?: string;  // New format: e.g. "2"
+  cost?: number;  // Cost of this composition item
+  name?: string;  // Component name
 }
 
 export interface ProductAttribute {
@@ -125,6 +150,7 @@ export interface Product {
   is_popular?: boolean;
   is_available_on_sno?: boolean;
   order?: number;
+  display_order?: number;  // Sort order for products
   status?: number;
   available?: boolean;
   available_in?: boolean;
@@ -133,12 +159,12 @@ export interface Product {
   tva_rate_in?: number;
   tva_rate_delivery?: number;
   tva_rate_take_away?: number;
+  cost_price?: number;  // Food cost
+  foodcost_percent?: number;  // Food cost percentage
+  margin_percent?: number;  // Margin percentage
   components?: ProductComposition[];
-  composition?: ProductComposition[];
   attributes?: ProductAttribute[];
-  configuration?: {
-    attributes?: ProductAttribute[];
-  };
+  configuration?: (string[] | { attributes?: Attribute[] });  // Pre-configured attributes from API or IDs array for payload
   sub_products?: SubProduct[];
   quantity?: number;
   paid_quantity?: number;
@@ -173,7 +199,9 @@ export interface Category {
   name?: string;
   // Common
   order: number;
+  categ_order?: number;  // Sort order for categories
   bg_color?: string;
+  availability?: boolean;  // Availability status for the category
   products: Product[];
 }
 

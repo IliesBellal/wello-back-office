@@ -29,17 +29,18 @@ const mockTvaRates: TvaRateGroup[] = [
 ];
 
 const mockUnitsOfMeasure: UnitOfMeasure[] = [
-  { id: 10, name: "Grammes (g)", compatible_with: ["10", "11", "12"] },
-  { id: 11, name: "Kilogrammes (kg)", compatible_with: ["10", "11", "12"] },
-  { id: 12, name: "Milligrammes (mg)", compatible_with: ["10", "11", "12"] },
-  { id: 20, name: "Litres (L)", compatible_with: ["20", "21"] },
-  { id: 21, name: "Centilitres (cL)", compatible_with: ["20", "21"] }
+  { id: "1", name: "Pièces", compatible_with: ["1"] },
+  { id: "2", name: "Grammes", compatible_with: ["2", "3"] },
+  { id: "3", name: "Kilogrammes", compatible_with: ["2", "3"] },
+  { id: "4", name: "Litres", compatible_with: ["4", "5", "6"] },
+  { id: "5", name: "Millilitres", compatible_with: ["4", "5", "6"] },
+  { id: "6", name: "Centilitres", compatible_with: ["4", "5"] }
 ];
 
 const mockComponents: Component[] = [
-  { component_id: "c1", name: "Farine", price: 500, status: "1" },
-  { component_id: "c2", name: "Sauce Tomate", category: "1", price: 200, status: "1" },
-  { component_id: "c3", name: "Mozzarella", category: "2", price: 100, status: "1" }
+  { component_id: "c1", name: "Farine", price: 500, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" },
+  { component_id: "c2", name: "Sauce Tomate", category: "1", price: 200, unit_of_measure: "Millilitres", unit_of_measure_id: "5", status: "1" },
+  { component_id: "c3", name: "Mozzarella", category: "2", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" }
 ];
 
 const mockComponentCategories: ComponentCategory[] = [
@@ -48,9 +49,9 @@ const mockComponentCategories: ComponentCategory[] = [
     category_name: "Viande",
     order: 0,
     components: [
-      { component_id: "71", name: "Jambon", category: "1", price: 100, status: "1" },
-      { component_id: "74", name: "Lardons", category: "1", price: 100, status: "1" },
-      { component_id: "79", name: "Poulet", category: "1", price: 100, status: "1" }
+      { component_id: "71", name: "Jambon", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" },
+      { component_id: "74", name: "Lardons", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" },
+      { component_id: "79", name: "Poulet", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" }
     ]
   },
   {
@@ -58,8 +59,8 @@ const mockComponentCategories: ComponentCategory[] = [
     category_name: "Fromage",
     order: 1,
     components: [
-      { component_id: "85", name: "Mozzarella", category: "2", price: 150, status: "1" },
-      { component_id: "86", name: "Chèvre", category: "2", price: 120, status: "1" }
+      { component_id: "85", name: "Mozzarella", category: "2", price: 150, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" },
+      { component_id: "86", name: "Chèvre", category: "2", price: 120, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" }
     ]
   }
 ];
@@ -101,7 +102,10 @@ const mockProducts: Product[] = [
     category_id: "cat1", 
     name: "Margherita", 
     description: "Tomate, Mozza", 
-    price: 1200, 
+    price: 1200,
+    price_take_away: 1200,
+    price_delivery: 1300,
+    cost_price: 380,
     bg_color: "#ffffff",
     is_group: false, 
     available: true,
@@ -111,8 +115,8 @@ const mockProducts: Product[] = [
     tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
     availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
     integrations: { 
-      uber_eats: { enabled: true, price_override: 1350, id: "ue_123" },
-      deliveroo: { enabled: false }
+      uber_eats: { enabled: true, price_override: 1490, id: "ue_123" },
+      deliveroo: { enabled: true, price_override: 1490 }
     }
   },
   {
@@ -120,7 +124,10 @@ const mockProducts: Product[] = [
     category_id: "cat1", 
     name: "Regina", 
     description: "Tomate, Mozza, Jambon, Champignons", 
-    price: 1400, 
+    price: 1400,
+    price_take_away: 1400,
+    price_delivery: 1500,
+    cost_price: 520,
     bg_color: "#ffffff",
     is_group: false, 
     available: true,
@@ -130,7 +137,7 @@ const mockProducts: Product[] = [
     tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
     availability: { on_site: true, takeaway: true, delivery: false, scan_order: true },
     integrations: { 
-      uber_eats: { enabled: false },
+      uber_eats: { enabled: true, price_override: 1690 },
       deliveroo: { enabled: false }
     }
   },
@@ -156,7 +163,10 @@ const mockProducts: Product[] = [
     category_id: "cat2", 
     name: "Eau Minérale", 
     description: "50cl", 
-    price: 150, 
+    price: 150,
+    price_take_away: 150,
+    price_delivery: 200,
+    cost_price: 25,
     bg_color: "#ffffff",
     is_group: false, 
     available: true,
@@ -166,7 +176,7 @@ const mockProducts: Product[] = [
     tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
     availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
     integrations: { 
-      uber_eats: { enabled: false },
+      uber_eats: { enabled: true, price_override: 250 },
       deliveroo: { enabled: false }
     }
   }
@@ -253,6 +263,38 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.patch<void>(`/menu/products/${productId}`, data)
+    );
+  },
+
+  async updateProductAvailability(productId: string, status: boolean): Promise<void> {
+    logAPI('PATCH', `/menu/products/${productId}/availability`, { status: status.toString() });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/products/${productId}/availability`, { status: status.toString() })
+    );
+  },
+
+  async deleteProduct(productId: string): Promise<void> {
+    logAPI('DELETE', `/menu/products/${productId}`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/products/${productId}`)
+    );
+  },
+
+  async updateCategoryAvailability(categoryId: string, status: boolean): Promise<void> {
+    logAPI('PATCH', `/menu/products/category/${categoryId}/availability`, { status: status.toString() });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/products/category/${categoryId}/availability`, { status: status.toString() })
+    );
+  },
+
+  async deleteCategory(categoryId: string): Promise<void> {
+    logAPI('DELETE', `/menu/products/category/${categoryId}`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/products/category/${categoryId}`)
     );
   },
 
@@ -427,7 +469,7 @@ export const menuService = {
         component_id: `comp_${Date.now()}`, 
         name: data.name,
         unit_id: data.unit_id,
-        price_per_unit: data.price / 100,
+        price: data.price / 100,
         category_id: data.category_id
       } as Component),
       () => apiClient.post<Component>('/menu/components/create', data)
@@ -439,14 +481,6 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.delete<void>(`/menu/components/${componentId}`)
-    );
-  },
-
-  async deleteCategory(categoryId: string): Promise<void> {
-    logAPI('DELETE', `/menu/products/category/${categoryId}`);
-    return withMock(
-      () => undefined,
-      () => apiClient.delete<void>(`/menu/products/category/${categoryId}`)
     );
   },
 
@@ -527,6 +561,22 @@ export const menuService = {
     return withMock(
       () => [...mockAllergens],
       () => apiClient.get<WelloApiResponse<Allergen[]>>('/allergens').then(res => res.data)
+    );
+  },
+
+  async saveDisplayOrder(displayOrder: Array<{ category_id: string; products: string[] }>): Promise<void> {
+    logAPI('PATCH', '/menu/display-orders', { display_order: displayOrder });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/display-orders', { display_order: displayOrder })
+    );
+  },
+
+  async deleteTag(tagId: string): Promise<void> {
+    logAPI('DELETE', `/menu/tags/${tagId}`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/tags/${tagId}`)
     );
   }
 };

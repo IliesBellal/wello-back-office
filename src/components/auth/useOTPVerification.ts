@@ -145,7 +145,7 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await apiClient.get<FallbackSMSResponse>('/mfa/fallback-sms', { headers });
+      const response = await apiClient.get<FallbackSMSResponse>('/auth/mfa/fallback-sms', { headers });
 
       if (response.status === 'success') {
         setCooldown(60);

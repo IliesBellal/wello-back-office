@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Product, TvaRateGroup, UnitOfMeasure, Component, Attribute, Tag, Allergen } from '@/types/menu';
+import { Product, TvaRateGroup, UnitOfMeasure, Component, Attribute, ProductAttribute, Tag, Allergen } from '@/types/menu';
 import {
   Sheet,
   SheetContent,
@@ -45,9 +45,57 @@ export const ProductDetailsSheet = ({
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
 
+  // Helper function to convert configuration attributes to ProductAttribute format
+  const buildFormDataFromProduct = (prod: Product): Partial<Product> => {
+    const configurationAttributes: ProductAttribute[] = [];
+    // Check if configuration is an object with attributes property
+    if (
+      prod.configuration &&
+      typeof prod.configuration === 'object' &&
+      !Array.isArray(prod.configuration) &&
+      'attributes' in prod.configuration &&
+      Array.isArray(prod.configuration.attributes)
+    ) {
+      configurationAttributes.push(
+        ...prod.configuration.attributes.map((attr: Attribute) => ({
+          attribute_id: attr.id,
+          options: attr.options
+            ?.filter((opt) => {
+              // Handle both AttributeOption and AttributeOptionDetail types
+              const optWithSelected = opt as { selected?: boolean };
+              return optWithSelected.selected;
+            })
+            .map((opt) => {
+              // Get price from either extra_price (new format) or price (old format)
+              const price = 'extra_price' in opt && opt.extra_price !== undefined ? opt.extra_price : ('price' in opt && opt.price !== undefined ? opt.price : 0);
+              return {
+                option_id: opt.id,
+                price_override: price as number
+              };
+            }) || []
+        }))
+      );
+    }
+
+    return {
+      ...prod,
+      // Ensure composition is initialized (pre-fill with API data)
+      components: prod.components || [],
+      // Ensure attributes is initialized - use configuration attributes if available, fallback to attributes
+      attributes: configurationAttributes.length > 0 
+        ? configurationAttributes
+        : (prod.attributes || []),
+      // Normalize to string IDs in case the API returns full objects
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allergens: (prod.allergens || []).map((a: any) => typeof a === 'string' ? a : a?.allergen_id).filter(Boolean),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      tags: (prod.tags || []).map((t: any) => typeof t === 'string' ? t : t?.id).filter(Boolean),
+    };
+  };
+
   useEffect(() => {
     if (product) {
-      setFormData(product);
+      setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
     }
   }, [product]);
@@ -81,7 +129,7 @@ export const ProductDetailsSheet = ({
 
   const handleCancel = () => {
     if (product) {
-      setFormData(product);
+      setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
     }
   };
@@ -464,10 +512,10 @@ export const ProductDetailsSheet = ({
 
           <TabsContent value="composition">
             <ProductCompositionTab
-              composition={formData.composition || []}
+              composition={formData.components || []}
               components={components}
               units={units}
-              onChange={(composition) => setFormData({ ...formData, composition })}
+              onChange={(composition) => setFormData({ ...formData, components: composition })}
               disabled={!isEditMode}
             />
           </TabsContent>
@@ -509,7 +557,7 @@ export const ProductDetailsSheet = ({
                           <input
                             type="checkbox"
                             id={`allergen-${allergen.allergen_id}`}
-                            checked={product.allergens?.includes(allergen.allergen_id) || false}
+                            checked={formData.allergens?.includes(allergen.allergen_id) || false}
                             disabled
                             className="rounded"
                           />
@@ -553,7 +601,7 @@ export const ProductDetailsSheet = ({
                           <input
                             type="checkbox"
                             id={`tag-${tag.id}`}
-                            checked={product.tags?.includes(tag.id) || false}
+                            checked={formData.tags?.includes(tag.id) || false}
                             disabled
                             className="rounded"
                           />

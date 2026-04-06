@@ -1,13 +1,11 @@
 import { useState } from 'react';
 import { NavLink } from '@/components/NavLink';
-import { Home, ShoppingBag, Menu as MenuIcon, Users, Settings, Store, User, ChevronDown, FileText, Package, LayoutGrid, Users2, Calculator, Warehouse } from 'lucide-react';
+import { Home, ShoppingBag, Menu as MenuIcon, Users, Settings, Store, User, ChevronDown, FileText, Package, LayoutGrid, Users2, Calculator, Warehouse, Utensils, Tag, TicketPercent } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const menuItems = [
   { title: 'Dashboard', icon: Home, path: '/', end: true },
   { title: 'Commandes', icon: ShoppingBag, path: '/orders', end: false },
-  { title: 'Menu', icon: MenuIcon, path: '/menu', end: true },
-  { title: 'Composants', icon: Package, path: '/menu/components', end: false },
   { title: 'Plan de Salle', icon: LayoutGrid, path: '/locations' },
   { title: 'Utilisateurs', icon: Users2, path: '/users' },
   { title: 'Registres de Caisse', icon: Calculator, path: '/cash-registers' },
@@ -16,16 +14,25 @@ const menuItems = [
   { title: 'Rapports & Comptabilité', icon: FileText, path: '/reports/financial' },
 ];
 
+const menuSubItems = [
+  { title: 'Produits', icon: Utensils, path: '/menu', end: true },
+  { title: 'Ingrédients', icon: Package, path: '/menu/components', end: false },
+  { title: 'Grille de prix', icon: Tag, path: '/menu/price-grid', end: false },
+  { title: 'Options & Suppléments', icon: Settings, path: '/menu/attributes', end: false },
+  { title: 'Promotions & Dispo.', icon: TicketPercent, path: '/menu/promotions', end: false },
+];
+
 const settingsSubItems = [
   { title: 'Établissement', icon: Store, path: '/settings/establishment' },
   { title: 'Mon Profil', icon: User, path: '/settings/profile' },
 ];
 
 export const Sidebar = () => {
+  const [menuOpen, setMenuOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(true);
 
   return (
-    <aside className="w-64 bg-sidebar border-r border-sidebar-border shadow-soft flex flex-col">
+    <aside className="w-64 bg-sidebar border-r border-sidebar-border shadow-soft flex flex-col overflow-y-auto">
       <div className="p-6 border-b border-sidebar-border">
         <h1 className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
           Wello Resto
@@ -44,6 +51,30 @@ export const Sidebar = () => {
             <span>{item.title}</span>
           </NavLink>
         ))}
+
+        <Collapsible open={menuOpen} onOpenChange={setMenuOpen}>
+          <CollapsibleTrigger className="flex items-center justify-between w-full gap-3 px-4 py-3 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
+            <div className="flex items-center gap-3">
+              <MenuIcon className="w-5 h-5" />
+              <span>Menu</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1 mt-1">
+            {menuSubItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.end}
+                className="flex items-center gap-3 px-4 py-2 ml-6 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                activeClassName="bg-gradient-primary text-white font-medium shadow-soft"
+              >
+                <item.icon className="w-4 h-4" />
+                <span>{item.title}</span>
+              </NavLink>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
 
         <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
           <CollapsibleTrigger className="flex items-center justify-between w-full gap-3 px-4 py-3 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors">

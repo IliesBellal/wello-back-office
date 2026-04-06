@@ -28,7 +28,7 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
   }
 
   return (
-    <div className="min-h-screen flex w-full bg-background">
+    <div className="h-screen overflow-hidden flex w-full bg-background">
       <OfflineIndicator />
       
       {/* Desktop Sidebar - hidden on mobile */}

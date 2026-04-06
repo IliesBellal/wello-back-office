@@ -19,6 +19,9 @@ import Users from './pages/Users';
 import CashRegisters from './pages/CashRegisters';
 import Customers from './pages/Customers';
 import Stocks from './pages/Stocks';
+import PriceGrid from './pages/PriceGrid';
+import AttributesPage from './pages/Attributes';
+import PromotionsAvailabilities from './pages/PromotionsAvailabilities';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -38,6 +41,9 @@ const App = () => (
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               <Route path="/menu" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
               <Route path="/menu/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
+              <Route path="/menu/price-grid" element={<ProtectedRoute><PriceGrid /></ProtectedRoute>} />
+              <Route path="/menu/attributes" element={<ProtectedRoute><AttributesPage /></ProtectedRoute>} />
+              <Route path="/menu/promotions" element={<ProtectedRoute><PromotionsAvailabilities /></ProtectedRoute>} />
               <Route path="/reports/financial" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
               <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />

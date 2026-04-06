@@ -165,8 +165,8 @@ export default function Components() {
                   </h3>
                   <div className="space-y-1 text-sm">
                     <p className="font-medium text-primary">
-                      {component.price_per_unit 
-                        ? `+${(component.price_per_unit).toFixed(2)} €`
+                      {component.price 
+                        ? `+${(component.price).toFixed(2)} €`
                         : component.price 
                         ? `+${(component.price / 100).toFixed(2)} €`
                         : 'Gratuit'}
