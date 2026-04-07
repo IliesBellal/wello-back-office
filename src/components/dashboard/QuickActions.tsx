@@ -1,49 +1,55 @@
-import { Plus, FileText, CreditCard, ShoppingBag } from 'lucide-react';
+import { Plus, AlertTriangle, CalendarDays, CreditCard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
 interface QuickActionsProps {
   onNewProduct: () => void;
+  onMarkRupture: () => void;
 }
 
-export const QuickActions = ({ onNewProduct }: QuickActionsProps) => {
+export const QuickActions = ({ onNewProduct, onMarkRupture }: QuickActionsProps) => {
   const navigate = useNavigate();
 
   const actions = [
     {
-      icon: Plus,
-      label: 'Nouveau Produit',
-      onClick: onNewProduct,
-      variant: 'default' as const,
+      icon: AlertTriangle,
+      label: 'Marquer une rupture',
+      onClick: onMarkRupture,
+      variant: 'outline' as const,
+      className: 'border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400',
     },
     {
-      icon: FileText,
-      label: 'Compta M-1',
-      onClick: () => navigate('/reports/financial?period=last_month'),
+      icon: Plus,
+      label: 'Créer un produit',
+      onClick: onNewProduct,
+      variant: 'default' as const,
+      className: '',
+    },
+    {
+      icon: CalendarDays,
+      label: 'Planning du jour',
+      onClick: () => navigate('/orders?view=planning'),
       variant: 'outline' as const,
+      className: '',
     },
     {
       icon: CreditCard,
-      label: 'Fermer une caisse',
+      label: 'Caisses du jour',
       onClick: () => navigate('/cash-registers'),
       variant: 'outline' as const,
-    },
-    {
-      icon: ShoppingBag,
-      label: 'Nouvelle Commande',
-      onClick: () => navigate('/orders'),
-      variant: 'outline' as const,
+      className: '',
     },
   ];
 
   return (
-    <div className="flex flex-wrap gap-3">
+    <div className="flex flex-wrap gap-2">
       {actions.map((action) => (
         <Button
           key={action.label}
           variant={action.variant}
           onClick={action.onClick}
-          className="gap-2"
+          className={`gap-2 ${action.className}`}
+          size="sm"
         >
           <action.icon className="h-4 w-4" />
           <span className="hidden sm:inline">{action.label}</span>

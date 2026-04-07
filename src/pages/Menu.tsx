@@ -1,10 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Folder, MoreVertical, Plus, Globe, Grid3x3, AlertCircle, Tag as TagIcon } from 'lucide-react';
+import { Folder, MoreVertical, Plus, Globe, Grid3x3, AlertCircle, Tag as TagIcon, Search, X } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
-import { ProductCard } from '@/components/menu/ProductCard';
+import { ProductsTable } from '@/components/menu/ProductsTable';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
 import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
 import { CategoryManagementSheet } from '@/components/menu/CategoryManagementSheet';
@@ -15,6 +17,30 @@ import { TagsSheet } from '@/components/menu/TagsSheet';
 import { ProductCreateSheet } from '@/components/menu/ProductCreateSheet';
 import { Product, Tag, Allergen } from '@/types/menu';
 import { menuService } from '@/services/menuService';
+
+type SortKey = 'name' | 'category' | 'tags' | 'status';
+type SortDir = 'asc' | 'desc';
+
+function getProductValue(product: Product, key: SortKey, categories: Record<string, string>): string | number {
+  switch (key) {
+    case 'name': return product.name.toLowerCase();
+    case 'category': return (categories[product.category_id || ''] || product.category || '').toLowerCase();
+    case 'tags': return (product.tags?.length ?? 0);
+    case 'status': {
+      const statuses = [];
+      if (product.available_in || (product.available !== false && !('available_in' in product))) {
+        statuses.push('1');
+      }
+      if (product.available_take_away) {
+        statuses.push('2');
+      }
+      if (product.available_delivery) {
+        statuses.push('3');
+      }
+      return statuses.length || 0;
+    }
+  }
+}
 
 export default function Menu() {
   const { 
@@ -44,6 +70,13 @@ export default function Menu() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [allergens, setAllergens] = useState<Allergen[]>([]);
 
+  // Filtres et tri
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
   // Load tags and allergens on mount
   useEffect(() => {
     const loadTagsAndAllergens = async () => {
@@ -64,7 +97,6 @@ export default function Menu() {
 
   const handleTagCreated = (newTag: { id: string; name: string }) => {
     setTags(prevTags => {
-      // Check if tag already exists (prevent duplicates)
       if (prevTags.some(t => t.id === newTag.id)) {
         return prevTags;
       }
@@ -75,6 +107,75 @@ export default function Menu() {
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
     setSheetOpen(true);
+  };
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
+
+  // Build category mapping
+  const categoryMap = useMemo(() => {
+    if (!menuData) return {} as Record<string, string>;
+    return menuData.products_types.reduce((acc, cat) => {
+      acc[cat.category_id] = cat.category_name || cat.category;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [menuData]);
+
+  // Get all products and apply filters/sorting
+  const filteredProducts = useMemo(() => {
+    if (!menuData) return [];
+
+    let result = menuData.products || [];
+
+    // Filtre recherche
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter(p => 
+        p.name.toLowerCase().includes(q) || 
+        (p.description && p.description.toLowerCase().includes(q))
+      );
+    }
+
+    // Filtre catégorie
+    if (categoryFilter !== 'all') {
+      result = result.filter(p => p.category_id === categoryFilter);
+    }
+
+    // Filtre tags
+    if (tagFilter.length > 0) {
+      result = result.filter(p => {
+        const productTags = p.tags || [];
+        return tagFilter.some(tagId => productTags.includes(tagId));
+      });
+    }
+
+    // Tri
+    return [...result].sort((a, b) => {
+      const va = getProductValue(a, sortKey, categoryMap);
+      const vb = getProductValue(b, sortKey, categoryMap);
+      
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      }
+      
+      const na = va as number;
+      const nb = vb as number;
+      return sortDir === 'asc' ? na - nb : nb - na;
+    });
+  }, [menuData, search, categoryFilter, tagFilter, sortKey, sortDir, categoryMap]);
+
+  const handleTagFilterChange = (tagId: string) => {
+    setTagFilter(prev => 
+      prev.includes(tagId) 
+        ? prev.filter(id => id !== tagId)
+        : [...prev, tagId]
+    );
   };
 
   if (loading) {
@@ -131,26 +232,76 @@ export default function Menu() {
           </div>
         </div>
 
-        <div className="space-y-8">
-          {menuData.products_types
-            .sort((a, b) => (a.categ_order ?? a.order ?? 0) - (b.categ_order ?? b.order ?? 0))
-            .map((category) => (
-              <div key={category.category_id} className="mb-8">
-                <h2 className="text-2xl font-bold text-foreground mb-4">{category.category_name || category.category}</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {category.products
-                    .filter((p) => p.category_id === category.category_id)
-                    .sort((a, b) => (a.display_order ?? a.order ?? 0) - (b.display_order ?? b.order ?? 0))
-                    .map((product) => (
-                      <ProductCard
-                        key={product.product_id}
-                        product={product}
-                        onClick={() => handleProductClick(product)}
-                      />
-                    ))}
-                </div>
+        {/* Filters */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-3 flex-1">
+              {/* Recherche */}
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un produit…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
-            ))}
+
+              {/* Filtre catégorie */}
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Toutes les catégories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les catégories</SelectItem>
+                  {menuData?.products_types?.map(cat => (
+                    <SelectItem key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name || cat.category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Filtre tags */}
+              <div className="flex gap-2 flex-wrap items-center">
+                {tags.map(tag => (
+                  <button
+                    key={tag.id}
+                    onClick={() => handleTagFilterChange(tag.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      tagFilter.includes(tag.id)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                    }`}
+                  >
+                    {tag.name}
+                    {tagFilter.includes(tag.id) && (
+                      <X className="w-3 h-3 ml-1 inline" />
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {/* Compteur */}
+              <div className="flex items-center text-sm text-muted-foreground whitespace-nowrap">
+                {filteredProducts.length} produit{filteredProducts.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Products Table */}
+        <div className="rounded-xl border border-border overflow-hidden">
+          <ProductsTable
+            products={filteredProducts}
+            categories={categoryMap}
+            tags={tags}
+            allergens={allergens}
+            onProductClick={handleProductClick}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+          />
         </div>
 
         <SimpleProductSheet
@@ -161,7 +312,7 @@ export default function Menu() {
           units={units}
           components={components}
           attributes={attributes}
-          categories={menuData.products_types}
+          categories={menuData?.products_types || []}
           tags={tags}
           allergens={allergens}
           onSave={updateProduct}
@@ -173,7 +324,7 @@ export default function Menu() {
           product={selectedProduct && selectedProduct.is_product_group ? selectedProduct : null}
           open={sheetOpen && selectedProduct !== null && selectedProduct.is_product_group}
           onOpenChange={setSheetOpen}
-          categories={menuData.products_types}
+          categories={menuData?.products_types || []}
           onSave={updateProduct}
           onCreateCategory={createProductCategory}
         />
@@ -181,18 +332,17 @@ export default function Menu() {
         <CategoryManagementSheet
           open={categoryManagerOpen}
           onOpenChange={setCategoryManagerOpen}
-          categories={menuData.products_types}
+          categories={menuData?.products_types || []}
           onCreateCategory={createProductCategory}
           onUpdateCategory={updateCategory}
           onDeleteCategory={deleteCategory}
         />
 
-
         <OrganizeModal
           open={organizeModalOpen}
           onOpenChange={setOrganizeModalOpen}
-          categories={menuData.products_types}
-          products={menuData.products}
+          categories={menuData?.products_types || []}
+          products={menuData?.products || []}
           onSaveOrder={saveOrder}
         />
 
@@ -204,7 +354,7 @@ export default function Menu() {
         <ProductCreateSheet
           open={productCreateOpen}
           onOpenChange={setProductCreateOpen}
-          categories={menuData.products_types}
+          categories={menuData?.products_types || []}
           tvaRates={tvaRates}
           onCreateProduct={createProduct}
           onCreateCategory={createProductCategory}

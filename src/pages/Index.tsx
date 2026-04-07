@@ -1,127 +1,134 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { QuickActions } from '@/components/dashboard/QuickActions';
-import { RevenueCard } from '@/components/dashboard/RevenueCard';
-import { ServiceCard } from '@/components/dashboard/ServiceCard';
-import { CustomersCard } from '@/components/dashboard/CustomersCard';
-import { AlertsCard } from '@/components/dashboard/AlertsCard';
-import { HourlyChart } from '@/components/dashboard/HourlyChart';
-import { ActivityFeed } from '@/components/dashboard/ActivityFeed';
+import { KPICard } from '@/components/dashboard/KPICard';
+import { HourlyChannelChart } from '@/components/dashboard/HourlyChannelChart';
 import { QuickProductSheet } from '@/components/dashboard/QuickProductSheet';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { Euro, Receipt, ShoppingCart, ClipboardList, AlertTriangle } from 'lucide-react';
 import {
-  getDashboardRealtime,
-  getDashboardHourly,
-  getDashboardActivity,
-  type DashboardRealtime,
-  type HourlyData,
-  type ActivityEvent,
+  getDashboardSummary,
+  type DashboardSummary,
 } from '@/services/dashboardService';
 
 const Index = () => {
-  const [realtimeData, setRealtimeData] = useState<DashboardRealtime | null>(null);
-  const [hourlyData, setHourlyData] = useState<HourlyData[]>([]);
-  const [activityData, setActivityData] = useState<ActivityEvent[]>([]);
+  const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [productSheetOpen, setProductSheetOpen] = useState(false);
+  const [ruptureSheetOpen, setRuptureSheetOpen] = useState(false);
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [realtime, hourly, activity] = await Promise.all([
-          getDashboardRealtime(),
-          getDashboardHourly(),
-          getDashboardActivity(),
-        ]);
-        setRealtimeData(realtime);
-        setHourlyData(hourly);
-        setActivityData(activity);
-      } catch (error) {
-        console.error('Failed to fetch dashboard data:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    getDashboardSummary()
+      .then(setData)
+      .catch((err) => console.error('Failed to fetch dashboard:', err))
+      .finally(() => setLoading(false));
   }, []);
 
   const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
+    const h = new Date().getHours();
+    if (h < 12) return 'Bonjour';
+    if (h < 18) return 'Bon après-midi';
     return 'Bonsoir';
   };
 
+  const today = new Date().toLocaleDateString('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
+
   return (
     <DashboardLayout>
-      <div className="p-6 lg:p-8 space-y-8">
-        {/* Header Section */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div className="p-6 lg:p-8 space-y-6">
+
+        {/* ── Header ── */}
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              {getGreeting()} 👋
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Voici l'état de votre activité en temps réel
-            </p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-2xl font-bold text-foreground capitalize">
+                {getGreeting()} 👋
+              </h1>
+              {data?.alerts && data.alerts.low_stock_count > 0 && (
+                <Badge variant="destructive" className="gap-1 text-xs">
+                  <AlertTriangle className="h-3 w-3" />
+                  {data.alerts.low_stock_count} rupture{data.alerts.low_stock_count > 1 ? 's' : ''}
+                </Badge>
+              )}
+            </div>
+            <p className="text-muted-foreground mt-0.5 capitalize text-sm">{today}</p>
           </div>
-          <QuickActions onNewProduct={() => setProductSheetOpen(true)} />
+          <QuickActions
+            onNewProduct={() => setProductSheetOpen(true)}
+            onMarkRupture={() => setRuptureSheetOpen(true)}
+          />
         </div>
 
-        {/* KPI Cards Section */}
+        {/* ── KPI Cards ── */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-[200px] rounded-2xl" />
+              <Skeleton key={i} className="h-[220px] rounded-2xl" />
             ))}
           </div>
-        ) : realtimeData ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-            <RevenueCard
-              current={realtimeData.revenue.current}
-              currency={realtimeData.revenue.currency}
-              trendPercentage={realtimeData.revenue.trend_percentage}
-              trendDirection={realtimeData.revenue.trend_direction}
-              comparisons={realtimeData.revenue.comparisons}
-              progressTarget={realtimeData.revenue.progress_target}
+        ) : data ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {/* CA */}
+            <KPICard
+              title="Chiffre d'affaires"
+              icon={Euro}
+              data={data.kpis.revenue}
+              format="currency"
+              currency={data.kpis.revenue.currency}
+              target={data.kpis.revenue.target_day}
+              targetLabel="Objectif journalier"
+              badge={
+                data.kpis.revenue.in_progress_amount > 0
+                  ? {
+                      label: 'En cours',
+                      value: `${new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0 }).format(data.kpis.revenue.in_progress_amount)}`,
+                      color: 'warning',
+                    }
+                  : undefined
+              }
             />
-            <ServiceCard
-              avgTimeMinutes={realtimeData.service.avg_time_minutes}
-              status={realtimeData.service.status}
-              ordersPerHour={realtimeData.service.orders_per_hour}
+            {/* Ticket moyen */}
+            <KPICard
+              title="Ticket moyen"
+              icon={Receipt}
+              data={data.kpis.avg_ticket}
+              format="currency"
+              currency={data.kpis.avg_ticket.currency}
             />
-            <CustomersCard
-              totalCovers={realtimeData.customers.total_covers}
-              newCustomers={realtimeData.customers.new_customers}
-              returningCustomers={realtimeData.customers.returning_customers}
-              satisfactionRate={realtimeData.customers.satisfaction_rate}
+            {/* Panier moyen */}
+            <KPICard
+              title="Panier moyen"
+              icon={ShoppingCart}
+              data={data.kpis.avg_basket}
+              format="currency"
+              currency={data.kpis.avg_basket.currency}
             />
-            <AlertsCard
-              lowStockCount={realtimeData.alerts.low_stock_count}
-              voidedOrders={realtimeData.alerts.voided_orders}
-              pendingDeliveries={realtimeData.alerts.pending_deliveries}
+            {/* Commandes */}
+            <KPICard
+              title="Commandes"
+              icon={ClipboardList}
+              data={data.kpis.orders}
+              format="integer"
+              badge={{
+                label: 'En cours',
+                value: data.kpis.orders.in_progress,
+                color: data.kpis.orders.in_progress > 15 ? 'danger' : 'warning',
+              }}
             />
           </div>
         ) : null}
 
-        {/* Chart & Activity Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            {loading ? (
-              <Skeleton className="h-[360px] rounded-2xl" />
-            ) : (
-              <HourlyChart data={hourlyData} />
-            )}
-          </div>
-          <div className="lg:col-span-1">
-            {loading ? (
-              <Skeleton className="h-[360px] rounded-2xl" />
-            ) : (
-              <ActivityFeed events={activityData} />
-            )}
-          </div>
-        </div>
+        {/* ── Row 2 : Évolution - Commandes & CA ── */}
+        {loading ? (
+          <Skeleton className="h-[360px] rounded-2xl" />
+        ) : data ? (
+          <HourlyChannelChart data={data.hourly} />
+        ) : null}
       </div>
 
       {/* Quick Product Creation Sheet */}
@@ -129,6 +136,11 @@ const Index = () => {
         open={productSheetOpen}
         onOpenChange={setProductSheetOpen}
       />
+
+      {/*
+        TODO: RuptureSheet — sheet de déclaration de rupture
+        Paramètre: open={ruptureSheetOpen} onOpenChange={setRuptureSheetOpen}
+      */}
     </DashboardLayout>
   );
 };

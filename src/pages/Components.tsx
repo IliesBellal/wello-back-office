@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -12,15 +13,36 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2 } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Plus, Trash2, Search, Edit2, X } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
+import { IngredientsTable } from '@/components/menu/IngredientsTable';
 import { ComponentCreateSheet } from '@/components/menu/ComponentCreateSheet';
 import { toast } from 'sonner';
-import { Component } from '@/types/menu';
+import { Component, ComponentCategory } from '@/types/menu';
+
+type SortKey = 'name' | 'category' | 'price' | 'unit';
+type SortDir = 'asc' | 'desc';
+
+function getComponentValue(component: Component, key: SortKey, categories: Record<string, string>): string | number {
+  switch (key) {
+    case 'name': return component.name.toLowerCase();
+    case 'category': return (categories[component.category_id || ''] || component.category || '').toLowerCase();
+    case 'price': return component.price ?? -1;
+    case 'unit': return component.unit_of_measure?.toLowerCase() || '';
+  }
+}
 
 export default function Components() {
   const { 
-    menuData,
     components, 
     componentCategories,
     units,
@@ -31,32 +53,76 @@ export default function Components() {
   } = useMenuData();
   
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<Component | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Group components by category
-  const componentsByCategory = useMemo(() => {
-    const grouped = new Map<string, typeof components>();
-    components.forEach(comp => {
-      const catId = comp.category_id || 'uncategorized';
-      if (!grouped.has(catId)) {
-        grouped.set(catId, []);
+  // Filtres et tri
+  const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortKey, setSortKey] = useState<SortKey>('name');
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
+
+  // Category management  
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
+  const [categoryDeleteOpen, setCategoryDeleteOpen] = useState(false);
+  const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
+  // Build category mapping
+  const categoryMap = useMemo(() => {
+    return componentCategories.reduce((acc, cat) => {
+      acc[cat.category_id] = cat.category_name || cat.category;
+      return acc;
+    }, {} as Record<string, string>);
+  }, [componentCategories]);
+
+  // Get filtered and sorted ingredients
+  const filteredComponents = useMemo(() => {
+    let result = components || [];
+
+    // Filtre recherche
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      result = result.filter(c => 
+        c.name.toLowerCase().includes(q)
+      );
+    }
+
+    // Filtre catégorie
+    if (categoryFilter !== 'all') {
+      result = result.filter(c => c.category_id === categoryFilter);
+    }
+
+    // Tri
+    return [...result].sort((a, b) => {
+      const va = getComponentValue(a, sortKey, categoryMap);
+      const vb = getComponentValue(b, sortKey, categoryMap);
+      
+      if (typeof va === 'string' && typeof vb === 'string') {
+        return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
       }
-      grouped.get(catId)!.push(comp);
+      
+      const na = va as number;
+      const nb = vb as number;
+      return sortDir === 'asc' ? na - nb : nb - na;
     });
-    return grouped;
-  }, [components]);
+  }, [components, search, categoryFilter, sortKey, sortDir, categoryMap]);
 
-  const categories = componentCategories;
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
 
-  const displayedComponents = selectedCategoryId
-    ? componentsByCategory.get(selectedCategoryId) || []
-    : components;
-
-  const handleDeleteClick = (e: React.MouseEvent, component: Component) => {
-    e.stopPropagation();
+  const handleDeleteClick = (component: Component) => {
     setComponentToDelete(component);
     setDeleteDialogOpen(true);
   };
@@ -77,6 +143,32 @@ export default function Components() {
     }
   };
 
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Le nom de la catégorie est requis');
+      return;
+    }
+
+    setIsCreatingCategory(true);
+    try {
+      await createComponentCategory(newCategoryName);
+      toast.success('Catégorie créée avec succès');
+      setNewCategoryName('');
+      setCategoryDialogOpen(false);
+    } catch (error) {
+      toast.error("Erreur lors de la création de la catégorie");
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    if (!deletingCategoryId) return;
+    // TODO: Implement delete category when API is available
+    toast.error('Suppression de catégorie non encore implémentée');
+    setCategoryDeleteOpen(false);
+  };
+
   if (loading) {
     return (
       <DashboardLayout>
@@ -89,128 +181,189 @@ export default function Components() {
 
   return (
     <DashboardLayout>
-      <div className="flex h-full">
-        {/* Left Sidebar - Categories */}
-        <div className="w-64 border-r border-border bg-background p-4 space-y-2">
-          <h2 className="text-lg font-semibold mb-4">Catégories</h2>
-          <Button
-            variant={selectedCategoryId === null ? "default" : "ghost"}
-            className={`w-full justify-start ${selectedCategoryId === null ? 'bg-gradient-primary' : ''}`}
-            onClick={() => setSelectedCategoryId(null)}
-          >
-            Tous les composants
-          </Button>
-          {categories.map((category) => (
-            <Button
-              key={category.category_id}
-              variant={selectedCategoryId === category.category_id ? "default" : "ghost"}
-              className={`w-full justify-start ${selectedCategoryId === category.category_id ? 'bg-gradient-primary' : ''}`}
-              onClick={() => setSelectedCategoryId(category.category_id)}
-            >
-              {category.category_name}
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-foreground">
+            Ingrédients & Composants
+          </h1>
+          <div className="flex gap-2">
+            <Button className="bg-gradient-primary" onClick={() => setCreateSheetOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Nouvel Ingrédient
             </Button>
-          ))}
+            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Catégorie
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Ajouter une catégorie d'ingrédient</DialogTitle>
+                  <DialogDescription>
+                    Créez une nouvelle catégorie pour organiser vos ingrédients
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <Input
+                    placeholder="Nom de la catégorie (ex: Fruits & Légumes)"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleCreateCategory();
+                      }
+                    }}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
+                    Annuler
+                  </Button>
+                  <Button 
+                    onClick={handleCreateCategory}
+                    disabled={isCreatingCategory || !newCategoryName.trim()}
+                    className="bg-gradient-primary"
+                  >
+                    {isCreatingCategory ? 'Création...' : 'Créer'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
-        {/* Main Content - Components Grid */}
-        <div className="flex-1 p-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">
-                Composants & Ingrédients
-              </h1>
-              <p className="text-muted-foreground mt-1">
-                {selectedCategoryId
-                  ? categories.find(c => c.category === selectedCategoryId)?.category
-                  : `${components.length} composant(s) au total`}
-              </p>
-            </div>
-            <Button 
-              className="bg-gradient-primary"
-              onClick={() => setCreateSheetOpen(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Nouveau Composant
-            </Button>
-          </div>
+        {/* Filters */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div className="flex flex-col sm:flex-row gap-3 flex-1">
+              {/* Recherche */}
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un ingrédient…"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
 
-          {displayedComponents.length === 0 ? (
-            <Card className="p-8 text-center">
-              <p className="text-muted-foreground">Aucun composant trouvé</p>
-              <Button 
-                className="mt-4 bg-gradient-primary"
-                onClick={() => setCreateSheetOpen(true)}
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Créer le premier composant
-              </Button>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {displayedComponents.map((component) => (
-                <Card 
-                  key={component.component_id}
-                  className="p-4 hover:shadow-md transition-shadow cursor-pointer group relative"
+              {/* Filtre catégorie */}
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Toutes les catégories" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les catégories</SelectItem>
+                  {componentCategories.map(cat => (
+                    <SelectItem key={cat.category_id} value={cat.category_id}>
+                      {cat.category_name || cat.category}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {/* Compteur */}
+              <div className="flex items-center text-sm text-muted-foreground whitespace-nowrap">
+                {filteredComponents.length} ingrédient{filteredComponents.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Catégories managées (affichage complet) */}
+        {componentCategories.length > 0 && (
+          <div className="bg-card border border-border rounded-lg p-4">
+            <h3 className="text-sm font-semibold mb-3">Catégories ({componentCategories.length})</h3>
+            <div className="flex flex-wrap gap-2">
+              {componentCategories.map(cat => (
+                <div
+                  key={cat.category_id}
+                  className="flex items-center gap-2 bg-muted px-3 py-1.5 rounded-full text-sm"
                 >
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                    onClick={(e) => handleDeleteClick(e, component)}
+                  <span>{cat.category_name || cat.category}</span>
+                  <button
+                    onClick={() => {
+                      setDeletingCategoryId(cat.category_id);
+                      setCategoryDeleteOpen(true);
+                    }}
+                    className="ml-1 text-muted-foreground hover:text-destructive transition-colors"
                   >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                  <h3 className="font-semibold text-foreground mb-2 pr-8">
-                    {component.name}
-                  </h3>
-                  <div className="space-y-1 text-sm">
-                    <p className="font-medium text-primary">
-                      {component.price 
-                        ? `+${(component.price).toFixed(2)} €`
-                        : component.price 
-                        ? `+${(component.price / 100).toFixed(2)} €`
-                        : 'Gratuit'}
-                    </p>
-                    {component.available === false && (
-                      <p className="text-xs text-muted-foreground">Non disponible</p>
-                    )}
-                  </div>
-                </Card>
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Ingredients Table */}
+        <div className="rounded-xl border border-border overflow-hidden">
+          <IngredientsTable
+            ingredients={filteredComponents}
+            categories={categoryMap}
+            units={units || []}
+            sortKey={sortKey}
+            sortDir={sortDir}
+            onSort={handleSort}
+            onDelete={handleDeleteClick}
+          />
         </div>
+
+        <ComponentCreateSheet
+          open={createSheetOpen}
+          onOpenChange={setCreateSheetOpen}
+          categories={componentCategories}
+          units={units || []}
+          onCreateComponent={createComponent}
+          onCreateCategory={createComponentCategory}
+        />
+
+        {/* Delete ingredient dialog */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer cet ingrédient ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous sûr de vouloir supprimer "{componentToDelete?.name}" ? Cette action est irréversible.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleConfirmDelete} 
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? "Suppression..." : "Supprimer"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        {/* Delete category dialog */}
+        <AlertDialog open={categoryDeleteOpen} onOpenChange={setCategoryDeleteOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Supprimer cette catégorie ?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Êtes-vous sûr de vouloir supprimer cette catégorie ? Les ingrédients seront déplacés dans "Non catégorisé".
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeletingCategory}>Annuler</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDeleteCategory} 
+                disabled={isDeletingCategory}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeletingCategory ? "Suppression..." : "Supprimer"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-
-      <ComponentCreateSheet
-        open={createSheetOpen}
-        onOpenChange={setCreateSheetOpen}
-        categories={categories}
-        units={units}
-        onCreateComponent={createComponent}
-        onCreateCategory={createComponentCategory}
-      />
-
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce composant ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer "{componentToDelete?.name}" ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleConfirmDelete} 
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Suppression..." : "Supprimer"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </DashboardLayout>
   );
 }

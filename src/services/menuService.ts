@@ -578,5 +578,37 @@ export const menuService = {
       () => undefined,
       () => apiClient.delete<void>(`/menu/tags/${tagId}`)
     );
+  },
+
+  async updateTag(tagId: string, name: string): Promise<{ id: string; name: string }> {
+    logAPI('PATCH', `/menu/tags/${tagId}`, { name });
+    return withMock(
+      () => ({ id: tagId, name }),
+      async () => {
+        const response = await apiClient.patch<WelloApiResponse<{ id: string; name: string }>>(`/menu/tags/${tagId}`, { name });
+        return response.data;
+      }
+    );
+  },
+
+  async assignTagsToProducts(productIds: string[], tagIds: string[]): Promise<void> {
+    logAPI('POST', '/menu/bulk-assign-tags', { product_ids: productIds, tag_ids: tagIds });
+    return withMock(
+      () => undefined,
+      () => apiClient.post<void>('/menu/bulk-assign-tags', { product_ids: productIds, tag_ids: tagIds })
+    );
+  },
+
+  async bulkUpdatePrices(products: Array<{
+    product_id: string;
+    price?: number;
+    price_take_away?: number;
+    price_delivery?: number;
+  }>): Promise<void> {
+    logAPI('PATCH', '/menu/products/bulk', { products });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/products/bulk', { products })
+    );
   }
 };

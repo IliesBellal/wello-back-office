@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, Tag, TrendingUp, TrendingDown, ShoppingCart, BadgePercent } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, Tag, TrendingUp, TrendingDown, ShoppingCart, BadgePercent, Edit2, Save, X, Loader2 } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { Product, Category } from '@/types/menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PriceTPEInput } from '@/components/ui/PriceTPEInput';
+import { menuService } from '@/services/menuService';
+import { useToast } from '@/hooks/use-toast';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -66,6 +70,10 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editedPrices, setEditedPrices] = useState<Record<string, Record<string, number>>>({});
+  const { toast } = useToast();
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -75,6 +83,81 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
       setSortDir('asc');
     }
   };
+
+  // Mise à jour d'un prix lors de l'édition
+  const updatePrice = useCallback((productId: string, priceField: string, cents: number) => {
+    setEditedPrices(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [priceField]: cents,
+      },
+    }));
+  }, []);
+
+  // Annule l'édition
+  const cancelEdit = useCallback(() => {
+    setIsEditing(false);
+    setEditedPrices({});
+  }, []);
+
+  // Valide et enregistre tous les prix modifiés
+  const saveChanges = useCallback(async () => {
+    if (Object.keys(editedPrices).length === 0) {
+      toast({
+        title: 'Aucun changement',
+        description: 'Aucun prix n\'a été modifié',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Prépare les données pour le bulk update
+      const productsToUpdate: Array<{
+        product_id: string;
+        price?: number;
+        price_take_away?: number;
+        price_delivery?: number;
+      }> = [];
+
+      Object.entries(editedPrices).forEach(([productId, priceUpdates]) => {
+        const product: {
+          product_id: string;
+          price?: number;
+          price_take_away?: number;
+          price_delivery?: number;
+        } = {
+          product_id: productId,
+        };
+        // Ajoute uniquement les prix qui ont été modifiés
+        if ('price' in priceUpdates) product.price = priceUpdates.price;
+        if ('price_take_away' in priceUpdates) product.price_take_away = priceUpdates.price_take_away;
+        if ('price_delivery' in priceUpdates) product.price_delivery = priceUpdates.price_delivery;
+        productsToUpdate.push(product);
+      });
+
+      await menuService.bulkUpdatePrices(productsToUpdate);
+      
+      toast({
+        title: 'Succès',
+        description: `${productsToUpdate.length} produit(s) mis à jour avec succès`,
+      });
+      
+      setIsEditing(false);
+      setEditedPrices({});
+    } catch (error) {
+      console.error('Error saving prices:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour les prix',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [editedPrices, toast]);
 
   const filtered = useMemo(() => {
     let result = products;
@@ -100,34 +183,77 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
     });
   }, [products, search, categoryFilter, sortKey, sortDir]);
 
+  // Récupère le prix affiché (edited ou original)
+  const getDisplayPrice = (productId: string, field: string, originalPrice: number | undefined) => {
+    const edited = editedPrices[productId]?.[field];
+    return edited !== undefined ? edited : (originalPrice ?? 0);
+  };
+
   return (
     <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher un produit…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="pl-9"
-          />
+      {/* Filters & Actions */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row gap-3 flex-1">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher un produit…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-full sm:w-52">
+              <SelectValue placeholder="Toutes les catégories" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Toutes les catégories</SelectItem>
+              {categories.map(cat => (
+                <SelectItem key={cat.category_id} value={cat.category_id}>
+                  {cat.category || cat.category_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="flex items-center text-sm text-muted-foreground whitespace-nowrap">
+            {filtered.length} produit{filtered.length !== 1 ? 's' : ''}
+          </div>
         </div>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-full sm:w-52">
-            <SelectValue placeholder="Toutes les catégories" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Toutes les catégories</SelectItem>
-            {categories.map(cat => (
-              <SelectItem key={cat.category_id} value={cat.category_id}>
-                {cat.category || cat.category_name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <div className="flex items-center text-sm text-muted-foreground self-center whitespace-nowrap">
-          {filtered.length} produit{filtered.length !== 1 ? 's' : ''}
+
+        {/* Boutons d'action */}
+        <div className="flex gap-2">
+          {isEditing ? (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={cancelEdit}
+                disabled={isSaving}
+              >
+                <X className="w-4 h-4 mr-1" />
+                Annuler
+              </Button>
+              <Button
+                size="sm"
+                className="bg-gradient-primary"
+                onClick={saveChanges}
+                disabled={isSaving || Object.keys(editedPrices).length === 0}
+              >
+                {isSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                Enregistrer ({Object.keys(editedPrices).length})
+              </Button>
+            </>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setIsEditing(true)}
+            >
+              <Edit2 className="w-4 h-4 mr-1" />
+              Modifier les prix
+            </Button>
+          )}
         </div>
       </div>
 
@@ -198,15 +324,39 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
                     </TableCell>
                     {/* Prix sur place */}
                     <TableCell className="font-mono text-sm">
-                      {formatPrice(product.price)}
+                      {isEditing ? (
+                        <PriceTPEInput
+                          value={getDisplayPrice(product.product_id, 'price', product.price)}
+                          onChange={(cents) => updatePrice(product.product_id, 'price', cents)}
+                          autoConfirmOnBlur={false}
+                        />
+                      ) : (
+                        formatPrice(product.price)
+                      )}
                     </TableCell>
                     {/* À emporter */}
                     <TableCell className="font-mono text-sm">
-                      {formatPrice(product.price_take_away)}
+                      {isEditing ? (
+                        <PriceTPEInput
+                          value={getDisplayPrice(product.product_id, 'price_take_away', product.price_take_away)}
+                          onChange={(cents) => updatePrice(product.product_id, 'price_take_away', cents)}
+                          autoConfirmOnBlur={false}
+                        />
+                      ) : (
+                        formatPrice(product.price_take_away)
+                      )}
                     </TableCell>
                     {/* Livraison */}
                     <TableCell className="font-mono text-sm">
-                      {formatPrice(product.price_delivery)}
+                      {isEditing ? (
+                        <PriceTPEInput
+                          value={getDisplayPrice(product.product_id, 'price_delivery', product.price_delivery)}
+                          onChange={(cents) => updatePrice(product.product_id, 'price_delivery', cents)}
+                          autoConfirmOnBlur={false}
+                        />
+                      ) : (
+                        formatPrice(product.price_delivery)
+                      )}
                     </TableCell>
                     {/* Uber Eats */}
                     <TableCell className="font-mono text-sm">

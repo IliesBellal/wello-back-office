@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { 
   Home, ShoppingBag, Menu as MenuIcon, Users, Settings, 
   Store, User, ChevronDown, FileText, Package, LayoutGrid, 
-  Users2, Calculator, Warehouse, LogOut, Building2 
+  Users2, Calculator, Warehouse, LogOut, Building2, Utensils, Tag, TicketPercent, BarChart3, Clock
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -23,14 +23,25 @@ import {
 const menuItems = [
   { title: 'Dashboard', icon: Home, path: '/', end: true },
   { title: 'Commandes', icon: ShoppingBag, path: '/orders', end: false },
-  { title: 'Menu', icon: MenuIcon, path: '/menu', end: true },
-  { title: 'Composants', icon: Package, path: '/menu/components', end: false },
   { title: 'Plan de Salle', icon: LayoutGrid, path: '/locations' },
   { title: 'Utilisateurs', icon: Users2, path: '/users' },
   { title: 'Registres de Caisse', icon: Calculator, path: '/cash-registers' },
   { title: 'Clients', icon: Users, path: '/customers' },
   { title: 'Stocks', icon: Warehouse, path: '/stocks' },
   { title: 'Rapports', icon: FileText, path: '/reports/financial' },
+];
+
+const dashboardSubItems = [
+  { title: 'Analyse', icon: BarChart3, path: '/dashboard/analysis', end: true },
+  { title: 'Historique de commandes', icon: Clock, path: '/dashboard/order-history', end: true },
+];
+
+const menuSubItems = [
+  { title: 'Produits', icon: Utensils, path: '/menu', end: true },
+  { title: 'Ingrédients', icon: Package, path: '/menu/components', end: false },
+  { title: 'Grille de prix', icon: Tag, path: '/menu/price-grid', end: false },
+  { title: 'Options & Suppléments', icon: Settings, path: '/menu/attributes', end: false },
+  { title: 'Promotions & Dispo.', icon: TicketPercent, path: '/menu/promotions', end: false },
 ];
 
 const settingsSubItems = [
@@ -44,6 +55,8 @@ interface MobileSidebarProps {
 
 export const MobileSidebar = ({ onClose }: MobileSidebarProps) => {
   const { authData, logout } = useAuth();
+  const [dashboardOpen, setDashboardOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
@@ -81,6 +94,54 @@ export const MobileSidebar = ({ onClose }: MobileSidebarProps) => {
             <span>{item.title}</span>
           </NavLink>
         ))}
+
+        <Collapsible open={dashboardOpen} onOpenChange={setDashboardOpen}>
+          <CollapsibleTrigger className="flex items-center justify-between w-full gap-3 px-4 py-3 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors min-h-[44px]">
+            <div className="flex items-center gap-3">
+              <BarChart3 className="w-5 h-5" />
+              <span>Tableau de bord</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 transition-transform ${dashboardOpen ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1 mt-1">
+            {dashboardSubItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={handleNavClick}
+                className="flex items-center gap-3 px-4 py-3 ml-4 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors min-h-[44px]"
+                activeClassName="bg-gradient-primary text-white font-medium shadow-soft"
+              >
+                <item.icon className="w-4 h-4" />
+                <span>{item.title}</span>
+              </NavLink>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
+
+        <Collapsible open={menuOpen} onOpenChange={setMenuOpen}>
+          <CollapsibleTrigger className="flex items-center justify-between w-full gap-3 px-4 py-3 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors min-h-[44px]">
+            <div className="flex items-center gap-3">
+              <MenuIcon className="w-5 h-5" />
+              <span>Menu</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 transition-transform ${menuOpen ? 'rotate-180' : ''}`} />
+          </CollapsibleTrigger>
+          <CollapsibleContent className="space-y-1 mt-1">
+            {menuSubItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                onClick={handleNavClick}
+                className="flex items-center gap-3 px-4 py-3 ml-4 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors min-h-[44px]"
+                activeClassName="bg-gradient-primary text-white font-medium shadow-soft"
+              >
+                <item.icon className="w-4 h-4" />
+                <span>{item.title}</span>
+              </NavLink>
+            ))}
+          </CollapsibleContent>
+        </Collapsible>
 
         <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
           <CollapsibleTrigger className="flex items-center justify-between w-full gap-3 px-4 py-3 rounded-xl text-sidebar-foreground hover:bg-sidebar-accent transition-colors min-h-[44px]">

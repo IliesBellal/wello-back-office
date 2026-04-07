@@ -11,6 +11,8 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Settings from "./pages/Settings";
 import Menu from "./pages/Menu";
+import CategoriesTable from './pages/CategoriesTable';
+import TagsTable from './pages/TagsTable';
 import Components from './pages/Components';
 import FinancialReports from './pages/FinancialReports';
 import Orders from './pages/Orders';
@@ -22,6 +24,9 @@ import Stocks from './pages/Stocks';
 import PriceGrid from './pages/PriceGrid';
 import AttributesPage from './pages/Attributes';
 import PromotionsAvailabilities from './pages/PromotionsAvailabilities';
+import DashboardAnalysis from './pages/DashboardAnalysis';
+import DashboardOrderHistory from './pages/DashboardOrderHistory';
+import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -38,21 +43,42 @@ const App = () => (
             <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              
+              {/* Orders Management */}
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+              
+              {/* Menu Management */}
               <Route path="/menu" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
+              <Route path="/menu/categories" element={<ProtectedRoute><CategoriesTable /></ProtectedRoute>} />
+              <Route path="/menu/tags" element={<ProtectedRoute><TagsTable /></ProtectedRoute>} />
               <Route path="/menu/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
               <Route path="/menu/price-grid" element={<ProtectedRoute><PriceGrid /></ProtectedRoute>} />
               <Route path="/menu/attributes" element={<ProtectedRoute><AttributesPage /></ProtectedRoute>} />
               <Route path="/menu/promotions" element={<ProtectedRoute><PromotionsAvailabilities /></ProtectedRoute>} />
-              <Route path="/reports/financial" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
+              
+              {/* Location & Service */}
               <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
-              <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
               <Route path="/cash-registers" element={<ProtectedRoute><CashRegisters /></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><Customers /></ProtectedRoute>} />
+              
+              {/* Stocks */}
               <Route path="/stocks" element={<ProtectedRoute><Stocks /></ProtectedRoute>} />
-              <Route path="/settings/:section" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              
+              {/* Reports & Analytics */}
+              <Route path="/reports/financial" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
+              <Route path="/reports/performance" element={<ProtectedRoute><NotImplementedPage title="Performance" /></ProtectedRoute>} />
+              
+              {/* Administration */}
+              <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="/settings/:section" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+              <Route path="/settings/integrations" element={<ProtectedRoute><NotImplementedPage title="Intégrations" /></ProtectedRoute>} />
+              
+              {/* Dashboard Sub-pages */}
+              <Route path="/dashboard/analysis" element={<ProtectedRoute><DashboardAnalysis /></ProtectedRoute>} />
+              <Route path="/dashboard/order-history" element={<ProtectedRoute><DashboardOrderHistory /></ProtectedRoute>} />
+              
+              {/* 404 Fallback */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

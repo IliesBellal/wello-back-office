@@ -22,6 +22,7 @@ import { ChevronDown, LogOut, Building2 } from 'lucide-react';
 import { authService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
+import { NotificationBell } from '@/components/shared/NotificationBell';
 
 export const Header = () => {
   const { authData, setAuthData, logout } = useAuth();
@@ -145,6 +146,8 @@ export const Header = () => {
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <NotificationBell authData={authData} />
 
         <Button
           variant="outline"

@@ -14,6 +14,7 @@ import { Menu, Building2, ChevronDown, Check } from 'lucide-react';
 import { MobileSidebar } from './MobileSidebar';
 import { authService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
+import { NotificationBell } from '@/components/shared/NotificationBell';
 
 export const MobileHeader = () => {
   const { authData, setAuthData } = useAuth();
@@ -137,7 +138,7 @@ export const MobileHeader = () => {
         </DropdownMenuContent>
       </DropdownMenu>
 
-      <div className="w-11" /> {/* Spacer for balance */}
+      <NotificationBell authData={authData} />
     </header>
   );
 };

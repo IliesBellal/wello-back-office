@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Sidebar } from './Sidebar';
+import { Sidebar } from '@/components/navigation/Sidebar';
 import { Header } from './Header';
 import { MobileHeader } from '@/components/mobile/MobileHeader';
 import { BottomNav } from '@/components/mobile/BottomNav';
