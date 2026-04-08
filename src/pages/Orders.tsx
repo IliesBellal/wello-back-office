@@ -4,6 +4,8 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ordersService, Order } from "@/services/ordersService";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -15,7 +17,7 @@ import {
   getOrderStateClassName,
   getOrderTypeLabel,
 } from "@/utils/orderUtils";
-import { Loader2, ChevronRight } from "lucide-react";
+import { Loader2, ChevronRight, Search, X } from "lucide-react";
 import { CardSkeleton } from "@/components/shared/CardSkeleton";
 
 export default function Orders() {
@@ -29,6 +31,12 @@ export default function Orders() {
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [activeTab, setActiveTab] = useState("pending");
   const [historyHasBeenLoaded, setHistoryHasBeenLoaded] = useState(false);
+  
+  // Search states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<Order[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [isSearchActive, setIsSearchActive] = useState(false);
   
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -73,6 +81,39 @@ export default function Orders() {
       setLoadingMore(false);
     }
   }, [historyPage, loadingMore, hasMoreHistory]);
+
+  // Handle search
+  const handleSearch = useCallback(async (term: string) => {
+    if (!term.trim()) {
+      setIsSearchActive(false);
+      setSearchResults([]);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      const results = await ordersService.searchOrders(term);
+      setSearchResults(results);
+      setIsSearchActive(true);
+    } catch (error) {
+      console.error("Search failed:", error);
+      setSearchResults([]);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  // Handle search input submit (Enter key or button click)
+  const handleSearchSubmit = useCallback(() => {
+    handleSearch(searchTerm);
+  }, [searchTerm, handleSearch]);
+
+  // Clear search
+  const handleClearSearch = useCallback(() => {
+    setSearchTerm("");
+    setSearchResults([]);
+    setIsSearchActive(false);
+  }, []);
 
   // Intersection observer for infinite scroll - only on history tab
   useEffect(() => {
@@ -258,17 +299,93 @@ export default function Orders() {
           </TabsContent>
 
           <TabsContent value="history" className="space-y-3 mt-4 md:mt-6">
-            {loadingHistory ? (
+            {/* Search Bar */}
+            <div className="flex gap-2 flex-col sm:flex-row">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Rechercher par ID, numéro ou nom du client..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      handleSearchSubmit();
+                    }
+                  }}
+                  className="pl-10 h-10 min-h-[44px] sm:h-auto"
+                />
+                {isSearchActive && (
+                  <button
+                    onClick={handleClearSearch}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Clear search"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Button
+                onClick={handleSearchSubmit}
+                disabled={searchLoading || !searchTerm.trim()}
+                className="h-10 min-h-[44px] sm:h-auto sm:w-auto"
+              >
+                {searchLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Rechercher
+              </Button>
+            </div>
+
+            {/* Search Results or History */}
+            {isSearchActive && (
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-blue-700 dark:text-blue-300">
+                    {searchResults.length} résultat{searchResults.length !== 1 ? "s" : ""} trouvé{searchResults.length !== 1 ? "s" : ""} pour "<strong>{searchTerm}</strong>"
+                  </span>
+                  <button
+                    onClick={handleClearSearch}
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 text-xs underline"
+                  >
+                    Annuler la recherche
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {searchLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <CardSkeleton key={i} lines={2} showBadge />
+                ))}
+              </div>
+            ) : isSearchActive ? (
+              // Show search results
+              searchResults.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">
+                    Aucune commande trouvée pour "<strong>{searchTerm}</strong>"
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {searchResults.map((order) => (
+                    <OrderCard key={order.order_id} order={order} />
+                  ))}
+                </div>
+              )
+            ) : loadingHistory ? (
+              // Show loading skeleton for history
               <div className="space-y-3">
                 {Array.from({ length: 5 }).map((_, i) => (
                   <CardSkeleton key={i} lines={2} showBadge />
                 ))}
               </div>
             ) : historyOrders.length === 0 ? (
+              // Show empty history
               <div className="text-center py-12">
                 <p className="text-muted-foreground">Aucun historique</p>
               </div>
             ) : (
+              // Show history orders
               <>
                 {historyOrders.map((order) => (
                   <OrderCard key={order.order_id} order={order} />

@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { CommandPaletteSearchBar } from '@/components/command-palette/CommandPaletteSearchBar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,8 +93,9 @@ export const Header = () => {
   if (!authData) return null;
 
   return (
-    <header className="h-16 bg-card border-b border-border shadow-soft flex items-center justify-between px-6">
-      <div>
+    <header className="h-16 bg-card border-b border-border shadow-soft flex items-center justify-between gap-4 px-6">
+      {/* Left Section - Greeting */}
+      <div className="flex-shrink-0 min-w-max">
         <h2 className="text-lg font-semibold text-foreground">
           Bonjour, {authData.first_name}
         </h2>
@@ -107,7 +109,13 @@ export const Header = () => {
         </p>
       </div>
       
-      <div className="flex items-center gap-4">
+      {/* Middle Section - Search Bar */}
+      <div className="flex-1 flex justify-center max-w-2xl">
+        <CommandPaletteSearchBar />
+      </div>
+
+      {/* Right Section - Actions */}
+      <div className="flex items-center gap-4 flex-shrink-0">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2 h-10 rounded-xl" disabled={isSwitching}>

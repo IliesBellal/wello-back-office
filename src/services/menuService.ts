@@ -610,5 +610,21 @@ export const menuService = {
       () => undefined,
       () => apiClient.patch<void>('/menu/products/bulk', { products })
     );
+  },
+
+  async bulkAssignProductsToCategory(productIds: string[], categoryId: string): Promise<void> {
+    logAPI('PATCH', '/menu/categories/bulk-assign', { product_ids: productIds, category_id: categoryId });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/categories/bulk-assign', { product_ids: productIds, category_id: categoryId })
+    );
+  },
+
+  async bulkAssignProductsToMarketCategory(productIds: string[], categoryId: string): Promise<void> {
+    logAPI('PATCH', '/menu/market-categories/bulk-assign', { product_ids: productIds, category_id: categoryId });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/market-categories/bulk-assign', { product_ids: productIds, category_id: categoryId })
+    );
   }
 };

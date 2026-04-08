@@ -23,6 +23,7 @@ import {
   Clock,
   ChevronsLeft,
   ChevronsRight,
+  Link2,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -77,6 +78,12 @@ const menuSubItems: MenuItem[] = [
 const settingsSubItems: MenuItem[] = [
   { title: 'Établissement', icon: Store, path: '/settings/establishment' },
   { title: 'Mon Profil', icon: User, path: '/settings/profile' },
+];
+
+const integrationsSubItems: MenuItem[] = [
+  { title: 'Vue d\'ensemble', icon: LayoutGrid, path: '/integrations/overview', end: true },
+  { title: 'Uber Eats', icon: Store, path: '/integrations/uber-eats', end: true },
+  { title: 'Deliveroo', icon: Store, path: '/integrations/deliveroo', end: true },
 ];
 
 // ─── Collapsed NavItem ────────────────────────────────────────────────────
@@ -249,6 +256,7 @@ export const Sidebar = () => {
   const [dashboardOpen, setDashboardOpen] = useState(true);
   const [menuOpen, setMenuOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(true);
+  const [integrationsOpen, setIntegrationsOpen] = useState(true);
 
   // Persist collapsed state to localStorage
   useEffect(() => {
@@ -353,6 +361,22 @@ export const Sidebar = () => {
             icon={Settings}
             children={settingsSubItems}
             defaultOpen={settingsOpen}
+          />
+        )}
+
+        {/* Integrations (with sub-items) */}
+        {collapsed ? (
+          <CollapsedCollapsible
+            title="Canaux et Plateformes"
+            icon={Link2}
+            children={integrationsSubItems}
+          />
+        ) : (
+          <ExpandedCollapsible
+            title="Canaux et Plateformes"
+            icon={Link2}
+            children={integrationsSubItems}
+            defaultOpen={integrationsOpen}
           />
         )}
       </nav>

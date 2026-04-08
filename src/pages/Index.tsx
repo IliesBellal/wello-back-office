@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { DashboardHero } from '@/components/dashboard/DashboardHero';
 import { QuickActions } from '@/components/dashboard/QuickActions';
 import { KPICard } from '@/components/dashboard/KPICard';
 import { HourlyChannelChart } from '@/components/dashboard/HourlyChannelChart';
+import { RevenueEvolutionChart } from '@/components/dashboard/RevenueEvolutionChart';
 import { QuickProductSheet } from '@/components/dashboard/QuickProductSheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +65,12 @@ const Index = () => {
             onMarkRupture={() => setRuptureSheetOpen(true)}
           />
         </div>
+
+        {/* ── Hero Metrics (Simplified) ── */}
+        <DashboardHero data={data} loading={loading} />
+
+        {/* ── Revenue Evolution Chart ── */}
+        <RevenueEvolutionChart />
 
         {/* ── KPI Cards ── */}
         {loading ? (

@@ -378,5 +378,23 @@ export const ordersService = {
         return orders[0];
       })
     );
+  },
+
+  searchOrders: async (term: string): Promise<Order[]> => {
+    logAPI('GET', '/orders/search', { term });
+    
+    return withMock(
+      () => {
+        const allOrders = [...mockPendingOrders, ...mockHistoryOrders];
+        const searchTerm = term.toLowerCase().trim();
+        
+        return allOrders.filter(order => 
+          order.order_id.toLowerCase().includes(searchTerm) ||
+          order.order_num.toLowerCase().includes(searchTerm) ||
+          order.customer?.customer_name.toLowerCase().includes(searchTerm)
+        );
+      },
+      () => apiClient.get<GetOrderResponse>('/orders/search', { params: { term } }).then(res => res.data.orders || [])
+    );
   }
 };

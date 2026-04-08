@@ -92,45 +92,30 @@ export const Sidebar: React.FC = () => {
         </Button>
       </div>
 
-      {/* ═══ NAVIGATION SECTIONS ═══ */}
+      {/* ═══ NAVIGATION ═══ */}
       <nav
         className={cn(
           'flex-1 overflow-y-auto overflow-x-hidden',
-          'py-4 space-y-6',
+          'py-4 space-y-1',
           'transition-all duration-300',
           isExpanded ? 'px-3' : 'px-2 flex flex-col items-center'
         )}
       >
-        {navigationConfig.map((section) => (
-          <div key={section.id} className="space-y-2 w-full">
-            {/* Section Label (only when expanded) */}
-            {section.label && isExpanded && (
-              <div className="px-3 py-2 animate-in fade-in duration-300">
-                <p className="text-xs font-bold text-sidebar-foreground/50 uppercase tracking-widest">
-                  {section.label}
-                </p>
-              </div>
-            )}
+        {navigationConfig.map((item) => {
+          const hasSubItems = item.subItems && item.subItems.length > 0;
 
-            {/* Section Items */}
-            <div
-              className={cn(
-                'space-y-1.5',
-                isExpanded && 'animate-in fade-in slide-in-from-left-4 duration-300'
-              )}
-            >
-              {section.items.map((item) => (
-                // Items without sub-items
-                <SidebarItem key={item.id} item={item} isCollapsed={!isExpanded} />
-              ))}
+          if (!hasSubItems && item.path) {
+            // Simple item without sub-items
+            return <SidebarItem key={item.id} item={item} isCollapsed={!isExpanded} />;
+          }
 
-              {/* Items with sub-items */}
-              {section.items.map((item) => (
-                <CollapsibleItem key={item.id} item={item} isCollapsed={!isExpanded} />
-              ))}
-            </div>
-          </div>
-        ))}
+          if (hasSubItems) {
+            // Item with sub-items
+            return <CollapsibleItem key={item.id} item={item} isCollapsed={!isExpanded} />;
+          }
+
+          return null;
+        })}
       </nav>
 
       {/* ═══ FOOTER - USER MENU ═══ */}

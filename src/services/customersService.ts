@@ -321,6 +321,69 @@ export const getProducts = async (): Promise<{ id: string; name: string }[]> => 
   );
 };
 
+export const getLoyaltyPrograms = async (): Promise<LoyaltyProgram[]> => {
+  logAPI("GET", "/customers/loyalty-programs");
+  
+  return withMock(
+    () => [
+      {
+        id: "lp_1",
+        name: "Points par commandes",
+        description: "Gagnez des points à chaque commande",
+        type: "orders_count",
+        current_value: 0,
+        target_value: 10,
+        is_active: true,
+      },
+      {
+        id: "lp_2",
+        name: "Réduction dépense",
+        description: "Réduction pour chaque tranche de 100€ dépensée",
+        type: "total_spent",
+        current_value: 0,
+        target_value: 100,
+        is_active: true,
+      },
+    ],
+    () => apiClient.get<LoyaltyProgram[]>("/customers/loyalty-programs").then(res => res.data)
+  );
+};
+
+export const getLoyaltyProgramById = async (programId: string): Promise<LoyaltyProgram> => {
+  logAPI("GET", `/customers/loyalty-programs/${programId}`);
+  
+  return withMock(
+    () => ({
+      id: programId,
+      name: "Programme test",
+      description: "Description test",
+      type: "orders_count",
+      current_value: 0,
+      target_value: 10,
+      is_active: true,
+    }),
+    () => apiClient.get<LoyaltyProgram>(`/customers/loyalty-programs/${programId}`).then(res => res.data)
+  );
+};
+
+export const updateLoyaltyProgram = async (programId: string, payload: Partial<CreateLoyaltyProgramPayload>): Promise<{ status: string }> => {
+  logAPI("PATCH", `/customers/loyalty-programs/${programId}`, payload);
+  
+  return withMock(
+    () => ({ status: "ok" }),
+    () => apiClient.patch<{ status: string }>(`/customers/loyalty-programs/${programId}`, payload)
+  );
+};
+
+export const deleteLoyaltyProgram = async (programId: string): Promise<{ status: string }> => {
+  logAPI("DELETE", `/customers/loyalty-programs/${programId}`);
+  
+  return withMock(
+    () => ({ status: "ok" }),
+    () => apiClient.delete<{ status: string }>(`/customers/loyalty-programs/${programId}`)
+  );
+};
+
 // ============= Constants =============
 export const acquisitionSourceLabels: Record<string, string> = {
   WELLO_RESTO_APPS: "Caisse",

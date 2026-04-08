@@ -98,7 +98,7 @@ const SortableCategoryRow = ({
   );
 };
 
-export default function CategoriesTable() {
+export default function MarketCategoriesTable() {
   const { menuData, loading, createProductCategory, updateCategory, deleteCategory } = useMenuData();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -206,7 +206,7 @@ export default function CategoriesTable() {
 
     setIsAssigning(true);
     try {
-      await menuService.bulkAssignProductsToCategory(productIds, selectedCategoryForBulk.category_id);
+      await menuService.bulkAssignProductsToMarketCategory(productIds, selectedCategoryForBulk.category_id);
       toast({
         title: 'Succès',
         description: `${productIds.length} produit(s) assigné(s) à la catégorie`,
@@ -274,7 +274,7 @@ export default function CategoriesTable() {
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">Catégories Caisse</h1>
+          <h1 className="text-3xl font-bold text-foreground">Catégories Vitrine</h1>
           <Button className="bg-gradient-primary" onClick={handleSaveOrder} disabled={isSaving}>
             {isSaving ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -315,7 +315,7 @@ export default function CategoriesTable() {
                   <TableHead className="w-10"></TableHead>
                   <TableHead>Nom</TableHead>
                   <TableHead className="w-20">Ordre</TableHead>
-                  <TableHead className="w-24 text-right">Actions</TableHead>
+                  <TableHead className="w-32 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

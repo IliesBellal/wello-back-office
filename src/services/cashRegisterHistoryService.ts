@@ -1,0 +1,243 @@
+import { apiClient, withMock, logAPI, WelloApiResponse } from '@/services/apiClient';
+
+// ============= TYPES =============
+export interface CashRegisterHistoryRecord {
+  id: string;
+  register_number: string; // ex: "Z-2026-0408-001"
+  type: 'Z' | 'X';
+  created_at: string; // ISO date/time
+  total_revenue: number; // en centimes
+  transaction_count: number;
+  payment_methods: {
+    [key: string]: number; // CB, cash, tickets_resto, etc. (en centimes)
+  };
+  nf525_certified: boolean;
+  nf525_hash?: string;
+  nf525_timestamp?: string;
+  pdf_url?: string;
+}
+
+export interface CashRegisterStats {
+  z_count: number;
+  x_count: number;
+  total_revenue: number; // en centimes
+  total_transactions: number;
+}
+
+export interface CashRegisterListResponse {
+  registers: CashRegisterHistoryRecord[];
+  stats: CashRegisterStats;
+}
+
+// ============= MOCK DATA =============
+const generateMockRegisters = (): CashRegisterHistoryRecord[] => {
+  const registers: CashRegisterHistoryRecord[] = [];
+  const baseDate = new Date();
+  
+  for (let i = 0; i < 25; i++) {
+    const date = new Date(baseDate);
+    date.setDate(date.getDate() - i);
+    const time = i % 2 === 0 ? 21 : 14;
+    date.setHours(time, Math.floor(Math.random() * 60), 0);
+    
+    const isZ = i % 3 !== 0; // 2/3 Z, 1/3 X
+    const revenue = Math.floor(Math.random() * 500000) + 100000; // 1000€ - 6000€
+    
+    registers.push({
+      id: `reg_${i}`,
+      register_number: `${isZ ? 'Z' : 'X'}-${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}${String(date.getDate()).padStart(2, '0')}-${String(i).padStart(3, '0')}`,
+      type: isZ ? 'Z' : 'X',
+      created_at: date.toISOString(),
+      total_revenue: revenue,
+      transaction_count: Math.floor(Math.random() * 50) + 10,
+      payment_methods: {
+        CB: Math.floor(revenue * 0.65),
+        cash: Math.floor(revenue * 0.25),
+        tickets_resto: Math.floor(revenue * 0.1),
+      },
+      nf525_certified: isZ,
+      nf525_hash: isZ ? `hash_${i}_${Date.now()}` : undefined,
+      nf525_timestamp: isZ ? date.toISOString() : undefined,
+      pdf_url: isZ ? `/pdfs/register_${i}.pdf` : undefined,
+    });
+  }
+  
+  return registers;
+};
+
+const mockRegisters = generateMockRegisters();
+
+// ============= SERVICE FUNCTIONS =============
+export const getCashRegisterHistory = async (
+  startDate: string,
+  endDate: string,
+  type: 'all' | 'Z' | 'X' = 'all'
+): Promise<CashRegisterListResponse> => {
+  logAPI(
+    'GET',
+    '/accounting/registers',
+    { start_date: startDate, end_date: endDate, type }
+  );
+
+  return withMock(
+    () => {
+      const filtered = mockRegisters.filter((reg) => {
+        const regDate = reg.created_at.split('T')[0];
+        const inRange = regDate >= startDate && regDate <= endDate;
+        const typeMatch = type === 'all' || reg.type === type;
+        return inRange && typeMatch;
+      });
+
+      const stats: CashRegisterStats = {
+        z_count: filtered.filter((r) => r.type === 'Z').length,
+        x_count: filtered.filter((r) => r.type === 'X').length,
+        total_revenue: filtered.reduce((sum, r) => sum + r.total_revenue, 0),
+        total_transactions: filtered.reduce((sum, r) => sum + r.transaction_count, 0),
+      };
+
+      return {
+        registers: filtered,
+        stats,
+      };
+    },
+    () =>
+      apiClient
+        .get<WelloApiResponse<CashRegisterListResponse>>(
+          '/accounting/registers',
+          {
+            params: {
+              start_date: startDate,
+              end_date: endDate,
+              type,
+            },
+          }
+        )
+        .then((res) => res.data)
+  );
+};
+
+export const getCashRegisterStats = async (
+  startDate: string,
+  endDate: string
+): Promise<CashRegisterStats> => {
+  logAPI(
+    'GET',
+    '/accounting/registers/stats',
+    { start_date: startDate, end_date: endDate }
+  );
+
+  return withMock(
+    () => {
+      const filtered = mockRegisters.filter((reg) => {
+        const regDate = reg.created_at.split('T')[0];
+        return regDate >= startDate && regDate <= endDate;
+      });
+
+      return {
+        z_count: filtered.filter((r) => r.type === 'Z').length,
+        x_count: filtered.filter((r) => r.type === 'X').length,
+        total_revenue: filtered.reduce((sum, r) => sum + r.total_revenue, 0),
+        total_transactions: filtered.reduce((sum, r) => sum + r.transaction_count, 0),
+      };
+    },
+    () =>
+      apiClient
+        .get<WelloApiResponse<CashRegisterStats>>(
+          '/accounting/registers/stats',
+          {
+            params: {
+              start_date: startDate,
+              end_date: endDate,
+            },
+          }
+        )
+        .then((res) => res.data)
+  );
+};
+
+export const exportRegisterPDF = async (registerId: string): Promise<void> => {
+  logAPI('POST', `/accounting/registers/${registerId}/export-pdf`);
+
+  return withMock(
+    () => {
+      // Mock: trigger download with dummy PDF
+      const link = document.createElement('a');
+      link.href = `/mock-register-${registerId}.pdf`;
+      link.download = `register_${registerId}.pdf`;
+      link.click();
+    },
+    async () => {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'https://api.example.com'}/accounting/registers/${registerId}/export-pdf`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+          },
+        }
+      );
+
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `register_${registerId}.pdf`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    }
+  );
+};
+
+export const exportPeriodRegisters = async (
+  startDate: string,
+  endDate: string,
+  type: 'all' | 'Z' | 'X' = 'all',
+  format: 'zip' | 'single' = 'zip'
+): Promise<void> => {
+  logAPI('POST', '/accounting/registers/export-period', {
+    start_date: startDate,
+    end_date: endDate,
+    type,
+    format,
+  });
+
+  return withMock(
+    () => {
+      // Mock: trigger download with dummy ZIP
+      const link = document.createElement('a');
+      link.href = `/mock-registers-${startDate}-${endDate}.zip`;
+      link.download = `registers_${startDate}_to_${endDate}.zip`;
+      link.click();
+    },
+    async () => {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || 'https://api.example.com'}/accounting/registers/export-period`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+          },
+          body: JSON.stringify({
+            start_date: startDate,
+            end_date: endDate,
+            type,
+            format,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error('Export failed');
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `registers_${startDate}_to_${endDate}.${format === 'zip' ? 'zip' : 'pdf'}`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+    }
+  );
+};
