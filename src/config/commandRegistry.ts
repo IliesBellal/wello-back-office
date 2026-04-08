@@ -71,18 +71,6 @@ const generateNavigationCommands = (): CommandRegistry[] => {
  */
 const manualCommands: CommandRegistry[] = [
   {
-    id: 'action-new-order',
-    label: 'Créer une nouvelle commande',
-    description: 'Ouvrir le formulaire de création de commande',
-    category: 'Actions',
-    icon: FileText,
-    keywords: ['commande', 'nouvelle', 'créer', 'order', 'new'],
-    action: {
-      type: 'callback' as const,
-      name: 'openNewOrderModal',
-    },
-  },
-  {
     id: 'setting-theme',
     label: 'Activer mode sombre',
     description: 'Basculer entre le mode clair et sombre',
