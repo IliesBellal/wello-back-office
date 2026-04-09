@@ -4,26 +4,32 @@ import { TvaRateGroup, Menu, UnitOfMeasure, Component, Attribute, Product, Categ
 // ============= Mock Data =============
 const mockTvaRates: TvaRateGroup[] = [
   { 
-    id: 1, 
-    name: "Sur Place", 
+    id: 59, 
+    name: "Sur place", 
+    delivery_type: "IN",
     rates: [
-      { id: 10, value: 10, label: "TVA 10%" }, 
-      { id: 20, value: 20, label: "TVA 20%" }
+      { id: 5, value: 10, label: "TVA 10%" }, 
+      { id: 6, value: 20, label: "TVA 20%" }
     ] 
   },
   { 
-    id: 2, 
-    name: "Emporter", 
+    id: 60, 
+    name: "À livrer", 
+    delivery_type: "DELIVERY",
     rates: [
-      { id: 5, value: 5.5, label: "TVA 5.5%" }, 
-      { id: 10, value: 10, label: "TVA 10%" }
+      { id: 8, value: 5.5, label: "TVA 5.5%" }, 
+      { id: 7, value: 10, label: "TVA 10%" },
+      { id: 9, value: 20, label: "TVA 20%" }
     ] 
   },
   { 
-    id: 3, 
-    name: "Livraison", 
+    id: 61, 
+    name: "À emporter", 
+    delivery_type: "TAKE_AWAY",
     rates: [
-      { id: 20, value: 20, label: "TVA 20%" }
+      { id: 1, value: 5.5, label: "TVA 5.5%" }, 
+      { id: 2, value: 10, label: "TVA 10%" },
+      { id: 3, value: 20, label: "TVA 20%" }
     ] 
   }
 ];
@@ -625,6 +631,22 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.patch<void>('/menu/market-categories/bulk-assign', { product_ids: productIds, category_id: categoryId })
+    );
+  },
+
+  async updateComponentStatus(componentId: string, status: boolean): Promise<void> {
+    logAPI('POST', `/menu/components/${componentId}/status`, { status: status ? '1' : '0' });
+    return withMock(
+      () => undefined,
+      () => apiClient.post<void>(`/menu/components/${componentId}/status`, { status: status ? '1' : '0' })
+    );
+  },
+
+  async updateProductStatus(productId: string, status: boolean): Promise<void> {
+    logAPI('POST', `/menu/products/${productId}/status`, { status: status ? '1' : '0' });
+    return withMock(
+      () => undefined,
+      () => apiClient.post<void>(`/menu/products/${productId}/status`, { status: status ? '1' : '0' })
     );
   }
 };

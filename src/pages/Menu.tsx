@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Folder, MoreVertical, Plus, Globe, Grid3x3, AlertCircle, Tag as TagIcon, Search, X } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
+import { useProductCreateSheet } from '@/contexts/ProductCreateSheetContext';
 import { ProductsTable } from '@/components/menu/ProductsTable';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
 import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
@@ -17,6 +18,7 @@ import { TagsSheet } from '@/components/menu/TagsSheet';
 import { ProductCreateSheet } from '@/components/menu/ProductCreateSheet';
 import { Product, Tag, Allergen } from '@/types/menu';
 import { menuService } from '@/services/menuService';
+import { toast } from 'sonner';
 
 type SortKey = 'name' | 'category' | 'tags' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -44,7 +46,6 @@ function getProductValue(product: Product, key: SortKey, categories: Record<stri
 
 export default function Menu() {
   const { 
-    tvaRates, 
     menuData, 
     units, 
     components, 
@@ -64,11 +65,13 @@ export default function Menu() {
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [organizeModalOpen, setOrganizeModalOpen] = useState(false);
   const [externalMenusOpen, setExternalMenusOpen] = useState(false);
-  const [productCreateOpen, setProductCreateOpen] = useState(false);
   const [allergensSheetOpen, setAllergensSheetOpen] = useState(false);
   const [tagsSheetOpen, setTagsSheetOpen] = useState(false);
+  const { isOpen: productCreateOpen, setIsOpen: setProductCreateOpen } = useProductCreateSheet();
   const [tags, setTags] = useState<Tag[]>([]);
   const [allergens, setAllergens] = useState<Allergen[]>([]);
+  const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
+  const [productStatusMap, setProductStatusMap] = useState<Record<string, boolean>>({});
 
   // Filtres et tri
   const [search, setSearch] = useState('');
@@ -115,6 +118,37 @@ export default function Menu() {
     } else {
       setSortKey(key);
       setSortDir('asc');
+    }
+  };
+
+  const handleProductStatusChange = async (productId: string, status: boolean) => {
+    // Immédiatement mettre à jour le statut localement (optimistic update)
+    setProductStatusMap(prev => ({
+      ...prev,
+      [productId]: status
+    }));
+    
+    // Désactiver le switch pendant l'appel
+    setUpdatingProductId(productId);
+    
+    try {
+      await menuService.updateProductStatus(productId, status);
+      
+      // Aussi actualiser le produit sélectionné si c'est celui-ci
+      if (selectedProduct?.product_id === productId) {
+        setSelectedProduct(prev => prev ? { ...prev, available: status } : null);
+      }
+      toast.success(status ? 'Produit disponible' : 'Produit indisponible');
+    } catch (error) {
+      // En cas d'erreur, revenir à l'état précédent
+      setProductStatusMap(prev => ({
+        ...prev,
+        [productId]: !status
+      }));
+      toast.error('Erreur lors de la mise à jour du statut');
+    } finally {
+      // Re-activer le switch
+      setUpdatingProductId(null);
     }
   };
 
@@ -301,6 +335,9 @@ export default function Menu() {
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
+            onStatusChange={handleProductStatusChange}
+            productStatusMap={productStatusMap}
+            updatingProductId={updatingProductId}
           />
         </div>
 
@@ -308,7 +345,6 @@ export default function Menu() {
           product={selectedProduct && !selectedProduct.is_product_group ? selectedProduct : null}
           open={sheetOpen && selectedProduct !== null && !selectedProduct.is_product_group}
           onOpenChange={setSheetOpen}
-          tvaRates={tvaRates}
           units={units}
           components={components}
           attributes={attributes}
@@ -354,8 +390,6 @@ export default function Menu() {
         <ProductCreateSheet
           open={productCreateOpen}
           onOpenChange={setProductCreateOpen}
-          categories={menuData?.products_types || []}
-          tvaRates={tvaRates}
           onCreateProduct={createProduct}
           onCreateCategory={createProductCategory}
         />

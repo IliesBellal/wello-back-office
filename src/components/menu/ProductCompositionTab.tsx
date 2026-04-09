@@ -197,48 +197,50 @@ export const ProductCompositionTab = ({
           </CardContent>
         </Card>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Ingrédient</TableHead>
-              <TableHead>Quantité</TableHead>
-              <TableHead>Unité</TableHead>
-              <TableHead>Coût unitaire</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {composition.map((item) => {
-              const component = getComponentDetails(item.component_id);
-              const unit = item.unit_of_measure_id 
-                ? (item?.unit_of_measure || 'Inconnu')
-                : getUnitDetails(item.unit_id)?.name;
-              
-              return (
-                <TableRow key={item.component_id}>
-                  <TableCell className="font-medium">
-                    {item.name || component?.name || 'Inconnu'}
-                  </TableCell>
-                  <TableCell>{item.quantity}</TableCell>
-                  <TableCell>{unit || 'Inconnu'}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.cost !== undefined ? `${item.cost.toFixed(2)} €` : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveItem(item.component_id)}
-                      disabled={disabled}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+        <div className="bg-card rounded-lg border border-border overflow-hidden">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Ingrédient</TableHead>
+                <TableHead>Quantité</TableHead>
+                <TableHead>Unité</TableHead>
+                <TableHead>Coût unitaire</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {composition.map((item) => {
+                const component = getComponentDetails(item.component_id);
+                const unit = item.unit_of_measure_id 
+                  ? (item?.unit_of_measure || 'Inconnu')
+                  : getUnitDetails(item.unit_id)?.name;
+                
+                return (
+                  <TableRow key={item.component_id}>
+                    <TableCell className="font-medium">
+                      {item.name || component?.name || 'Inconnu'}
+                    </TableCell>
+                    <TableCell>{item.quantity}</TableCell>
+                    <TableCell>{unit || 'Inconnu'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {item.cost !== undefined ? `${item.cost.toFixed(2)} €` : '-'}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemoveItem(item.component_id)}
+                        disabled={disabled}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </div>
   );

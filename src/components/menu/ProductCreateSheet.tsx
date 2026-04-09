@@ -10,6 +10,7 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Form,
   FormControl,
@@ -28,7 +29,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CategorySelector } from '@/components/shared/CategorySelector';
-import { Category, TvaRateGroup, ProductCreatePayload } from '@/types/menu';
+import { useProductCreateData } from '@/hooks/useProductCreateData';
+import { ProductCreatePayload } from '@/types/menu';
 
 const productFormSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
@@ -47,8 +49,6 @@ type ProductFormValues = z.infer<typeof productFormSchema>;
 interface ProductCreateSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  categories: Category[];
-  tvaRates: TvaRateGroup[];
   onCreateProduct: (data: ProductCreatePayload) => Promise<void>;
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
 }
@@ -56,11 +56,11 @@ interface ProductCreateSheetProps {
 export function ProductCreateSheet({
   open,
   onOpenChange,
-  categories,
-  tvaRates,
   onCreateProduct,
   onCreateCategory,
 }: ProductCreateSheetProps) {
+  // Load TVA rates and categories autonomously when sheet opens
+  const { tvaRates, categories, loading } = useProductCreateData(open);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ProductFormValues>({
@@ -120,9 +120,29 @@ export function ProductCreateSheet({
           </SheetDescription>
         </SheetHeader>
 
+        {/* Loading Skeleton */}
+        {loading && (
+          <div className="space-y-6 mt-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          </div>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 mt-6">
-            <FormField
+            {!loading && (
+              <>
+                <FormField
               control={form.control}
               name="name"
               render={({ field }) => (
@@ -316,6 +336,8 @@ export function ProductCreateSheet({
                 />
               </div>
             </div>
+              </>
+            )}
 
             <div className="flex gap-2 pt-4">
               <Button
@@ -329,7 +351,7 @@ export function ProductCreateSheet({
               <Button 
                 type="submit" 
                 className="flex-1 bg-gradient-primary"
-                disabled={isSubmitting}
+                disabled={isSubmitting || loading}
               >
                 {isSubmitting ? "Création..." : "Créer le produit"}
               </Button>

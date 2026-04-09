@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 type SortKey = 'name' | 'category' | 'tags' | 'status';
 type SortDir = 'asc' | 'desc';
@@ -22,6 +23,9 @@ interface ProductsTableProps {
   sortKey?: SortKey;
   sortDir?: SortDir;
   onSort?: (key: SortKey) => void;
+  onStatusChange?: (productId: string, status: boolean) => void;
+  productStatusMap?: Record<string, boolean>;
+  updatingProductId?: string | null;
 }
 
 const SortIcon = ({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) => {
@@ -68,6 +72,9 @@ export const ProductsTable = ({
   sortKey = 'name',
   sortDir = 'asc',
   onSort,
+  onStatusChange,
+  productStatusMap = {},
+  updatingProductId = null,
 }: ProductsTableProps) => {
   if (products.length === 0) {
     return (
@@ -78,7 +85,7 @@ export const ProductsTable = ({
   }
 
   return (
-    <div className="border rounded-xl overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">
@@ -120,6 +127,7 @@ export const ProductsTable = ({
                 {onSort && <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />}
               </span>
             </TableHead>
+            <TableHead>Disponible</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -234,6 +242,15 @@ export const ProductsTable = ({
                       </Badge>
                     ))}
                   </div>
+                </TableCell>
+
+                {/* Disponible */}
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <Switch
+                    checked={productStatusMap[product.product_id] !== undefined ? productStatusMap[product.product_id] : (product.available ?? true)}
+                    onCheckedChange={(checked) => onStatusChange?.(product.product_id, checked)}
+                    disabled={updatingProductId === product.product_id}
+                  />
                 </TableCell>
               </TableRow>
             );

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,13 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
       value: () => ({
         from: subDays(new Date(), 7),
         to: new Date(),
+      }),
+    },
+    {
+      label: 'Cette semaine',
+      value: () => ({
+        from: startOfWeek(new Date(), { weekStartsOn: 1 }),
+        to: endOfWeek(new Date(), { weekStartsOn: 1 }),
       }),
     },
     {

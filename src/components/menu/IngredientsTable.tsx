@@ -10,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 
 type SortKey = 'name' | 'category' | 'price' | 'unit';
 type SortDir = 'asc' | 'desc';
@@ -22,6 +23,9 @@ interface IngredientsTableProps {
   sortDir?: SortDir;
   onSort?: (key: SortKey) => void;
   onDelete?: (component: Component) => void;
+  onStatusChange?: (componentId: string, status: boolean) => void;
+  componentStatusMap?: Record<string, boolean>;
+  updatingComponentId?: string | null;
 }
 
 const SortIcon = ({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) => {
@@ -49,6 +53,9 @@ export const IngredientsTable = ({
   sortDir = 'asc',
   onSort,
   onDelete,
+  onStatusChange,
+  componentStatusMap = {},
+  updatingComponentId = null,
 }: IngredientsTableProps) => {
   if (ingredients.length === 0) {
     return (
@@ -59,7 +66,7 @@ export const IngredientsTable = ({
   }
 
   return (
-    <div className="border rounded-xl overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">
@@ -100,6 +107,7 @@ export const IngredientsTable = ({
               </span>
             </TableHead>
             <TableHead>Prix d'achat / Unité</TableHead>
+            <TableHead>Disponible</TableHead>
             {onDelete && <TableHead className="w-10"></TableHead>}
           </TableRow>
         </TableHeader>
@@ -127,6 +135,13 @@ export const IngredientsTable = ({
                 <TableCell>{unitLabel}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {ingredient.cost ? formatPrice(ingredient.cost) : '—'}
+                </TableCell>
+                <TableCell>
+                  <Switch
+                    checked={componentStatusMap[ingredient.component_id] !== undefined ? componentStatusMap[ingredient.component_id] : (ingredient.available ?? ingredient.status === '1' ?? true)}
+                    onCheckedChange={(checked) => onStatusChange?.(ingredient.component_id, checked)}
+                    disabled={updatingComponentId === ingredient.component_id}
+                  />
                 </TableCell>
                 {onDelete && (
                   <TableCell>

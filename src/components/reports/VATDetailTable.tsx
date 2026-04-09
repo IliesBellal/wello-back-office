@@ -16,7 +16,7 @@ const formatCurrency = (cents: number) => {
 
 export const VATDetailTable = ({ data }: VATDetailTableProps) => {
   return (
-    <div className="rounded-xl border border-border overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow>

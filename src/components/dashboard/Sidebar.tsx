@@ -24,6 +24,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Link2,
+  Receipt,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -61,14 +62,12 @@ const mainMenuItems: MenuItem[] = [
   { title: 'Commandes', icon: ShoppingBag, path: '/orders', end: false },
   { title: 'Plan de Salle', icon: LayoutGrid, path: '/locations' },
   { title: 'Utilisateurs', icon: Users2, path: '/users' },
-  { title: 'Registres de Caisse', icon: Calculator, path: '/cash-registers' },
   { title: 'Clients', icon: Users, path: '/customers' },
   { title: 'Stocks', icon: Warehouse, path: '/stocks' },
-  { title: 'Rapports & Comptabilité', icon: FileText, path: '/reports/financial' },
 ];
 
 const menuSubItems: MenuItem[] = [
-  { title: 'Produits', icon: Utensils, path: '/menu', end: true },
+  { title: 'Produits', icon: Utensils, path: '/menu/products', end: true },
   { title: 'Ingrédients', icon: Package, path: '/menu/components', end: false },
   { title: 'Grille de prix', icon: Tag, path: '/menu/price-grid', end: false },
   { title: 'Options & Suppléments', icon: Settings, path: '/menu/attributes', end: false },
@@ -78,6 +77,12 @@ const menuSubItems: MenuItem[] = [
 const settingsSubItems: MenuItem[] = [
   { title: 'Établissement', icon: Store, path: '/settings/establishment' },
   { title: 'Mon Profil', icon: User, path: '/settings/profile' },
+];
+
+const accountingSubItems: MenuItem[] = [
+  { title: 'Registres de caisse', icon: Calculator, path: '/accounting/registers' },
+  { title: 'Déclaration de TVA', icon: TicketPercent, path: '/accounting/vat' },
+  { title: 'Rapports financiers', icon: BarChart3, path: '/accounting/report' },
 ];
 
 const integrationsSubItems: MenuItem[] = [
@@ -195,25 +200,25 @@ interface ExpandedCollapsibleProps {
   icon: typeof Home;
   title: string;
   children: MenuItem[];
-  defaultOpen?: boolean;
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
 }
 
 const ExpandedCollapsible = ({
   icon: Icon,
   title,
   children,
-  defaultOpen = true,
+  isOpen,
+  onOpenChange,
 }: ExpandedCollapsibleProps) => {
-  const [open, setOpen] = useState(defaultOpen);
-
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
+    <Collapsible open={isOpen} onOpenChange={onOpenChange}>
       <CollapsibleTrigger className="flex items-center justify-between w-full gap-3 px-4 py-3 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent/50 transition-all">
         <div className="flex items-center gap-4">
           <Icon className="w-5 h-5 shrink-0" />
           <span className="text-sm font-medium">{title}</span>
         </div>
-        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
       <CollapsibleContent className="space-y-1 mt-1 pl-2">
         {children.map((item) => (
@@ -241,6 +246,9 @@ const ExpandedCollapsible = ({
 // ─── Sidebar ──────────────────────────────────────────────────────────────
 
 const SIDEBAR_STORAGE_KEY = 'wello-sidebar-collapsed';
+const SIDEBAR_SECTION_STORAGE_KEY = 'wello-sidebar-open-section';
+
+type OpenSection = 'dashboard' | 'menu' | 'accounting' | 'settings' | 'integrations' | null;
 
 export const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(() => {
@@ -253,10 +261,24 @@ export const Sidebar = () => {
     }
   });
   
-  const [dashboardOpen, setDashboardOpen] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(true);
-  const [settingsOpen, setSettingsOpen] = useState(true);
-  const [integrationsOpen, setIntegrationsOpen] = useState(true);
+  const [openSection, setOpenSection] = useState<OpenSection>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const stored = localStorage.getItem(SIDEBAR_SECTION_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  // Create a unified handler that ensures only one section can be open at a time
+  const handleOpenChange = (
+    section: 'dashboard' | 'menu' | 'accounting' | 'settings' | 'integrations',
+    isOpen: boolean
+  ) => {
+    const newOpenSection = isOpen ? section : null;
+    setOpenSection(newOpenSection);
+  };
 
   // Persist collapsed state to localStorage
   useEffect(() => {
@@ -266,6 +288,15 @@ export const Sidebar = () => {
       console.warn('Failed to save sidebar state:', e);
     }
   }, [collapsed]);
+
+  // Persist open section state to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_SECTION_STORAGE_KEY, JSON.stringify(openSection));
+    } catch (e) {
+      console.warn('Failed to save sidebar section state:', e);
+    }
+  }, [openSection]);
 
   return (
     <aside
@@ -328,7 +359,8 @@ export const Sidebar = () => {
             title="Tableau de bord"
             icon={Home}
             children={dashboardItems}
-            defaultOpen={dashboardOpen}
+            isOpen={openSection === 'dashboard'}
+            onOpenChange={(isOpen) => handleOpenChange('dashboard', isOpen)}
           />
         )}
 
@@ -344,7 +376,25 @@ export const Sidebar = () => {
             title="Menu"
             icon={MenuIcon}
             children={menuSubItems}
-            defaultOpen={menuOpen}
+            isOpen={openSection === 'menu'}
+            onOpenChange={(isOpen) => handleOpenChange('menu', isOpen)}
+          />
+        )}
+
+        {/* Accounting (with sub-items) */}
+        {collapsed ? (
+          <CollapsedCollapsible
+            title="Comptabilité"
+            icon={Receipt}
+            children={accountingSubItems}
+          />
+        ) : (
+          <ExpandedCollapsible
+            title="Comptabilité"
+            icon={Receipt}
+            children={accountingSubItems}
+            isOpen={openSection === 'accounting'}
+            onOpenChange={(isOpen) => handleOpenChange('accounting', isOpen)}
           />
         )}
 
@@ -360,7 +410,8 @@ export const Sidebar = () => {
             title="Paramètres"
             icon={Settings}
             children={settingsSubItems}
-            defaultOpen={settingsOpen}
+            isOpen={openSection === 'settings'}
+            onOpenChange={(isOpen) => handleOpenChange('settings', isOpen)}
           />
         )}
 
@@ -376,7 +427,8 @@ export const Sidebar = () => {
             title="Canaux et Plateformes"
             icon={Link2}
             children={integrationsSubItems}
-            defaultOpen={integrationsOpen}
+            isOpen={openSection === 'integrations'}
+            onOpenChange={(isOpen) => handleOpenChange('integrations', isOpen)}
           />
         )}
       </nav>

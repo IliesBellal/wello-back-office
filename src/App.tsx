@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { MFAProvider } from "./contexts/MFAContext";
+import { ProductCreateSheetProvider } from "./contexts/ProductCreateSheetContext";
 import { CommandPaletteProvider } from "./components/command-palette";
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import GlobalLoadingBar from "./components/GlobalLoadingBar";
@@ -20,7 +21,6 @@ import FinancialReports from './pages/FinancialReports';
 import Orders from './pages/Orders';
 import Locations from './pages/Locations';
 import Users from './pages/Users';
-import CashRegisters from './pages/CashRegisters';
 import CashRegisterHistory from './pages/CashRegisterHistory';
 import VAT from './pages/TVA';
 import Customers from './pages/Customers';
@@ -47,11 +47,12 @@ const App = () => (
       <MFAProvider>
         <AuthProvider>
           <BrowserRouter>
-            <CommandPaletteProvider>
-              <GlobalLoadingBar />
-              <Toaster />
-              <Sonner />
-              <Routes>
+            <ProductCreateSheetProvider>
+              <CommandPaletteProvider>
+                <GlobalLoadingBar />
+                <Toaster />
+                <Sonner />
+                <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               
@@ -59,7 +60,7 @@ const App = () => (
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
               
               {/* Menu Management */}
-              <Route path="/menu" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
+              <Route path="/menu/products" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
               <Route path="/menu/categories" element={<ProtectedRoute><CategoriesTable /></ProtectedRoute>} />
               <Route path="/menu/market-categories" element={<ProtectedRoute><MarketCategoriesTable /></ProtectedRoute>} />
               <Route path="/menu/tags" element={<ProtectedRoute><TagsTable /></ProtectedRoute>} />
@@ -70,7 +71,6 @@ const App = () => (
               
               {/* Location & Service */}
               <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
-              <Route path="/cash-registers" element={<ProtectedRoute><CashRegisters /></ProtectedRoute>} />
               <Route path="/customers" element={<ProtectedRoute><CustomersList /></ProtectedRoute>} />
               <Route path="/customers/loyalty-programs" element={<ProtectedRoute><LoyaltyPrograms /></ProtectedRoute>} />
               
@@ -80,10 +80,10 @@ const App = () => (
               {/* Accounting */}
               <Route path="/accounting/registers" element={<ProtectedRoute><CashRegisterHistory /></ProtectedRoute>} />
               <Route path="/accounting/vat" element={<ProtectedRoute><VAT /></ProtectedRoute>} />
+              <Route path="/accounting/report" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
               
               {/* Reports & Analytics */}
-              <Route path="/reports/financial" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
-              <Route path="/reports/performance" element={<ProtectedRoute><NotImplementedPage title="Performance" /></ProtectedRoute>} />
+              {/* Consolidated under Accounting section */}
               
               {/* Administration */}
               <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
@@ -106,6 +106,7 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             </CommandPaletteProvider>
+            </ProductCreateSheetProvider>
           </BrowserRouter>
         </AuthProvider>
       </MFAProvider>

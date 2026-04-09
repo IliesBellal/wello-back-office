@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { TvaRateGroup, Menu, Product, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory } from '@/types/menu';
+import { Menu, Product, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
-  const [tvaRates, setTvaRates] = useState<TvaRateGroup[]>([]);
   const [menuData, setMenuData] = useState<MenuData>({ products_types: [], products: [] });
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
@@ -21,8 +20,7 @@ export const useMenuData = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [rates, menuResponse, productsData, unitsData, componentsData, attributesData] = await Promise.all([
-        menuService.getTvaRates(),
+      const [menuResponse, productsData, unitsData, componentsData, attributesData] = await Promise.all([
         menuService.getMenuData(),
         menuService.getProducts(),
         menuService.getUnitsOfMeasure(),
@@ -61,7 +59,6 @@ export const useMenuData = () => {
       // Extract components and categories from the API response
       const { components: flattenedComponents, categories: componentCategoriesFromApi } = componentsData;
 
-      setTvaRates(rates);
       setMenuData({
         status: apiData.status,
         last_menu_update: apiData.last_menu_update,
@@ -345,7 +342,6 @@ export const useMenuData = () => {
   };
 
   return {
-    tvaRates,
     menuData,
     units,
     components,

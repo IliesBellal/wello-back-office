@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Trash2, Search, Edit2, X } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
+import { menuService } from '@/services/menuService';
 import { IngredientsTable } from '@/components/menu/IngredientsTable';
 import { ComponentCreateSheet } from '@/components/menu/ComponentCreateSheet';
 import { toast } from 'sonner';
@@ -56,6 +57,8 @@ export default function Components() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<Component | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [updatingComponentId, setUpdatingComponentId] = useState<string | null>(null);
+  const [componentStatusMap, setComponentStatusMap] = useState<Record<string, boolean>>({});
 
   // Filtres et tri
   const [search, setSearch] = useState('');
@@ -125,6 +128,32 @@ export default function Components() {
   const handleDeleteClick = (component: Component) => {
     setComponentToDelete(component);
     setDeleteDialogOpen(true);
+  };
+
+  const handleStatusChange = async (componentId: string, status: boolean) => {
+    // Immédiatement mettre à jour le statut localement (optimistic update)
+    setComponentStatusMap(prev => ({
+      ...prev,
+      [componentId]: status
+    }));
+    
+    // Désactiver le switch pendant l'appel
+    setUpdatingComponentId(componentId);
+    
+    try {
+      await menuService.updateComponentStatus(componentId, status);
+      toast.success(status ? 'Ingrédient disponible' : 'Ingrédient indisponible');
+    } catch (error) {
+      // En cas d'erreur, revenir à l'état précédent
+      setComponentStatusMap(prev => ({
+        ...prev,
+        [componentId]: !status
+      }));
+      toast.error('Erreur lors de la mise à jour du statut');
+    } finally {
+      // Re-activer le switch
+      setUpdatingComponentId(null);
+    }
   };
 
   const handleConfirmDelete = async () => {
@@ -308,6 +337,9 @@ export default function Components() {
             sortDir={sortDir}
             onSort={handleSort}
             onDelete={handleDeleteClick}
+            onStatusChange={handleStatusChange}
+            componentStatusMap={componentStatusMap}
+            updatingComponentId={updatingComponentId}
           />
         </div>
 

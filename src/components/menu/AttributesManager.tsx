@@ -211,45 +211,47 @@ export const AttributesManager = ({
                     </Button>
                   </div>
 
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nom</TableHead>
-                        <TableHead>Supplément (€)</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(formData.options || []).map((option) => (
-                        <TableRow key={option.id}>
-                          <TableCell>
-                            <Input
-                              value={option.title}
-                              onChange={(e) => handleUpdateOption(option.id, 'title', e.target.value)}
-                              placeholder="Nom de l'option"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={formatPrice(option.price)}
-                              onChange={(e) => handleUpdateOption(option.id, 'price', parsePrice(e.target.value))}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveOption(option.id)}
-                            >
-                              <Trash2 className="w-4 h-4 text-destructive" />
-                            </Button>
-                          </TableCell>
+                  <div className="bg-card rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Nom</TableHead>
+                          <TableHead>Supplément (€)</TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {(formData.options || []).map((option) => (
+                          <TableRow key={option.id}>
+                            <TableCell>
+                              <Input
+                                value={option.title}
+                                onChange={(e) => handleUpdateOption(option.id, 'title', e.target.value)}
+                                placeholder="Nom de l'option"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={formatPrice(option.price)}
+                                onChange={(e) => handleUpdateOption(option.id, 'price', parsePrice(e.target.value))}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleRemoveOption(option.id)}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-4">

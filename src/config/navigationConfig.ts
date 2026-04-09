@@ -21,6 +21,8 @@ import {
   Gift,
   Receipt,
   Percent,
+  LineChart,
+  History,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -54,47 +56,28 @@ export interface NavigationItem {
 export const navigationConfig: NavigationItem[] = [
   // ═══ MAIN ═══
   {
-    id: 'dashboard',
+    id: 'home',
     label: 'Accueil',
     icon: LayoutDashboard,
     path: '/',
   },
+  // ═══ MAIN ═══
   {
-    id: 'orders',
-    label: 'Commandes',
-    icon: ShoppingCart,
-    path: '/orders',
-  },
-
-  // ═══ LOCATION & SERVICE ═══
-  {
-    id: 'floor-plan',
-    label: 'Plan de salle',
-    icon: LayoutGrid,
-    path: '/locations',
-  },
-  {
-    id: 'cash-registers',
-    label: 'Registres de caisse',
-    icon: Wallet,
-    path: '/cash-registers',
-  },
-  {
-    id: 'customers',
-    label: 'Clients',
-    icon: Users,
+    id: 'dashboard',
+    label: 'Tableau de bord',
+    icon: LayoutDashboard,
     subItems: [
       {
-        id: 'customers-list',
-        label: 'Liste clients',
-        icon: Users,
-        path: '/customers',
+        id: 'dashboard-analysis',
+        label: 'Analyse',
+        icon: LineChart,
+        path: '/dashboard/analysis',
       },
       {
-        id: 'loyalty-programs',
-        label: 'Fidélité',
-        icon: Gift,
-        path: '/customers/loyalty-programs',
+        id: 'dashboard-order-history',
+        label: 'Historique des commandes',
+        icon: History,
+        path: '/dashboard/order-history',
       },
     ],
   },
@@ -109,7 +92,7 @@ export const navigationConfig: NavigationItem[] = [
         id: 'products',
         label: 'Produits',
         icon: Package,
-        path: '/menu',
+        path: '/menu/products',
       },
       {
         id: 'categories',
@@ -150,6 +133,39 @@ export const navigationConfig: NavigationItem[] = [
     ],
   },
   {
+    id: 'orders',
+    label: 'Commandes',
+    icon: ShoppingCart,
+    path: '/orders',
+  },
+
+  // ═══ LOCATION & SERVICE ═══
+  {
+    id: 'floor-plan',
+    label: 'Plan de salle',
+    icon: LayoutGrid,
+    path: '/locations',
+  },
+  {
+    id: 'customers',
+    label: 'Clients',
+    icon: Users,
+    subItems: [
+      {
+        id: 'customers-list',
+        label: 'Liste clients',
+        icon: Users,
+        path: '/customers',
+      },
+      {
+        id: 'loyalty-programs',
+        label: 'Fidélité',
+        icon: Gift,
+        path: '/customers/loyalty-programs',
+      },
+    ],
+  },
+  {
     id: 'stocks',
     label: 'Stocks',
     icon: Boxes,
@@ -174,22 +190,17 @@ export const navigationConfig: NavigationItem[] = [
         icon: Percent,
         path: '/accounting/vat',
       },
+      {
+        id: 'financial-report',
+        label: 'Rapports financiers',
+        icon: BarChart3,
+        path: '/accounting/report',
+      },
     ],
   },
 
   // ═══ REPORTS & ANALYTICS ═══
-  {
-    id: 'financial-reports',
-    label: 'Rapports financiers',
-    icon: BarChart3,
-    path: '/reports/financial',
-  },
-  {
-    id: 'performance',
-    label: 'Performance',
-    icon: TrendingUp,
-    path: '/reports/performance',
-  },
+  // Note: Consolidated under Accounting section
 
   // ═══ INTEGRATIONS ═══
   {

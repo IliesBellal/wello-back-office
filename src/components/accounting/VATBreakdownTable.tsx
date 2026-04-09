@@ -103,7 +103,7 @@ export const VATBreakdownTable = ({ data, loading = false }: VATBreakdownTablePr
   }
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="bg-card rounded-lg border border-border overflow-hidden">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">

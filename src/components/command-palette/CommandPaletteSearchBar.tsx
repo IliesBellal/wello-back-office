@@ -41,7 +41,7 @@ export function CommandPaletteSearchBar() {
 
       {/* Placeholder Text */}
       <span className="flex-1 text-left truncate opacity-70">
-        Chercher une commande, une page...
+        Que voulez-vous faire ?
       </span>
 
       {/* Keyboard Shortcut Badge */}

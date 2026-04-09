@@ -258,7 +258,7 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -601,7 +601,7 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -714,7 +714,7 @@ function TableSkeleton({ colCount = 7 }: { colCount?: number }) {
         <Skeleton className="h-10 w-64" />
         <Skeleton className="h-10 w-52" />
       </div>
-      <div className="rounded-xl border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-hidden">
         <div className="bg-muted/40 p-3 flex gap-4">
           {Array.from({ length: colCount }).map((_, i) => (
             <Skeleton key={i} className="h-5 flex-1" />

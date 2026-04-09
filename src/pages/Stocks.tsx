@@ -77,7 +77,7 @@ const Stocks = () => {
         </div>
 
         {/* Data Table */}
-        <div className="rounded-xl border bg-card shadow-sm">
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
           <Table>
             <TableHeader>
               <TableRow>

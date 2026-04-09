@@ -1,5 +1,5 @@
 import { navigationConfig } from './navigationConfig';
-import { Search, Settings, LogOut, Moon, Sun, FileText } from 'lucide-react';
+import { Search, Settings, LogOut, Moon, Sun, FileText, Plus, AlertTriangle } from 'lucide-react';
 import { SVGProps } from 'react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -70,6 +70,30 @@ const generateNavigationCommands = (): CommandRegistry[] => {
  * Add specific keywords and custom actions here
  */
 const manualCommands: CommandRegistry[] = [
+  {
+    id: 'action-create-product',
+    label: 'Créer un produit',
+    description: 'Ouvrir le formulaire de création de produit',
+    category: 'Actions',
+    icon: Plus,
+    keywords: ['créer', 'create', 'nouveau', 'new', 'produit', 'product'],
+    action: {
+      type: 'callback' as const,
+      name: 'openCreateProductSheet',
+    },
+  },
+  {
+    id: 'action-stock-shortage',
+    label: 'Rupture de stock',
+    description: 'Aller vers la gestion des ingrédients',
+    category: 'Actions',
+    icon: AlertTriangle,
+    keywords: ['rupture', 'stock', 'shortage', 'ingrédient', 'ingredient', 'component'],
+    action: {
+      type: 'navigate' as const,
+      path: '/menu/components',
+    },
+  },
   {
     id: 'setting-theme',
     label: 'Activer mode sombre',

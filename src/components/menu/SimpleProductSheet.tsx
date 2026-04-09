@@ -36,12 +36,12 @@ import { ProductOptionsTab } from './ProductOptionsTab';
 import { CategorySelector } from '@/components/shared/CategorySelector';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
+import { useProductEditData } from '@/hooks/useProductEditData';
 
 interface SimpleProductSheetProps {
   product: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tvaRates: TvaRateGroup[];
   units: UnitOfMeasure[];
   components: Component[];
   attributes: Attribute[];
@@ -57,7 +57,6 @@ export const SimpleProductSheet = ({
   product,
   open,
   onOpenChange,
-  tvaRates,
   units,
   components,
   attributes,
@@ -68,6 +67,7 @@ export const SimpleProductSheet = ({
   onCreateCategory,
   onTagCreated
 }: SimpleProductSheetProps) => {
+  const { tvaRates } = useProductEditData(open);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);

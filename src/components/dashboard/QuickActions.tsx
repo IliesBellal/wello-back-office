@@ -35,7 +35,7 @@ export const QuickActions = ({ onNewProduct, onMarkRupture }: QuickActionsProps)
     {
       icon: CreditCard,
       label: 'Caisses du jour',
-      onClick: () => navigate('/cash-registers'),
+      onClick: () => navigate('/accounting/registers'),
       variant: 'outline' as const,
       className: '',
     },

@@ -201,7 +201,7 @@ export default function TagsTable() {
             </Button>
           </div>
 
-          <div className="border rounded-lg">
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>

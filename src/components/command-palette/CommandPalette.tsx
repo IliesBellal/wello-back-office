@@ -4,6 +4,7 @@ import { useCommandPalette, CommandPaletteContext, CommandAction, type CommandPa
 import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
+import { ProductCreateSheetContext } from '@/contexts/ProductCreateSheetContext';
 
 // Re-export context and type for use in custom hook
 export { CommandPaletteContext };
@@ -24,13 +25,13 @@ interface CommandPaletteProviderProps {
  * 
  * Callbacks supported:
  * - navigate: Route-based navigation
- * - openNewOrderModal: Open new order creation modal
  * - toggleTheme: Switch between light/dark mode
  * - logout: Sign out and redirect
  */
 export function CommandPaletteProvider({ children }: CommandPaletteProviderProps) {
   const navigate = useNavigate();
   const { setTheme, theme } = useTheme();
+  const productCreateSheetContext = useContext(ProductCreateSheetContext);
 
   // Handle command execution with routing + callbacks
   const handleExecuteCommand = useCallback(
@@ -41,9 +42,14 @@ export function CommandPaletteProvider({ children }: CommandPaletteProviderProps
       } else if (action.type === 'callback') {
         // Route callbacks to appropriate handlers
         switch (action.name) {
-          case 'openNewOrderModal':
-            // TODO: Emit event or use context to open modal
-            toast.info('Fonction "Créer une commande" - À implémenter');
+          case 'openCreateProductSheet':
+            if (productCreateSheetContext) {
+              productCreateSheetContext.setIsOpen(true);
+              navigate('/menu/products');
+              toast.success('Ouverture du formulaire de création de produit');
+            } else {
+              toast.error('Impossible d\'ouvrir le formulaire de création de produit');
+            }
             break;
 
           case 'toggleTheme': {
