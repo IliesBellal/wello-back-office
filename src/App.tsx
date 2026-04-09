@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { MFAProvider } from "./contexts/MFAContext";
 import { ProductCreateSheetProvider } from "./contexts/ProductCreateSheetContext";
+import { OrganizeModalProvider } from "./contexts/OrganizeModalContext";
 import { CommandPaletteProvider } from "./components/command-palette";
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import GlobalLoadingBar from "./components/GlobalLoadingBar";
@@ -48,7 +49,8 @@ const App = () => (
         <AuthProvider>
           <BrowserRouter>
             <ProductCreateSheetProvider>
-              <CommandPaletteProvider>
+              <OrganizeModalProvider>
+                <CommandPaletteProvider>
                 <GlobalLoadingBar />
                 <Toaster />
                 <Sonner />
@@ -105,7 +107,8 @@ const App = () => (
               {/* 404 Fallback */}
               <Route path="*" element={<NotFound />} />
             </Routes>
-            </CommandPaletteProvider>
+                </CommandPaletteProvider>
+              </OrganizeModalProvider>
             </ProductCreateSheetProvider>
           </BrowserRouter>
         </AuthProvider>

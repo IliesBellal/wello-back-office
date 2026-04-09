@@ -109,6 +109,10 @@ interface OptionItem {
   adoption_rate: number;
   avg_price: number;
   basket_impact: number;
+  cost_per_unit: number;  // Coût unitaire (centimes)
+  total_cost: number;     // Coût total
+  profit: number;         // Bénéfice total (centimes)
+  margin_percent: number; // Marge en %
 }
 
 interface OptionsMetrics {
@@ -116,6 +120,9 @@ interface OptionsMetrics {
   options_revenue: number;
   avg_adoption_rate: number;
   basket_impact_avg: number;
+  total_cost: number;     // Coût total  (centimes)
+  total_profit: number;   // Bénéfice total (centimes)
+  avg_margin_percent: number; // Marge moyenne %
 }
 
 interface OptionsAnalyticsResponse {
@@ -553,64 +560,91 @@ class AnalyticsService {
         name: 'Supplément Bacon (Burger)',
         product_name: 'Burger Classique',
         count: 178,
-        revenue: 712,
+        revenue: 71200,
         adoption_rate: 52.4,
-        avg_price: 4,
+        avg_price: 400,
         basket_impact: 1.2,
+        cost_per_unit: 150,
+        total_cost: 26700,
+        profit: 44500,
+        margin_percent: 62.4,
       },
       {
         id: '2',
         name: 'Extra Fromage',
         product_name: 'Pizza Quatre Fromages',
         count: 145,
-        revenue: 435,
+        revenue: 43500,
         adoption_rate: 50,
-        avg_price: 3,
+        avg_price: 300,
         basket_impact: 1.0,
+        cost_per_unit: 80,
+        total_cost: 11600,
+        profit: 31900,
+        margin_percent: 73.3,
       },
       {
         id: '3',
         name: 'Crème fraîche',
         product_name: 'Pâtes Carbonara',
         count: 98,
-        revenue: 196,
+        revenue: 19600,
         adoption_rate: 52.9,
-        avg_price: 2,
+        avg_price: 200,
         basket_impact: 0.8,
+        cost_per_unit: 60,
+        total_cost: 5880,
+        profit: 13720,
+        margin_percent: 70,
       },
       {
         id: '4',
         name: 'Sauce BBQ',
         product_name: 'Burger Classique',
         count: 120,
-        revenue: 240,
+        revenue: 24000,
         adoption_rate: 35.3,
-        avg_price: 2,
+        avg_price: 200,
         basket_impact: 0.6,
+        cost_per_unit: 40,
+        total_cost: 4800,
+        profit: 19200,
+        margin_percent: 80,
       },
       {
         id: '5',
         name: 'Tranche de Gâteau',
         product_name: 'Tiramisu',
         count: 45,
-        revenue: 135,
+        revenue: 13500,
         adoption_rate: 25,
-        avg_price: 3,
+        avg_price: 300,
         basket_impact: 0.5,
+        cost_per_unit: 100,
+        total_cost: 4500,
+        profit: 9000,
+        margin_percent: 66.7,
       },
     ];
+
+    const totalCost = mockOptions.reduce((sum, opt) => sum + opt.total_cost, 0);
+    const totalProfit = mockOptions.reduce((sum, opt) => sum + opt.profit, 0);
+    const totalRevenue = mockOptions.reduce((sum, opt) => sum + opt.revenue, 0);
 
     return {
       metrics: {
         total_options: 586,
-        options_revenue: 1718,
+        options_revenue: totalRevenue,
         avg_adoption_rate: 43.1,
         basket_impact_avg: 0.82,
+        total_cost: totalCost,
+        total_profit: totalProfit,
+        avg_margin_percent: totalProfit > 0 ? (totalProfit / totalRevenue) * 100 : 0,
       },
       options: mockOptions,
       comparisons: {
-        previous_period: { value: 1540, change: 11.6 },
-        year_ago: { value: 1420, change: 21.1 },
+        previous_period: { value: 154000, change: 11.6 },
+        year_ago: { value: 142000, change: 21.1 },
       },
     };
   }

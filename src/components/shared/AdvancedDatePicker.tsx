@@ -26,6 +26,7 @@ interface Preset {
 export function AdvancedDatePicker({ value, onChange, disabled = false }: AdvancedDatePickerProps) {
   const [open, setOpen] = useState(false);
   const [temp, setTemp] = useState<DateRange>(value);
+  const [selectionPhase, setSelectionPhase] = useState<'start' | 'end' | null>(null);
 
   const presets: Preset[] = [
     {
@@ -69,30 +70,39 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
     const range = preset.value();
     setTemp(range);
     onChange(range);
+    setSelectionPhase(null);
     setOpen(false);
   };
 
   const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
     if (!range?.from) return;
 
-    // Si seulement 'from' est défini, c'est le premier click
-    if (!range?.to) {
+    // Si range.to existe ET range.to !== range.from, on a une plage complète (2e clic)
+    if (range.to && range.to.getTime() !== range.from.getTime()) {
+      // On est en phase 2 ou à une plage complète
+      const firstClick = temp.from;
+      const secondClick = range.from;
+
+      // Assurer que from <= to
+      if (firstClick <= secondClick) {
+        setTemp({ from: firstClick, to: secondClick });
+      } else {
+        setTemp({ from: secondClick, to: firstClick });
+      }
+      setSelectionPhase('start');
+    } else {
+      // Phase 1: Premier clic ou calendrier réinitialisé
       setTemp({
         from: range.from,
         to: range.from,
       });
-    }
-    // Si les deux sont définis, c'est le deuxième click (range complet)
-    else {
-      setTemp({
-        from: range.from,
-        to: range.to,
-      });
+      setSelectionPhase('end');
     }
   };
 
   const handleApply = () => {
     onChange(temp);
+    setSelectionPhase(null);
     setOpen(false);
   };
 
@@ -101,6 +111,7 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
     const newRange = { from: today, to: today };
     setTemp(newRange);
     onChange(newRange);
+    setSelectionPhase(null);
     setOpen(false);
   };
 
@@ -146,9 +157,23 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
           {/* Calendar Section */}
           <div className="p-4 space-y-4">
             <div className="space-y-2">
-              <label className="text-xs font-semibold text-muted-foreground block">
-                Sélectionnez une période
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Sélectionnez une période
+                </label>
+                {selectionPhase && (
+                  <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
+                    {selectionPhase === 'start' ? 'Cliquez le début' : 'Cliquez la fin'}
+                  </span>
+                )}
+              </div>
+              
+              {/* Affichage de la plage sélectionnée */}
+              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                {format(temp.from, 'dd MMM yyyy', { locale: fr })}
+                {temp.to !== temp.from && ` → ${format(temp.to, 'dd MMM yyyy', { locale: fr })}`}
+              </div>
+
               <Calendar
                 mode="range"
                 selected={{ from: temp.from, to: temp.to }}

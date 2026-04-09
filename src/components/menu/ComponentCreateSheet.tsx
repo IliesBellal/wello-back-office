@@ -34,6 +34,8 @@ const componentFormSchema = z.object({
   category_id: z.string().min(1, "La catégorie est requise"),
   unit_id: z.coerce.number().min(1, "L'unité est requise"),
   price: z.coerce.number().min(0, "Le prix doit être positif ou nul"),
+  purchase_cost: z.coerce.number().min(0, "Le prix d'achat doit être positif ou nul").optional(),
+  purchase_unit_id: z.coerce.number().optional(),
 });
 
 type ComponentFormValues = z.infer<typeof componentFormSchema>;
@@ -64,6 +66,8 @@ export function ComponentCreateSheet({
       category_id: '',
       unit_id: undefined,
       price: 0,
+      purchase_cost: undefined,
+      purchase_unit_id: undefined,
     },
   });
 
@@ -75,6 +79,8 @@ export function ComponentCreateSheet({
         category_id: data.category_id,
         unit_id: data.unit_id,
         price: Math.round(data.price * 100), // Convert to cents
+        purchase_cost: data.purchase_cost ? Math.round(data.purchase_cost * 100) : undefined,
+        purchase_unit_id: data.purchase_unit_id && data.purchase_unit_id !== 'none' ? data.purchase_unit_id : undefined,
       });
       form.reset();
       onOpenChange(false);
@@ -173,6 +179,56 @@ export function ComponentCreateSheet({
                 </FormItem>
               )}
             />
+
+            <div className="border-t pt-4">
+              <h3 className="text-sm font-semibold mb-4">Informations d'achat (optionnel)</h3>
+
+              <FormField
+                control={form.control}
+                name="purchase_cost"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Prix d'achat (€)</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="0.01"
+                        placeholder="0.30"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="purchase_unit_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unité d'achat</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value?.toString() || 'none'}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner une unité" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="none">Aucune</SelectItem>
+                        {units.map((unit) => (
+                          <SelectItem key={unit.id} value={unit.id.toString()}>
+                            {unit.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="flex gap-2 pt-4">
               <Button

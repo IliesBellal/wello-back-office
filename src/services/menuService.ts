@@ -468,7 +468,7 @@ export const menuService = {
     );
   },
 
-  async createComponent(data: { name: string; unit_id: number; price: number; category_id?: string }): Promise<Component> {
+  async createComponent(data: { name: string; unit_id: number; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string | number }): Promise<Component> {
     logAPI('POST', '/menu/components/create', data);
     return withMock(
       () => ({ 
@@ -476,9 +476,22 @@ export const menuService = {
         name: data.name,
         unit_id: data.unit_id,
         price: data.price / 100,
-        category_id: data.category_id
+        category_id: data.category_id,
+        purchase_cost: data.purchase_cost,
+        purchase_unit_id: data.purchase_unit_id
       } as Component),
       () => apiClient.post<Component>('/menu/components/create', data)
+    );
+  },
+
+  async updateComponent(componentId: string, data: { name?: string; category_id?: string; unit_id?: number; price?: number; purchase_cost?: number; purchase_unit_id?: string | number }): Promise<Component> {
+    logAPI('PUT', `/menu/components/${componentId}`, data);
+    return withMock(
+      () => ({ 
+        component_id: componentId, 
+        ...data
+      } as unknown as Component),
+      () => apiClient.put<Component>(`/menu/components/${componentId}`, data)
     );
   },
 

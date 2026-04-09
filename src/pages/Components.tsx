@@ -27,6 +27,7 @@ import { useMenuData } from '@/hooks/useMenuData';
 import { menuService } from '@/services/menuService';
 import { IngredientsTable } from '@/components/menu/IngredientsTable';
 import { ComponentCreateSheet } from '@/components/menu/ComponentCreateSheet';
+import { ComponentViewEditSheet } from '@/components/menu/ComponentViewEditSheet';
 import { toast } from 'sonner';
 import { Component, ComponentCategory } from '@/types/menu';
 
@@ -50,10 +51,13 @@ export default function Components() {
     loading,
     createComponent,
     createComponentCategory,
+    updateComponent,
     deleteComponent
   } = useMenuData();
   
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
+  const [editSheetOpen, setEditSheetOpen] = useState(false);
+  const [componentToEdit, setComponentToEdit] = useState<Component | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<Component | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -123,6 +127,11 @@ export default function Components() {
       setSortKey(key);
       setSortDir('asc');
     }
+  };
+
+  const handleEditClick = (component: Component) => {
+    setComponentToEdit(component);
+    setEditSheetOpen(true);
   };
 
   const handleDeleteClick = (component: Component) => {
@@ -336,6 +345,7 @@ export default function Components() {
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
+            onEdit={handleEditClick}
             onDelete={handleDeleteClick}
             onStatusChange={handleStatusChange}
             componentStatusMap={componentStatusMap}
@@ -350,6 +360,15 @@ export default function Components() {
           units={units || []}
           onCreateComponent={createComponent}
           onCreateCategory={createComponentCategory}
+        />
+
+        <ComponentViewEditSheet
+          open={editSheetOpen}
+          onOpenChange={setEditSheetOpen}
+          component={componentToEdit}
+          units={units || []}
+          onUpdate={updateComponent}
+          onDeleteConfirm={deleteComponent}
         />
 
         {/* Delete ingredient dialog */}

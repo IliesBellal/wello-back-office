@@ -5,6 +5,7 @@ import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { ProductCreateSheetContext } from '@/contexts/ProductCreateSheetContext';
+import { OrganizeModalContext } from '@/contexts/OrganizeModalContext';
 
 // Re-export context and type for use in custom hook
 export { CommandPaletteContext };
@@ -32,6 +33,7 @@ export function CommandPaletteProvider({ children }: CommandPaletteProviderProps
   const navigate = useNavigate();
   const { setTheme, theme } = useTheme();
   const productCreateSheetContext = useContext(ProductCreateSheetContext);
+  const organizeModalContext = useContext(OrganizeModalContext);
 
   // Handle command execution with routing + callbacks
   const handleExecuteCommand = useCallback(
@@ -51,6 +53,21 @@ export function CommandPaletteProvider({ children }: CommandPaletteProviderProps
               toast.error('Impossible d\'ouvrir le formulaire de création de produit');
             }
             break;
+
+          case 'openOrganizeModal':
+            if (organizeModalContext) {
+              organizeModalContext.setIsOpen(true);
+              navigate('/menu/products');
+              toast.success('Ouverture de la vue caisse');
+            } else {
+              toast.error('Impossible d\'ouvrir la vue caisse');
+            }
+            break;
+
+            case 'openCashRegisterView':
+              toast.info('Fonction "Vue caisse" - À implémenter');
+              navigate('/menu/products');
+              break;
 
           case 'toggleTheme': {
             const newTheme = theme === 'dark' ? 'light' : 'dark';
@@ -72,7 +89,7 @@ export function CommandPaletteProvider({ children }: CommandPaletteProviderProps
         }
       }
     },
-    [navigate, setTheme, theme]
+    [navigate, setTheme, theme, organizeModalContext]
   );
 
   // Setup command palette hook

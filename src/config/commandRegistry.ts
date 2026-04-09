@@ -1,5 +1,5 @@
 import { navigationConfig } from './navigationConfig';
-import { Search, Settings, LogOut, Moon, Sun, FileText, Plus, AlertTriangle } from 'lucide-react';
+import { Search, Settings, LogOut, Moon, Sun, FileText, Plus, AlertTriangle, LayoutGrid } from 'lucide-react';
 import { SVGProps } from 'react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -80,6 +80,18 @@ const manualCommands: CommandRegistry[] = [
     action: {
       type: 'callback' as const,
       name: 'openCreateProductSheet',
+    },
+  },
+  {
+    id: 'action-organize-menu',
+    label: 'Vue caisse',
+    description: 'Afficher la vue caisse pour organiser les produits',
+    category: 'Actions',
+    icon: LayoutGrid,
+    keywords: ['vue', 'caisse', 'organization', 'organize', 'arrangement', 'disposition', 'layout'],
+    action: {
+      type: 'callback' as const,
+      name: 'openOrganizeModal',
     },
   },
   {

@@ -34,6 +34,9 @@ export interface Component {
   unit_of_measure_id?: string;  // e.g. "2" (numeric ID from API)
   quantity?: number;  // Quantity in the product composition
   cost?: number;  // Cost of the component in the product
+  purchase_cost?: number;  // Purchase price (prix d'achat) in cents
+  purchase_unit_id?: string | number;  // Purchase unit of measure ID
+  purchase_unit_of_measure?: string;  // Purchase unit label
   status?: string;
   available?: boolean;
 }
@@ -52,6 +55,10 @@ export interface AttributeOption {
   price?: number;  // Legacy format
   extra_price?: number;  // New format from API
   max_quantity?: number;
+  component_id?: string;  // Optional ingredient ID
+  quantity?: number;  // Quantity of ingredient
+  unit_of_measure_id?: string | number;  // Unit of ingredient
+  order?: number;  // Display order
 }
 
 export interface AttributeOptionDetail {
@@ -67,7 +74,8 @@ export interface AttributeOptionDetail {
 
 export interface Attribute {
   id: string;
-  title: string;
+  name: string;  // Visible only to restaurant staff
+  title: string;  // Visible to customers
   type: 'CHECK' | 'QUANTITY';
   min?: number;
   max?: number;
@@ -210,6 +218,17 @@ export interface ComponentCreatePayload {
   category_id: string;
   unit_id: number;
   price: number; // in cents
+  purchase_cost?: number; // in cents
+  purchase_unit_id?: string | number;
+}
+
+export interface ComponentUpdatePayload {
+  name?: string;
+  category_id?: string;
+  unit_id?: number;
+  price?: number; // in cents
+  purchase_cost?: number; // in cents
+  purchase_unit_id?: string | number;
 }
 
 export interface ProductCreatePayload {

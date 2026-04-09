@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Folder, MoreVertical, Plus, Globe, Grid3x3, AlertCircle, Tag as TagIcon, Search, X } from 'lucide-react';
+import { Folder, MoreVertical, Plus, Globe, Grid3x3, AlertCircle, Tag as TagIcon, Search } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { useProductCreateSheet } from '@/contexts/ProductCreateSheetContext';
+import { useOrganizeModal } from '@/contexts/OrganizeModalContext';
+import { MultiFilter } from '@/components/shared/MultiFilter';
 import { ProductsTable } from '@/components/menu/ProductsTable';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
 import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
@@ -63,11 +65,11 @@ export default function Menu() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
-  const [organizeModalOpen, setOrganizeModalOpen] = useState(false);
   const [externalMenusOpen, setExternalMenusOpen] = useState(false);
   const [allergensSheetOpen, setAllergensSheetOpen] = useState(false);
   const [tagsSheetOpen, setTagsSheetOpen] = useState(false);
   const { isOpen: productCreateOpen, setIsOpen: setProductCreateOpen } = useProductCreateSheet();
+  const { isOpen: organizeModalOpen, setIsOpen: setOrganizeModalOpen } = useOrganizeModal();
   const [tags, setTags] = useState<Tag[]>([]);
   const [allergens, setAllergens] = useState<Allergen[]>([]);
   const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
@@ -204,14 +206,6 @@ export default function Menu() {
     });
   }, [menuData, search, categoryFilter, tagFilter, sortKey, sortDir, categoryMap]);
 
-  const handleTagFilterChange = (tagId: string) => {
-    setTagFilter(prev => 
-      prev.includes(tagId) 
-        ? prev.filter(id => id !== tagId)
-        : [...prev, tagId]
-    );
-  };
-
   if (loading) {
     return (
       <DashboardLayout>
@@ -297,24 +291,11 @@ export default function Menu() {
               </Select>
 
               {/* Filtre tags */}
-              <div className="flex gap-2 flex-wrap items-center">
-                {tags.map(tag => (
-                  <button
-                    key={tag.id}
-                    onClick={() => handleTagFilterChange(tag.id)}
-                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                      tagFilter.includes(tag.id)
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                    }`}
-                  >
-                    {tag.name}
-                    {tagFilter.includes(tag.id) && (
-                      <X className="w-3 h-3 ml-1 inline" />
-                    )}
-                  </button>
-                ))}
-              </div>
+              <MultiFilter
+                options={tags.map(tag => ({ id: tag.id, label: tag.name }))}
+                selectedIds={tagFilter}
+                onChange={setTagFilter}
+              />
 
               {/* Compteur */}
               <div className="flex items-center text-sm text-muted-foreground whitespace-nowrap">

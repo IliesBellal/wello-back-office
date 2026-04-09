@@ -8,7 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, Trash2, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 
@@ -22,6 +22,7 @@ interface IngredientsTableProps {
   sortKey?: SortKey;
   sortDir?: SortDir;
   onSort?: (key: SortKey) => void;
+  onEdit?: (component: Component) => void;
   onDelete?: (component: Component) => void;
   onStatusChange?: (componentId: string, status: boolean) => void;
   componentStatusMap?: Record<string, boolean>;
@@ -52,6 +53,7 @@ export const IngredientsTable = ({
   sortKey = 'name',
   sortDir = 'asc',
   onSort,
+  onEdit,
   onDelete,
   onStatusChange,
   componentStatusMap = {},
@@ -97,18 +99,9 @@ export const IngredientsTable = ({
                 {onSort && <SortIcon col="price" sortKey={sortKey} sortDir={sortDir} />}
               </span>
             </TableHead>
-            <TableHead
-              onClick={() => onSort?.('unit')}
-              className={onSort ? 'cursor-pointer select-none hover:bg-muted/60 transition-colors' : ''}
-            >
-              <span className="inline-flex items-center">
-                Unité de mesure
-                {onSort && <SortIcon col="unit" sortKey={sortKey} sortDir={sortDir} />}
-              </span>
-            </TableHead>
             <TableHead>Prix d'achat / Unité</TableHead>
             <TableHead>Disponible</TableHead>
-            {onDelete && <TableHead className="w-10"></TableHead>}
+            {(onEdit || onDelete) && <TableHead className="w-20">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -132,7 +125,6 @@ export const IngredientsTable = ({
                   )}
                 </TableCell>
                 <TableCell>{formatPrice(ingredient.price)}</TableCell>
-                <TableCell>{unitLabel}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {ingredient.cost ? formatPrice(ingredient.cost) : '—'}
                 </TableCell>
@@ -143,16 +135,30 @@ export const IngredientsTable = ({
                     disabled={updatingComponentId === ingredient.component_id}
                   />
                 </TableCell>
-                {onDelete && (
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => onDelete(ingredient)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                {(onEdit || onDelete) && (
+                  <TableCell className="flex gap-1">
+                    {onEdit && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                        onClick={() => onEdit(ingredient)}
+                        title="Éditer"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {onDelete && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => onDelete(ingredient)}
+                        title="Supprimer"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </TableCell>
                 )}
               </TableRow>

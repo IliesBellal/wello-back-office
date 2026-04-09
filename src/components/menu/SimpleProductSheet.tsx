@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Edit, Save, X, ImageIcon, Loader2, Plus, Eye, EyeOff, Trash2 } from 'lucide-react';
+import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
 import { CategorySelector } from '@/components/shared/CategorySelector';
@@ -75,9 +75,7 @@ export const SimpleProductSheet = ({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [isCreatingTag, setIsCreatingTag] = useState(false);
-  const [showAvailabilityDialog, setShowAvailabilityDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
 
@@ -285,44 +283,14 @@ export const SimpleProductSheet = ({
     }
   };
 
-  const handleToggleAvailability = async () => {
-    if (!product) return;
-    
-    setIsProcessing(true);
-    try {
-      const newStatus = !product.available;
-      await menuService.updateProductAvailability(product.product_id, newStatus);
-      
-      // Update local product state
-      product.available = newStatus;
-      setShowAvailabilityDialog(false);
-      
-      toast({
-        title: "Succès",
-        description: newStatus 
-          ? "Produit réactivé avec succès. Il est maintenant commandable."
-          : "Produit désactivé. Il a été retiré de la carte."
-      });
-    } catch (error) {
-      console.error('Error updating availability:', error);
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Impossible de mettre à jour la disponibilité.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+
 
   const handleDeleteProduct = async () => {
     if (!product) return;
     
-    setIsProcessing(true);
     try {
       await menuService.deleteProduct(product.product_id);
       
-      setShowDeleteDialog(false);
       onOpenChange(false);
       
       toast({
@@ -336,8 +304,6 @@ export const SimpleProductSheet = ({
         description: error instanceof Error ? error.message : "Impossible de supprimer le produit.",
         variant: "destructive"
       });
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -409,25 +375,13 @@ export const SimpleProductSheet = ({
             <div className="flex gap-2">
               {!isEditMode ? (
                 <>
-                  {!product.available && (
-                    <Button 
-                      variant="destructive" 
-                      size="icon"
-                      onClick={() => setShowDeleteDialog(true)}
-                      disabled={isProcessing}
-                      title="Supprimer définitivement"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
                   <Button 
-                    variant="outline" 
+                    variant="destructive" 
                     size="icon"
-                    onClick={() => setShowAvailabilityDialog(true)}
-                    disabled={isProcessing}
-                    title={product.available ? "Désactiver le produit" : "Activer le produit"}
+                    onClick={() => setShowDeleteDialog(true)}
+                    title="Supprimer le produit"
                   >
-                    {product.available ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                   <Button variant="outline" onClick={() => setIsEditMode(true)}>
                     <Edit className="w-4 h-4 mr-2" />
@@ -517,8 +471,8 @@ export const SimpleProductSheet = ({
                   <div>
                     <Label className="text-xs font-semibold">Statut</Label>
                     <p className="mt-1">
-                      <Badge variant={product.status === 'available' ? 'default' : product.status === 'out_of_stock' ? 'secondary' : 'destructive'}>
-                        {product.status === 'available' ? 'Disponible' : product.status === 'out_of_stock' ? 'Hors stock' : 'Indisponible'}
+                      <Badge variant={product.status === 'available' ? 'default' : product.status === 'out_of_stock' ? 'secondary' : product.status === 'removed_from_menu' ? 'outline' : 'destructive'}>
+                        {product.status === 'available' ? 'Disponible' : product.status === 'out_of_stock' ? 'Hors stock' : product.status === 'removed_from_menu' ? 'Retiré de la carte' : 'Indisponible'}
                       </Badge>
                     </p>
                   </div>
@@ -643,6 +597,7 @@ export const SimpleProductSheet = ({
                         <SelectItem value="available">Disponible</SelectItem>
                         <SelectItem value="out_of_stock">Hors stock</SelectItem>
                         <SelectItem value="not_available">Indisponible</SelectItem>
+                        <SelectItem value="removed_from_menu">Retiré de la carte</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -1094,32 +1049,6 @@ export const SimpleProductSheet = ({
           </TabsContent>
         </Tabs>
 
-        {/* Availability Toggle Dialog */}
-        <AlertDialog open={showAvailabilityDialog} onOpenChange={setShowAvailabilityDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {product?.available ? "Désactiver le produit" : "Activer le produit"}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {product?.available 
-                  ? "Êtes-vous sûr ? Le produit sera retiré de la carte et ne sera plus commandable par les clients."
-                  : "Êtes-vous sûr ? Le produit redeviendra commandable."
-                }
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="flex gap-2 justify-end">
-              <AlertDialogCancel disabled={isProcessing}>Annuler</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleToggleAvailability}
-                disabled={isProcessing}
-              >
-                Confirmer
-              </AlertDialogAction>
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
-
         {/* Delete Product Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
           <AlertDialogContent>
@@ -1130,10 +1059,9 @@ export const SimpleProductSheet = ({
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="flex gap-2 justify-end">
-              <AlertDialogCancel disabled={isProcessing}>Annuler</AlertDialogCancel>
+              <AlertDialogCancel>Annuler</AlertDialogCancel>
               <AlertDialogAction 
                 onClick={handleDeleteProduct}
-                disabled={isProcessing}
                 className="bg-destructive"
               >
                 Supprimer
@@ -1141,6 +1069,7 @@ export const SimpleProductSheet = ({
             </div>
           </AlertDialogContent>
         </AlertDialog>
+
       </SheetContent>
     </Sheet>
   );

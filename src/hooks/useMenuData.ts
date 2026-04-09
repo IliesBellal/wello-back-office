@@ -267,7 +267,7 @@ export const useMenuData = () => {
     }
   };
 
-  const createComponent = async (data: { name: string; unit_id: number; price: number; category_id?: string }) => {
+  const createComponent = async (data: { name: string; unit_id: number; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string | number }) => {
     try {
       const newComponent = await menuService.createComponent(data);
       setComponents(prev => [...prev, newComponent]);
@@ -279,6 +279,23 @@ export const useMenuData = () => {
       toast({
         title: "Erreur",
         description: "Impossible de créer le composant",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const updateComponent = async (componentId: string, data: { name?: string; category_id?: string; unit_id?: number; price?: number; purchase_cost?: number; purchase_unit_id?: string | number }) => {
+    try {
+      const updatedComponent = await menuService.updateComponent(componentId, data);
+      setComponents(prev => prev.map(c => c.component_id === componentId ? updatedComponent : c));
+      toast({
+        title: "Succès",
+        description: "Composant mis à jour avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour le composant",
         variant: "destructive"
       });
     }
@@ -357,6 +374,7 @@ export const useMenuData = () => {
     updateCategory,
     createProduct,
     createComponent,
+    updateComponent,
     deleteComponent,
     deleteCategory
   };

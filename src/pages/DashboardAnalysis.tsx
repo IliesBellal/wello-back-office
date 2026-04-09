@@ -16,11 +16,34 @@ import { analyticsService } from '@/services/analyticsService';
 import { subDays, format } from 'date-fns';
 import { TrendingUp, TrendingDown, Download } from 'lucide-react';
 import { ExportButton } from '@/components/analytics';
+import { MultiFilter } from '@/components/shared/MultiFilter';
+import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { toast } from 'sonner';
 
-type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'tags' | 'annulations' | 'remises' | 'clients' | 'tva' | 'restaurants';
+type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'tags' | 'annulations' | 'remises' | 'clients' | 'paiements' | 'restaurants';
+
+interface DateRange {
+  from: Date;
+  to: Date;
+}
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+// Couleurs cohérentes pour les canaux de vente
+const CHANNEL_COLORS: Record<string, string> = {
+  'restaurant': '#3b82f6',           // Bleu
+  'dine_in': '#3b82f6',              // Bleu (alias)
+  'takeaway': '#10b981',             // Vert
+  'delivery': '#f59e0b',             // Orange
+  'ubereats': '#06b6d4',             // Cyan
+  'ubereats_takeaway': '#06b6d4',    // Cyan
+  'ubereats_delivery': '#0891b2',    // Cyan foncé
+  'deliveroo': '#14b8a6',            // Teal
+  'deliveroo_takeaway': '#14b8a6',   // Teal
+  'deliveroo_delivery': '#0d9488',   // Teal foncé
+  'scanorder': '#8b5cf6',            // Violet
+  'click_collect': '#f59e0b',        // Orange
+};
 
 const EvolutionBadge = ({ percent }: { percent: number }) => (
   <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -100,8 +123,10 @@ const DataTable = ({ columns, data, sortBy }: { columns: Array<{ key: string; la
 
 export const DashboardAnalysis = () => {
   const [activeTab, setActiveTab] = useState<TabType>('ca');
-  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 30));
-  const [endDate, setEndDate] = useState<Date>(new Date());
+  const [dateRange, setDateRange] = useState<DateRange>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
 
   // Filtres spécifiques par onglet
   const [productCategory, setProductCategory] = useState<string | undefined>();
@@ -110,25 +135,69 @@ export const DashboardAnalysis = () => {
   const [selectedTags, setSelectedTags] = useState<string[]>(['Végétarien', 'Vegan', 'Sans gluten']);
   const [cancellationReasons, setCancellationReasons] = useState<string[]>(['ordering_error', 'customer_wait', 'kitchen_issue', 'payment_issue']);
   const [discountTypes, setDiscountTypes] = useState<string[]>(['promotion', 'happy_hour', 'gesture', 'loyalty', 'promo_code']);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(['card', 'cash', 'mobile']);
+  const [paymentChannel, setPaymentChannel] = useState<string>('all');
 
   // Données analytiques
   const analyticsData = useMemo(() => {
     return {
-      revenue: analyticsService.getRevenueAnalytics(startDate, endDate, ['restaurant', 'takeaway', 'delivery'], 'day'),
-      orders: analyticsService.getOrdersAnalytics(startDate, endDate, ['dine_in', 'takeaway', 'delivery']),
-      products: analyticsService.getProductsAnalytics(startDate, endDate, productCategory, productSort),
-      options: analyticsService.getOptionsAnalytics(startDate, endDate, optionTypes),
-      tags: analyticsService.getTagsAnalytics(startDate, endDate, selectedTags),
-      cancellations: analyticsService.getCancellationsAnalytics(startDate, endDate, cancellationReasons),
-      discounts: analyticsService.getDiscountsAnalytics(startDate, endDate, discountTypes),
-      clients: analyticsService.getCustomersAnalytics(startDate, endDate),
-      vat: analyticsService.getVATAnalytics(startDate, endDate),
-      restaurants: analyticsService.getRestaurantsAnalytics(startDate, endDate),
+      revenue: analyticsService.getRevenueAnalytics(dateRange.from, dateRange.to, ['restaurant', 'takeaway', 'delivery'], 'day'),
+      orders: analyticsService.getOrdersAnalytics(dateRange.from, dateRange.to, ['dine_in', 'takeaway', 'delivery']),
+      products: analyticsService.getProductsAnalytics(dateRange.from, dateRange.to, productCategory, productSort),
+      options: analyticsService.getOptionsAnalytics(dateRange.from, dateRange.to, optionTypes),
+      tags: analyticsService.getTagsAnalytics(dateRange.from, dateRange.to, selectedTags),
+      cancellations: analyticsService.getCancellationsAnalytics(dateRange.from, dateRange.to, cancellationReasons),
+      discounts: analyticsService.getDiscountsAnalytics(dateRange.from, dateRange.to, discountTypes),
+      clients: analyticsService.getCustomersAnalytics(dateRange.from, dateRange.to),
+      vat: analyticsService.getVATAnalytics(dateRange.from, dateRange.to),
+      restaurants: analyticsService.getRestaurantsAnalytics(dateRange.from, dateRange.to),
+      payments: {
+        metrics: {
+          total_amount: 125000,
+          card_amount: 75000,
+          cash_amount: 35000,
+          mobile_amount: 15000,
+          total_transactions: 1250,
+        },
+        by_method: [
+          { method: 'Carte bancaire', amount: 75000, transactions: 750, percentage: 60 },
+          { method: 'Espèces', amount: 35000, transactions: 350, percentage: 28 },
+          { method: 'Paiement mobile', amount: 15000, transactions: 150, percentage: 12 },
+        ],
+        timeline: [
+          { date: '01 Mar', card: 2500, cash: 1200, mobile: 500 },
+          { date: '02 Mar', card: 2800, cash: 1100, mobile: 600 },
+          { date: '03 Mar', card: 3100, cash: 1350, mobile: 700 },
+          { date: '04 Mar', card: 2900, cash: 1250, mobile: 550 },
+          { date: '05 Mar', card: 3200, cash: 1400, mobile: 750 },
+          { date: '06 Mar', card: 3500, cash: 1500, mobile: 800 },
+          { date: '07 Mar', card: 3300, cash: 1300, mobile: 700 },
+        ],
+        detail: [
+          { id: '1', date: '2026-03-07 14:30', method: 'Carte bancaire', channel: 'dine_in', amount: 125.50, status: 'Confirmé', reference: 'CB001254' },
+          { id: '2', date: '2026-03-07 14:45', method: 'Espèces', channel: 'takeaway', amount: 35.00, status: 'Confirmé', reference: 'CASH001' },
+          { id: '3', date: '2026-03-07 15:00', method: 'Paiement mobile', channel: 'delivery', amount: 42.75, status: 'Confirmé', reference: 'MOBILE001' },
+          { id: '4', date: '2026-03-07 15:15', method: 'Carte bancaire', channel: 'dine_in', amount: 89.90, status: 'Confirmé', reference: 'CB001255' },
+          { id: '5', date: '2026-03-07 15:30', method: 'Espèces', channel: 'takeaway', amount: 56.50, status: 'Confirmé', reference: 'CASH002' },
+        ],
+      },
     };
-  }, [startDate, endDate, productCategory, productSort, optionTypes, selectedTags, cancellationReasons, discountTypes]);
+  }, [dateRange, productCategory, productSort, optionTypes, selectedTags, cancellationReasons, discountTypes, paymentMethods, paymentChannel]);
 
   // ==================== ONGLET CA ====================
-  const renderCATab = () => (
+  const renderCATab = () => {
+    // Données par canal pour le pie chart (mock pour démonstration)
+    const channelRevenueData = [
+      { name: 'Sur place', value: analyticsData.revenue.current_period.total * 0.25, channel: 'dine_in' },
+      { name: 'À emporter', value: analyticsData.revenue.current_period.total * 0.18, channel: 'takeaway' },
+      { name: 'Livraison', value: analyticsData.revenue.current_period.total * 0.12, channel: 'delivery' },
+      { name: 'UE Emporter', value: analyticsData.revenue.current_period.total * 0.15, channel: 'ubereats_takeaway' },
+      { name: 'UE Livraison', value: analyticsData.revenue.current_period.total * 0.12, channel: 'ubereats_delivery' },
+      { name: 'DR Emporter', value: analyticsData.revenue.current_period.total * 0.10, channel: 'deliveroo_takeaway' },
+      { name: 'DR Livraison', value: analyticsData.revenue.current_period.total * 0.08, channel: 'deliveroo_delivery' },
+    ];
+
+    return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard
@@ -147,41 +216,90 @@ export const DashboardAnalysis = () => {
         />
       </div>
 
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Évolution CA</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={analyticsData.revenue.timeline}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Legend />
-              <Area type="monotone" dataKey="restaurant" stackId="1" stroke="#3b82f6" fill="#3b82f6" name="Restaurant" />
-              <Area type="monotone" dataKey="takeaway" stackId="1" stroke="#10b981" fill="#10b981" name="À emporter" />
-              <Area type="monotone" dataKey="delivery" stackId="1" stroke="#f59e0b" fill="#f59e0b" name="Livraison" />
-            </AreaChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="bg-card border border-border lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Évolution CA</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={analyticsData.revenue.timeline}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                <Legend />
+                <Area type="monotone" dataKey="restaurant" stackId="1" stroke={CHANNEL_COLORS['restaurant']} fill={CHANNEL_COLORS['restaurant']} name="Sur place" />
+                <Area type="monotone" dataKey="takeaway" stackId="1" stroke={CHANNEL_COLORS['takeaway']} fill={CHANNEL_COLORS['takeaway']} name="À emporter" />
+                <Area type="monotone" dataKey="delivery" stackId="1" stroke={CHANNEL_COLORS['delivery']} fill={CHANNEL_COLORS['delivery']} name="Livraison" />
+                <Area type="monotone" dataKey="ubereats_takeaway" stackId="1" stroke={CHANNEL_COLORS['ubereats_takeaway']} fill={CHANNEL_COLORS['ubereats_takeaway']} name="UE Emporter" />
+                <Area type="monotone" dataKey="ubereats_delivery" stackId="1" stroke={CHANNEL_COLORS['ubereats_delivery']} fill={CHANNEL_COLORS['ubereats_delivery']} name="UE Livraison" />
+                <Area type="monotone" dataKey="deliveroo_takeaway" stackId="1" stroke={CHANNEL_COLORS['deliveroo_takeaway']} fill={CHANNEL_COLORS['deliveroo_takeaway']} name="DR Emporter" />
+                <Area type="monotone" dataKey="deliveroo_delivery" stackId="1" stroke={CHANNEL_COLORS['deliveroo_delivery']} fill={CHANNEL_COLORS['deliveroo_delivery']} name="DR Livraison" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Répartition CA par canal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={channelRevenueData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
+                  {channelRevenueData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHANNEL_COLORS[entry.channel]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                  formatter={(value: number) => `${(value / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}`}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="flex justify-end">
         <ExportButton
           filename="CA"
           onExport={() => analyticsService.exportRevenueCSV(
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0],
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
             ['restaurant', 'takeaway', 'delivery']
           )}
         />
       </div>
     </div>
-  );
+    );
+  };
 
   // ==================== ONGLET COMMANDES ====================
-  const renderOrdersTab = () => (
+  const renderOrdersTab = () => {
+    // Données par canal pour le pie chart (mock pour démonstration)
+    const channelOrderData = [
+      { name: 'Sur place', value: analyticsData.orders.metrics.total_orders * 0.22, channel: 'dine_in' },
+      { name: 'À emporter', value: analyticsData.orders.metrics.total_orders * 0.16, channel: 'takeaway' },
+      { name: 'Livraison', value: analyticsData.orders.metrics.total_orders * 0.10, channel: 'delivery' },
+      { name: 'UE Emporter', value: analyticsData.orders.metrics.total_orders * 0.18, channel: 'ubereats_takeaway' },
+      { name: 'UE Livraison', value: analyticsData.orders.metrics.total_orders * 0.15, channel: 'ubereats_delivery' },
+      { name: 'DR Emporter', value: analyticsData.orders.metrics.total_orders * 0.12, channel: 'deliveroo_takeaway' },
+      { name: 'DR Livraison', value: analyticsData.orders.metrics.total_orders * 0.07, channel: 'deliveroo_delivery' },
+    ];
+
+    return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
@@ -203,40 +321,84 @@ export const DashboardAnalysis = () => {
         />
       </div>
 
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Évolution des commandes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={analyticsData.orders.timeline}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Legend />
-              <Line type="monotone" dataKey="total_orders" stroke="#3b82f6" name="Commandes" />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <Card className="bg-card border border-border lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Évolution des commandes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={analyticsData.orders.timeline}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                <Legend />
+                <Line type="monotone" dataKey="dine_in" stroke={CHANNEL_COLORS['dine_in']} name="Sur place" />
+                <Line type="monotone" dataKey="takeaway" stroke={CHANNEL_COLORS['takeaway']} name="À emporter" />
+                <Line type="monotone" dataKey="delivery" stroke={CHANNEL_COLORS['delivery']} name="Livraison" />
+                <Line type="monotone" dataKey="ubereats_takeaway" stroke={CHANNEL_COLORS['ubereats_takeaway']} name="UE Emporter" />
+                <Line type="monotone" dataKey="ubereats_delivery" stroke={CHANNEL_COLORS['ubereats_delivery']} name="UE Livraison" />
+                <Line type="monotone" dataKey="deliveroo_takeaway" stroke={CHANNEL_COLORS['deliveroo_takeaway']} name="DR Emporter" />
+                <Line type="monotone" dataKey="deliveroo_delivery" stroke={CHANNEL_COLORS['deliveroo_delivery']} name="DR Livraison" />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Répartition par canal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={channelOrderData}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
+                  {channelOrderData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={CHANNEL_COLORS[entry.channel]} />
+                  ))}
+                </Pie>
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                  formatter={(value: number) => `${Math.round(value)} commandes`}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="flex justify-end">
         <ExportButton
           filename="Commandes"
           onExport={() => analyticsService.exportOrdersCSV(
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0],
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
             ['dine_in', 'takeaway', 'delivery'],
             'all'
           )}
         />
       </div>
     </div>
-  );
+    );
+  };
 
   // ==================== ONGLET PRODUITS ====================
-  const renderProductsTab = () => (
+  const renderProductsTab = () => {
+    // Calcul des totaux pour les pourcentages
+    const totalQuantity = analyticsData.products.products.reduce((sum, prod) => sum + prod.quantity, 0);
+    const totalRevenue = analyticsData.products.products.reduce((sum, prod) => sum + prod.revenue, 0);
+
+    return (
     <div className="space-y-6">
       <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
@@ -296,27 +458,6 @@ export const DashboardAnalysis = () => {
 
       <Card className="bg-card border border-border">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Top 10 produits</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={analyticsData.products.products.slice(0, 10).reverse()}
-              layout="vertical"
-              margin={{ left: 100, right: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis type="number" stroke="#6b7280" />
-              <YAxis dataKey="name" type="category" stroke="#6b7280" width={100} />
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Bar dataKey={productSort === 'revenue' ? 'revenue' : 'quantity'} fill="#3b82f6" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
           <CardTitle className="text-sm font-semibold">Détails des produits</CardTitle>
         </CardHeader>
         <CardContent>
@@ -324,8 +465,24 @@ export const DashboardAnalysis = () => {
             columns={[
               { key: 'name', label: 'Produit', sortable: true },
               { key: 'category', label: 'Catégorie', sortable: true },
-              { key: 'quantity', label: 'Quantité', sortable: true },
-              { key: 'revenue', label: 'CA (€)', sortable: true, render: (v: number) => v.toFixed(2) },
+              {
+                key: 'quantity',
+                label: 'Quantité vendue',
+                sortable: true,
+                render: (v: number) => {
+                  const pct = totalQuantity > 0 ? Math.round((v / totalQuantity) * 100) : 0;
+                  return `${v} (${pct}%)`;
+                }
+              },
+              {
+                key: 'revenue',
+                label: 'CA (€)',
+                sortable: true,
+                render: (v: number) => {
+                  const pct = totalRevenue > 0 ? Math.round((v / totalRevenue) * 100) : 0;
+                  return `${v.toFixed(2)} (${pct}%)`;
+                }
+              },
               { key: 'cost', label: 'Coût (€)', sortable: true, render: (v: number) => v.toFixed(2) },
               { key: 'margin', label: 'Marge (€)', sortable: true, render: (v: number) => v.toFixed(2) },
               { key: 'margin_percent', label: 'Marge %', sortable: true, render: (v: number) => v.toFixed(1) + '%' },
@@ -341,18 +498,24 @@ export const DashboardAnalysis = () => {
         <ExportButton
           filename="Produits"
           onExport={() => analyticsService.exportProductsCSV(
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0],
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
             productCategory,
             productSort
           )}
         />
       </div>
     </div>
-  );
+    );
+  };
 
   // ==================== ONGLET OPTIONS ====================
-  const renderOptionsTab = () => (
+  const renderOptionsTab = () => {
+    // Calcul des totaux pour les pourcentages
+    const totalCount = analyticsData.options.options.reduce((sum, opt) => sum + opt.count, 0);
+    const totalRevenue = analyticsData.options.options.reduce((sum, opt) => sum + opt.revenue, 0);
+
+    return (
     <div className="space-y-6">
       <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
@@ -395,8 +558,23 @@ export const DashboardAnalysis = () => {
           value={analyticsData.options.metrics.options_revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
         />
         <MetricCard
+          label="Coût total des options"
+          value={(analyticsData.options.metrics.total_cost / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+        />
+        <MetricCard
+          label="Bénéfice total"
+          value={(analyticsData.options.metrics.total_profit / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <MetricCard
           label="Taux d'ajout moyen"
           value={analyticsData.options.metrics.avg_adoption_rate.toFixed(1) + '%'}
+        />
+        <MetricCard
+          label="Marge moyenne %"
+          value={analyticsData.options.metrics.avg_margin_percent.toFixed(1) + '%'}
         />
         <MetricCard
           label="Impact panier moyen"
@@ -406,20 +584,29 @@ export const DashboardAnalysis = () => {
 
       <Card className="bg-card border border-border">
         <CardHeader>
-          <CardTitle className="text-sm font-semibold">Top 10 options ajoutées</CardTitle>
+          <CardTitle className="text-sm font-semibold">Top 10 options - Coût vs Bénéfice</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart
-              data={analyticsData.options.options.slice(0, 10).reverse()}
+              data={analyticsData.options.options.slice(0, 10).map(opt => ({
+                ...opt,
+                total_cost_display: opt.total_cost / 100,
+                profit_display: opt.profit / 100
+              })).reverse()}
               layout="vertical"
               margin={{ left: 150, right: 20 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis type="number" stroke="#6b7280" />
               <YAxis dataKey="name" type="category" stroke="#6b7280" width={150} />
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Bar dataKey="count" fill="#10b981" />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                formatter={(value: number) => `${value.toFixed(2)}€`}
+              />
+              <Legend />
+              <Bar dataKey="total_cost_display" stackId="a" fill="#ef4444" name="Coût" />
+              <Bar dataKey="profit_display" stackId="a" fill="#10b981" name="Bénéfice" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -434,11 +621,32 @@ export const DashboardAnalysis = () => {
             columns={[
               { key: 'name', label: 'Option', sortable: true },
               { key: 'product_name', label: 'Produit parent', sortable: true },
-              { key: 'count', label: 'Nombre d\'ajouts', sortable: true },
-              { key: 'revenue', label: 'CA généré (€)', sortable: true, render: (v: number) => v.toFixed(2) },
+              {
+                key: 'count',
+                label: 'Nombre d\'ajouts',
+                sortable: true,
+                render: (v: number) => {
+                  const pct = totalCount > 0 ? Math.round((v / totalCount) * 100) : 0;
+                  return `${v} (${pct}%)`;
+                }
+              },
+              {
+                key: 'revenue',
+                label: 'CA généré (€)',
+                sortable: true,
+                render: (v: number) => {
+                  const pct = totalRevenue > 0 ? Math.round((v / totalRevenue) * 100) : 0;
+                  return `${v.toFixed(2)} (${pct}%)`;
+                }
+              },
+              { key: 'cost_per_unit', label: 'Coût unitaire (€)', sortable: true, render: (v: number) => (v / 100).toFixed(2) },
+              { key: 'total_cost', label: 'Coût total (€)', sortable: true, render: (v: number) => (v / 100).toFixed(2) },
+              { key: 'profit', label: 'Bénéfice (€)', sortable: true, render: (v: number) => <span className="text-green-600 font-medium">+{(v / 100).toFixed(2)}</span> },
               { key: 'adoption_rate', label: 'Taux d\'ajout %', sortable: true, render: (v: number) => v.toFixed(1) + '%' },
-              { key: 'avg_price', label: 'Prix moyen (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'basket_impact', label: 'Impact panier (+€)', sortable: true, render: (v: number) => v.toFixed(2) },
+              { key: 'margin_percent', label: 'Marge %', sortable: true, render: (v: number) => {
+                const color = v >= 70 ? 'text-green-600' : v >= 50 ? 'text-amber-600' : 'text-red-600';
+                return <span className={`${color} font-medium`}>{v.toFixed(1)}%</span>;
+              }},
             ]}
             data={analyticsData.options.options}
             sortBy="count"
@@ -450,128 +658,117 @@ export const DashboardAnalysis = () => {
         <ExportButton
           filename="Options"
           onExport={() => analyticsService.exportOptionsCSV(
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0],
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
             optionTypes
           )}
         />
       </div>
     </div>
-  );
+    );
+  };
 
   // ==================== ONGLET TAGS ====================
-  const renderTagsTab = () => (
-    <div className="space-y-6">
-      <Card className="bg-card border border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <label className="text-xs font-medium text-muted-foreground mb-3 block">Tags</label>
-            <div className="grid grid-cols-2 gap-3">
-              {['Végétarien', 'Vegan', 'Sans gluten', 'Signature', 'Nouveauté', 'Bio', 'Local'].map((tag) => (
-                <label key={tag} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedTags.includes(tag)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedTags([...selectedTags, tag]);
-                      } else {
-                        setSelectedTags(selectedTags.filter((t) => t !== tag));
-                      }
-                    }}
-                    className="rounded"
-                  />
-                  {tag}
-                </label>
-              ))}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+  const renderTagsTab = () => {
+    // Calcul des totaux pour les pourcentages
+    const totalQuantity = analyticsData.tags.by_tag.reduce((sum, tag) => sum + tag.quantity, 0);
+    const totalRevenue = analyticsData.tags.by_tag.reduce((sum, tag) => sum + tag.revenue, 0);
+    const totalWithTags = totalQuantity;
+    const totalWithoutTags = Math.round(totalWithTags * 0.3); // 30% estimation for tagged vs untagged
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard label="Produits avec tags" value={analyticsData.tags.metrics.tagged_products} />
-        <MetricCard
-          label="CA total tagué"
-          value={analyticsData.tags.metrics.tagged_revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-        <MetricCard label="Tendance globale" value="" change={analyticsData.tags.metrics.evolution_percent} />
-      </div>
+    return (
+      <div className="space-y-6">
 
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Répartition CA par tag</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={analyticsData.tags.by_tag}
-                dataKey="revenue"
-                nameKey="tag"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label
-              >
-                {analyticsData.tags.by_tag.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card className="bg-card border border-border">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Part de quantité par tag</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={analyticsData.tags.by_tag}
+                    dataKey="quantity"
+                    nameKey="tag"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label
+                  >
+                    {analyticsData.tags.by_tag.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
 
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Évolution dans le temps</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={analyticsData.tags.timeline}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Legend />
-              {selectedTags.map((tag, idx) => (
-                <Line
-                  key={tag}
-                  type="monotone"
-                  dataKey={tag}
-                  stroke={COLORS[idx % COLORS.length]}
-                  name={tag}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+          <Card className="bg-card border border-border">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Quantité: avec tags vs sans tags</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Avec tags', value: totalWithTags },
+                      { name: 'Sans tags', value: totalWithoutTags },
+                    ]}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={100}
+                    label
+                  >
+                    <Cell fill="#3b82f6" />
+                    <Cell fill="#d1d5db" />
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
 
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Détails par tag</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={[
-              { key: 'tag', label: 'Tag', sortable: true },
-              { key: 'product_count', label: 'Nombre de produits', sortable: true },
-              { key: 'quantity', label: 'Quantité vendue', sortable: true },
-              { key: 'revenue', label: 'CA total (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'avg_basket', label: 'Panier moyen (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'revenue_percent', label: '% du CA', sortable: true, render: (v: number) => v.toFixed(1) + '%' },
-              { key: 'evolution_percent', label: 'Évolution %', sortable: true, render: (v: number) => <EvolutionBadge percent={v} /> },
-            ]}
-            data={analyticsData.tags.by_tag}
-            sortBy="revenue"
-          />
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Détails par tag</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <DataTable
+              columns={[
+                { key: 'tag', label: 'Tag', sortable: true },
+                { key: 'product_count', label: 'Nombre de produits', sortable: true },
+                {
+                  key: 'quantity',
+                  label: 'Quantité vendue',
+                  sortable: true,
+                  render: (v: number, row: any) => {
+                    const pct = ((v / totalQuantity) * 100).toFixed(1);
+                    return `${v} (${pct}%)`;
+                  },
+                },
+                {
+                  key: 'revenue',
+                  label: 'CA total (€)',
+                  sortable: true,
+                  render: (v: number, row: any) => {
+                    const pct = ((v / totalRevenue) * 100).toFixed(1);
+                    return `${v.toFixed(2)} (${pct}%)`;
+                  },
+                },
+                { key: 'avg_basket', label: 'Panier moyen (€)', sortable: true, render: (v: number) => v.toFixed(2) },
+              ]}
+              data={analyticsData.tags.by_tag}
+              sortBy="quantity"
+            />
         </CardContent>
       </Card>
 
@@ -579,14 +776,15 @@ export const DashboardAnalysis = () => {
         <ExportButton
           filename="Tags"
           onExport={() => analyticsService.exportTagsCSV(
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0],
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
             selectedTags
           )}
         />
       </div>
     </div>
-  );
+    );
+  };
 
   // ==================== ONGLET ANNULATIONS ====================
   const renderCancellationsTab = () => (
@@ -716,8 +914,8 @@ export const DashboardAnalysis = () => {
         <ExportButton
           filename="Annulations"
           onExport={() => analyticsService.exportCancellationsCSV(
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0],
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
             cancellationReasons
           )}
         />
@@ -849,8 +1047,8 @@ export const DashboardAnalysis = () => {
         <ExportButton
           filename="Remises"
           onExport={() => analyticsService.exportDiscountsCSV(
-            startDate.toISOString().split('T')[0],
-            endDate.toISOString().split('T')[0],
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
             discountTypes
           )}
         />
@@ -870,13 +1068,156 @@ export const DashboardAnalysis = () => {
     </div>
   );
 
-  // ==================== ONGLET TVA ====================
-  const renderTVATab = () => (
+  // ==================== ONGLET RÈGLEMENTS ====================
+  const renderPaymentsTab = () => (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard label="TVA Total" value={analyticsData.vat.total_vat.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} />
-        <MetricCard label="TVA 10%" value={analyticsData.vat.by_rate[0].vat_amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} />
-        <MetricCard label="TVA 5.5%" value={analyticsData.vat.by_rate[1].vat_amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} />
+      {/* Filtres */}
+      <Card className="bg-card border border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Méthodes de paiement */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-2 block">Méthodes de paiement</label>
+              <MultiFilter
+                options={[
+                  { id: 'card', label: 'Carte bancaire' },
+                  { id: 'cash', label: 'Espèces' },
+                  { id: 'mobile', label: 'Paiement mobile' },
+                ]}
+                selectedIds={paymentMethods}
+                onChange={setPaymentMethods}
+              />
+            </div>
+
+            {/* Canal */}
+            <div>
+              <label className="text-xs font-medium text-muted-foreground mb-2 block">Canal</label>
+              <select
+                value={paymentChannel}
+                onChange={(e) => setPaymentChannel(e.target.value)}
+                className="w-full px-3 py-2 rounded border border-input bg-background text-foreground text-sm"
+              >
+                <option value="all">Tous les canaux</option>
+                <option value="dine_in">Sur place</option>
+                <option value="takeaway">À emporter</option>
+                <option value="delivery">Livraison</option>
+              </select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Metric Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <MetricCard
+          label="Montant total"
+          value={analyticsData.payments.metrics.total_amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+        />
+        <MetricCard
+          label="Carte bancaire"
+          value={analyticsData.payments.metrics.card_amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+        />
+        <MetricCard
+          label="Espèces"
+          value={analyticsData.payments.metrics.cash_amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+        />
+        <MetricCard
+          label="Paiement mobile"
+          value={analyticsData.payments.metrics.mobile_amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+        />
+      </div>
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Stacked Area Chart */}
+        <Card className="bg-card border border-border lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Évolution des règlements</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <AreaChart data={analyticsData.payments.timeline}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                <Legend />
+                <Area type="monotone" dataKey="card" stackId="1" stroke="#3b82f6" fill="#3b82f6" name="Carte bancaire" />
+                <Area type="monotone" dataKey="cash" stackId="1" stroke="#10b981" fill="#10b981" name="Espèces" />
+                <Area type="monotone" dataKey="mobile" stackId="1" stroke="#f59e0b" fill="#f59e0b" name="Paiement mobile" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        {/* Donut Chart */}
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Répartition des paiements</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={analyticsData.payments.by_method}
+                  dataKey="amount"
+                  nameKey="method"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  label
+                >
+                  <Cell fill="#3b82f6" />
+                  <Cell fill="#10b981" />
+                  <Cell fill="#f59e0b" />
+                </Pie>
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                  formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Detail Table */}
+      <Card className="bg-card border border-border">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold">Détail des règlements</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <DataTable
+            columns={[
+              { key: 'date', label: 'Date & Heure', sortable: true },
+              { key: 'method', label: 'Méthode', sortable: true },
+              { key: 'channel', label: 'Canal', sortable: true },
+              { key: 'amount', label: 'Montant', sortable: true, render: (val) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) },
+              { key: 'status', label: 'Statut', sortable: true },
+              { key: 'reference', label: 'Référence', sortable: false },
+            ]}
+            data={analyticsData.payments.detail}
+            sortBy="date"
+          />
+        </CardContent>
+      </Card>
+
+      {/* Export */}
+      <div className="flex justify-end">
+        <ExportButton
+          filename="Règlements"
+          onExport={() => analyticsService.exportPaymentsCSV(
+            dateRange.from.toISOString().split('T')[0],
+            dateRange.to.toISOString().split('T')[0],
+            paymentMethods,
+            paymentChannel
+          )}
+        />
       </div>
     </div>
   );
@@ -917,8 +1258,8 @@ export const DashboardAnalysis = () => {
         return renderDiscountsTab();
       case 'clients':
         return renderClientsTab();
-      case 'tva':
-        return renderTVATab();
+      case 'paiements':
+        return renderPaymentsTab();
       case 'restaurants':
         return renderRestaurantsTab();
       default:
@@ -935,7 +1276,7 @@ export const DashboardAnalysis = () => {
     { id: 'annulations', label: 'Annulations' },
     { id: 'remises', label: 'Remises' },
     { id: 'clients', label: 'Clients' },
-    { id: 'tva', label: 'TVA' },
+    { id: 'paiements', label: 'Règlements' },
     { id: 'restaurants', label: 'Restaurants' },
   ];
 
@@ -953,25 +1294,8 @@ export const DashboardAnalysis = () => {
             <CardTitle className="text-sm font-semibold">Période</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">Début</label>
-                <input
-                  type="date"
-                  value={startDate.toISOString().split('T')[0]}
-                  onChange={(e) => setStartDate(new Date(e.target.value))}
-                  className="w-full px-3 py-2 rounded border border-input bg-background text-foreground"
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">Fin</label>
-                <input
-                  type="date"
-                  value={endDate.toISOString().split('T')[0]}
-                  onChange={(e) => setEndDate(new Date(e.target.value))}
-                  className="w-full px-3 py-2 rounded border border-input bg-background text-foreground"
-                />
-              </div>
+            <div className="w-full max-w-sm">
+              <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
             </div>
           </CardContent>
         </Card>
