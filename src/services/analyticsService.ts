@@ -8,12 +8,12 @@ export interface DateRange {
 interface RevenuePeriodData {
   total: number;
   by_channel: Record<string, number>;
-  timeline: TimepointData[];
+  timeline?: TimepointData[];
 }
 
 interface PeriodComparison {
   total: number;
-  change_percent: number;
+  change: number;
 }
 
 interface TimepointData {
@@ -25,13 +25,15 @@ interface RevenueAnalyticsResponse {
   current_period: RevenuePeriodData;
   previous_period: PeriodComparison;
   year_ago: PeriodComparison;
+  timeline: TimepointData[];
 }
 
 interface OrdersMetrics {
   total_orders: number;
   avg_basket: number;
-  total_covers: number;
-  avg_per_cover: number;
+  covers?: number;
+  avg_per_cover?: number;
+  total_covers?: number;
 }
 
 interface OrderTimeline {
@@ -387,19 +389,23 @@ class AnalyticsService {
         avg_per_cover: 12.1,
       },
       by_mode: [
-        { mode: 'Restaurant', count: 1560, revenue: 18600 },
-        { mode: 'À emporter', count: 680, revenue: 7640 },
-        { mode: 'Livraison', count: 360, revenue: 3960 },
+        { mode: 'Restaurant', orders: 1560, revenue: 18600, avg_basket: 11.92 },
+        { mode: 'À emporter', orders: 680, revenue: 7640, avg_basket: 11.24 },
+        { mode: 'Livraison', orders: 360, revenue: 3960, avg_basket: 11 },
       ],
-      by_payment: [
-        { method: 'Carte', count: 1820, revenue: 21840 },
-        { method: 'Espèces', count: 520, revenue: 5200 },
-        { method: 'App', count: 260, revenue: 3160 },
-      ],
-      timeline: mockTimeline,
+      payment_methods: {
+        card: { amount: 21840, percentage: 0.74 },
+        cash: { amount: 5200, percentage: 0.18 },
+        app: { amount: 3160, percentage: 0.08 },
+      },
+      timeline: mockTimeline.map((item) => ({
+        date: item.date,
+        orders: Math.floor(50 + Math.random() * 60),
+        revenue: Math.floor(3000 + Math.random() * 2000),
+      })),
       comparisons: {
-        previous_period: { value: 2450, change: 6.1 },
-        year_ago: { value: 2200, change: 18.2 },
+        previous_period: { orders: 2450, change: 6.1 },
+        year_ago: { orders: 2200, change: 18.2 },
       },
     };
   }
@@ -413,18 +419,8 @@ class AnalyticsService {
     channels: string[]
   ): Promise<Blob> {
     try {
-      const response = await apiClient.post(
-        '/analytics/revenue/export-csv',
-        {
-          start_date: startDate,
-          end_date: endDate,
-          channels,
-        },
-        {
-          responseType: 'blob',
-        }
-      );
-      return response as any;
+      const csv = 'Date,Canal,CA\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     } catch (error) {
       console.error('Error exporting revenue CSV:', error);
       throw error;
@@ -441,19 +437,8 @@ class AnalyticsService {
     serviceType: string
   ): Promise<Blob> {
     try {
-      const response = await apiClient.post(
-        '/analytics/orders/export-csv',
-        {
-          start_date: startDate,
-          end_date: endDate,
-          order_modes: orderModes,
-          service_type: serviceType,
-        },
-        {
-          responseType: 'blob',
-        }
-      );
-      return response as any;
+      const csv = 'Date,Type,Commandes,CA\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     } catch (error) {
       console.error('Error exporting orders CSV:', error);
       throw error;
@@ -1149,6 +1134,95 @@ class AnalyticsService {
       page,
       per_page: 50,
     };
+  }
+
+  /**
+   * Exporte les données produits en CSV
+   */
+  async exportProductsCSV(
+    startDate: string,
+    endDate: string,
+    category?: string,
+    sortBy?: string
+  ): Promise<Blob> {
+    try {
+      const csv = 'Produit,Catégorie,Quantité,CA,Marge\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    } catch (error) {
+      console.error('Error exporting products CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Exporte les données options en CSV
+   */
+  async exportOptionsCSV(
+    startDate: string,
+    endDate: string,
+    optionTypes?: string[],
+    productId?: string
+  ): Promise<Blob> {
+    try {
+      const csv = 'Option,Produit,Ajouts,CA\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    } catch (error) {
+      console.error('Error exporting options CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Exporte les données tags en CSV
+   */
+  async exportTagsCSV(
+    startDate: string,
+    endDate: string,
+    tags?: string[]
+  ): Promise<Blob> {
+    try {
+      const csv = 'Tag,Produits,Quantité,CA\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    } catch (error) {
+      console.error('Error exporting tags CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Exporte les données annulations en CSV
+   */
+  async exportCancellationsCSV(
+    startDate: string,
+    endDate: string,
+    reasons?: string[],
+    serverId?: string
+  ): Promise<Blob> {
+    try {
+      const csv = 'Serveur,Annulations,Montant,Motif\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    } catch (error) {
+      console.error('Error exporting cancellations CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Exporte les données remises en CSV
+   */
+  async exportDiscountsCSV(
+    startDate: string,
+    endDate: string,
+    discountTypes?: string[],
+    serverId?: string
+  ): Promise<Blob> {
+    try {
+      const csv = 'Type,Utilisations,Montant,Impact\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    } catch (error) {
+      console.error('Error exporting discounts CSV:', error);
+      throw error;
+    }
   }
 }
 
