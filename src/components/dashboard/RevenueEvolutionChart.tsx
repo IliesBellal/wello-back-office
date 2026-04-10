@@ -2,19 +2,35 @@ import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  AreaChart,
-  Area,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  Legend,
 } from 'recharts';
+import { ChannelToggleButtons, channelColors } from './ChannelToggleButtons';
+import type { HourlyChannelData } from '@/services/dashboardService';
 
-interface RevenueDataPoint {
-  hour: string;
-  revenue: number;
+type ChannelType = 'all' | 'sur_place' | 'emporter' | 'uber_eats' | 'deliveroo';
+
+interface ChartDataPoint extends HourlyChannelData {
+  sur_place: number;
+  emporter: number;
+  livraison: number;
+  uber_eats: number;
+  deliveroo: number;
 }
+
+const channelLabels: Record<string, string> = {
+  sur_place: 'Sur place',
+  emporter: 'À emporter',
+  livraison: 'Livraison',
+  uber_eats: 'Uber Eats',
+  deliveroo: 'Deliveroo',
+};
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('fr-FR', {
@@ -25,15 +41,28 @@ const formatCurrency = (value: number) => {
   }).format(value / 100);
 };
 
-const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: RevenueDataPoint }> }) => {
+const CustomTooltip = ({
+  active,
+  payload,
+  selectedChannels,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload: ChartDataPoint; name: string; value: number; stroke?: string }>;
+  selectedChannels: ChannelType[];
+}) => {
   if (active && payload && payload.length > 0) {
     const data = payload[0].payload;
     return (
-      <div className="bg-background border border-border rounded-lg shadow-lg p-3">
+      <div className="bg-white border border-border rounded-lg shadow-lg p-3 space-y-1">
         <p className="text-sm font-semibold text-foreground">{data.hour}</p>
-        <p className="text-sm text-muted-foreground">
-          CA: <span className="font-semibold text-foreground">{formatCurrency(data.revenue)}</span>
-        </p>
+        {payload.map((entry) => (
+          <p key={entry.name} className="text-xs" style={{ color: entry.stroke }}>
+            {entry.name}:{' '}
+            <span className="font-semibold">
+              {formatCurrency(entry.value)}
+            </span>
+          </p>
+        ))}
       </div>
     );
   }
@@ -41,33 +70,36 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
 };
 
 export const RevenueEvolutionChart = () => {
-  const [data, setData] = useState<RevenueDataPoint[] | null>(null);
+  const [data, setData] = useState<ChartDataPoint[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedChannels, setSelectedChannels] = useState<ChannelType[]>([
+    'all',
+    'sur_place',
+    'emporter',
+    'uber_eats',
+    'deliveroo',
+  ]);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Mock data for now - replace with actual API call
-        // const response = await fetch('/api/dashboard/revenue-evolution');
-        // const data = await response.json();
-        
-        // Mock data showing revenue evolution throughout the day
-        const mockData: RevenueDataPoint[] = [
-          { hour: '10h', revenue: 125000 },
-          { hour: '11h', revenue: 245000 },
-          { hour: '12h', revenue: 580000 },
-          { hour: '13h', revenue: 720000 },
-          { hour: '14h', revenue: 745000 },
-          { hour: '15h', revenue: 812000 },
-          { hour: '16h', revenue: 945000 },
-          { hour: '17h', revenue: 1050000 },
-          { hour: '18h', revenue: 1280000 },
-          { hour: '19h', revenue: 1650000 },
-          { hour: '20h', revenue: 1920000 },
-          { hour: '21h', revenue: 2100000 },
+        // Mock data
+        const mockData: ChartDataPoint[] = [
+          { hour: '10:00', sur_place: 0, emporter: 120, livraison: 80, uber_eats: 60, deliveroo: 40, total: 300 },
+          { hour: '11:00', sur_place: 180, emporter: 210, livraison: 130, uber_eats: 90, deliveroo: 50, total: 660 },
+          { hour: '12:00', sur_place: 980, emporter: 560, livraison: 310, uber_eats: 280, deliveroo: 180, total: 2310 },
+          { hour: '13:00', sur_place: 1420, emporter: 720, livraison: 390, uber_eats: 340, deliveroo: 210, total: 3080 },
+          { hour: '14:00', sur_place: 640, emporter: 380, livraison: 210, uber_eats: 190, deliveroo: 120, total: 1540 },
+          { hour: '15:00', sur_place: 120, emporter: 150, livraison: 90, uber_eats: 80, deliveroo: 40, total: 480 },
+          { hour: '16:00', sur_place: 80, emporter: 110, livraison: 60, uber_eats: 50, deliveroo: 30, total: 330 },
+          { hour: '17:00', sur_place: 60, emporter: 90, livraison: 40, uber_eats: 40, deliveroo: 20, total: 250 },
+          { hour: '18:00', sur_place: 280, emporter: 200, livraison: 120, uber_eats: 110, deliveroo: 70, total: 780 },
+          { hour: '19:00', sur_place: 820, emporter: 410, livraison: 280, uber_eats: 240, deliveroo: 140, total: 1890 },
+          { hour: '20:00', sur_place: 1180, emporter: 530, livraison: 350, uber_eats: 310, deliveroo: 170, total: 2540 },
+          { hour: '21:00', sur_place: 850, emporter: 320, livraison: 210, uber_eats: 180, deliveroo: 110, total: 1670 },
         ];
 
         setData(mockData);
@@ -82,27 +114,21 @@ export const RevenueEvolutionChart = () => {
     loadData();
   }, []);
 
-  const maxRevenue = useMemo(
-    () => data ? Math.max(...data.map(d => d.revenue)) : 0,
-    [data]
-  );
-
-  const chartData = useMemo(
-    () => data?.map(d => ({
-      ...d,
-      displayRevenue: d.revenue / 100, // Convert cents to euros for Y-axis
-    })),
-    [data]
-  );
+  const visibleChannels = useMemo(() => {
+    if (selectedChannels.length === 0 || !selectedChannels.includes('all')) {
+      return selectedChannels.filter(c => c !== 'all') as Exclude<ChannelType, 'all'>[];
+    }
+    return ['sur_place', 'emporter', 'uber_eats', 'deliveroo'] as const;
+  }, [selectedChannels]);
 
   if (error) {
     return (
-      <Card className="shadow-card">
+      <Card>
         <CardHeader>
           <CardTitle>Évolution du chiffre d'affaires</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+          <div className="flex items-center justify-center h-[360px] text-muted-foreground">
             <p>{error}</p>
           </div>
         </CardContent>
@@ -111,29 +137,55 @@ export const RevenueEvolutionChart = () => {
   }
 
   return (
-    <Card className="shadow-card">
-      <CardHeader>
-        <CardTitle>Évolution du chiffre d'affaires</CardTitle>
-        <p className="text-sm text-muted-foreground mt-1">Au cours de la journée</p>
+    <Card className="shadow-sm">
+      <CardHeader className="pb-6">
+        <div className="flex items-start justify-between gap-6">
+          <div className="space-y-1">
+            <CardTitle className="text-lg">Évolution du chiffre d'affaires</CardTitle>
+            <p className="text-sm text-muted-foreground">Au cours de la journée</p>
+          </div>
+          <ChannelToggleButtons selectedChannels={selectedChannels} onChange={setSelectedChannels} />
+        </div>
       </CardHeader>
       <CardContent>
         {loading ? (
-          <Skeleton className="h-[300px] rounded-lg" />
-        ) : chartData && chartData.length > 0 ? (
-          <div className="h-[300px]">
+          <Skeleton className="h-[360px] rounded-lg" />
+        ) : data && data.length > 0 ? (
+          <div className="h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+              <LineChart
+                data={data}
+                margin={{ top: 5, right: 30, left: 0, bottom: 0 }}
               >
                 <defs>
-                  <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
+                  {visibleChannels.map((channel) => (
+                    <linearGradient
+                      key={`gradient-${channel}`}
+                      id={`gradient-${channel}`}
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor={channelColors[channel]}
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor={channelColors[channel]}
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  ))}
                 </defs>
 
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="hsl(var(--border))"
+                  vertical={false}
+                />
 
                 <XAxis
                   dataKey="hour"
@@ -149,25 +201,68 @@ export const RevenueEvolutionChart = () => {
                   tickFormatter={(value) =>
                     value >= 1000 ? `${(value / 1000).toFixed(1)}k€` : `${value}€`
                   }
-                  domain={[0, Math.ceil(maxRevenue / 100 / 500) * 500]}
                 />
 
-                <Tooltip content={<CustomTooltip />} />
-
-                <Area
-                  type="monotone"
-                  dataKey="displayRevenue"
-                  stroke="#3b82f6"
-                  strokeWidth={2.5}
-                  fill="url(#colorRevenue)"
-                  dot={false}
-                  isAnimationActive
+                <Tooltip
+                  content={
+                    <CustomTooltip selectedChannels={selectedChannels} />
+                  }
                 />
-              </AreaChart>
+
+                {visibleChannels.length > 1 && <Legend />}
+
+                {visibleChannels.includes('sur_place') && (
+                  <Line
+                    type="monotone"
+                    dataKey="sur_place"
+                    stroke={channelColors.sur_place}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive
+                    name={channelLabels.sur_place}
+                  />
+                )}
+
+                {visibleChannels.includes('emporter') && (
+                  <Line
+                    type="monotone"
+                    dataKey="emporter"
+                    stroke={channelColors.emporter}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive
+                    name={channelLabels.emporter}
+                  />
+                )}
+
+                {visibleChannels.includes('uber_eats') && (
+                  <Line
+                    type="monotone"
+                    dataKey="uber_eats"
+                    stroke={channelColors.uber_eats}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive
+                    name={channelLabels.uber_eats}
+                  />
+                )}
+
+                {visibleChannels.includes('deliveroo') && (
+                  <Line
+                    type="monotone"
+                    dataKey="deliveroo"
+                    stroke={channelColors.deliveroo}
+                    strokeWidth={2}
+                    dot={false}
+                    isAnimationActive
+                    name={channelLabels.deliveroo}
+                  />
+                )}
+              </LineChart>
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+          <div className="flex items-center justify-center h-[360px] text-muted-foreground">
             <p>Aucune donnée disponible</p>
           </div>
         )}

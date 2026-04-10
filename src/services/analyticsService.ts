@@ -782,6 +782,10 @@ class AnalyticsService {
       return {
         date: date.toISOString().split('T')[0],
         rate: 2.5 + (Math.random() - 0.5) * 2,
+        sur_place: 2.1 + (Math.random() - 0.5) * 1.5,
+        emporter: 3.2 + (Math.random() - 0.5) * 2,
+        uber_eats: 2.8 + (Math.random() - 0.5) * 1.8,
+        deliveroo: 3.5 + (Math.random() - 0.5) * 2.2,
       };
     });
 

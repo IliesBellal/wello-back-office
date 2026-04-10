@@ -10,13 +10,24 @@ export interface KPIComparison {
   same_day_last_year: number;   // Même jour l'année passée
 }
 
+/** Données de période (semaine, mois) avec comparaisons */
+export interface PeriodComparison {
+  current: number;              // Semaine actuelle ou mois actuel
+  previous_period: number;      // Semaine ou mois précédent
+  same_period_last_year: number; // Même semaine/mois l'année passée
+}
+
 /** KPIs principaux du dashboard */
 export interface DashboardKPIs {
   /** Chiffre d'affaires */
   revenue: KPIComparison & {
     currency: string;
     target_day: number;         // Objectif CA journalier
+    target_week: number;        // Objectif CA hebdomadaire
+    target_month: number;       // Objectif CA mensuel
     in_progress_amount: number; // Montant des commandes en cours de préparation
+    week: PeriodComparison;     // Données de la semaine
+    month: PeriodComparison;    // Données du mois
   };
   /** Ticket moyen = CA / nombre de tickets (encaissements) */
   avg_ticket: KPIComparison & { currency: string };
@@ -121,7 +132,19 @@ const mockKPIs: DashboardKPIs = {
     same_day_last_year: 9_870,
     currency: 'EUR',
     target_day: 15_000,
+    target_week: 98_000,
+    target_month: 420_000,
     in_progress_amount: 640,
+    week: {
+      current: 87_500,
+      previous_period: 82_200,
+      same_period_last_year: 79_800,
+    },
+    month: {
+      current: 385_200,
+      previous_period: 371_600,
+      same_period_last_year: 356_900,
+    },
   },
   avg_ticket: {
     today: 28.40,

@@ -4,7 +4,7 @@
  * 10-tab analytics dashboard with all tabs implemented
  */
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,11 @@ import {
 } from 'recharts';
 import { analyticsService } from '@/services/analyticsService';
 import { subDays, format } from 'date-fns';
-import { TrendingUp, TrendingDown, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, Download, ChevronRight } from 'lucide-react';
 import { ExportButton } from '@/components/analytics';
 import { MultiFilter } from '@/components/shared/MultiFilter';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
+import { ChannelToggleButtons } from '@/components/dashboard/ChannelToggleButtons';
 import { toast } from 'sonner';
 
 type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'tags' | 'annulations' | 'remises' | 'clients' | 'paiements' | 'restaurants';
@@ -64,9 +65,22 @@ const MetricCard = ({ label, value, change }: { label: string; value: string | n
   </Card>
 );
 
-const DataTable = ({ columns, data, sortBy }: { columns: Array<{ key: string; label: string; sortable?: boolean; render?: (val: any, row: any) => React.ReactNode }>; data: any[]; sortBy: string }) => {
+const DataTable = ({ 
+  columns, 
+  data, 
+  sortBy,
+  renderExpandedRow,
+  expandableRowKey,
+}: { 
+  columns: Array<{ key: string; label: string; sortable?: boolean; render?: (val: any, row: any) => React.ReactNode }>;
+  data: any[];
+  sortBy: string;
+  renderExpandedRow?: (row: any) => React.ReactNode;
+  expandableRowKey?: string;
+}) => {
   const [sortColumn, setSortColumn] = useState(sortBy);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -75,6 +89,16 @@ const DataTable = ({ columns, data, sortBy }: { columns: Array<{ key: string; la
       setSortColumn(column);
       setSortDirection('desc');
     }
+  };
+
+  const toggleRowExpand = (rowId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(rowId)) {
+      newExpanded.delete(rowId);
+    } else {
+      newExpanded.add(rowId);
+    }
+    setExpandedRows(newExpanded);
   };
 
   const sortedData = [...data].sort((a, b) => {
@@ -89,6 +113,7 @@ const DataTable = ({ columns, data, sortBy }: { columns: Array<{ key: string; la
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border">
+            {renderExpandedRow && <th className="w-10 px-2 py-3" />}
             {columns.map((col: any) => (
               <th
                 key={col.key}
@@ -106,15 +131,46 @@ const DataTable = ({ columns, data, sortBy }: { columns: Array<{ key: string; la
           </tr>
         </thead>
         <tbody>
-          {sortedData.slice(0, 10).map((row: Record<string, any>, idx: number) => (
-            <tr key={idx} className="border-b border-border hover:bg-muted/50">
-              {columns.map((col: any) => (
-                <td key={col.key} className="px-4 py-3">
-                  {col.render ? col.render(row[col.key], row) : row[col.key]}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {sortedData.slice(0, 10).map((row: Record<string, any>, idx: number) => {
+            const rowId = expandableRowKey ? row[expandableRowKey] : String(idx);
+            const isExpanded = expandedRows.has(rowId);
+            
+            return (
+              <React.Fragment key={rowId}>
+                <tr className="border-b border-border hover:bg-muted/50">
+                  {renderExpandedRow && (
+                    <td className="w-10 px-2 py-3">
+                      <button
+                        onClick={() => toggleRowExpand(rowId)}
+                        className="inline-flex items-center justify-center w-6 h-6 hover:bg-muted rounded transition-colors"
+                      >
+                        <svg
+                          className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </td>
+                  )}
+                  {columns.map((col: any) => (
+                    <td key={col.key} className="px-4 py-3">
+                      {col.render ? col.render(row[col.key], row) : row[col.key]}
+                    </td>
+                  ))}
+                </tr>
+                {isExpanded && renderExpandedRow && (
+                  <tr className="bg-muted/30 border-b border-border">
+                    <td colSpan={columns.length + 1} className="px-4 py-4">
+                      {renderExpandedRow(row)}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            );
+          })}
         </tbody>
       </table>
     </div>
@@ -134,6 +190,7 @@ export const DashboardAnalysis = () => {
   const [optionTypes, setOptionTypes] = useState<string[]>(['paid', 'free', 'removed']);
   const [selectedTags, setSelectedTags] = useState<string[]>(['Végétarien', 'Vegan', 'Sans gluten']);
   const [cancellationReasons, setCancellationReasons] = useState<string[]>(['ordering_error', 'customer_wait', 'kitchen_issue', 'payment_issue']);
+  const [cancellationChannels, setCancellationChannels] = useState<('all' | 'sur_place' | 'emporter' | 'uber_eats' | 'deliveroo')[]>(['sur_place', 'emporter', 'uber_eats', 'deliveroo']);
   const [discountTypes, setDiscountTypes] = useState<string[]>(['promotion', 'happy_hour', 'gesture', 'loyalty', 'promo_code']);
   const [paymentMethods, setPaymentMethods] = useState<string[]>(['card', 'cash', 'mobile']);
   const [paymentChannel, setPaymentChannel] = useState<string>('all');
@@ -793,34 +850,20 @@ export const DashboardAnalysis = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-3 block">Motif d'annulation</label>
-            <div className="space-y-2">
-              {[
-                { value: 'ordering_error', label: 'Erreur de commande' },
-                { value: 'customer_wait', label: 'Client n\'a pas attendu' },
-                { value: 'kitchen_issue', label: 'Problème cuisine' },
-                { value: 'payment_issue', label: 'Problème paiement' },
-                { value: 'other', label: 'Autre' },
-              ].map((reason) => (
-                <label key={reason.value} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={cancellationReasons.includes(reason.value)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setCancellationReasons([...cancellationReasons, reason.value]);
-                      } else {
-                        setCancellationReasons(cancellationReasons.filter((r) => r !== reason.value));
-                      }
-                    }}
-                    className="rounded"
-                  />
-                  {reason.label}
-                </label>
-              ))}
-            </div>
+            <MultiFilter
+              options={[
+                { id: 'ordering_error', label: 'Erreur de commande' },
+                { id: 'customer_wait', label: 'Client n\'a pas attendu' },
+                { id: 'kitchen_issue', label: 'Problème cuisine' },
+                { id: 'payment_issue', label: 'Problème paiement' },
+                { id: 'other', label: 'Autre' },
+              ]}
+              selectedIds={cancellationReasons}
+              onChange={setCancellationReasons}
+              label="Motif d'annulation"
+            />
           </div>
         </CardContent>
       </Card>
@@ -845,50 +888,69 @@ export const DashboardAnalysis = () => {
         />
       </div>
 
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Répartition par motif</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={analyticsData.cancellations.by_reason}
-                dataKey="count"
-                nameKey="reason"
-                cx="50%"
-                cy="50%"
-                outerRadius={100}
-                label
-              >
-                {analyticsData.cancellations.by_reason.map((_, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Legend />
-            </PieChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Répartition par motif</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={analyticsData.cancellations.by_reason}
+                  dataKey="count"
+                  nameKey="reason"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label
+                >
+                  {analyticsData.cancellations.by_reason.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
 
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Évolution du taux d'annulation</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={analyticsData.cancellations.timeline}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="date" stroke="#6b7280" />
-              <YAxis stroke="#6b7280" />
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Legend />
-              <Line type="monotone" dataKey="rate" stroke="#ef4444" name="Taux d'annulation %" />
-            </LineChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Évolution du taux d'annulation</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <ChannelToggleButtons
+                selectedChannels={cancellationChannels}
+                onChange={setCancellationChannels}
+              />
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={analyticsData.cancellations.timeline}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                <XAxis dataKey="date" stroke="#6b7280" />
+                <YAxis stroke="#6b7280" />
+                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                <Legend />
+                {cancellationChannels.includes('sur_place') && (
+                  <Line type="monotone" dataKey="sur_place" stroke={CHANNEL_COLORS['dine_in']} name="Sur place" strokeWidth={2} />
+                )}
+                {cancellationChannels.includes('emporter') && (
+                  <Line type="monotone" dataKey="emporter" stroke={CHANNEL_COLORS['takeaway']} name="À emporter" strokeWidth={2} />
+                )}
+                {cancellationChannels.includes('uber_eats') && (
+                  <Line type="monotone" dataKey="uber_eats" stroke={CHANNEL_COLORS['ubereats']} name="Uber Eats" strokeWidth={2} />
+                )}
+                {cancellationChannels.includes('deliveroo') && (
+                  <Line type="monotone" dataKey="deliveroo" stroke={CHANNEL_COLORS['deliveroo']} name="Deliveroo" strokeWidth={2} />
+                )}
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="bg-card border border-border">
         <CardHeader>
@@ -906,6 +968,42 @@ export const DashboardAnalysis = () => {
             ]}
             data={analyticsData.cancellations.by_server}
             sortBy="cancellations"
+            expandableRowKey="server_name"
+            renderExpandedRow={(server: any) => (
+              <div className="space-y-4">
+                <div className="text-sm font-semibold text-foreground">Commandes annulées - {server.server_name}</div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border/50">
+                        <th className="px-3 py-2 text-left">Date</th>
+                        <th className="px-3 py-2 text-left">Heure</th>
+                        <th className="px-3 py-2 text-left">Commande</th>
+                        <th className="px-3 py-2 text-left">Montant</th>
+                        <th className="px-3 py-2 text-left">Motif</th>
+                        <th className="px-3 py-2 text-left">Canal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {server.deleted_orders?.map((order: any, idx: number) => (
+                        <tr key={idx} className="border-b border-border/30 hover:bg-muted/50">
+                          <td className="px-3 py-2">{order.date}</td>
+                          <td className="px-3 py-2">{order.time}</td>
+                          <td className="px-3 py-2 font-mono text-muted-foreground">{order.order_id}</td>
+                          <td className="px-3 py-2 font-semibold">{order.amount.toFixed(2)}€</td>
+                          <td className="px-3 py-2">
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
+                              {order.reason}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2">{order.channel}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           />
         </CardContent>
       </Card>

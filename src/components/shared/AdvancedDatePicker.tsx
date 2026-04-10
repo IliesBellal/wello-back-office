@@ -25,8 +25,8 @@ interface Preset {
 
 export function AdvancedDatePicker({ value, onChange, disabled = false }: AdvancedDatePickerProps) {
   const [open, setOpen] = useState(false);
-  const [temp, setTemp] = useState<DateRange>(value);
-  const [selectionPhase, setSelectionPhase] = useState<'start' | 'end' | null>(null);
+  const [firstClick, setFirstClick] = useState<Date | null>(null);
+  const [tempRange, setTempRange] = useState<{ from: Date; to: Date } | null>(null);
 
   const presets: Preset[] = [
     {
@@ -39,7 +39,7 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
     {
       label: '7 derniers jours',
       value: () => ({
-        from: subDays(new Date(), 7),
+        from: subDays(new Date(), 6),
         to: new Date(),
       }),
     },
@@ -60,7 +60,7 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
     {
       label: '30 derniers jours',
       value: () => ({
-        from: subDays(new Date(), 30),
+        from: subDays(new Date(), 29),
         to: new Date(),
       }),
     },
@@ -68,55 +68,75 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
 
   const handlePreset = (preset: Preset) => {
     const range = preset.value();
-    setTemp(range);
+    setFirstClick(null);
+    setTempRange(null);
     onChange(range);
-    setSelectionPhase(null);
     setOpen(false);
   };
 
-  const handleDateRangeSelect = (range: { from?: Date; to?: Date } | undefined) => {
-    if (!range?.from) return;
+  const handleDateClick = (date: Date | undefined) => {
+    if (!date) return;
 
-    // Si range.to existe ET range.to !== range.from, on a une plage complète (2e clic)
-    if (range.to && range.to.getTime() !== range.from.getTime()) {
-      // On est en phase 2 ou à une plage complète
-      const firstClick = temp.from;
-      const secondClick = range.from;
-
-      // Assurer que from <= to
-      if (firstClick <= secondClick) {
-        setTemp({ from: firstClick, to: secondClick });
-      } else {
-        setTemp({ from: secondClick, to: firstClick });
-      }
-      setSelectionPhase('start');
-    } else {
-      // Phase 1: Premier clic ou calendrier réinitialisé
-      setTemp({
-        from: range.from,
-        to: range.from,
-      });
-      setSelectionPhase('end');
+    // Premier clic : on stocke la date
+    if (firstClick === null) {
+      setFirstClick(date);
+      setTempRange({ from: date, to: date });
+      return;
     }
+
+    // Deuxième clic : on crée la range
+    const start = firstClick < date ? firstClick : date;
+    const end = firstClick < date ? date : firstClick;
+
+    setTempRange({ from: start, to: end });
+    setFirstClick(null); // Reset pour prochain cycle
   };
 
   const handleApply = () => {
-    onChange(temp);
-    setSelectionPhase(null);
+    if (tempRange) {
+      onChange(tempRange);
+      setOpen(false);
+      setFirstClick(null);
+      setTempRange(null);
+    }
+  };
+
+  const handleCancel = () => {
+    setFirstClick(null);
+    setTempRange(null);
     setOpen(false);
   };
 
   const handleClear = () => {
     const today = new Date();
     const newRange = { from: today, to: today };
-    setTemp(newRange);
+    setFirstClick(null);
+    setTempRange(null);
     onChange(newRange);
-    setSelectionPhase(null);
     setOpen(false);
   };
 
+  const handleOpenChange = (newOpen: boolean) => {
+    setOpen(newOpen);
+    if (newOpen) {
+      // Reset au moment de l'ouverture
+      setFirstClick(null);
+      setTempRange(null);
+    }
+  };
+
+  // Détecte si un preset est actif
+  const isPresetActive = (preset: Preset) => {
+    if (!tempRange) return false;
+    const presetRange = preset.value();
+    return (
+      tempRange.from.toDateString() === presetRange.from.toDateString() &&
+      tempRange.to.toDateString() === presetRange.to.toDateString()
+    );
+  };
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild disabled={disabled}>
         <Button
           variant="outline"
@@ -143,8 +163,7 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
                 onClick={() => handlePreset(preset)}
                 className={cn(
                   'w-full text-left px-3 py-2 text-sm rounded-md transition-colors',
-                  temp.from.toDateString() === preset.value().from.toDateString() &&
-                  temp.to.toDateString() === preset.value().to.toDateString()
+                  isPresetActive(preset)
                     ? 'bg-primary text-primary-foreground font-medium'
                     : 'hover:bg-muted text-muted-foreground'
                 )}
@@ -161,24 +180,29 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
                 <label className="text-xs font-semibold text-muted-foreground">
                   Sélectionnez une période
                 </label>
-                {selectionPhase && (
+                {firstClick && (
                   <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded">
-                    {selectionPhase === 'start' ? 'Cliquez le début' : 'Cliquez la fin'}
+                    Cliquez la fin
                   </span>
                 )}
               </div>
               
               {/* Affichage de la plage sélectionnée */}
-              <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-                {format(temp.from, 'dd MMM yyyy', { locale: fr })}
-                {temp.to !== temp.from && ` → ${format(temp.to, 'dd MMM yyyy', { locale: fr })}`}
-              </div>
+              {tempRange && (
+                <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
+                  {format(tempRange.from, 'dd MMM yyyy', { locale: fr })}
+                  {tempRange.to.getTime() !== tempRange.from.getTime() && 
+                    ` → ${format(tempRange.to, 'dd MMM yyyy', { locale: fr })}`
+                  }
+                </div>
+              )}
 
               <Calendar
                 mode="range"
-                selected={{ from: temp.from, to: temp.to }}
-                onSelect={handleDateRangeSelect}
+                selected={tempRange ? { from: tempRange.from, to: tempRange.to } : undefined}
+                onDayClick={handleDateClick}
                 locale={fr}
+                numberOfMonths={1}
                 className="rounded-md border border-border"
               />
             </div>
@@ -194,9 +218,18 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
                 Réinitialiser
               </Button>
               <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCancel}
+                className="flex-1"
+              >
+                Annuler
+              </Button>
+              <Button
                 size="sm"
                 onClick={handleApply}
                 className="flex-1"
+                disabled={!tempRange || firstClick !== null}
               >
                 Appliquer
               </Button>

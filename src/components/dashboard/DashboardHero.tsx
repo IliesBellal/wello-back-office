@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
-import { HeroMetricCard } from './HeroMetricCard';
+import { RevenueCard } from './RevenueCard';
+import { MetricCard } from './MetricCard';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Euro, ShoppingCart, Receipt } from 'lucide-react';
+import { ShoppingCart, Banknote } from 'lucide-react';
 import type { DashboardSummary } from '@/services/dashboardService';
 
 interface DashboardHeroProps {
@@ -9,67 +10,88 @@ interface DashboardHeroProps {
   loading?: boolean;
 }
 
-const formatCurrency = (cents: number) => {
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(cents / 100);
-};
+const calculateTrend = (
+  current: number,
+  previous: number
+): { text: string; direction: 'up' | 'down' | 'neutral' } => {
+  if (previous === 0) {
+    return { text: 'N/A', direction: 'neutral' };
+  }
 
-const calculateTrend = (today: number, yesterday: number): { text: string; trend: 'up' | 'down' | 'neutral' } => {
-  if (yesterday === 0) {
-    return { text: 'N/A', trend: 'neutral' };
-  }
-  
-  const percentChange = ((today - yesterday) / yesterday) * 100;
+  const percentChange = ((current - previous) / previous) * 100;
   const rounded = Math.round(percentChange);
-  
+
   if (rounded > 0) {
-    return { text: `+${rounded}%`, trend: 'up' };
+    return { text: `+${rounded}%`, direction: 'up' };
   } else if (rounded < 0) {
-    return { text: `${rounded}%`, trend: 'down' };
+    return { text: `${rounded}%`, direction: 'down' };
   }
-  return { text: '0%', trend: 'neutral' };
+  return { text: '0%', direction: 'neutral' };
 };
 
 export const DashboardHero = ({ data, loading }: DashboardHeroProps) => {
   const metrics = useMemo(() => {
     if (!data) return null;
 
-    const revenueToday = data.kpis.revenue.today;
-    const revenueYesterday = data.kpis.revenue.yesterday;
-    const ordersToday = data.kpis.orders.today;
-    const ordersYesterday = data.kpis.orders.yesterday;
-    const avgBasketToday = data.kpis.avg_basket.today;
-    const avgBasketYesterday = data.kpis.avg_basket.yesterday;
+    const revenue = data.kpis.revenue;
+    const orders = data.kpis.orders;
+    const avgBasket = data.kpis.avg_basket;
 
     return {
       revenue: {
-        value: formatCurrency(revenueToday),
-        comparison: calculateTrend(revenueToday, revenueYesterday),
-        subtitle: `Hier: ${formatCurrency(revenueYesterday)}`,
+        day: {
+          value: revenue.today,
+          currency: revenue.currency,
+          comparison: calculateTrend(revenue.today, revenue.yesterday),
+        },
+        week: {
+          value: revenue.week.current,
+          currency: revenue.currency,
+          comparison: calculateTrend(revenue.week.current, revenue.week.previous_period),
+        },
+        month: {
+          value: revenue.month.current,
+          currency: revenue.currency,
+          comparison: calculateTrend(revenue.month.current, revenue.month.previous_period),
+        },
       },
-      orders: {
-        value: `${new Intl.NumberFormat('fr-FR').format(ordersToday)}`,
-        comparison: calculateTrend(ordersToday, ordersYesterday),
-        subtitle: `Hier: ${ordersYesterday} commandes`,
+      commandesJour: {
+        label: 'Commandes du jour',
+        value: orders.today,
+        icon: ShoppingCart,
+        comparison: calculateTrend(orders.today, orders.yesterday),
+        context: `vs hier : ${orders.yesterday} commandes`,
       },
-      avgBasket: {
-        value: formatCurrency(avgBasketToday),
-        comparison: calculateTrend(avgBasketToday, avgBasketYesterday),
-        subtitle: `Hier: ${formatCurrency(avgBasketYesterday)}`,
+      panierMoyen: {
+        label: 'Panier moyen',
+        value: revenue.currency === 'EUR' 
+          ? new Intl.NumberFormat('fr-FR', {
+              style: 'currency',
+              currency: revenue.currency,
+              minimumFractionDigits: 0,
+              maximumFractionDigits: 0,
+            }).format(avgBasket.today / 100)
+          : avgBasket.today,
+        icon: Banknote,
+        comparison: calculateTrend(avgBasket.today, avgBasket.yesterday),
+        context: `vs hier : ${new Intl.NumberFormat('fr-FR', {
+          style: 'currency',
+          currency: revenue.currency,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 0,
+        }).format(avgBasket.yesterday / 100)}`,
       },
     };
   }, [data]);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Skeleton key={i} className="h-[160px] rounded-lg" />
-        ))}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+        <div className="md:col-span-3">
+          <Skeleton className="h-[200px] rounded-lg" />
+        </div>
+        <Skeleton className="h-[200px] rounded-lg" />
+        <Skeleton className="h-[200px] rounded-lg" />
       </div>
     );
   }
@@ -83,32 +105,32 @@ export const DashboardHero = ({ data, loading }: DashboardHeroProps) => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-      {/* CA du jour */}
-      <HeroMetricCard
-        title="Chiffre d'affaires"
-        icon={Euro}
-        value={metrics.revenue.value}
-        comparison={metrics.revenue.comparison}
-        subtitle={metrics.revenue.subtitle}
+    <div className="grid grid-cols-1 md:grid-cols-5 gap-5">
+      {/* Revenue Card - 3 colonnes */}
+      <div className="md:col-span-3">
+        <RevenueCard
+          day={metrics.revenue.day}
+          week={metrics.revenue.week}
+          month={metrics.revenue.month}
+        />
+      </div>
+
+      {/* Commandes du jour - 1 colonne */}
+      <MetricCard
+        label={metrics.commandesJour.label}
+        value={metrics.commandesJour.value}
+        icon={metrics.commandesJour.icon}
+        comparison={metrics.commandesJour.comparison}
+        context={metrics.commandesJour.context}
       />
 
-      {/* Nombre de commandes */}
-      <HeroMetricCard
-        title="Commandes"
-        icon={ShoppingCart}
-        value={metrics.orders.value}
-        comparison={metrics.orders.comparison}
-        subtitle={metrics.orders.subtitle}
-      />
-
-      {/* Panier moyen */}
-      <HeroMetricCard
-        title="Panier moyen"
-        icon={Receipt}
-        value={metrics.avgBasket.value}
-        comparison={metrics.avgBasket.comparison}
-        subtitle={metrics.avgBasket.subtitle}
+      {/* Panier moyen - 1 colonne */}
+      <MetricCard
+        label={metrics.panierMoyen.label}
+        value={metrics.panierMoyen.value}
+        icon={metrics.panierMoyen.icon}
+        comparison={metrics.panierMoyen.comparison}
+        context={metrics.panierMoyen.context}
       />
     </div>
   );
