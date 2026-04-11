@@ -66,7 +66,7 @@ export const TableRowSkeleton = ({ columns = 4 }: { columns?: number }) => {
 
 export const GridSkeleton = ({ count = 6, columns = 3 }: { count?: number; columns?: number }) => {
   return (
-    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${columns} gap-4`}>
+    <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-${columns} gap-6 lg:gap-8`}>
       {Array.from({ length: count }).map((_, i) => (
         <CardSkeleton key={i} />
       ))}

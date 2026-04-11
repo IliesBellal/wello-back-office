@@ -342,7 +342,7 @@ export const OrganizeModal = ({
             <div className="flex-1 overflow-y-auto p-4">
               <DndContext collisionDetection={closestCenter} onDragEnd={handleProductDragEnd}>
                 <SortableContext items={categoryProducts.map(p => p.product_id)} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-4 gap-4">
+                  <div className="grid grid-cols-4 gap-6 lg:gap-8">
                     {categoryProducts.map(product => (
                       <SortableProductItem key={product.product_id} product={product} />
                     ))}

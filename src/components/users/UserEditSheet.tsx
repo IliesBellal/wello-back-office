@@ -182,7 +182,7 @@ export function UserEditSheet({ user, open, onOpenChange, onSuccess }: UserEditS
                 <div className="space-y-4">
                   <h4 className="text-sm font-medium text-muted-foreground">Identité</h4>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-6 md:gap-8">
                     <FormField
                       control={form.control}
                       name="first_name"
@@ -267,7 +267,7 @@ export function UserEditSheet({ user, open, onOpenChange, onSuccess }: UserEditS
                 <div className="space-y-4">
                   <h4 className="text-sm font-medium text-muted-foreground">Coordonnées</h4>
                   
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-3 gap-6 md:gap-8">
                     <FormField
                       control={form.control}
                       name="address.street_number"
@@ -294,7 +294,7 @@ export function UserEditSheet({ user, open, onOpenChange, onSuccess }: UserEditS
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-6 md:gap-8">
                     <FormField
                       control={form.control}
                       name="address.zip_code"

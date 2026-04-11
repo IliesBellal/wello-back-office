@@ -12,7 +12,7 @@ interface ColorPreviewProps {
 export const ColorPreview = ({ primaryColor, textColor, onPrimaryChange, onTextChange }: ColorPreviewProps) => {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
           <Label htmlFor="primary_color">Couleur principale</Label>
           <div className="flex gap-2">

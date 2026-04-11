@@ -451,7 +451,7 @@ export const SimpleProductSheet = ({
                   </div>
                 </div>
                 {/* Category and Background Color */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6 md:gap-8">
                   <div>
                     <Label className="text-xs font-semibold">Catégorie</Label>
                     <p className="mt-1 text-foreground">
@@ -558,7 +558,7 @@ export const SimpleProductSheet = ({
                 />
 
                 {/* Category and Background Color */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6 md:gap-8">
                   <div>
                     <Label>Catégorie</Label>
                     <CategorySelector

@@ -32,7 +32,7 @@ export function KeyMetrics({
 
   if (isLoading) {
     return (
-      <div className={`grid ${gridCols[columns]} gap-4`}>
+      <div className={`grid ${gridCols[columns]} gap-6 md:gap-8`}>
         {[1, 2, 3, 4].map((i) => (
           <Card key={i}>
             <CardHeader className="pb-2">
@@ -49,7 +49,7 @@ export function KeyMetrics({
   }
 
   return (
-    <div className={`grid ${gridCols[columns]} gap-4`}>
+    <div className={`grid ${gridCols[columns]} gap-6 md:gap-8`}>
       {metrics.map((metric, idx) => {
         const isPositive = metric.isPositive !== undefined ? metric.isPositive : metric.changePercent >= 0;
         

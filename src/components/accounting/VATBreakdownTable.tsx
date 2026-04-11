@@ -145,7 +145,7 @@ export const VATBreakdownTable = ({ data, loading = false }: VATBreakdownTablePr
 
       {/* Totals Footer */}
       <div className="border-t bg-muted/30 px-6 py-4">
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 lg:gap-8">
           <div>
             <p className="text-xs text-muted-foreground mb-1">CA HT TOTAL</p>
             <p className="text-lg font-bold font-mono">

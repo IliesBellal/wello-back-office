@@ -287,29 +287,30 @@ export default function MarketCategoriesTable() {
           </div>
         }
       >
-        {/* Create New Category */}
-        <div className="space-y-3 bg-card p-4 rounded-lg border border-border">
-          <h2 className="text-lg font-semibold">Nouvelle Catégorie</h2>
-          <div className="flex gap-2">
-            <Input
-              placeholder="Nom de la catégorie..."
-              value={newCategoryName}
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleCreate();
-                }
-              }}
-            />
-            <Button onClick={handleCreate} className="bg-gradient-primary">
-              <Plus className="w-4 h-4 mr-2" />
-              Créer
-            </Button>
+        <div className="space-y-8">
+          {/* Create New Category */}
+          <div className="space-y-3 bg-card p-4 rounded-lg border border-border">
+            <h2 className="text-lg font-semibold">Nouvelle Catégorie</h2>
+            <div className="flex gap-2">
+              <Input
+                placeholder="Nom de la catégorie..."
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCreate();
+                  }
+                }}
+              />
+              <Button onClick={handleCreate} className="bg-gradient-primary">
+                <Plus className="w-4 h-4 mr-2" />
+                Créer
+              </Button>
+            </div>
           </div>
-        </div>
 
-        {/* Categories Table */}
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
+          {/* Categories Table */}
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
@@ -378,6 +379,7 @@ export default function MarketCategoriesTable() {
               </TableBody>
             </Table>
           </div>
+        </div>
         </div>
       </PageContainer>
 

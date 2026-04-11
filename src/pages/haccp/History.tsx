@@ -245,7 +245,7 @@ export const History = () => {
                 initialSortDir="desc"
                 renderExpandedRow={(record: ConformityCheckRecord) => (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 xl:gap-12">
                       {/* Commentaire */}
                       <div>
                         <p className="text-sm font-semibold text-foreground mb-2">Commentaire</p>

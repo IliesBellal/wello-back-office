@@ -28,7 +28,7 @@ export const CategorySection = ({
       </div>
       
       <SortableContext items={productIds} strategy={rectSortingStrategy}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
           {sortedProducts.map((product) => (
             <ProductCard
               key={product.product_id}

@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '@/components/ui/button';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AnimatePresence, motion } from 'framer-motion';
 
 export type NavigationVariant = 'desktop' | 'mobile';
 
@@ -154,51 +155,82 @@ export const NavigationItems: React.FC<NavigationItemsProps> = ({
                       <span className="text-sm font-medium">{item.label}</span>
                     </div>
 
-                    <ChevronDown
-                      className={cn(
-                        'w-4 h-4 shrink-0 transition-transform duration-300',
-                        isOpen ? 'rotate-180' : 'rotate-0'
-                      )}
-                    />
+                    {/* Animated Chevron - Desktop */}
+                    <motion.div
+                      animate={{ rotate: isOpen ? 180 : 0 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                      className="flex items-center justify-center w-4 h-4 shrink-0"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </motion.div>
                   </Button>
                 </CollapsibleTrigger>
 
-                <CollapsibleContent className={cn(
-                  'space-y-1 pl-3 mt-1 border-l border-sidebar-border ml-5',
-                  'data-state-open:animate-in data-state-closed:animate-out',
-                  'data-state-open:fade-in data-state-closed:fade-out',
-                )}>
-                  {item.subItems?.map((subItem) => {
-                    const SubIcon = subItem.icon;
+                {/* Animated Sub-items Container - Desktop */}
+                <AnimatePresence initial={false}>
+                  {isOpen && (
+                    <motion.div
+                      key={`content-${item.id}`}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 300,
+                        damping: 30,
+                        opacity: { duration: 0.2 }
+                      }}
+                      className="overflow-hidden"
+                    >
+                      <div className={cn(
+                        'space-y-1 pl-3 border-l border-sidebar-border ml-5 py-1'
+                      )}>
+                        {item.subItems?.map((subItem, index) => {
+                          const SubIcon = subItem.icon;
 
-                    return (
-                      <NavLink
-                        key={subItem.id}
-                        to={subItem.path}
-                        className={cn(
-                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
-                          'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
-                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-                          'group relative',
-                        )}
-                        activeClassName={cn(
-                          'bg-sidebar-accent/70 text-sidebar-foreground font-medium',
-                          'before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2',
-                          'before:w-0.5 before:h-5 before:rounded-r-full before:bg-sidebar-primary',
-                        )}
-                      >
-                        <SubIcon className="w-4 h-4 shrink-0 flex-none" />
-                        <span className="truncate">{subItem.label}</span>
+                          return (
+                            <motion.div
+                              key={subItem.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -20 }}
+                              transition={{
+                                type: 'spring',
+                                stiffness: 300,
+                                damping: 30,
+                                delay: index * 0.05
+                              }}
+                            >
+                              <NavLink
+                                to={subItem.path}
+                                className={cn(
+                                  'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
+                                  'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                                  'group relative',
+                                )}
+                                activeClassName={cn(
+                                  'bg-sidebar-accent/70 text-sidebar-foreground font-medium',
+                                  'before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2',
+                                  'before:w-0.5 before:h-5 before:rounded-r-full before:bg-sidebar-primary',
+                                )}
+                              >
+                                <SubIcon className="w-4 h-4 shrink-0 flex-none" />
+                                <span className="truncate">{subItem.label}</span>
 
-                        {subItem.badge && subItem.badge > 0 && (
-                          <span className="ml-auto inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-destructive-foreground bg-destructive/80 rounded-full">
-                            {subItem.badge}
-                          </span>
-                        )}
-                      </NavLink>
-                    );
-                  })}
-                </CollapsibleContent>
+                                {subItem.badge && subItem.badge > 0 && (
+                                  <span className="ml-auto inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-destructive-foreground bg-destructive/80 rounded-full">
+                                    {subItem.badge}
+                                  </span>
+                                )}
+                              </NavLink>
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </Collapsible>
             );
           }
@@ -241,22 +273,61 @@ export const NavigationItems: React.FC<NavigationItemsProps> = ({
                   <item.icon className="w-5 h-5" />
                   <span>{item.label}</span>
                 </div>
-                <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                {/* Animated Chevron - Mobile */}
+                <motion.div
+                  animate={{ rotate: isOpen ? 180 : 0 }}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                  className="flex items-center justify-center w-4 h-4 shrink-0"
+                >
+                  <ChevronDown className="w-4 h-4" />
+                </motion.div>
               </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-1 mt-1">
-                {item.subItems?.map((subItem) => (
-                  <NavLink
-                    key={subItem.id}
-                    to={subItem.path}
-                    onClick={handleNavClick}
-                    className="flex items-center gap-3 px-4 py-3 ml-4 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors min-h-[44px]"
-                    activeClassName="bg-gradient-primary text-white font-medium shadow-soft"
+
+              {/* Animated Sub-items Container - Mobile */}
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div
+                    key={`mobile-content-${item.id}`}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 300,
+                      damping: 30,
+                      opacity: { duration: 0.2 }
+                    }}
+                    className="overflow-hidden"
                   >
-                    <subItem.icon className="w-4 h-4" />
-                    <span>{subItem.label}</span>
-                  </NavLink>
-                ))}
-              </CollapsibleContent>
+                    <div className="space-y-1 mt-1">
+                      {item.subItems?.map((subItem, index) => (
+                        <motion.div
+                          key={subItem.id}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: -20 }}
+                          transition={{
+                            type: 'spring',
+                            stiffness: 300,
+                            damping: 30,
+                            delay: index * 0.05
+                          }}
+                        >
+                          <NavLink
+                            to={subItem.path}
+                            onClick={handleNavClick}
+                            className="flex items-center gap-3 px-4 py-3 ml-4 rounded-xl text-sm text-sidebar-foreground hover:bg-sidebar-accent transition-colors min-h-[44px]"
+                            activeClassName="bg-gradient-primary text-white font-medium shadow-soft"
+                          >
+                            <subItem.icon className="w-4 h-4" />
+                            <span>{subItem.label}</span>
+                          </NavLink>
+                        </motion.div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </Collapsible>
           );
         }

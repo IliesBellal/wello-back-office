@@ -154,7 +154,7 @@ const Customers = () => {
 
         {/* Customer List */}
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 md:gap-8 md:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3, 4, 5, 6].map(i => (
               <Skeleton key={i} className="h-28" />
             ))}
@@ -168,7 +168,7 @@ const Customers = () => {
           </div>
         ) : (
           <>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 md:gap-8 md:grid-cols-2 lg:grid-cols-3">
               {customers.map(customer => (
                 <CustomerCard
                   key={customer.id}

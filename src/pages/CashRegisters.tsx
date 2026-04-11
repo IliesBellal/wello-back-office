@@ -123,7 +123,7 @@ const CashRegisters = () => {
       >
         {/* Content */}
         {loading ? (
-          <div className="space-y-4">
+          <div className="space-y-8">
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-20 w-full" />
             ))}
@@ -133,7 +133,7 @@ const CashRegisters = () => {
             Aucun registre pour cette date
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-8">
             {registers.map((register) => (
               <CashRegisterCard
                 key={register.id}

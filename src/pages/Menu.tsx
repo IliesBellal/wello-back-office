@@ -263,6 +263,7 @@ export default function Menu() {
           </div>
         }
       >
+        <div className="space-y-8">
         {/* Filters */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -390,6 +391,7 @@ export default function Menu() {
           tags={tags}
           onTagCreated={(newTag) => setTags([...tags, newTag])}
         />
+        </div>
       </PageContainer>
     </DashboardLayout>
   );

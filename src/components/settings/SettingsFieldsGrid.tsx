@@ -33,7 +33,7 @@ export const SettingsFieldsGrid = ({
 
   return (
     <div className={cn(
-      'grid gap-4',
+      'grid gap-6 md:gap-8',
       colsClass[columns],
       className
     )}>

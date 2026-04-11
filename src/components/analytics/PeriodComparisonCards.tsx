@@ -27,7 +27,7 @@ export function PeriodComparisonCards({
 }: PeriodComparisonCardsProps) {
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
         {[1, 2, 3].map((i) => (
           <Card key={i}>
             <CardHeader className="pb-2">
@@ -47,7 +47,7 @@ export function PeriodComparisonCards({
   const yearAgoChangeIsPositive = yearAgo.changePercent >= 0;
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
       {/* Période actuelle */}
       <Card>
         <CardHeader className="pb-2">

@@ -159,33 +159,34 @@ const VAT = () => {
           </div>
         }
       >
-        {/* Period & Channels Selection */}
-        <div className="w-full max-w-md">
-          <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
-        </div>
+        <div className="space-y-8">
+          {/* Period & Channels Selection */}
+          <div className="w-full max-w-md">
+            <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
+          </div>
 
-        {/* ═══ CHANNELS SECTION ═══ */}
-        <Card>
-          <CardContent className="pt-6">
-            <ChannelSelector
-              channels={vatChannels}
-              selectedChannels={parsedChannels}
-              onChange={handleChannelChange}
-            />
-            {parsedChannels.length === 0 && (
-              <div className="mt-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                <span>Veuillez sélectionner au moins un canal de vente</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          {/* ═══ CHANNELS SECTION ═══ */}
+          <Card>
+            <CardContent className="pt-6">
+              <ChannelSelector
+                channels={vatChannels}
+                selectedChannels={parsedChannels}
+                onChange={handleChannelChange}
+              />
+              {parsedChannels.length === 0 && (
+                <div className="mt-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>Veuillez sélectionner au moins un canal de vente</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* ═══ SHOW CONTENT ONLY IF CHANNELS SELECTED ═══ */}
-        {parsedChannels.length > 0 && (
-          <>
+          {/* ═══ SHOW CONTENT ONLY IF CHANNELS SELECTED ═══ */}
+          {parsedChannels.length > 0 && (
+            <div className="space-y-8">
             {/* VAT Summary Cards */}
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-3 lg:gap-8">
               {loading ? (
                 <>
                   {[1, 2, 3].map((i) => (
@@ -230,7 +231,7 @@ const VAT = () => {
                   <CardTitle className="text-base">Répartition par canal</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
                     {Object.entries(vatData?.by_channel || {}).map(([channel, data]) => {
                       const channelLabel = vatChannels.find((c) => c.id === channel)?.label || channel;
                       return (
@@ -265,8 +266,9 @@ const VAT = () => {
                 />
               </CardContent>
             </Card>
-          </>
-        )}
+            </div>
+          )}
+        </div>
       </PageContainer>
     </DashboardLayout>
   );

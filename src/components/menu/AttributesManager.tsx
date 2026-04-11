@@ -170,7 +170,7 @@ export const AttributesManager = ({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6 md:gap-8">
                   <div className="space-y-2">
                     <Label htmlFor="min">Minimum</Label>
                     <Input

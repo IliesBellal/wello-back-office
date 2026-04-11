@@ -100,8 +100,9 @@ const FinancialReports = () => {
           </div>
         }
       >
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="space-y-8">
+          {/* KPI Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {isLoading ? (
             <>
               <Skeleton className="h-32 rounded-xl" />
@@ -207,6 +208,7 @@ const FinancialReports = () => {
             </CardContent>
           </Tabs>
         </Card>
+        </div>
       </PageContainer>
     </DashboardLayout>
   );

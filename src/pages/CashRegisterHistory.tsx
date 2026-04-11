@@ -107,6 +107,7 @@ const CashRegisterHistory = () => {
           </div>
         }
       >
+        <div className="space-y-8">
         {/* ═══ STATS SECTION ═══ */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <Tile
@@ -263,6 +264,7 @@ const CashRegisterHistory = () => {
             </CardContent>
           )}
         </Card>
+        </div>
       </PageContainer>
     </DashboardLayout>
   );

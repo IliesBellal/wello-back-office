@@ -190,6 +190,7 @@ const CustomersList = () => {
           </div>
         }
       >
+        <div className="space-y-8">
         {/* Search */}
         <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -267,6 +268,7 @@ const CustomersList = () => {
               </Table>
             </div>
           )}
+        </div>
         </div>
       </PageContainer>
 

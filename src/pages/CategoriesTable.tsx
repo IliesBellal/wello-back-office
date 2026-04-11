@@ -287,6 +287,7 @@ export default function CategoriesTable() {
           </div>
         }
       >
+        <div className="space-y-8">
         {/* Create New Category */}
         <div className="space-y-3 bg-card p-4 rounded-lg border border-border">
           <h2 className="text-lg font-semibold">Nouvelle Catégorie</h2>
@@ -378,6 +379,7 @@ export default function CategoriesTable() {
               </TableBody>
             </Table>
           </div>
+        </div>
         </div>
       </PageContainer>
 

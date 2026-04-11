@@ -78,7 +78,7 @@ export const EstablishmentTab = () => {
       </Card>
 
       {/* Grille de sections: 2 colonnes sur desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 xl:gap-12 mb-10">
         {/* Identity Card - Pleine largeur */}
         <Card className="md:col-span-2">
           <CardHeader>

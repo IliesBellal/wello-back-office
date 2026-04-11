@@ -148,7 +148,7 @@ export const BulkAssignTagsDialog = ({
           <DialogTitle>Assigner des Tags en Masse</DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden grid grid-cols-2 gap-4">
+        <div className="flex-1 overflow-hidden grid grid-cols-2 gap-6">
           {/* Tags Selection */}
           <div className="flex flex-col space-y-3 overflow-hidden">
             <div>

@@ -96,7 +96,7 @@ export const Compliance = () => {
         </div>
 
         {/* ═══ KPI CARDS ═══ */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10">
           <Tile
             title="Taux de conformité global"
             value={`${stats.globalComplianceRate}%`}
@@ -126,7 +126,7 @@ export const Compliance = () => {
         {/* ═══ ZONE SCORES GRID ═══ */}
         <div>
           <h2 className="text-lg font-semibold mb-4 text-foreground">Scores par zone</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-10">
             {zones.map((zone) => {
               const config = getZoneStatusConfig(zone.status);
               return (

@@ -137,7 +137,7 @@ export const OpeningHours = () => {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-6 md:gap-8">
               <div>
                 <Label>Heure de début</Label>
                 <Input
