@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tag } from '@/types/menu';
@@ -167,18 +168,20 @@ export default function TagsTable() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">Gestion des Tags</h1>
-          <Button
-            className="bg-gradient-primary"
-            onClick={() => setBulkAssignOpen(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Assigner en masse
-          </Button>
-        </div>
-
+      <PageContainer
+        header={
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-foreground">Gestion des Tags</h1>
+            <Button
+              className="bg-gradient-primary"
+              onClick={() => setBulkAssignOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Assigner en masse
+            </Button>
+          </div>
+        }
+      >
         <div className="space-y-4">
           <div className="flex gap-2">
             <Input
@@ -287,13 +290,13 @@ export default function TagsTable() {
             </Table>
           </div>
         </div>
+      </PageContainer>
 
         <BulkAssignTagsDialog
           open={bulkAssignOpen}
           onOpenChange={setBulkAssignOpen}
           tags={tags}
         />
-      </div>
 
       <ConfirmDialog
         open={deleteDialogOpen}

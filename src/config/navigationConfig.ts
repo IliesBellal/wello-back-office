@@ -23,6 +23,13 @@ import {
   Percent,
   LineChart,
   History,
+  Briefcase,
+  Calendar,
+  Umbrella,
+  ArrowLeftRight,
+  ShieldCheck,
+  ClipboardList,
+  AlertTriangle,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -132,19 +139,19 @@ export const navigationConfig: NavigationItem[] = [
       },
     ],
   },
-  {
-    id: 'orders',
-    label: 'Commandes',
-    icon: ShoppingCart,
-    path: '/orders',
-  },
-
   // ═══ LOCATION & SERVICE ═══
   {
-    id: 'floor-plan',
-    label: 'Plan de salle',
+    id: 'reservations',
+    label: 'Réservations',
     icon: LayoutGrid,
-    path: '/locations',
+    subItems: [
+      {
+        id: 'floor-plan',
+        label: 'Plan de salle',
+        icon: LayoutGrid,
+        path: '/locations',
+      },
+    ],
   },
   {
     id: 'customers',
@@ -155,7 +162,7 @@ export const navigationConfig: NavigationItem[] = [
         id: 'customers-list',
         label: 'Liste clients',
         icon: Users,
-        path: '/customers',
+        path: '/customers/list',
       },
       {
         id: 'loyalty-programs',
@@ -170,6 +177,39 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Stocks',
     icon: Boxes,
     path: '/stocks',
+  },
+
+  // ═══ TEAM MANAGEMENT ═══
+  {
+    id: 'team',
+    label: 'Équipe',
+    icon: Briefcase,
+    subItems: [
+      {
+        id: 'team-planning',
+        label: 'Planning',
+        icon: Calendar,
+        path: '/equipe/planning',
+      },
+      {
+        id: 'team-employees',
+        label: 'Employés',
+        icon: Users,
+        path: '/equipe/employes',
+      },
+      {
+        id: 'team-timesheets',
+        label: 'Pointages',
+        icon: Clock,
+        path: '/equipe/pointages',
+      },
+      {
+        id: 'team-leaves',
+        label: 'Congés & Échanges',
+        icon: Umbrella,
+        path: '/equipe/conges',
+      },
+    ],
   },
 
   // ═══ ACCOUNTING ═══
@@ -215,16 +255,16 @@ export const navigationConfig: NavigationItem[] = [
         path: '/integrations/overview',
       },
       {
-        id: 'online-orders',
-        label: 'Commandes en ligne',
-        icon: ShoppingCart,
-        path: '/integrations/online-orders',
-      },
-      {
         id: 'market-categories',
         label: 'Catégories vitrine',
         icon: Folder,
         path: '/menu/market-categories',
+      },
+      {
+        id: 'scannorder',
+        label: 'ScanNOrder',
+        icon: Store,
+        path: '/integrations/scannorder',
       },
       {
         id: 'uber-eats',
@@ -241,13 +281,34 @@ export const navigationConfig: NavigationItem[] = [
     ],
   },
 
-  // ═══ ADMINISTRATION ═══
+  // ═══ HYGIENE & SAFETY ═══
   {
-    id: 'users',
-    label: 'Utilisateurs',
-    icon: Users,
-    path: '/users',
+    id: 'haccp',
+    label: 'HACCP',
+    icon: ShieldCheck,
+    subItems: [
+      {
+        id: 'haccp-compliance',
+        label: 'Conformité',
+        icon: ShieldCheck,
+        path: '/haccp/compliance',
+      },
+      {
+        id: 'haccp-history',
+        label: 'Historique',
+        icon: ClipboardList,
+        path: '/haccp/history',
+      },
+      {
+        id: 'haccp-alerts',
+        label: 'Alertes',
+        icon: AlertTriangle,
+        path: '/haccp/alerts',
+      },
+    ],
   },
+
+  // ═══ ADMINISTRATION ═══
   {
     id: 'settings',
     label: 'Paramètres',

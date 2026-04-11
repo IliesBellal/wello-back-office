@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { ChannelSelector } from '@/components/accounting/ChannelSelector';
@@ -138,9 +139,8 @@ const VAT = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        {/* ═══ HEADER ═══ */}
-        <div className="space-y-4">
+      <PageContainer
+        header={
           <div className="flex items-center justify-between">
             <div className="space-y-2">
               <h1 className="text-3xl font-bold">Déclaration de TVA</h1>
@@ -157,11 +157,11 @@ const VAT = () => {
               {exporting ? 'Export en cours...' : 'Exporter CSV'}
             </Button>
           </div>
-
-          {/* Period & Channels Selection */}
-          <div className="w-full max-w-md">
-            <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
-          </div>
+        }
+      >
+        {/* Period & Channels Selection */}
+        <div className="w-full max-w-md">
+          <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
         </div>
 
         {/* ═══ CHANNELS SECTION ═══ */}
@@ -267,7 +267,7 @@ const VAT = () => {
             </Card>
           </>
         )}
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 };

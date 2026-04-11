@@ -1,16 +1,15 @@
-import { useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/hooks/useSidebar';
 import { navigationConfig } from '@/config/navigationConfig';
-import { SidebarItem } from './SidebarItem';
-import { CollapsibleItem } from './CollapsibleItem';
+import { NavigationItems } from './NavigationItems';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 
 /**
- * Main Sidebar Component
+ * Desktop Sidebar Component
  * 
  * Features:
  * - Smooth collapse/expand animation (300ms)
@@ -20,11 +19,19 @@ import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
  * - Popover sub-items when collapsed
  * - Responsive design (hidden on mobile)
  * - Accessibility features (ARIA labels, keyboard nav)
+ * - Uses shared NavigationItems component
  */
 export const Sidebar: React.FC = () => {
-  const { isExpanded, toggleExpanded } = useSidebar();
+  const { isExpanded, toggleExpanded, openMenuId, toggleSubItem } = useSidebar();
   const { logout } = useAuth();
   const navigate = useNavigate();
+
+  // Convert openMenuId to collapsibleState object for NavigationItems component
+  const collapsibleState = useMemo(() => {
+    return {
+      [openMenuId || '']: openMenuId !== null,
+    };
+  }, [openMenuId]);
 
   const handleLogout = async () => {
     await logout();
@@ -101,21 +108,13 @@ export const Sidebar: React.FC = () => {
           isExpanded ? 'px-3' : 'px-2 flex flex-col items-center'
         )}
       >
-        {navigationConfig.map((item) => {
-          const hasSubItems = item.subItems && item.subItems.length > 0;
-
-          if (!hasSubItems && item.path) {
-            // Simple item without sub-items
-            return <SidebarItem key={item.id} item={item} isCollapsed={!isExpanded} />;
-          }
-
-          if (hasSubItems) {
-            // Item with sub-items
-            return <CollapsibleItem key={item.id} item={item} isCollapsed={!isExpanded} />;
-          }
-
-          return null;
-        })}
+        <NavigationItems
+          items={navigationConfig}
+          variant="desktop"
+          isCollapsed={!isExpanded}
+          collapsibleState={collapsibleState}
+          onToggleCollapsible={toggleSubItem}
+        />
       </nav>
 
       {/* ═══ FOOTER - USER MENU ═══ */}

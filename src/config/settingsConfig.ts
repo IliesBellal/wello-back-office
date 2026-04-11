@@ -22,15 +22,11 @@ export const establishmentInfoFields: FieldConfig[] = [
 export const establishmentTimingsFields: FieldConfig[] = [
   { key: 'wait_time_min', label: 'Temps d\'attente minimum (min)', type: 'number', group: 'timings', min: 0, max: 120 },
   { key: 'wait_time_max', label: 'Temps d\'attente maximum (min)', type: 'number', group: 'timings', min: 0, max: 120 },
-  { key: 'auto_close_enabled', label: 'Fermeture automatique', type: 'switch', group: 'timings' },
-  { key: 'auto_close_delay', label: 'Délai de fermeture auto (min)', type: 'number', group: 'timings', min: 0, max: 60 },
 ];
 
 export const establishmentOrderingFields: FieldConfig[] = [
-  { key: 'paid_orders_only', label: 'Commandes payées uniquement', type: 'switch', group: 'ordering' },
   { key: 'concurrent_capacity', label: 'Capacité simultanée', type: 'number', group: 'ordering', min: 1, max: 200 },
   { key: 'disable_low_stock', label: 'Désactiver articles en rupture', type: 'switch', group: 'ordering' },
-  { key: 'register_required', label: 'Inscription obligatoire', type: 'switch', group: 'ordering' },
 ];
 
 export const establishmentScanOrderFields: FieldConfig[] = [

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { DashboardHero } from '@/components/dashboard/DashboardHero';
 import { RevenueEvolutionChart } from '@/components/dashboard/RevenueEvolutionChart';
 import { QuickProductSheet } from '@/components/dashboard/QuickProductSheet';
@@ -35,24 +36,25 @@ const Index = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-8 lg:p-10 space-y-10 bg-gradient-to-b from-gray-50 to-white/50 min-h-screen">
+      <div className="bg-gradient-to-b from-gray-50 to-white/50 min-h-screen">
+        <PageContainer
+          header={
+            <div>
+              <h1 className="text-3xl font-bold text-foreground capitalize">
+                {getGreeting()} 👋
+              </h1>
+              <p className="text-muted-foreground mt-1 capitalize text-sm">{today}</p>
+            </div>
+          }
+        >
+          {/* ── Metric Cards ── */}
+          <DashboardHero data={data} loading={loading} />
 
-        {/* ── Header ── */}
-        <div>
-          <h1 className="text-3xl font-bold text-foreground capitalize">
-            {getGreeting()} 👋
-          </h1>
-          <p className="text-muted-foreground mt-1 capitalize text-sm">{today}</p>
-        </div>
-
-        {/* ── Metric Cards ── */}
-        <DashboardHero data={data} loading={loading} />
-
-        {/* ── Revenue Evolution Chart ── */}
-        <div className="mt-8">
-          <RevenueEvolutionChart />
-        </div>
-
+          {/* ── Revenue Evolution Chart ── */}
+          <div className="mt-8">
+            <RevenueEvolutionChart />
+          </div>
+        </PageContainer>
       </div>
 
       {/* Quick Product Creation Sheet */}

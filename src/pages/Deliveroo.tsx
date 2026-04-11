@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { IntegrationCard } from '@/components/integrations/IntegrationCard';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { AlertCircle } from 'lucide-react';
@@ -102,12 +103,14 @@ export default function DeliverooPage() {
 
   return (
     <DashboardLayout>
-      <div className="mobile-padding space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Deliveroo</h1>
-          <p className="text-muted-foreground mt-1">Gérez votre intégration Deliveroo</p>
-        </div>
-
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Deliveroo</h1>
+            <p className="text-muted-foreground mt-1">Gérez votre intégration Deliveroo</p>
+          </div>
+        }
+      >
         <IntegrationCard
           name="Deliveroo"
           status={status}
@@ -117,7 +120,7 @@ export default function DeliverooPage() {
           onSync={handleSync}
           tutorial={<DeliverrooTutorial />}
         />
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 }

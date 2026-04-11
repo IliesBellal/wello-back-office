@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageContainer, TabSystem } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -729,37 +729,36 @@ function TabSkeleton() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PromotionsAvailabilities() {
+  const [activeTab, setActiveTab] = useState('promotions');
+
+  const tabs = [
+    { id: 'promotions', label: 'Promotions', icon: 'Tag' },
+    { id: 'availabilities', label: 'Disponibilités', icon: 'Clock' },
+  ];
+
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Promotions &amp; Disponibilités</h1>
-          <p className="text-muted-foreground mt-1">
-            Gérez vos offres promotionnelles et les créneaux de disponibilité de votre menu.
-          </p>
-        </div>
-
-        <Tabs defaultValue="promotions">
-          <TabsList>
-            <TabsTrigger value="promotions" className="flex items-center gap-2">
-              <Tag className="w-4 h-4" />
-              Promotions
-            </TabsTrigger>
-            <TabsTrigger value="availabilities" className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Disponibilités
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="promotions" className="mt-4">
-            <PromotionsTab />
-          </TabsContent>
-
-          <TabsContent value="availabilities" className="mt-4">
-            <AvailabilitiesTab />
-          </TabsContent>
-        </Tabs>
-      </div>
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Promotions &amp; Disponibilités</h1>
+            <p className="text-muted-foreground mt-1">
+              Gérez vos offres promotionnelles et les créneaux de disponibilité de votre menu.
+            </p>
+          </div>
+        }
+      >
+        <TabSystem
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          renderContent={(tabId) => {
+            if (tabId === 'promotions') return <PromotionsTab />;
+            if (tabId === 'availabilities') return <AvailabilitiesTab />;
+            return null;
+          }}
+        />
+      </PageContainer>
     </DashboardLayout>
   );
 }

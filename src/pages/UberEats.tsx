@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { IntegrationCard } from '@/components/integrations/IntegrationCard';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { AlertCircle, Check, Monitor, ListChecks, Settings } from 'lucide-react';
@@ -90,12 +91,14 @@ export default function UberEatsPage() {
 
   return (
     <DashboardLayout>
-      <div className="mobile-padding space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Uber Eats</h1>
-          <p className="text-muted-foreground mt-1">Gérez votre intégration Uber Eats</p>
-        </div>
-
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Uber Eats</h1>
+            <p className="text-muted-foreground mt-1">Gérez votre intégration Uber Eats</p>
+          </div>
+        }
+      >
         <IntegrationCard
           name="Uber Eats"
           status={status}
@@ -105,7 +108,7 @@ export default function UberEatsPage() {
           onSync={handleSync}
           tutorial={<UberEatsTutorial />}
         />
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 }

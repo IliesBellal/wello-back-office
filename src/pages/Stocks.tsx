@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
+import { PageContainer } from "@/components/shared";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -54,28 +55,29 @@ const Stocks = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <Package className="h-5 w-5 text-primary" />
+      <PageContainer
+        header={
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                <Package className="h-5 w-5 text-primary" />
+              </div>
+              <h1 className="text-2xl font-semibold text-foreground">Gestion des Stocks</h1>
             </div>
-            <h1 className="text-2xl font-semibold text-foreground">Gestion des Stocks</h1>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <Switch
-              id="low-stock-filter"
-              checked={showLowStockOnly}
-              onCheckedChange={setShowLowStockOnly}
-            />
-            <Label htmlFor="low-stock-filter" className="text-sm font-medium cursor-pointer">
-              Alerte Stock Bas
-            </Label>
+            <div className="flex items-center gap-2">
+              <Switch
+                id="low-stock-filter"
+                checked={showLowStockOnly}
+                onCheckedChange={setShowLowStockOnly}
+              />
+              <Label htmlFor="low-stock-filter" className="text-sm font-medium cursor-pointer">
+                Alerte Stock Bas
+              </Label>
+            </div>
           </div>
-        </div>
-
+        }
+      >
         {/* Data Table */}
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <Table>
@@ -141,7 +143,7 @@ const Stocks = () => {
             </TableBody>
           </Table>
         </div>
-      </div>
+      </PageContainer>
 
       <StockMovementDialog
         component={selectedComponent}

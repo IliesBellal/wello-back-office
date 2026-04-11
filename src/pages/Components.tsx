@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -219,59 +220,62 @@ export default function Components() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">
-            Ingrédients & Composants
-          </h1>
-          <div className="flex gap-2">
-            <Button className="bg-gradient-primary" onClick={() => setCreateSheetOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nouvel Ingrédient
-            </Button>
-            <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Catégorie
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Ajouter une catégorie d'ingrédient</DialogTitle>
-                  <DialogDescription>
-                    Créez une nouvelle catégorie pour organiser vos ingrédients
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <Input
-                    placeholder="Nom de la catégorie (ex: Fruits & Légumes)"
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleCreateCategory();
-                      }
-                    }}
-                  />
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
-                    Annuler
+      <PageContainer
+        header={
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-foreground">
+              Ingrédients & Composants
+            </h1>
+            <div className="flex gap-2">
+              <Button className="bg-gradient-primary" onClick={() => setCreateSheetOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Nouvel Ingrédient
+              </Button>
+              <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Catégorie
                   </Button>
-                  <Button 
-                    onClick={handleCreateCategory}
-                    disabled={isCreatingCategory || !newCategoryName.trim()}
-                    className="bg-gradient-primary"
-                  >
-                    {isCreatingCategory ? 'Création...' : 'Créer'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Ajouter une catégorie d'ingrédient</DialogTitle>
+                    <DialogDescription>
+                      Créez une nouvelle catégorie pour organiser vos ingrédients
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <Input
+                      placeholder="Nom de la catégorie (ex: Fruits & Légumes)"
+                      value={newCategoryName}
+                      onChange={(e) => setNewCategoryName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleCreateCategory();
+                        }
+                      }}
+                    />
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setCategoryDialogOpen(false)}>
+                      Annuler
+                    </Button>
+                    <Button 
+                      onClick={handleCreateCategory}
+                      disabled={isCreatingCategory || !newCategoryName.trim()}
+                      className="bg-gradient-primary"
+                    >
+                      {isCreatingCategory ? 'Création...' : 'Créer'}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           </div>
-        </div>
-
+        }
+        className="space-y-6"
+      >
         {/* Filters */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
@@ -414,7 +418,7 @@ export default function Components() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 }

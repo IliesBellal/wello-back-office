@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useMenuData } from '@/hooks/useMenuData';
@@ -271,20 +272,21 @@ export default function CategoriesTable() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">Catégories Caisse</h1>
-          <Button className="bg-gradient-primary" onClick={handleSaveOrder} disabled={isSaving}>
-            {isSaving ? (
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4 mr-2" />
-            )}
-            {isSaving ? 'Enregistrement...' : 'Enregistrer l\'ordre'}
-          </Button>
-        </div>
-
+      <PageContainer
+        header={
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-foreground">Catégories Caisse</h1>
+            <Button className="bg-gradient-primary" onClick={handleSaveOrder} disabled={isSaving}>
+              {isSaving ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Save className="w-4 h-4 mr-2" />
+              )}
+              {isSaving ? 'Enregistrement...' : 'Enregistrer l\'ordre'}
+            </Button>
+          </div>
+        }
+      >
         {/* Create New Category */}
         <div className="space-y-3 bg-card p-4 rounded-lg border border-border">
           <h2 className="text-lg font-semibold">Nouvelle Catégorie</h2>
@@ -377,6 +379,7 @@ export default function CategoriesTable() {
             </Table>
           </div>
         </div>
+      </PageContainer>
 
         {/* Delete Confirmation Dialog */}
         <ConfirmDialog
@@ -401,7 +404,6 @@ export default function CategoriesTable() {
             onConfirm={handleBulkAssignConfirm}
           />
         )}
-      </div>
     </DashboardLayout>
   );
 }

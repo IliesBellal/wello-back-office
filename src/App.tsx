@@ -19,9 +19,7 @@ import MarketCategoriesTable from './pages/MarketCategoriesTable';
 import TagsTable from './pages/TagsTable';
 import Components from './pages/Components';
 import FinancialReports from './pages/FinancialReports';
-import Orders from './pages/Orders';
 import Locations from './pages/Locations';
-import Users from './pages/Users';
 import CashRegisterHistory from './pages/CashRegisterHistory';
 import VAT from './pages/TVA';
 import Customers from './pages/Customers';
@@ -36,7 +34,14 @@ import DashboardOrderHistory from './pages/DashboardOrderHistory';
 import IntegrationsOverview from './pages/IntegrationsOverview';
 import UberEats from './pages/UberEats';
 import Deliveroo from './pages/Deliveroo';
-import OnlineOrders from './pages/OnlineOrders';
+import ScanNOrder from './pages/ScanNOrder';
+import EquipePlanning from './pages/equipe/Planning';
+import EquipeEmployes from './pages/equipe/Employees';
+import EquipePointages from './pages/equipe/Timesheets';
+import EquipeConges from './pages/equipe/Leaves';
+import HacCPCompliance from './pages/haccp/Compliance';
+import HacCPHistory from './pages/haccp/History';
+import HacCPAlerts from './pages/haccp/Alerts';
 import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
 
@@ -58,9 +63,6 @@ const App = () => (
               <Route path="/login" element={<Login />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               
-              {/* Orders Management */}
-              <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-              
               {/* Menu Management */}
               <Route path="/menu/products" element={<ProtectedRoute><Menu /></ProtectedRoute>} />
               <Route path="/menu/categories" element={<ProtectedRoute><CategoriesTable /></ProtectedRoute>} />
@@ -73,7 +75,7 @@ const App = () => (
               
               {/* Location & Service */}
               <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
-              <Route path="/customers" element={<ProtectedRoute><CustomersList /></ProtectedRoute>} />
+              <Route path="/customers/list" element={<ProtectedRoute><CustomersList /></ProtectedRoute>} />
               <Route path="/customers/loyalty-programs" element={<ProtectedRoute><LoyaltyPrograms /></ProtectedRoute>} />
               
               {/* Stocks */}
@@ -88,7 +90,6 @@ const App = () => (
               {/* Consolidated under Accounting section */}
               
               {/* Administration */}
-              <Route path="/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/settings/:section" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/settings/integrations" element={<ProtectedRoute><NotImplementedPage title="Intégrations" /></ProtectedRoute>} />
@@ -97,12 +98,23 @@ const App = () => (
               <Route path="/dashboard/analysis" element={<ProtectedRoute><DashboardAnalysis /></ProtectedRoute>} />
               <Route path="/dashboard/order-history" element={<ProtectedRoute><DashboardOrderHistory /></ProtectedRoute>} />
               
+              {/* Team Management */}
+              <Route path="/equipe/planning" element={<ProtectedRoute><EquipePlanning /></ProtectedRoute>} />
+              <Route path="/equipe/employes" element={<ProtectedRoute><EquipeEmployes /></ProtectedRoute>} />
+              <Route path="/equipe/pointages" element={<ProtectedRoute><EquipePointages /></ProtectedRoute>} />
+              <Route path="/equipe/conges" element={<ProtectedRoute><EquipeConges /></ProtectedRoute>} />
+              
               {/* Integrations */}
               <Route path="/integrations" element={<ProtectedRoute><IntegrationsOverview /></ProtectedRoute>} />
               <Route path="/integrations/overview" element={<ProtectedRoute><IntegrationsOverview /></ProtectedRoute>} />
-              <Route path="/integrations/online-orders" element={<ProtectedRoute><OnlineOrders /></ProtectedRoute>} />
+              <Route path="/integrations/scannorder" element={<ProtectedRoute><ScanNOrder /></ProtectedRoute>} />
               <Route path="/integrations/uber-eats" element={<ProtectedRoute><UberEats /></ProtectedRoute>} />
               <Route path="/integrations/deliveroo" element={<ProtectedRoute><Deliveroo /></ProtectedRoute>} />
+              
+              {/* HACCP - Hygiene & Safety */}
+              <Route path="/haccp/compliance" element={<ProtectedRoute><HacCPCompliance /></ProtectedRoute>} />
+              <Route path="/haccp/history" element={<ProtectedRoute><HacCPHistory /></ProtectedRoute>} />
+              <Route path="/haccp/alerts" element={<ProtectedRoute><HacCPAlerts /></ProtectedRoute>} />
               
               {/* 404 Fallback */}
               <Route path="*" element={<NotFound />} />

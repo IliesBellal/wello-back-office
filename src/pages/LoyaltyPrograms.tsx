@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -214,19 +215,20 @@ const LoyaltyPrograms = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Gift className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold text-foreground">Programmes de fidélité</h1>
+      <PageContainer
+        header={
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Gift className="h-8 w-8 text-primary" />
+              <h1 className="text-3xl font-bold text-foreground">Programmes de fidélité</h1>
+            </div>
+            <Button onClick={() => handleOpenDialog()} className="bg-gradient-primary">
+              <Plus className="w-4 h-4 mr-2" />
+              Nouveau programme
+            </Button>
           </div>
-          <Button onClick={() => handleOpenDialog()} className="bg-gradient-primary">
-            <Plus className="w-4 h-4 mr-2" />
-            Nouveau programme
-          </Button>
-        </div>
-
+        }
+      >
         {/* Programs Table */}
         <div className="bg-card rounded-lg border border-border overflow-hidden">
           {loading ? (
@@ -294,6 +296,7 @@ const LoyaltyPrograms = () => {
             </div>
           )}
         </div>
+      </PageContainer>
 
         {/* Program Dialog */}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -439,7 +442,6 @@ const LoyaltyPrograms = () => {
           confirmText="Supprimer"
           isDangerous={true}
         />
-      </div>
     </DashboardLayout>
   );
 };

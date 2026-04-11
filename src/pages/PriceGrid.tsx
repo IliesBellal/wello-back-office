@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabSystem, PageContainer } from '@/components/shared';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -737,6 +737,7 @@ function TableSkeleton({ colCount = 7 }: { colCount?: number }) {
 
 export default function PriceGrid() {
   const { menuData, loading } = useMenuData();
+  const [activeTab, setActiveTab] = useState('products');
 
   const categories: Category[] = useMemo(
     () => menuData?.products_types ?? [],
@@ -753,45 +754,46 @@ export default function PriceGrid() {
     );
   }, [categories]);
 
+  const tabs = [
+    { id: 'products', label: 'Prix produits', icon: Tag },
+    { id: 'profitability', label: 'Rentabilité', icon: TrendingUp },
+  ];
+
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Grille de prix</h1>
-          <p className="text-muted-foreground mt-1">
-            Consultez et comparez les prix de vos produits par canal de vente.
-          </p>
-        </div>
-
-        <Tabs defaultValue="products">
-          <TabsList>
-            <TabsTrigger value="products" className="flex items-center gap-2">
-              <Tag className="w-4 h-4" />
-              Prix produits
-            </TabsTrigger>
-            <TabsTrigger value="profitability" className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4" />
-              Rentabilité
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="products" className="mt-4">
-            {loading ? (
-              <TableSkeleton />
-            ) : (
-              <ProductPriceTable products={enrichedProducts} categories={categories} />
-            )}
-          </TabsContent>
-
-          <TabsContent value="profitability" className="mt-4">
-            {loading ? (
-              <TableSkeleton colCount={6} />
-            ) : (
-              <ProfitabilityTable products={enrichedProducts} />
-            )}
-          </TabsContent>
-        </Tabs>
-      </div>
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Grille de prix</h1>
+            <p className="text-muted-foreground mt-1">
+              Consultez et comparez les prix de vos produits par canal de vente.
+            </p>
+          </div>
+        }
+      >
+        <TabSystem
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          renderContent={(tabId) => {
+            if (tabId === 'products') {
+              return loading ? (
+                <TableSkeleton />
+              ) : (
+                <ProductPriceTable products={enrichedProducts} categories={categories} />
+              );
+            }
+            if (tabId === 'profitability') {
+              return loading ? (
+                <TableSkeleton colCount={6} />
+              ) : (
+                <ProfitabilityTable products={enrichedProducts} />
+              );
+            }
+            return null;
+          }}
+        />
+      </PageContainer>
     </DashboardLayout>
   );
 }

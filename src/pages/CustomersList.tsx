@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
@@ -176,20 +177,21 @@ const CustomersList = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Users className="h-8 w-8 text-primary" />
-            <h1 className="text-3xl font-bold text-foreground">Liste des clients</h1>
+      <PageContainer
+        header={
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Users className="h-8 w-8 text-primary" />
+              <h1 className="text-3xl font-bold text-foreground">Liste des clients</h1>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {customers.length} client{customers.length !== 1 ? 's' : ''}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {customers.length} client{customers.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-
+        }
+      >
         {/* Search */}
-        <div className="relative max-w-md">
+        <div className="relative w-full sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Rechercher un client..."
@@ -266,7 +268,7 @@ const CustomersList = () => {
             </div>
           )}
         </div>
-      </div>
+      </PageContainer>
 
       {/* Customer Details Sheet */}
       {selectedCustomer && (

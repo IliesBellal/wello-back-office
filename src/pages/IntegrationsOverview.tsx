@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -151,15 +152,17 @@ export default function IntegrationsOverviewPage() {
 
   return (
     <DashboardLayout>
-      <div className="mobile-padding space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Canaux et Plateformes</h1>
-          <p className="text-muted-foreground mt-1">
-            Gérez vos intégrations avec les plateformes de livraison
-          </p>
-        </div>
-
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Canaux et Plateformes</h1>
+            <p className="text-muted-foreground mt-1">
+              Gérez vos intégrations avec les plateformes de livraison
+            </p>
+          </div>
+        }
+        className="space-y-6"
+      >
         {/* Summary Cards */}
         {!loading && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -228,7 +231,7 @@ export default function IntegrationsOverviewPage() {
             path="/integrations/deliveroo"
           />
         </div>
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 }

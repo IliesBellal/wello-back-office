@@ -6,6 +6,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +20,9 @@ import { ExportButton } from '@/components/analytics';
 import { MultiFilter } from '@/components/shared/MultiFilter';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { ChannelToggleButtons } from '@/components/dashboard/ChannelToggleButtons';
+import { TabSystem } from '@/components/shared/TabSystem';
+import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
+import { Tile } from '@/components/shared/Tile';
 import { toast } from 'sonner';
 
 type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'tags' | 'annulations' | 'remises' | 'clients' | 'paiements' | 'restaurants';
@@ -53,18 +57,18 @@ const EvolutionBadge = ({ percent }: { percent: number }) => (
   </div>
 );
 
-const MetricCard = ({ label, value, change }: { label: string; value: string | number; change?: number }) => (
-  <Card className="bg-card border border-border">
-    <CardHeader className="pb-2">
-      <CardTitle className="text-xs font-medium text-muted-foreground">{label}</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="text-2xl font-bold">{value}</div>
-      {typeof change === 'number' && <EvolutionBadge percent={change} />}
-    </CardContent>
-  </Card>
+// Remplace le MetricCard local par une fonction qui crée des Tile
+const MetricCard = ({ label, value, change, isHighlighted }: { label: string; value: string | number; change?: number; isHighlighted?: boolean }) => (
+  <Tile 
+    title={label}
+    value={value}
+    isHighlighted={isHighlighted}
+  >
+    {typeof change === 'number' && <EvolutionBadge percent={change} />}
+  </Tile>
 );
 
+// Legacy DataTable component for tabs that haven't been migrated to ExpandableDataTable yet
 const DataTable = ({ 
   columns, 
   data, 
@@ -260,6 +264,7 @@ export const DashboardAnalysis = () => {
         <MetricCard
           label="CA Actuel"
           value={analyticsData.revenue.current_period.total.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+          isHighlighted
         />
         <MetricCard
           label="Période Préc."
@@ -363,6 +368,7 @@ export const DashboardAnalysis = () => {
           label="Nombre de commandes"
           value={analyticsData.orders.metrics.total_orders}
           change={analyticsData.orders.comparisons.previous_period.change}
+          isHighlighted
         />
         <MetricCard
           label="Panier moyen"
@@ -498,6 +504,7 @@ export const DashboardAnalysis = () => {
         <MetricCard
           label="Nombre de produits vendus"
           value={analyticsData.products.metrics.total_products_sold}
+          isHighlighted
         />
         <MetricCard
           label="CA total produits"
@@ -578,38 +585,24 @@ export const DashboardAnalysis = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-3 block">Types d'option</label>
-            <div className="space-y-2">
-              {[
-                { value: 'paid', label: 'Suppléments payants' },
-                { value: 'free', label: 'Modifications gratuites' },
-                { value: 'removed', label: 'Ingrédients retirés' },
-              ].map((opt) => (
-                <label key={opt.value} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={optionTypes.includes(opt.value)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setOptionTypes([...optionTypes, opt.value]);
-                      } else {
-                        setOptionTypes(optionTypes.filter((t) => t !== opt.value));
-                      }
-                    }}
-                    className="rounded"
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
+            <MultiFilter
+              options={[
+                { id: 'paid', label: 'Suppléments payants' },
+                { id: 'free', label: 'Modifications gratuites' },
+                { id: 'removed', label: 'Ingrédients retirés' },
+              ]}
+              selectedIds={optionTypes}
+              onChange={setOptionTypes}
+              label="Types d'option"
+            />
           </div>
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Nombre total d'options" value={analyticsData.options.metrics.total_options} />
+        <MetricCard label="Nombre total d'options" value={analyticsData.options.metrics.total_options} isHighlighted />
         <MetricCard
           label="CA généré par options"
           value={analyticsData.options.metrics.options_revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
@@ -873,6 +866,7 @@ export const DashboardAnalysis = () => {
           label="Nombre d'annulations"
           value={analyticsData.cancellations.metrics.total_cancellations}
           change={analyticsData.cancellations.comparisons.previous_period.change}
+          isHighlighted
         />
         <MetricCard
           label="Taux d'annulation"
@@ -957,7 +951,7 @@ export const DashboardAnalysis = () => {
           <CardTitle className="text-sm font-semibold">Détails par serveur</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable
+          <ExpandableDataTable<any>
             columns={[
               { key: 'server_name', label: 'Serveur', sortable: true },
               { key: 'cancellations', label: 'Annulations', sortable: true },
@@ -967,8 +961,9 @@ export const DashboardAnalysis = () => {
               { key: 'evolution_percent', label: 'Évolution %', sortable: true, render: (v: number) => <EvolutionBadge percent={v} /> },
             ]}
             data={analyticsData.cancellations.by_server}
-            sortBy="cancellations"
             expandableRowKey="server_name"
+            initialSortBy="cancellations"
+            initialSortDir="desc"
             renderExpandedRow={(server: any) => (
               <div className="space-y-4">
                 <div className="text-sm font-semibold text-foreground">Commandes annulées - {server.server_name}</div>
@@ -1028,34 +1023,20 @@ export const DashboardAnalysis = () => {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-3 block">Type de remise</label>
-            <div className="space-y-2">
-              {[
-                { value: 'promotion', label: 'Promotion' },
-                { value: 'happy_hour', label: 'Happy hour' },
-                { value: 'gesture', label: 'Geste commercial' },
-                { value: 'loyalty', label: 'Fidélité client' },
-                { value: 'promo_code', label: 'Codes promo' },
-              ].map((type) => (
-                <label key={type.value} className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={discountTypes.includes(type.value)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setDiscountTypes([...discountTypes, type.value]);
-                      } else {
-                        setDiscountTypes(discountTypes.filter((t) => t !== type.value));
-                      }
-                    }}
-                    className="rounded"
-                  />
-                  {type.label}
-                </label>
-              ))}
-            </div>
+            <MultiFilter
+              options={[
+                { id: 'promotion', label: 'Promotion' },
+                { id: 'happy_hour', label: 'Happy hour' },
+                { id: 'gesture', label: 'Geste commercial' },
+                { id: 'loyalty', label: 'Fidélité client' },
+                { id: 'promo_code', label: 'Codes promo' },
+              ]}
+              selectedIds={discountTypes}
+              onChange={setDiscountTypes}
+              label="Type de remise"
+            />
           </div>
         </CardContent>
       </Card>
@@ -1064,6 +1045,7 @@ export const DashboardAnalysis = () => {
         <MetricCard
           label="Volume remises accordées"
           value={analyticsData.discounts.metrics.total_discounts.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+          isHighlighted
         />
         <MetricCard
           label="Taux de remise moyen"
@@ -1155,16 +1137,224 @@ export const DashboardAnalysis = () => {
   );
 
   // ==================== ONGLET CLIENTS ====================
-  const renderClientsTab = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Nouveaux" value={analyticsData.clients.metrics.new_customers} />
-        <MetricCard label="Récurrents" value={analyticsData.clients.metrics.recurring_customers} />
-        <MetricCard label="Fréquence moy." value={analyticsData.clients.metrics.avg_frequency.toFixed(2) + 'x'} />
-        <MetricCard label="Panier moy." value={analyticsData.clients.metrics.avg_basket_by_segment.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })} />
+  const renderClientsTab = () => {
+    // Calcul du loyalty score et des insights
+    const totalRevenue = analyticsData.clients.new_vs_recurring.new + analyticsData.clients.new_vs_recurring.recurring;
+    const recurringRate = ((analyticsData.clients.new_vs_recurring.recurring / totalRevenue) * 100).toFixed(1);
+    const newCustomerAOV = analyticsData.clients.by_segment[0]?.avg_basket || 0;
+    const recurringCustomerAOV = analyticsData.clients.by_segment[1]?.avg_basket || 0;
+    const aovLift = recurringCustomerAOV > 0 ? (((newCustomerAOV - recurringCustomerAOV) / recurringCustomerAOV) * 100).toFixed(1) : '0';
+
+    return (
+      <div className="space-y-6">
+        {/* ========== KPI Cards ========== */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard
+            label="Nouveaux Clients"
+            value={analyticsData.clients.metrics.new_customers}
+            change={analyticsData.clients.comparisons.previous_period.change}
+            isHighlighted
+          />
+          <MetricCard
+            label="Taux de Récurrence"
+            value={recurringRate + '%'}
+          />
+          <MetricCard
+            label="AOV Nouveau vs Récurrent"
+            value={(newCustomerAOV > recurringCustomerAOV ? '+' : '') + aovLift + '%'}
+          />
+          <MetricCard
+            label="Fréquence d'achat"
+            value={analyticsData.clients.metrics.avg_frequency.toFixed(2) + 'x'}
+          />
+        </div>
+
+        {/* ========== Segment Breakdown ========== */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {analyticsData.clients.by_segment.map((seg) => (
+            <Card key={seg.segment} className="bg-card border border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-medium text-muted-foreground">{seg.segment}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div>
+                    <div className="text-2xl font-bold">{seg.count}</div>
+                    <div className="text-xs text-muted-foreground">{seg.total_orders} commandes</div>
+                  </div>
+                  <div className="pt-2 border-t border-border/50">
+                    <div className="text-sm font-semibold">{seg.revenue_percent}% CA</div>
+                    <div className="text-xs text-muted-foreground">{seg.revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* ========== Mix Client & Loyalty Score ========== */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="bg-card border border-border lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Évolution du mix Client</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <AreaChart data={analyticsData.clients.timeline}>
+                  <defs>
+                    <linearGradient id="gradNew" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gradRecur" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                  <XAxis dataKey="date" stroke="#6b7280" style={{ fontSize: '0.875rem' }} />
+                  <YAxis stroke="#6b7280" style={{ fontSize: '0.875rem' }} />
+                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="new_customers"
+                    stackId="1"
+                    stroke="#3b82f6"
+                    fillOpacity={1}
+                    fill="url(#gradNew)"
+                    name="Nouveaux"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="recurring_customers"
+                    stackId="1"
+                    stroke="#10b981"
+                    fillOpacity={1}
+                    fill="url(#gradRecur)"
+                    name="Récurrents"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border border-border">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Santé Base Client</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <div className="relative w-40 h-40 flex items-center justify-center">
+                {/* Loyalty Score Gauge */}
+                <svg className="transform -rotate-90" width="160" height="160" viewBox="0 0 160 160">
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="70"
+                    fill="none"
+                    stroke="#e5e7eb"
+                    strokeWidth="8"
+                  />
+                  <circle
+                    cx="80"
+                    cy="80"
+                    r="70"
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="8"
+                    strokeDasharray={`${(analyticsData.clients.loyalty_score || 72) * 4.4} 440`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute text-center">
+                  <div className="text-3xl font-bold">{analyticsData.clients.loyalty_score || 72}</div>
+                  <div className="text-xs text-muted-foreground">/ 100</div>
+                </div>
+              </div>
+              <div className="mt-6 text-center space-y-1">
+                <p className="text-sm font-semibold text-green-600">✓ Excellente santé</p>
+                <p className="text-xs text-muted-foreground">Base client engagée et fidèle</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ========== Top Clients Table ========== */}
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Top Clients</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ExpandableDataTable<any>
+              columns={[
+                { key: 'name', label: 'Client', sortable: true },
+                { 
+                  key: 'segment', 
+                  label: 'Segment', 
+                  sortable: true, 
+                  render: (val: string) => (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      val === 'Fidèle' ? 'bg-green-100 text-green-700' :
+                      val === 'Récurrent' ? 'bg-blue-100 text-blue-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}>
+                      {val}
+                    </span>
+                  ),
+                },
+                { key: 'orders', label: 'Commandes', sortable: true },
+                { 
+                  key: 'revenue', 
+                  label: 'CA généré', 
+                  sortable: true, 
+                  align: 'right',
+                  render: (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) 
+                },
+                { key: 'last_channel', label: 'Dernier Canal', sortable: true },
+              ]}
+              data={analyticsData.clients.top_clients || []}
+              expandableRowKey="id"
+              initialSortBy="revenue"
+              initialSortDir="desc"
+              renderExpandedRow={(client: any) => (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Dernière visite</p>
+                      <p className="font-semibold">{client.last_visit}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Valeur client</p>
+                      <p className="font-semibold">{client.lifetime_value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Panier moyen</p>
+                      <p className="font-semibold">{(client.revenue / client.orders).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-muted-foreground">Statut</p>
+                      <p className="font-semibold text-green-600">Actif</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+        {/* ========== Export ========== */}
+        <div className="flex justify-end">
+          <ExportButton
+            filename="Clients"
+            onExport={() => analyticsService.exportClientsCSV(
+              dateRange.from.toISOString().split('T')[0],
+              dateRange.to.toISOString().split('T')[0]
+            )}
+          />
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ==================== ONGLET RÈGLEMENTS ====================
   const renderPaymentsTab = () => (
@@ -1213,6 +1403,7 @@ export const DashboardAnalysis = () => {
         <MetricCard
           label="Montant total"
           value={analyticsData.payments.metrics.total_amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+          isHighlighted
         />
         <MetricCard
           label="Carte bancaire"
@@ -1324,12 +1515,13 @@ export const DashboardAnalysis = () => {
   const renderRestaurantsTab = () => (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {analyticsData.restaurants.by_restaurant.map((restaurant) => (
+        {analyticsData.restaurants.by_restaurant.map((restaurant, idx) => (
           <div key={restaurant.restaurant_id}>
             <MetricCard
               label={restaurant.name}
               value={restaurant.value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
               change={restaurant.evolution_percent}
+              isHighlighted={idx === 0}
             />
           </div>
         ))}
@@ -1380,14 +1572,17 @@ export const DashboardAnalysis = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 lg:p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Analyse</h1>
-          <p className="text-muted-foreground">Dashboard d'analyse avec 10 onglets</p>
-        </div>
-
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Analyse</h1>
+            <p className="text-muted-foreground">Dashboard d'analyse avec 10 onglets</p>
+          </div>
+        }
+        className="space-y-6"
+      >
         {/* Période globale */}
-        <Card className="bg-card border border-border mb-6">
+        <Card className="bg-card border border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold">Période</CardTitle>
           </CardHeader>
@@ -1398,28 +1593,14 @@ export const DashboardAnalysis = () => {
           </CardContent>
         </Card>
 
-        {/* Onglets */}
-        <div className="mb-6">
-          <div className="flex gap-2 overflow-x-auto border-b border-border pb-4">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as TabType)}
-                className={`px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
-                  activeTab === tab.id
-                    ? 'text-blue-600 border-b-2 border-blue-600'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Contenu */}
-        {renderTabContent()}
-      </div>
+        {/* Onglets avec TabSystem */}
+        <TabSystem
+          tabs={tabs}
+          activeTab={activeTab}
+          onTabChange={(tabId) => setActiveTab(tabId as TabType)}
+          renderContent={() => renderTabContent()}
+        />
+      </PageContainer>
     </DashboardLayout>
   );
 };

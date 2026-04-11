@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -218,12 +219,13 @@ export default function Menu() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">
-            Menu de l'établissement
-          </h1>
-          <div className="flex gap-2">
+      <PageContainer
+        header={
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-foreground">
+              Menu de l'établissement
+            </h1>
+            <div className="flex gap-2">
             <Button className="bg-gradient-primary" onClick={() => setProductCreateOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Nouveau Produit
@@ -258,14 +260,15 @@ export default function Menu() {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
-
+          </div>
+        }
+      >
         {/* Filters */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="flex flex-col sm:flex-row gap-3 flex-1">
               {/* Recherche */}
-              <div className="relative flex-1 max-w-sm">
+              <div className="relative w-full sm:max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   placeholder="Rechercher un produit…"
@@ -387,7 +390,7 @@ export default function Menu() {
           tags={tags}
           onTagCreated={(newTag) => setTags([...tags, newTag])}
         />
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 }

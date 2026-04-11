@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -659,14 +660,16 @@ export default function AttributesPage() {
 
   return (
     <DashboardLayout>
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Options &amp; Suppléments</h1>
-          <p className="text-muted-foreground mt-1">
-            Gérez les groupes d'options réutilisables à associer à vos produits.
-          </p>
-        </div>
-
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Options &amp; Suppléments</h1>
+            <p className="text-muted-foreground mt-1">
+              Gérez les groupes d'options réutilisables à associer à vos produits.
+            </p>
+          </div>
+        }
+      >
         {loading ? (
           <PageSkeleton />
         ) : view === 'list' ? (
@@ -683,7 +686,7 @@ export default function AttributesPage() {
             onCancel={() => setView('list')}
           />
         )}
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 }

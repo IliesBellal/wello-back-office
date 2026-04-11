@@ -7,6 +7,7 @@
 
 import { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -280,12 +281,14 @@ export const DashboardOrderHistory = () => {
 
   return (
     <DashboardLayout>
-      <div className="p-6 lg:p-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Historique des Commandes</h1>
-          <p className="text-muted-foreground">Suivi complet des commandes avec filtres et détails</p>
-        </div>
-
+      <PageContainer
+        header={
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">Historique des Commandes</h1>
+            <p className="text-muted-foreground">Suivi complet des commandes avec filtres et détails</p>
+          </div>
+        }
+      >
         {/* Filtres */}
         <Card className="bg-card border border-border mb-6">
           <CardHeader className="pb-3">
@@ -496,7 +499,7 @@ export const DashboardOrderHistory = () => {
             </button>
           </div>
         </div>
-      </div>
+      </PageContainer>
 
       {/* Detail Modal */}
       <OrderDetailModal 

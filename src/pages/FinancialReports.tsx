@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -82,21 +83,23 @@ const FinancialReports = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 p-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-foreground">Rapports Financiers</h1>
-          <div className="flex items-center gap-3">
-            <DateRangePicker
-              dateRange={dateRange}
-              onDateRangeChange={setDateRange}
-            />
-            <Button onClick={handleExportGlobal} className="bg-gradient-primary">
-              <Download className="w-4 h-4 mr-2" />
-              Export Comptable Global
-            </Button>
+      <PageContainer
+        header={
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold text-foreground">Rapports Financiers</h1>
+            <div className="flex items-center gap-3">
+              <DateRangePicker
+                dateRange={dateRange}
+                onDateRangeChange={setDateRange}
+              />
+              <Button onClick={handleExportGlobal} className="bg-gradient-primary">
+                <Download className="w-4 h-4 mr-2" />
+                Export Comptable Global
+              </Button>
+            </div>
           </div>
-        </div>
-
+        }
+      >
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {isLoading ? (
@@ -204,7 +207,7 @@ const FinancialReports = () => {
             </CardContent>
           </Tabs>
         </Card>
-      </div>
+      </PageContainer>
     </DashboardLayout>
   );
 };
