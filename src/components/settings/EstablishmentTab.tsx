@@ -3,17 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, Clock, Smartphone, ShoppingCart } from "lucide-react";
+import { Store, ShoppingCart, Clock } from "lucide-react";
 import { useEstablishmentSettings } from "@/hooks/useSettings";
 import { SettingsSection } from "./SettingsSection";
-import { ColorPreview } from "./ColorPreview";
 import { OpeningHours } from "./OpeningHours";
 import { EstablishmentSettings } from "@/types/settings";
 import {
   establishmentInfoFields,
   establishmentTimingsFields,
-  establishmentOrderingFields,
-  establishmentScanOrderFields
+  establishmentOrderingFields
 } from "@/config/settingsConfig";
 
 export const EstablishmentTab = () => {
@@ -48,8 +46,9 @@ export const EstablishmentTab = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
+    <div className="w-full max-w-7xl mx-auto px-6 md:px-8 py-10">
+      {/* Status Card */}
+      <Card className="mb-10">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
@@ -78,86 +77,65 @@ export const EstablishmentTab = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Store className="w-5 h-5" />
-            Identité & Branding
-          </CardTitle>
-          <CardDescription>
-            Informations générales de votre établissement
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <SettingsSection
-            fields={establishmentInfoFields.filter(f => f.key !== 'primary_color' && f.key !== 'text_color')}
-            values={formData.info}
-            onChange={(key, value) => handleFieldChange('info', key, value)}
-          />
-          
-          <ColorPreview
-            primaryColor={formData.info.primary_color}
-            textColor={formData.info.text_color}
-            onPrimaryChange={(color) => handleFieldChange('info', 'primary_color', color)}
-            onTextChange={(color) => handleFieldChange('info', 'text_color', color)}
-          />
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="w-5 h-5" />
-            Flux de Commande
-          </CardTitle>
-          <CardDescription>
-            Paramètres de gestion des commandes
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <h4 className="text-sm font-semibold mb-3">Temps d'attente</h4>
+      {/* Grille de sections: 2 colonnes sur desktop */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 mb-10">
+        {/* Identity Card - Pleine largeur */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5" />
+              Identité
+            </CardTitle>
+            <CardDescription>Informations générales</CardDescription>
+          </CardHeader>
+          <CardContent>
             <SettingsSection
-              fields={establishmentTimingsFields.filter(f => 
-                f.key !== 'auto_close_delay' || formData.timings.auto_close_enabled
-              )}
+              fields={establishmentInfoFields}
+              values={formData.info}
+              onChange={(key, value) => handleFieldChange('info', key, value)}
+              useGrid={true}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Timings Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Temps d'attente
+            </CardTitle>
+            <CardDescription>Configurez les délais de livraison</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SettingsSection
+              fields={establishmentTimingsFields}
               values={formData.timings}
               onChange={(key, value) => handleFieldChange('timings', key, value)}
             />
-          </div>
-          
-          <div>
-            <h4 className="text-sm font-semibold mb-3">Options de commande</h4>
+          </CardContent>
+        </Card>
+
+        {/* Ordering Options Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5" />
+              Options de commande
+            </CardTitle>
+            <CardDescription>Paramètres de gestion</CardDescription>
+          </CardHeader>
+          <CardContent>
             <SettingsSection
               fields={establishmentOrderingFields}
               values={formData.ordering}
               onChange={(key, value) => handleFieldChange('ordering', key, value)}
             />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Smartphone className="w-5 h-5" />
-            Scan & Order
-          </CardTitle>
-          <CardDescription>
-            Configuration de la commande digitale
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SettingsSection
-              fields={establishmentScanOrderFields}
-              values={formData.scan_order}
-              onChange={(key, value) => handleFieldChange('scan_order', key, value)}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* Opening Hours - Full Width */}
       <OpeningHours />
     </div>
   );
