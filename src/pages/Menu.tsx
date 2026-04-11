@@ -75,11 +75,12 @@ export default function Menu() {
   const [allergens, setAllergens] = useState<Allergen[]>([]);
   const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
   const [productStatusMap, setProductStatusMap] = useState<Record<string, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Filtres et tri
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string>('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -113,6 +114,13 @@ export default function Menu() {
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
     setSheetOpen(true);
+  };
+
+  const handleToggleGroup = (productId: string) => {
+    setExpandedGroups(prev => ({
+      ...prev,
+      [productId]: !prev[productId]
+    }));
   };
 
   const handleSort = (key: SortKey) => {
@@ -185,10 +193,10 @@ export default function Menu() {
     }
 
     // Filtre tags
-    if (tagFilter.length > 0) {
+    if (tagFilter !== 'all') {
       result = result.filter(p => {
         const productTags = p.tags || [];
-        return tagFilter.some(tagId => productTags.includes(tagId));
+        return productTags.includes(tagFilter);
       });
     }
 
@@ -295,11 +303,19 @@ export default function Menu() {
               </Select>
 
               {/* Filtre tags */}
-              <MultiFilter
-                options={tags.map(tag => ({ id: tag.id, label: tag.name }))}
-                selectedIds={tagFilter}
-                onChange={setTagFilter}
-              />
+              <Select value={tagFilter} onValueChange={setTagFilter}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Tous les tags" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les tags</SelectItem>
+                  {tags.map(tag => (
+                    <SelectItem key={tag.id} value={tag.id}>
+                      {tag.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               {/* Compteur */}
               <div className="flex items-center text-sm text-muted-foreground whitespace-nowrap">
@@ -323,6 +339,8 @@ export default function Menu() {
             onStatusChange={handleProductStatusChange}
             productStatusMap={productStatusMap}
             updatingProductId={updatingProductId}
+            expandedGroups={expandedGroups}
+            onToggleGroup={handleToggleGroup}
           />
         </div>
 

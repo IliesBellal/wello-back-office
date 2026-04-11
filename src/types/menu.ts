@@ -140,6 +140,7 @@ export interface Tag {
   id: string;
   merchant_id?: string;
   name: string;
+  order?: number;
 }
 
 export interface Product {

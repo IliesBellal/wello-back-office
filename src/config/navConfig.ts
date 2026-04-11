@@ -104,15 +104,6 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
 
-  // ═══ ORDERS ═══
-  {
-    id: 'orders',
-    title: 'Commandes',
-    icon: ShoppingBag,
-    href: '/orders',
-    primaryNav: true,
-  },
-
   // ═══ MENU MANAGEMENT ═══
   {
     id: 'menu',

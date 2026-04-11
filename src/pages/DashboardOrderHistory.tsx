@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { ExportButton } from '@/components/analytics';
 import { analyticsService } from '@/services/analyticsService';
 import { subDays } from 'date-fns';
-import { Search, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const ORDER_STATUS_COLORS: Record<string, { bg: string; text: string; label: string }> = {
   completed: { bg: 'bg-green-100', text: 'text-green-700', label: 'Complétée' },
@@ -41,6 +41,93 @@ const PAYMENT_LABELS: Record<string, string> = {
   cancelled: 'Annulée',
 };
 
+interface RefundModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onRefund: (amount: number, reason: string) => Promise<void>;
+  maxAmount: number;
+}
+
+const RefundModal = ({ isOpen, onClose, onRefund, maxAmount }: RefundModalProps) => {
+  const [amount, setAmount] = useState<string>(maxAmount.toString());
+  const [reason, setReason] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async () => {
+    if (!amount || !reason) return;
+    setIsLoading(true);
+    try {
+      await onRefund(parseFloat(amount), reason);
+      setAmount(maxAmount.toString());
+      setReason('');
+      onClose();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+      <Card className="bg-card border border-border w-full max-w-md">
+        <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-card border-b border-border">
+          <CardTitle className="text-lg font-bold">Rembourser</CardTitle>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </CardHeader>
+        <CardContent className="space-y-4 pt-6">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">Montant</label>
+            <div className="relative">
+              <Input
+                type="number"
+                step="0.01"
+                max={maxAmount}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">Montant max: {maxAmount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground mb-2 block">Motif</label>
+            <Select value={reason} onValueChange={setReason}>
+              <SelectTrigger className="bg-background border border-input">
+                <SelectValue placeholder="Sélectionner un motif" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="customer_request">Demande client</SelectItem>
+                <SelectItem value="duplicate_charge">Double paiement</SelectItem>
+                <SelectItem value="order_cancelled">Commande annulée</SelectItem>
+                <SelectItem value="product_return">Retour produit</SelectItem>
+                <SelectItem value="other">Autre</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2 pt-4 border-t border-border">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-border rounded text-sm hover:bg-muted transition disabled:opacity-50"
+              disabled={isLoading}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={!amount || !reason || isLoading}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition disabled:opacity-50"
+            >
+              {isLoading ? 'Traitement...' : 'Rembourser'}
+            </button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
 interface OrderDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -48,6 +135,8 @@ interface OrderDetailModalProps {
 }
 
 const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) => {
+  const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
+
   if (!isOpen) return null;
 
   // Mock order detail data
@@ -60,7 +149,6 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
       name: 'Marie Dubois',
       email: 'marie@example.com',
       phone: '06 12 34 56 78',
-      loyalty: 'Fidèle 5+',
     },
     items: [
       { name: 'Burger Premium', quantity: 1, price: 18.50 },
@@ -71,11 +159,15 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
     discount: 0,
     tax: 5.71,
     total: 35.21,
-    payment: {
-      method: 'card',
-      status: 'completed',
-      reference: 'CH-2026-04-08-14032',
-    },
+    payments: [
+      {
+        id: 'pay-1',
+        method: 'card',
+        status: 'completed',
+        reference: 'CH-2026-04-08-14032',
+        amount: 35.21,
+      },
+    ],
     timeline: [
       { time: '14:30', action: 'Commande créée' },
       { time: '14:35', action: 'Préparation en cours' },
@@ -84,13 +176,35 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
     ],
   };
 
+  const handleRefund = async (amount: number, reason: string) => {
+    try {
+      // TODO: Call API for refund
+      // await refundService.createRefund(orderId, amount, reason);
+      console.log(`Refund requested: ${amount}€ for reason: ${reason}`);
+    } catch (error) {
+      console.error('Refund failed:', error);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <Card className="bg-card border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-card border-b border-border">
-          <CardTitle className="text-lg font-bold">Détails Commande {orderDetail.number}</CardTitle>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
-        </CardHeader>
+    <>
+      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <Card className="bg-card border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-card border-b border-border">
+            <div>
+              <CardTitle className="text-lg font-bold">Détails Commande {orderDetail.number}</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">ID: {orderDetail.id}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setIsRefundModalOpen(true)}
+                className="px-3 py-2 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50 transition"
+              >
+                Rembourser
+              </button>
+              <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+            </div>
+          </CardHeader>
         <CardContent className="space-y-6 pt-6">
           {/* Infos générales */}
           <div>
@@ -122,10 +236,6 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
               <div>
                 <p className="text-muted-foreground text-xs">Nom</p>
                 <p className="font-medium">{orderDetail.customer.name}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Segment</p>
-                <p className="font-medium">{orderDetail.customer.loyalty}</p>
               </div>
               <div className="col-span-2">
                 <p className="text-muted-foreground text-xs">Email</p>
@@ -174,22 +284,32 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
             </div>
           </div>
 
-          {/* Paiement */}
+          {/* Paiements */}
           <div className="border-t border-border pt-6">
-            <h3 className="font-semibold mb-3">Paiement</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-muted-foreground text-xs">Méthode</p>
-                <p className="font-medium">{PAYMENT_LABELS[orderDetail.payment.method]}</p>
-              </div>
-              <div>
-                <p className="text-muted-foreground text-xs">Statut</p>
-                <p className="font-medium text-green-600">Payée</p>
-              </div>
-              <div className="col-span-2">
-                <p className="text-muted-foreground text-xs">Référence</p>
-                <p className="font-medium text-xs font-mono">{orderDetail.payment.reference}</p>
-              </div>
+            <h3 className="font-semibold mb-3">Paiements</h3>
+            <div className="space-y-4">
+              {orderDetail.payments.map((payment) => (
+                <div key={payment.id} className="border border-border rounded p-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground text-xs">Montant</p>
+                      <p className="font-bold">{payment.amount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Méthode</p>
+                      <p className="font-medium">{PAYMENT_LABELS[payment.method]}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Statut</p>
+                      <p className="font-medium text-green-600">Payée</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground text-xs">Référence</p>
+                      <p className="font-medium text-xs font-mono">{payment.reference}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -208,19 +328,17 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
               ))}
             </div>
           </div>
-
-          {/* Actions */}
-          <div className="border-t border-border pt-6 flex gap-2">
-            <button className="px-4 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 transition">
-              Reprendre la commande
-            </button>
-            <button className="px-4 py-2 border border-border rounded text-sm hover:bg-muted transition">
-              Voir la facture
-            </button>
-          </div>
         </CardContent>
       </Card>
     </div>
+
+    <RefundModal
+      isOpen={isRefundModalOpen}
+      onClose={() => setIsRefundModalOpen(false)}
+      onRefund={handleRefund}
+      maxAmount={orderDetail.total}
+    />
+    </>
   );
 };
 
@@ -229,7 +347,6 @@ export const DashboardOrderHistory = () => {
   const [endDate, setEndDate] = useState<Date>(new Date());
   const [selectedChannel, setSelectedChannel] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
-  const [selectedPayment, setSelectedPayment] = useState<string>('all');
   const [searchInput, setSearchInput] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -266,9 +383,8 @@ export const DashboardOrderHistory = () => {
   const filteredOrders = allOrders.filter(order => {
     const matchChannel = selectedChannel === 'all' || order.channel === selectedChannel;
     const matchStatus = selectedStatus === 'all' || order.status === selectedStatus;
-    const matchPayment = selectedPayment === 'all' || order.payment_method === selectedPayment;
     const matchSearch = !searchInput || order.number.includes(searchInput) || order.customer_name.toLowerCase().includes(searchInput.toLowerCase());
-    return matchChannel && matchStatus && matchPayment && matchSearch;
+    return matchChannel && matchStatus && matchSearch;
   });
 
   const totalPages = Math.ceil(filteredOrders.length / itemsPerPage);
@@ -337,20 +453,6 @@ export const DashboardOrderHistory = () => {
                 </Select>
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">Paiement</label>
-                <Select value={selectedPayment} onValueChange={(v) => { setSelectedPayment(v); setCurrentPage(1); }}>
-                  <SelectTrigger className="bg-background border border-input">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les paiements</SelectItem>
-                    <SelectItem value="card">Carte</SelectItem>
-                    <SelectItem value="cash">Espèces</SelectItem>
-                    <SelectItem value="applepay">Apple Pay</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
                 <label className="text-xs font-medium text-muted-foreground mb-2 block">Recherche</label>
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -371,12 +473,12 @@ export const DashboardOrderHistory = () => {
 
         {/* Statistiques */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="bg-card border border-border">
+          <Card className="bg-gradient-primary border border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium text-muted-foreground">Total commandes</CardTitle>
+              <CardTitle className="text-xs font-medium text-white">Total commandes</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{filteredOrders.length}</div>
+              <div className="text-2xl font-bold text-white">{filteredOrders.length}</div>
             </CardContent>
           </Card>
           <Card className="bg-card border border-border">
@@ -418,13 +520,15 @@ export const DashboardOrderHistory = () => {
                     <TableHead className="font-semibold">Canal</TableHead>
                     <TableHead className="font-semibold">Statut</TableHead>
                     <TableHead className="text-right font-semibold">Montant</TableHead>
-                    <TableHead className="font-semibold">Paiement</TableHead>
-                    <TableHead className="text-center font-semibold">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {paginatedOrders.map((order) => (
-                    <TableRow key={order.id} className="border-b border-border">
+                    <TableRow 
+                      key={order.id} 
+                      className="border-b border-border cursor-pointer hover:bg-muted transition"
+                      onClick={() => handleDetailOpen(order.id)}
+                    >
                       <TableCell className="font-medium">{order.number}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{order.date} {order.time}</TableCell>
                       <TableCell>{order.customer_name}</TableCell>
@@ -440,16 +544,6 @@ export const DashboardOrderHistory = () => {
                       </TableCell>
                       <TableCell className="text-right font-semibold">
                         {order.total.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                      </TableCell>
-                      <TableCell className="text-sm">{PAYMENT_LABELS[order.payment_method]}</TableCell>
-                      <TableCell className="text-center">
-                        <button 
-                          onClick={() => handleDetailOpen(order.id)}
-                          className="p-1 hover:bg-muted rounded transition inline-flex"
-                          title="Voir détails"
-                        >
-                          <Eye size={16} className="text-muted-foreground" />
-                        </button>
                       </TableCell>
                     </TableRow>
                   ))}

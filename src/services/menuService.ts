@@ -206,11 +206,11 @@ const mockAllergens: Allergen[] = [
 ];
 
 const mockTags: Tag[] = [
-  { id: "tag_1", name: "Végétarien" },
-  { id: "tag_2", name: "Vegan" },
-  { id: "tag_3", name: "Spicy" },
-  { id: "tag_4", name: "Nouveau" },
-  { id: "tag_5", name: "Populaire" }
+  { id: "tag_1", name: "Végétarien", order: 0 },
+  { id: "tag_2", name: "Vegan", order: 1 },
+  { id: "tag_3", name: "Spicy", order: 2 },
+  { id: "tag_4", name: "Nouveau", order: 3 },
+  { id: "tag_5", name: "Populaire", order: 4 }
 ];
 
 const mockMenuData: Menu = {
@@ -396,6 +396,15 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.patch<void>('/menu/categories/order', payload)
+    );
+  },
+
+  async updateTagOrder(tagIds: string[]): Promise<void> {
+    const payload = { tags: tagIds.map(id => ({ id })) };
+    logAPI('PATCH', '/menu/tags/order', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/tags/order', payload)
     );
   },
 
