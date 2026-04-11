@@ -77,10 +77,10 @@ export const RevenueCard = ({ day, week, month }: RevenueCardProps) => {
   return (
     <Card className="border border-border/40 bg-white shadow-sm hover:shadow-md transition-all duration-200 h-full">
       <CardContent className="p-6 h-full flex flex-col">
-        {/* 3 Sections Horizontales */}
-        <div className="grid grid-cols-3 gap-6 divide-x divide-border/20 h-full items-center">
+        {/* 3 Sections - Verticale en mobile, Horizontale en desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:divide-x md:divide-border/20 h-full md:items-center">
           {sections.map((section, idx) => (
-            <div key={idx} className="flex flex-col items-center space-y-3 first:pl-0 px-6 last:pr-0">
+            <div key={idx} className="flex flex-col items-center space-y-3 py-4 md:py-0 md:first:pl-0 md:px-6 md:last:pr-0">
               {/* Label */}
               <h3 className="text-sm font-bold text-muted-foreground">{section.title}</h3>
 

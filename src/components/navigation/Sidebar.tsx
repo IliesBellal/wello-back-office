@@ -2,8 +2,7 @@ import React, { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/hooks/useSidebar';
-import { navigationConfig } from '@/config/navigationConfig';
-import { NavigationItems } from './NavigationItems';
+import { NavigationContent } from './NavigationContent';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
@@ -19,14 +18,14 @@ import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
  * - Popover sub-items when collapsed
  * - Responsive design (hidden on mobile)
  * - Accessibility features (ARIA labels, keyboard nav)
- * - Uses shared NavigationItems component
+ * - Uses shared NavigationContent component for unified rendering
  */
 export const Sidebar: React.FC = () => {
   const { isExpanded, toggleExpanded, openMenuId, toggleSubItem } = useSidebar();
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  // Convert openMenuId to collapsibleState object for NavigationItems component
+  // Get collapsible state from the useSidebar hook
   const collapsibleState = useMemo(() => {
     return {
       [openMenuId || '']: openMenuId !== null,
@@ -100,22 +99,18 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* ═══ NAVIGATION ═══ */}
-      <nav
-        className={cn(
+      <NavigationContent
+        variant="desktop"
+        isCollapsed={!isExpanded}
+        collapsibleState={collapsibleState}
+        onToggleCollapsible={toggleSubItem}
+        containerClassName={cn(
           'flex-1 overflow-y-auto overflow-x-hidden',
           'py-4 space-y-1',
           'transition-all duration-300',
           isExpanded ? 'px-3' : 'px-2 flex flex-col items-center'
         )}
-      >
-        <NavigationItems
-          items={navigationConfig}
-          variant="desktop"
-          isCollapsed={!isExpanded}
-          collapsibleState={collapsibleState}
-          onToggleCollapsible={toggleSubItem}
-        />
-      </nav>
+      />
 
       {/* ═══ FOOTER - USER MENU ═══ */}
       <div
