@@ -1,13 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useMenuData } from '@/hooks/useMenuData';
 import { Category } from '@/types/menu';
-import { Plus, Pencil, Trash2, GripVertical, Loader2, Save, LinkIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, LinkIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { BulkAssignProductsDialog } from '@/components/shared/BulkAssignProductsDialog';
 import { menuService } from '@/services/menuService';
 import {
@@ -32,6 +39,7 @@ import {
 
 interface SortableCategoryRowProps {
   category: Category;
+  productCount: number;
   onEdit: (category: Category) => void;
   onDelete: (categoryId: string) => void;
   onBulkAssign: (category: Category) => void;
@@ -39,6 +47,7 @@ interface SortableCategoryRowProps {
 
 const SortableCategoryRow = ({
   category,
+  productCount,
   onEdit,
   onDelete,
   onBulkAssign,
@@ -69,7 +78,11 @@ const SortableCategoryRow = ({
       <TableCell className="text-sm text-muted-foreground">
         {category.categ_order ?? category.order ?? 0}
       </TableCell>
-      <TableCell className="text-right space-x-2">
+      <TableCell className="text-center text-sm text-muted-foreground">
+        {productCount}
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex items-center justify-end gap-1">
         <Button
           variant="ghost"
           size="sm"
@@ -94,6 +107,7 @@ const SortableCategoryRow = ({
         >
           <Trash2 className="w-4 h-4 text-destructive" />
         </Button>
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -105,6 +119,7 @@ export default function MarketCategoriesTable() {
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [editingOrder, setEditingOrder] = useState<number>(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -112,6 +127,8 @@ export default function MarketCategoriesTable() {
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [selectedCategoryForBulk, setSelectedCategoryForBulk] = useState<Category | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const saveOrderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -131,6 +148,7 @@ export default function MarketCategoriesTable() {
     try {
       await createProductCategory(newCategoryName);
       setNewCategoryName('');
+      setCreateDialogOpen(false);
       toast({
         title: 'Succès',
         description: 'Catégorie créée avec succès',
@@ -144,9 +162,12 @@ export default function MarketCategoriesTable() {
     }
   };
 
+  const handleCreateNewCategory = handleCreate;
+
   const handleEdit = (category: Category) => {
     setEditingId(category.category_id);
     setEditingName(category.category_name || category.category);
+    setEditingOrder(category.categ_order ?? category.order ?? 0);
   };
 
   const handleUpdateCategory = async (categoryId: string) => {
@@ -154,8 +175,27 @@ export default function MarketCategoriesTable() {
 
     try {
       await updateCategory(categoryId, editingName);
+      
+      // Update order if changed
+      const updatedCategory = categories.find(c => c.category_id === categoryId);
+      if (updatedCategory && editingOrder !== (updatedCategory.categ_order ?? updatedCategory.order ?? 0)) {
+        const newCategories = categories.map(c => 
+          c.category_id === categoryId ? { ...c, categ_order: editingOrder } : c
+        );
+        setCategories(newCategories);
+        
+        // Debounce save
+        if (saveOrderTimeoutRef.current) {
+          clearTimeout(saveOrderTimeoutRef.current);
+        }
+        saveOrderTimeoutRef.current = setTimeout(() => {
+          debouncedSaveOrder(newCategories);
+        }, 500);
+      }
+      
       setEditingId(null);
       setEditingName('');
+      setEditingOrder(0);
       toast({
         title: 'Succès',
         description: 'Catégorie mise à jour avec succès',
@@ -225,6 +265,20 @@ export default function MarketCategoriesTable() {
     }
   };
 
+  const debouncedSaveOrder = async (categoriesToSave: Category[]) => {
+    try {
+      const categoryOrder = categoriesToSave.map((c) => c.category_id);
+      await menuService.updateCategoryOrder(categoryOrder);
+    } catch (error) {
+      console.error('Error saving category order:', error);
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de sauvegarder l\'ordre',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -236,28 +290,16 @@ export default function MarketCategoriesTable() {
     const [movedItem] = newCategories.splice(oldIndex, 1);
     newCategories.splice(newIndex, 0, movedItem);
 
-    setCategories(newCategories.map((c, i) => ({ ...c, categ_order: i })));
-  };
+    const updatedCategories = newCategories.map((c, i) => ({ ...c, categ_order: i }));
+    setCategories(updatedCategories);
 
-  const handleSaveOrder = async () => {
-    setIsSaving(true);
-    try {
-      const categoryOrder = categories.map((c) => c.category_id);
-      await menuService.updateCategoryOrder(categoryOrder);
-      toast({
-        title: 'Succès',
-        description: 'Ordre des catégories sauvegardé avec succès',
-      });
-    } catch (error) {
-      console.error('Error saving category order:', error);
-      toast({
-        title: 'Erreur',
-        description: error instanceof Error ? error.message : 'Impossible de sauvegarder l\'ordre',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(false);
+    // Debounce save
+    if (saveOrderTimeoutRef.current) {
+      clearTimeout(saveOrderTimeoutRef.current);
     }
+    saveOrderTimeoutRef.current = setTimeout(() => {
+      debouncedSaveOrder(updatedCategories);
+    }, 500);
   };
 
   if (loading) {
@@ -276,39 +318,17 @@ export default function MarketCategoriesTable() {
         header={
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-foreground">Catégories Vitrine</h1>
-            <Button className="bg-gradient-primary" onClick={handleSaveOrder} disabled={isSaving}>
-              {isSaving ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="w-4 h-4 mr-2" />
-              )}
-              {isSaving ? 'Enregistrement...' : 'Enregistrer l\'ordre'}
+            <Button
+              className="bg-gradient-primary"
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Nouvelle catégorie
             </Button>
           </div>
         }
       >
-        <div className="space-y-8">
-          {/* Create New Category */}
-          <div className="space-y-3 bg-card p-4 rounded-lg border border-border">
-            <h2 className="text-lg font-semibold">Nouvelle Catégorie</h2>
-            <div className="flex gap-2">
-              <Input
-                placeholder="Nom de la catégorie..."
-                value={newCategoryName}
-                onChange={(e) => setNewCategoryName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCreate();
-                  }
-                }}
-              />
-              <Button onClick={handleCreate} className="bg-gradient-primary">
-                <Plus className="w-4 h-4 mr-2" />
-                Créer
-              </Button>
-            </div>
-          </div>
-
+        <div className="space-y-4">
           {/* Categories Table */}
           <div className="bg-card rounded-lg border border-border overflow-hidden">
           <div className="overflow-x-auto">
@@ -318,21 +338,26 @@ export default function MarketCategoriesTable() {
                   <TableHead className="w-10"></TableHead>
                   <TableHead>Nom</TableHead>
                   <TableHead className="w-20">Ordre</TableHead>
+                  <TableHead className="text-center">Produits</TableHead>
                   <TableHead className="w-32 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {categories.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       Aucune catégorie. Créez-en une pour commencer.
                     </TableCell>
                   </TableRow>
                 ) : (
                   <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                     <SortableContext items={categories.map((c) => c.category_id)} strategy={verticalListSortingStrategy}>
-                      {categories.map((category) =>
-                        editingId === category.category_id ? (
+                      {categories.map((category) => {
+                        const productCount = (menuData.products || []).filter(
+                          p => p.category_id === category.category_id
+                        ).length;
+                        
+                        return editingId === category.category_id ? (
                           <TableRow key={category.category_id}>
                             <TableCell></TableCell>
                             <TableCell>
@@ -349,30 +374,48 @@ export default function MarketCategoriesTable() {
                                 autoFocus
                               />
                             </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                value={editingOrder}
+                                onChange={(e) => setEditingOrder(parseInt(e.target.value) || 0)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleUpdateCategory(category.category_id);
+                                  } else if (e.key === 'Escape') {
+                                    setEditingId(null);
+                                  }
+                                }}
+                                className="w-full"
+                              />
+                            </TableCell>
                             <TableCell></TableCell>
-                            <TableCell className="text-right space-x-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleUpdateCategory(category.category_id)}
-                              >
-                                Enregistrer
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
-                                Annuler
-                              </Button>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleUpdateCategory(category.category_id)}
+                                >
+                                  Enregistrer
+                                </Button>
+                                <Button variant="ghost" size="sm" onClick={() => setEditingId(null)}>
+                                  Annuler
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ) : (
                           <SortableCategoryRow
                             key={category.category_id}
                             category={category}
+                            productCount={productCount}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onBulkAssign={handleBulkAssign}
                           />
-                        )
-                      )}
+                        );
+                      })}
                     </SortableContext>
                   </DndContext>
                 )}
@@ -382,6 +425,35 @@ export default function MarketCategoriesTable() {
         </div>
         </div>
       </PageContainer>
+
+        {/* Create New Category Dialog */}
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Nouvelle catégorie</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Input
+                placeholder="Nom de la catégorie"
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleCreateNewCategory();
+                  }
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                Annuler
+              </Button>
+              <Button onClick={handleCreateNewCategory}>
+                Créer
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Delete Confirmation Dialog */}
         <ConfirmDialog

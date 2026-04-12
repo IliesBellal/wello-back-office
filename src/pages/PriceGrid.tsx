@@ -284,99 +284,102 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map(product => {
+              filtered.map((product, index) => {
                 const uberPrice = product.integrations?.uber_eats?.enabled
                   ? product.integrations.uber_eats.price_override
                   : undefined;
-                const deliverooPrice = product.integrations?.deliveroo?.enabled
-                  ? product.integrations.deliveroo.price_override
-                  : undefined;
+            const deliverooPrice = product.integrations?.deliveroo?.enabled
+              ? product.integrations.deliveroo.price_override
+              : undefined;
+            
+            // Check if this is a group product
+            const isGroup = product.is_product_group || product.is_group;
 
-                return (
-                  <TableRow key={product.product_id} className="hover:bg-muted/20 transition-colors">
-                    {/* Produit */}
-                    <TableCell>
-                      <div className="flex items-center gap-3 min-w-0">
-                        {product.image_url ? (
-                          <img
-                            src={product.image_url}
-                            alt={product.name}
-                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                          />
-                        ) : (
-                          <div
-                            className="w-10 h-10 rounded-lg flex-shrink-0"
-                            style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
-                          />
-                        )}
-                        <span className="font-medium truncate">{product.name}</span>
-                      </div>
-                    </TableCell>
-                    {/* Catégorie */}
-                    <TableCell>
-                      {product.categoryName ? (
-                        <Badge variant="secondary" className="whitespace-nowrap">
-                          {product.categoryName}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
-                    </TableCell>
-                    {/* Prix sur place */}
-                    <TableCell className="font-mono text-sm">
-                      {isEditing ? (
-                        <PriceTPEInput
-                          value={getDisplayPrice(product.product_id, 'price', product.price)}
-                          onChange={(cents) => updatePrice(product.product_id, 'price', cents)}
-                          autoConfirmOnBlur={false}
-                        />
-                      ) : (
-                        formatPrice(product.price)
-                      )}
-                    </TableCell>
-                    {/* À emporter */}
-                    <TableCell className="font-mono text-sm">
-                      {isEditing ? (
-                        <PriceTPEInput
-                          value={getDisplayPrice(product.product_id, 'price_take_away', product.price_take_away)}
-                          onChange={(cents) => updatePrice(product.product_id, 'price_take_away', cents)}
-                          autoConfirmOnBlur={false}
-                        />
-                      ) : (
-                        formatPrice(product.price_take_away)
-                      )}
-                    </TableCell>
-                    {/* Livraison */}
-                    <TableCell className="font-mono text-sm">
-                      {isEditing ? (
-                        <PriceTPEInput
-                          value={getDisplayPrice(product.product_id, 'price_delivery', product.price_delivery)}
-                          onChange={(cents) => updatePrice(product.product_id, 'price_delivery', cents)}
-                          autoConfirmOnBlur={false}
-                        />
-                      ) : (
-                        formatPrice(product.price_delivery)
-                      )}
-                    </TableCell>
-                    {/* Uber Eats */}
-                    <TableCell className="font-mono text-sm">
-                      {uberPrice !== undefined ? (
-                        formatPrice(uberPrice)
-                      ) : (
-                        <span className="text-muted-foreground text-xs">Non activé</span>
-                      )}
-                    </TableCell>
-                    {/* Deliveroo */}
-                    <TableCell className="font-mono text-sm">
-                      {deliverooPrice !== undefined ? (
-                        formatPrice(deliverooPrice)
-                      ) : (
-                        <span className="text-muted-foreground text-xs">Non activé</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                );
-              })
+            return (
+              <TableRow key={`${product.product_id}-${index}`} className={`hover:bg-muted/20 transition-colors ${isGroup ? 'bg-muted/15 font-semibold' : ''}`}>
+                {/* Produit */}
+                <TableCell>
+                  <div className="flex items-center gap-3 min-w-0">
+                    {product.image_url ? (
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div
+                        className="w-10 h-10 rounded-lg flex-shrink-0"
+                        style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
+                      />
+                    )}
+                    <span className="font-medium truncate">{product.name}</span>
+                  </div>
+                </TableCell>
+                {/* Catégorie */}
+                <TableCell>
+                  {product.categoryName ? (
+                    <Badge variant="secondary" className="whitespace-nowrap">
+                      {product.categoryName}
+                    </Badge>
+                  ) : (
+                    <span className="text-muted-foreground text-sm">—</span>
+                  )}
+                </TableCell>
+                {/* Prix sur place */}
+                <TableCell className="font-mono text-sm">
+                  {isEditing ? (
+                    <PriceTPEInput
+                      value={getDisplayPrice(product.product_id, 'price', product.price)}
+                      onChange={(cents) => updatePrice(product.product_id, 'price', cents)}
+                      autoConfirmOnBlur={false}
+                    />
+                  ) : (
+                    formatPrice(product.price)
+                  )}
+                </TableCell>
+                {/* À emporter */}
+                <TableCell className="font-mono text-sm">
+                  {isEditing ? (
+                    <PriceTPEInput
+                      value={getDisplayPrice(product.product_id, 'price_take_away', product.price_take_away)}
+                      onChange={(cents) => updatePrice(product.product_id, 'price_take_away', cents)}
+                      autoConfirmOnBlur={false}
+                    />
+                  ) : (
+                    formatPrice(product.price_take_away)
+                  )}
+                </TableCell>
+                {/* Livraison */}
+                <TableCell className="font-mono text-sm">
+                  {isEditing ? (
+                    <PriceTPEInput
+                      value={getDisplayPrice(product.product_id, 'price_delivery', product.price_delivery)}
+                      onChange={(cents) => updatePrice(product.product_id, 'price_delivery', cents)}
+                      autoConfirmOnBlur={false}
+                    />
+                  ) : (
+                    formatPrice(product.price_delivery)
+                  )}
+                </TableCell>
+                {/* Uber Eats */}
+                <TableCell className="font-mono text-sm">
+                  {uberPrice !== undefined ? (
+                    formatPrice(uberPrice)
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Non activé</span>
+                  )}
+                </TableCell>
+                {/* Deliveroo */}
+                <TableCell className="font-mono text-sm">
+                  {deliverooPrice !== undefined ? (
+                    formatPrice(deliverooPrice)
+                  ) : (
+                    <span className="text-muted-foreground text-xs">Non activé</span>
+                  )}
+                </TableCell>
+              </TableRow>
+            );
+          })
             )}
           </TableBody>
         </Table>
@@ -745,13 +748,33 @@ export default function PriceGrid() {
   );
 
   const enrichedProducts: EnrichedProduct[] = useMemo(() => {
-    return categories.flatMap(cat =>
-      (cat.products ?? []).map(p => ({
-        ...p,
-        category_id: p.category_id ?? cat.category_id,
-        categoryName: cat.category || cat.category_name || '',
-      }))
-    );
+    return categories.flatMap(cat => {
+      const products: EnrichedProduct[] = [];
+      
+      (cat.products ?? []).forEach(p => {
+        const enriched = {
+          ...p,
+          category_id: p.category_id ?? cat.category_id,
+          categoryName: cat.category || cat.category_name || '',
+        };
+        
+        // Add product (group or simple)
+        products.push(enriched);
+        
+        // If it's a group, also add its sub-products
+        if (p.is_product_group && p.sub_products && p.sub_products.length > 0) {
+          p.sub_products.forEach(subProduct => {
+            products.push({
+              ...subProduct,
+              category_id: subProduct.category_id ?? cat.category_id,
+              categoryName: cat.category || cat.category_name || '',
+            } as EnrichedProduct);
+          });
+        }
+      });
+      
+      return products;
+    });
   }, [categories]);
 
   const tabs = [

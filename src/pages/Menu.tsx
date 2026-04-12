@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Folder, MoreVertical, Plus, Globe, Grid3x3, AlertCircle, Tag as TagIcon, Search } from 'lucide-react';
+import { MoreVertical, Plus, Globe, Grid3x3, Search } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { useProductCreateSheet } from '@/contexts/ProductCreateSheetContext';
 import { useOrganizeModal } from '@/contexts/OrganizeModalContext';
@@ -13,13 +13,10 @@ import { MultiFilter } from '@/components/shared/MultiFilter';
 import { ProductsTable } from '@/components/menu/ProductsTable';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
 import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
-import { CategoryManagementSheet } from '@/components/menu/CategoryManagementSheet';
 import { OrganizeModal } from '@/components/menu/OrganizeModal';
 import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
-import { AllergensSheet } from '@/components/menu/AllergensSheet';
-import { TagsSheet } from '@/components/menu/TagsSheet';
 import { ProductCreateSheet } from '@/components/menu/ProductCreateSheet';
-import { Product, Tag, Allergen } from '@/types/menu';
+import { Product } from '@/types/menu';
 import { menuService } from '@/services/menuService';
 import { toast } from 'sonner';
 
@@ -65,14 +62,9 @@ export default function Menu() {
   } = useMenuData();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
   const [externalMenusOpen, setExternalMenusOpen] = useState(false);
-  const [allergensSheetOpen, setAllergensSheetOpen] = useState(false);
-  const [tagsSheetOpen, setTagsSheetOpen] = useState(false);
   const { isOpen: productCreateOpen, setIsOpen: setProductCreateOpen } = useProductCreateSheet();
   const { isOpen: organizeModalOpen, setIsOpen: setOrganizeModalOpen } = useOrganizeModal();
-  const [tags, setTags] = useState<Tag[]>([]);
-  const [allergens, setAllergens] = useState<Allergen[]>([]);
   const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
   const [productStatusMap, setProductStatusMap] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
@@ -80,36 +72,8 @@ export default function Menu() {
   // Filtres et tri
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [tagFilter, setTagFilter] = useState<string>('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
-
-  // Load tags and allergens on mount
-  useEffect(() => {
-    const loadTagsAndAllergens = async () => {
-      try {
-        const [tagsData, allergensData] = await Promise.all([
-          menuService.getTags(),
-          menuService.getAllergens()
-        ]);
-        setTags(tagsData);
-        setAllergens(allergensData);
-      } catch (error) {
-        console.error('Error loading tags or allergens:', error);
-      }
-    };
-
-    loadTagsAndAllergens();
-  }, []);
-
-  const handleTagCreated = (newTag: { id: string; name: string }) => {
-    setTags(prevTags => {
-      if (prevTags.some(t => t.id === newTag.id)) {
-        return prevTags;
-      }
-      return [...prevTags, newTag];
-    });
-  };
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
@@ -192,14 +156,6 @@ export default function Menu() {
       result = result.filter(p => p.category_id === categoryFilter);
     }
 
-    // Filtre tags
-    if (tagFilter !== 'all') {
-      result = result.filter(p => {
-        const productTags = p.tags || [];
-        return productTags.includes(tagFilter);
-      });
-    }
-
     // Tri
     return [...result].sort((a, b) => {
       const va = getProductValue(a, sortKey, categoryMap);
@@ -213,7 +169,7 @@ export default function Menu() {
       const nb = vb as number;
       return sortDir === 'asc' ? na - nb : nb - na;
     });
-  }, [menuData, search, categoryFilter, tagFilter, sortKey, sortDir, categoryMap]);
+  }, [menuData, search, categoryFilter, sortKey, sortDir, categoryMap]);
 
   if (loading) {
     return (
@@ -231,16 +187,12 @@ export default function Menu() {
         header={
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-foreground">
-              Menu de l'établissement
+              Produits
             </h1>
             <div className="flex gap-2">
             <Button className="bg-gradient-primary" onClick={() => setProductCreateOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Nouveau Produit
-            </Button>
-            <Button variant="outline" onClick={() => setCategoryManagerOpen(true)}>
-              <Folder className="w-4 h-4 mr-2" />
-              Catégories
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -256,14 +208,6 @@ export default function Menu() {
                 <DropdownMenuItem onClick={() => setOrganizeModalOpen(true)}>
                   <Grid3x3 className="w-4 h-4 mr-2" />
                   Organiser (Mode Tablette)
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setAllergensSheetOpen(true)}>
-                  <AlertCircle className="w-4 h-4 mr-2" />
-                  Allergènes
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setTagsSheetOpen(true)}>
-                  <TagIcon className="w-4 h-4 mr-2" />
-                  Tags
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -302,21 +246,6 @@ export default function Menu() {
                 </SelectContent>
               </Select>
 
-              {/* Filtre tags */}
-              <Select value={tagFilter} onValueChange={setTagFilter}>
-                <SelectTrigger className="w-full sm:w-52">
-                  <SelectValue placeholder="Tous les tags" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Tous les tags</SelectItem>
-                  {tags.map(tag => (
-                    <SelectItem key={tag.id} value={tag.id}>
-                      {tag.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
               {/* Compteur */}
               <div className="flex items-center text-sm text-muted-foreground whitespace-nowrap">
                 {filteredProducts.length} produit{filteredProducts.length !== 1 ? 's' : ''}
@@ -330,8 +259,6 @@ export default function Menu() {
           <ProductsTable
             products={filteredProducts}
             categories={categoryMap}
-            tags={tags}
-            allergens={allergens}
             onProductClick={handleProductClick}
             sortKey={sortKey}
             sortDir={sortDir}
@@ -352,11 +279,8 @@ export default function Menu() {
           components={components}
           attributes={attributes}
           categories={menuData?.products_types || []}
-          tags={tags}
-          allergens={allergens}
           onSave={updateProduct}
           onCreateCategory={createProductCategory}
-          onTagCreated={handleTagCreated}
         />
 
         <GroupProductSheet
@@ -366,15 +290,6 @@ export default function Menu() {
           categories={menuData?.products_types || []}
           onSave={updateProduct}
           onCreateCategory={createProductCategory}
-        />
-
-        <CategoryManagementSheet
-          open={categoryManagerOpen}
-          onOpenChange={setCategoryManagerOpen}
-          categories={menuData?.products_types || []}
-          onCreateCategory={createProductCategory}
-          onUpdateCategory={updateCategory}
-          onDeleteCategory={deleteCategory}
         />
 
         <OrganizeModal
@@ -395,19 +310,6 @@ export default function Menu() {
           onOpenChange={setProductCreateOpen}
           onCreateProduct={createProduct}
           onCreateCategory={createProductCategory}
-        />
-
-        <AllergensSheet
-          open={allergensSheetOpen}
-          onOpenChange={setAllergensSheetOpen}
-          allergens={allergens}
-        />
-
-        <TagsSheet
-          open={tagsSheetOpen}
-          onOpenChange={setTagsSheetOpen}
-          tags={tags}
-          onTagCreated={(newTag) => setTags([...tags, newTag])}
         />
         </div>
       </PageContainer>

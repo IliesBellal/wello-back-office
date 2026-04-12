@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import { useState } from 'react';
 
 type SortKey = 'name' | 'category' | 'tags' | 'status';
@@ -18,8 +17,8 @@ type SortDir = 'asc' | 'desc';
 interface ProductsTableProps {
   products: Product[];
   categories: Record<string, string>;
-  tags: Tag[];
-  allergens: Allergen[];
+  tags?: Tag[];
+  allergens?: Allergen[];
   onProductClick: (product: Product) => void;
   sortKey?: SortKey;
   sortDir?: SortDir;
@@ -50,12 +49,12 @@ const getProductStatus = (product: Product) => {
   return statusMap[statusValue] || { label: 'Disponible', color: 'bg-green-100 text-green-800' };
 };
 
-const getTagLabel = (tagId: string, tags: Tag[]) => {
-  return tags.find(t => t.id === tagId)?.name || tagId;
+const getTagLabel = (tagId: string, tags?: Tag[]) => {
+  return tags?.find(t => t.id === tagId)?.name || tagId;
 };
 
-const getAllergenLabel = (allergenId: string, allergens: Allergen[]) => {
-  return allergens.find(a => a.allergen_id === allergenId)?.name || allergenId;
+const getAllergenLabel = (allergenId: string, allergens?: Allergen[]) => {
+  return allergens?.find(a => a.allergen_id === allergenId)?.name || allergenId;
 };
 
 export const ProductsTable = ({
@@ -223,15 +222,6 @@ export const ProductsTable = ({
               {status.label}
             </Badge>
           </TableCell>
-
-          {/* Disponible */}
-          <TableCell onClick={(e) => e.stopPropagation()}>
-            <Switch
-              checked={productStatusMap[product.product_id] !== undefined ? productStatusMap[product.product_id] : (product.available ?? true)}
-              onCheckedChange={(checked) => onStatusChange?.(product.product_id, checked)}
-              disabled={updatingProductId === product.product_id}
-            />
-          </TableCell>
         </TableRow>
       );
 
@@ -302,15 +292,6 @@ export const ProductsTable = ({
                   {subStatus.label}
                 </Badge>
               </TableCell>
-
-              {/* Disponible */}
-              <TableCell onClick={(e) => e.stopPropagation()}>
-                <Switch
-                  checked={productStatusMap[subProduct.id] !== undefined ? productStatusMap[subProduct.id] : true}
-                  onCheckedChange={(checked) => onStatusChange?.(subProduct.id, checked)}
-                  disabled={updatingProductId === subProduct.id}
-                />
-              </TableCell>
             </TableRow>
           );
         });
@@ -363,7 +344,6 @@ export const ProductsTable = ({
                 {onSort && <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />}
               </span>
             </TableHead>
-            <TableHead>Disponible</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

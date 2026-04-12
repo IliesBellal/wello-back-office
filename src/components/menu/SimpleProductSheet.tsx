@@ -46,8 +46,8 @@ interface SimpleProductSheetProps {
   components: Component[];
   attributes: Attribute[];
   categories: Category[];
-  tags: Tag[];
-  allergens: Allergen[];
+  tags?: Tag[];
+  allergens?: Allergen[];
   onSave: (productId: string, data: Partial<Product>) => Promise<void>;
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   onTagCreated?: (newTag: { id: string; name: string }) => void;
@@ -928,12 +928,12 @@ export const SimpleProductSheet = ({
             <div className="grid grid-cols-2 gap-6">
               {/* Allergens Column */}
               <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Allergènes ({allergens.length})</h3>
+                <h3 className="font-semibold text-sm">Allergènes ({(allergens ?? []).length})</h3>
                 <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-3">
-                  {allergens.length === 0 ? (
+                  {(allergens ?? []).length === 0 ? (
                     <p className="text-sm text-muted-foreground">Aucun allergène disponible</p>
                   ) : (
-                    allergens.map((allergen) => (
+                    (allergens ?? []).map((allergen) => (
                       <div key={allergen.allergen_id} className="flex items-center gap-2">
                         {isEditMode ? (
                           <input
@@ -1007,10 +1007,10 @@ export const SimpleProductSheet = ({
 
                 {/* Tags List */}
                 <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-3">
-                  {tags.length === 0 ? (
+                  {(tags ?? []).length === 0 ? (
                     <p className="text-sm text-muted-foreground">Aucun tag disponible</p>
                   ) : (
-                    tags.map((tag) => (
+                    (tags ?? []).map((tag) => (
                       <div key={tag.id} className="flex items-center gap-2">
                         {isEditMode ? (
                           <input
