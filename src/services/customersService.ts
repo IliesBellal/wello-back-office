@@ -23,6 +23,7 @@ export interface Customer {
   customer_total_orders: number;
   acquisition_source: string;
   created_at: string;
+  last_order_date?: string;
   match_score?: number;
 }
 
@@ -87,6 +88,7 @@ export interface RawApiCustomer {
   customer_nb_orders?: number;
   acquisition_source?: string;
   creation_date?: string | null;
+  last_order_date?: string | null;
   match_score?: number;
 }
 
@@ -106,6 +108,7 @@ const normalizeCustomer = (raw: RawApiCustomer): Customer => ({
   customer_total_orders: raw.customer_nb_orders ?? 0,
   acquisition_source: raw.acquisition_source ?? "",
   created_at: raw.creation_date ?? "",
+  last_order_date: raw.last_order_date ?? undefined,
   match_score: raw.match_score,
 });
 
@@ -129,7 +132,8 @@ const mockCustomers: Customer[] = [
     customer_total_spent: 75000,
     customer_total_orders: 24,
     acquisition_source: "WELLO_RESTO_APPS",
-    created_at: "2024-03-15T10:00:00Z"
+    created_at: "2024-03-15T10:00:00Z",
+    last_order_date: "2024-12-10T12:30:00Z"
   },
   {
     id: "c2",
@@ -138,7 +142,8 @@ const mockCustomers: Customer[] = [
     customer_total_spent: 32500,
     customer_total_orders: 12,
     acquisition_source: "UBER_EATS",
-    created_at: "2024-06-20T14:30:00Z"
+    created_at: "2024-06-20T14:30:00Z",
+    last_order_date: "2024-12-08T18:00:00Z"
   },
   {
     id: "c3",
@@ -158,7 +163,8 @@ const mockCustomers: Customer[] = [
     customer_total_spent: 128000,
     customer_total_orders: 45,
     acquisition_source: "DELIVEROO",
-    created_at: "2023-11-01T09:00:00Z"
+    created_at: "2023-11-01T09:00:00Z",
+    last_order_date: "2024-12-12T20:00:00Z"
   },
   {
     id: "c4",
@@ -169,7 +175,8 @@ const mockCustomers: Customer[] = [
     customer_total_spent: 18500,
     customer_total_orders: 7,
     acquisition_source: "WELLO_RESTO_APPS",
-    created_at: "2024-09-10T16:45:00Z"
+    created_at: "2024-09-10T16:45:00Z",
+    last_order_date: "2024-12-01T14:20:00Z"
   },
   {
     id: "c5",
@@ -178,7 +185,8 @@ const mockCustomers: Customer[] = [
     customer_total_spent: 52000,
     customer_total_orders: 18,
     acquisition_source: "JUST_EAT",
-    created_at: "2024-01-22T11:20:00Z"
+    created_at: "2024-01-22T11:20:00Z",
+    last_order_date: "2024-12-09T19:45:00Z"
   }
 ];
 

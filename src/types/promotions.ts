@@ -1,5 +1,11 @@
 export type DiscountType = 'percentage' | 'fixed';
 
+export interface TimeSlot {
+  day: DayOfWeek;
+  start_time: string; // HH:mm
+  end_time: string;   // HH:mm
+}
+
 export interface Promotion {
   id: string;
   name: string;
@@ -10,7 +16,10 @@ export interface Promotion {
   code?: string;
   start_date?: string; // ISO date string
   end_date?: string;   // ISO date string
+  no_end_date?: boolean; // If true, end_date is ignored
   active: boolean;
+  time_slots?: TimeSlot[]; // Restricted time slots for application
+  product_ids?: string[]; // Product IDs eligible for this promotion
 }
 
 export type DayOfWeek =

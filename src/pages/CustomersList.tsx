@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
-import { Button } from '@/components/ui/button';
+
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Customer, getCustomersList, searchCustomers } from '@/services/customersService';
@@ -15,9 +15,11 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, Users, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Users } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
-type SortField = 'first_name' | 'email' | 'phone' | 'customer_total_orders' | 'customer_total_spent';
+type SortField = 'first_name' | 'email' | 'phone' | 'customer_total_orders' | 'customer_total_spent' | 'created_at' | 'last_order_date';
 type SortDirection = 'asc' | 'desc' | null;
 
 interface SortState {
@@ -56,6 +58,10 @@ const CustomersList = () => {
         return customer.customer_total_orders || 0;
       case 'customer_total_spent':
         return customer.customer_total_spent || 0;
+      case 'created_at':
+        return customer.created_at ? new Date(customer.created_at).getTime() : 0;
+      case 'last_order_date':
+        return customer.last_order_date ? new Date(customer.last_order_date).getTime() : 0;
       default:
         return '';
     }
@@ -180,10 +186,7 @@ const CustomersList = () => {
       <PageContainer
         header={
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <Users className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold text-foreground">Liste des clients</h1>
-            </div>
+            <h1 className="text-3xl font-bold text-foreground">Liste des clients</h1>
             <p className="text-sm text-muted-foreground">
               {customers.length} client{customers.length !== 1 ? 's' : ''}
             </p>
@@ -235,12 +238,24 @@ const CustomersList = () => {
                     <TableHead className="text-right cursor-pointer hover:bg-muted">
                       <SortButton field="customer_total_orders" label="Nombre de commandes" />
                     </TableHead>
-                    <TableHead className="w-20 text-right">Actions</TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted">
+                      <SortButton field="created_at" label="Client depuis" />
+                    </TableHead>
+                    <TableHead className="cursor-pointer hover:bg-muted">
+                      <SortButton field="last_order_date" label="Dernière commande" />
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedCustomers().map((customer) => (
-                    <TableRow key={customer.id} className="cursor-pointer hover:bg-muted">
+                    <TableRow 
+                      key={customer.id} 
+                      className="cursor-pointer hover:bg-muted"
+                      onClick={() => {
+                        setSelectedCustomer(customer);
+                        setDetailsOpen(true);
+                      }}
+                    >
                       <TableCell className="font-medium">{getCustomerFullName(customer)}</TableCell>
                       <TableCell className="text-sm">{customer.email || '-'}</TableCell>
                       <TableCell className="text-sm">{customer.phone || '-'}</TableCell>
@@ -250,17 +265,11 @@ const CustomersList = () => {
                       <TableCell className="text-right text-sm">
                         {customer.customer_total_orders || 0}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedCustomer(customer);
-                            setDetailsOpen(true);
-                          }}
-                        >
-                          Voir
-                        </Button>
+                      <TableCell className="text-sm">
+                        {customer.created_at ? format(parseISO(customer.created_at), "dd MMM yyyy", { locale: fr }) : '-'}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {customer.last_order_date ? format(parseISO(customer.last_order_date), "dd MMM yyyy", { locale: fr }) : '-'}
                       </TableCell>
                     </TableRow>
                   ))}
