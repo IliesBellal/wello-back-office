@@ -1,9 +1,18 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/hooks/useSidebar';
 import { NavigationContent } from './NavigationContent';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
 
@@ -24,6 +33,7 @@ export const Sidebar: React.FC = () => {
   const { isExpanded, toggleExpanded, openMenuId, toggleSubItem } = useSidebar();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   // Get collapsible state from the useSidebar hook
   const collapsibleState = useMemo(() => {
@@ -32,7 +42,8 @@ export const Sidebar: React.FC = () => {
     };
   }, [openMenuId]);
 
-  const handleLogout = async () => {
+  const handleLogoutConfirm = async () => {
+    setShowLogoutDialog(false);
     await logout();
     navigate('/login');
   };
@@ -129,7 +140,7 @@ export const Sidebar: React.FC = () => {
             'group relative',
             isExpanded ? 'justify-start gap-3 px-3 py-2.5' : 'justify-center w-11 h-11 p-0'
           )}
-          onClick={handleLogout}
+          onClick={() => setShowLogoutDialog(true)}
           title={isExpanded ? 'Déconnexion' : 'Déconnexion'}
           aria-label="Se déconnecter"
         >
@@ -139,6 +150,22 @@ export const Sidebar: React.FC = () => {
           )}
         </Button>
       </div>
+
+      {/* ═══ LOGOUT CONFIRMATION DIALOG ═══ */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Déconnexion</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir vous déconnecter?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-3 justify-end">
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogoutConfirm}>Déconnexion</AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
     </aside>
   );
 };

@@ -185,35 +185,38 @@ export default function Menu() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold text-foreground">
-              Produits
-            </h1>
-            <div className="flex gap-2">
-            <Button className="bg-gradient-primary" onClick={() => setProductCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nouveau Produit
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreVertical className="w-4 h-4" />
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <h1 className="text-3xl font-bold text-foreground">
+                Produits
+              </h1>
+              <div className="flex gap-2 flex-wrap">
+                <Button className="bg-gradient-primary" onClick={() => setProductCreateOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nouveau Produit
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-popover">
-                <DropdownMenuItem onClick={() => setExternalMenusOpen(true)}>
-                  <Globe className="w-4 h-4 mr-2" />
-                  Menus Externes
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setOrganizeModalOpen(true)}>
-                  <Grid3x3 className="w-4 h-4 mr-2" />
-                  Organiser (Mode Tablette)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-popover">
+                    <DropdownMenuItem onClick={() => setExternalMenusOpen(true)}>
+                      <Globe className="w-4 h-4 mr-2" />
+                      Menus Externes
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setOrganizeModalOpen(true)}>
+                      <Grid3x3 className="w-4 h-4 mr-2" />
+                      Organiser (Mode Tablette)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
           </div>
         }
+        description="Gérez votre catalogue de produits, catégories et disponibilités"
       >
         <div className="space-y-8">
         {/* Filters */}

@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Shield } from "lucide-react";
+import { User, Shield, Mail, Phone, Check } from "lucide-react";
 import { useUserProfile } from "@/hooks/useSettings";
 import { SettingsSection } from "./SettingsSection";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import { OTPVerification } from "@/components/auth/OTPVerification";
 import { UserProfile } from "@/types/settings";
 import { userProfileFields } from "@/config/settingsConfig";
 
@@ -13,6 +14,8 @@ export const ProfileTab = () => {
   const { profile, isLoading, isSaving, updateProfile } = useUserProfile();
   const [formData, setFormData] = useState<UserProfile | null>(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [otpDialogOpen, setOtpDialogOpen] = useState(false);
+  const [otpMode, setOtpMode] = useState<'email' | 'tel' | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -29,6 +32,30 @@ export const ProfileTab = () => {
     if (formData) {
       updateProfile(formData);
     }
+  };
+
+  const handleVerifyClick = (type: 'email' | 'phone') => {
+    setOtpMode(type);
+    setOtpDialogOpen(true);
+  };
+
+  const handleOtpSuccess = () => {
+    if (formData && otpMode) {
+      const updatedProfile = {
+        ...formData,
+        ...(otpMode === 'email' && { email_verified: true }),
+        ...(otpMode === 'tel' && { phone_verified: true }),
+      };
+      setFormData(updatedProfile);
+      updateProfile(updatedProfile);
+    }
+    setOtpDialogOpen(false);
+    setOtpMode(null);
+  };
+
+  const handleOtpCancel = () => {
+    setOtpDialogOpen(false);
+    setOtpMode(null);
   };
 
   if (isLoading || !formData) {
@@ -80,6 +107,75 @@ export const ProfileTab = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <Mail className="w-5 h-5" />
+            Vérification de contact
+          </CardTitle>
+          <CardDescription>
+            Vérifiez votre email et numéro de téléphone
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Email Verification */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-card">
+            <div className="flex items-center gap-3 min-w-0">
+              <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{formData.email}</p>
+                <p className="text-xs text-muted-foreground">Email</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {formData.email_verified ? (
+                <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                  <Check className="w-4 h-4" />
+                  Vérifié
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleVerifyClick('email')}
+                  className="text-xs"
+                >
+                  Vérifier
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Phone Verification */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-card">
+            <div className="flex items-center gap-3 min-w-0">
+              <Phone className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium truncate">{formData.phone}</p>
+                <p className="text-xs text-muted-foreground">Téléphone</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {formData.phone_verified ? (
+                <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                  <Check className="w-4 h-4" />
+                  Vérifié
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleVerifyClick('tel')}
+                  className="text-xs"
+                >
+                  Vérifier
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <Shield className="w-5 h-5" />
             Sécurité
           </CardTitle>
@@ -102,6 +198,15 @@ export const ProfileTab = () => {
         open={isPasswordDialogOpen}
         onOpenChange={setIsPasswordDialogOpen}
       />
+
+      {otpMode && (
+        <OTPVerification
+          mode={otpMode}
+          isOpen={otpDialogOpen}
+          onSuccess={handleOtpSuccess}
+          onCancel={handleOtpCancel}
+        />
+      )}
     </div>
   );
 };

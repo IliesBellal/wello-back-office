@@ -8,6 +8,7 @@ import React, { useState, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, LineChart, Line, 
@@ -182,6 +183,7 @@ const DataTable = ({
 };
 
 export const DashboardAnalysis = () => {
+  const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<TabType>('ca');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
@@ -637,7 +639,7 @@ export const DashboardAnalysis = () => {
           <CardTitle className="text-sm font-semibold">Top 10 options - Coût vs Bénéfice</CardTitle>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
+          <ResponsiveContainer width="100%" height={isMobile ? 400 : 300}>
             <BarChart
               data={analyticsData.options.options.slice(0, 10).map(opt => ({
                 ...opt,
@@ -645,11 +647,11 @@ export const DashboardAnalysis = () => {
                 profit_display: opt.profit / 100
               })).reverse()}
               layout="vertical"
-              margin={{ left: 150, right: 20 }}
+              margin={{ left: isMobile ? 100 : 150, right: 20, top: 0, bottom: 0 }}
             >
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
               <XAxis type="number" stroke="#6b7280" />
-              <YAxis dataKey="name" type="category" stroke="#6b7280" width={150} />
+              <YAxis dataKey="name" type="category" stroke="#6b7280" width={isMobile ? 100 : 150} tick={{ fontSize: isMobile ? 11 : 12 }} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
                 formatter={(value: number) => `${value.toFixed(2)}€`}
@@ -1574,11 +1576,9 @@ export const DashboardAnalysis = () => {
     <DashboardLayout>
       <PageContainer
         header={
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Analyse</h1>
-            <p className="text-muted-foreground">Dashboard d'analyse avec 10 onglets</p>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">Analyse</h1>
         }
+        description="Dashboard d'analyse avec statistiques complètes, chiffres d'affaires, commandes et bien plus"
         className="space-y-6"
       >
         {/* Période globale */}

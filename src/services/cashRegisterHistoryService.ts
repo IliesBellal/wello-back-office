@@ -24,6 +24,16 @@ export interface CashRegisterStats {
   total_transactions: number;
 }
 
+export interface CashRegisterClosurePayload {
+  register_id: string;
+  cash_drawer_amount: number; // Expected cash in drawer (in cents)
+  observed_amount: number; // Actual cash counted (in cents)
+  adjustments: {
+    reason: string;
+    amount: number;
+  }[];
+}
+
 export interface CashRegisterListResponse {
   registers: CashRegisterHistoryRecord[];
   stats: CashRegisterStats;
@@ -239,5 +249,32 @@ export const exportPeriodRegisters = async (
       link.click();
       window.URL.revokeObjectURL(url);
     }
+  );
+};
+
+export const closeRegisterX = async (payload: CashRegisterClosurePayload): Promise<{ status: string; z_register_number: string }> => {
+  logAPI('POST', `/accounting/registers/${payload.register_id}/close`, payload);
+
+  return withMock(
+    () => {
+      const register = mockRegisters.find((r) => r.id === payload.register_id);
+      if (!register) throw new Error('Register not found');
+
+      // Convert X to Z
+      const now = new Date();
+      const newZNumber = `Z-${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.random()).padStart(3, '0').slice(2, 5)}`;
+
+      return {
+        status: 'closed',
+        z_register_number: newZNumber,
+      };
+    },
+    () =>
+      apiClient
+        .post<WelloApiResponse<{ status: string; z_register_number: string }>>(
+          `/accounting/registers/${payload.register_id}/close`,
+          payload
+        )
+        .then((res) => res.data)
   );
 };

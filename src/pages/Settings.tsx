@@ -12,17 +12,14 @@ const Settings = () => {
     <DashboardLayout>
       <PageContainer
         header={
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">
-              {currentSection === 'establishment' ? 'Établissement' : 'Mon Profil'}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              {currentSection === 'establishment' 
-                ? 'Gérez les paramètres de votre établissement'
-                : 'Gérez vos informations personnelles'
-              }
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">
+            {currentSection === 'establishment' ? 'Établissement' : 'Mon Profil'}
+          </h1>
+        }
+        description={
+          currentSection === 'establishment' 
+            ? 'Gérez les paramètres de votre établissement, horaires et informations générales'
+            : 'Gérez vos informations personnelles et préférences de compte'
         }
       >
         {currentSection === 'establishment' && <EstablishmentTab />}

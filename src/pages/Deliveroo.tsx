@@ -105,11 +105,9 @@ export default function DeliverooPage() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Deliveroo</h1>
-            <p className="text-muted-foreground mt-1">Gérez votre intégration Deliveroo</p>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">Deliveroo</h1>
         }
+        description="Gérez votre intégration Deliveroo, commandes et synchronisation du menu"
       >
         <IntegrationCard
           name="Deliveroo"

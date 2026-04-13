@@ -3,7 +3,10 @@ export interface UserProfile {
   lastname: string;
   email: string;
   phone: string;
+  address?: string;
   avatar: string;
+  email_verified?: boolean;
+  phone_verified?: boolean;
 }
 
 export interface EstablishmentInfo {

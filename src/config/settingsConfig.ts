@@ -5,6 +5,7 @@ export const userProfileFields: FieldConfig[] = [
   { key: 'lastname', label: 'Nom', type: 'text', group: 'profile', placeholder: 'Votre nom' },
   { key: 'email', label: 'Email', type: 'email', group: 'profile', placeholder: 'votre@email.fr' },
   { key: 'phone', label: 'Téléphone', type: 'tel', group: 'profile', placeholder: '+33 6 12 34 56 78' },
+  { key: 'address', label: 'Adresse postale', type: 'text', group: 'profile', placeholder: '123 rue de la Paix, 75000 Paris' },
 ];
 
 export const establishmentInfoFields: FieldConfig[] = [

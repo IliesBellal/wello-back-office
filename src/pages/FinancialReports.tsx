@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
+import { TabSystem } from '@/components/shared/TabSystem';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Download, Calendar as CalendarIcon } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { DollarSign, TrendingUp, Receipt } from 'lucide-react';
@@ -31,6 +31,7 @@ const FinancialReports = () => {
     from: startOfMonth(now),
     to: endOfMonth(now)
   });
+  const [detailsTab, setDetailsTab] = useState<string>('vat');
 
   const { data: vatData, isLoading: vatLoading } = useQuery({
     queryKey: ['vat-report', dateRange],
@@ -87,20 +88,27 @@ const FinancialReports = () => {
         header={
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold text-foreground">Rapports Financiers</h1>
-            <div className="flex items-center gap-3">
-              <DateRangePicker
-                dateRange={dateRange}
-                onDateRangeChange={setDateRange}
-              />
-              <Button onClick={handleExportGlobal} className="bg-gradient-primary">
-                <Download className="w-4 h-4 mr-2" />
-                Export Comptable Global
-              </Button>
-            </div>
+            <Button onClick={handleExportGlobal} className="bg-gradient-primary">
+              <Download className="w-4 h-4 mr-2" />
+              Export Comptable Global
+            </Button>
           </div>
         }
       >
         <div className="space-y-8">
+          {/* Date Range Filter */}
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-4">
+                <CalendarIcon className="h-5 w-5 text-muted-foreground" />
+                <DateRangePicker
+                  dateRange={dateRange}
+                  onDateRangeChange={setDateRange}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
           {/* KPI Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {isLoading ? (
@@ -165,48 +173,56 @@ const FinancialReports = () => {
 
         {/* Details Tabs */}
         <Card className="shadow-card rounded-xl">
-          <Tabs defaultValue="vat">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <TabsList>
-                  <TabsTrigger value="vat">Détail TVA</TabsTrigger>
-                  <TabsTrigger value="payments">Détail Paiements</TabsTrigger>
-                </TabsList>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <TabsContent value="vat">
-                <div className="space-y-4">
-                  <div className="flex justify-end">
-                    <Button onClick={handleExportVAT} variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
-                      Exporter TVA
-                    </Button>
-                  </div>
-                  {isLoading ? (
-                    <Skeleton className="h-96 w-full" />
-                  ) : (
-                    <VATDetailTable data={vatData?.calendar || []} />
-                  )}
-                </div>
-              </TabsContent>
-              <TabsContent value="payments">
-                <div className="space-y-4">
-                  <div className="flex justify-end">
-                    <Button onClick={handleExportPayments} variant="outline">
-                      <Download className="w-4 h-4 mr-2" />
-                      Exporter Paiements
-                    </Button>
-                  </div>
-                  {isLoading ? (
-                    <Skeleton className="h-96 w-full" />
-                  ) : (
-                    <PaymentDetailTable data={paymentData?.calendar || []} />
-                  )}
-                </div>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
+          <CardHeader>
+            <CardTitle className="text-foreground">Détails & Paiements</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <TabSystem
+              tabs={[
+                { id: 'vat', label: 'Détail TVA' },
+                { id: 'payments', label: 'Détail Paiements' }
+              ]}
+              activeTab={detailsTab}
+              onTabChange={setDetailsTab}
+              renderContent={(tabId) => {
+                if (tabId === 'vat') {
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex justify-end">
+                        <Button onClick={handleExportVAT} variant="outline">
+                          <Download className="w-4 h-4 mr-2" />
+                          Exporter TVA
+                        </Button>
+                      </div>
+                      {isLoading ? (
+                        <Skeleton className="h-96 w-full" />
+                      ) : (
+                        <VATDetailTable data={vatData?.calendar || []} />
+                      )}
+                    </div>
+                  );
+                }
+                if (tabId === 'payments') {
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex justify-end">
+                        <Button onClick={handleExportPayments} variant="outline">
+                          <Download className="w-4 h-4 mr-2" />
+                          Exporter Paiements
+                        </Button>
+                      </div>
+                      {isLoading ? (
+                        <Skeleton className="h-96 w-full" />
+                      ) : (
+                        <PaymentDetailTable data={paymentData?.calendar || []} />
+                      )}
+                    </div>
+                  );
+                }
+                return null;
+              }}
+            />
+          </CardContent>
         </Card>
         </div>
       </PageContainer>

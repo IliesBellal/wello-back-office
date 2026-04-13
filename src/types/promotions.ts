@@ -38,4 +38,5 @@ export interface Availability {
   start_time: string; // HH:mm
   end_time: string;   // HH:mm
   active: boolean;
+  product_ids?: string[]; // Product IDs eligible for this availability
 }

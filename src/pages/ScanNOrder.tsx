@@ -20,7 +20,8 @@ import {
   uploadBanner,
   OnlineOrdersConfig,
 } from '@/services/onlineOrdersService';
-import { AlertCircle, ChevronLeft, Upload } from 'lucide-react';
+import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 // ════════════════════════════════════════════════════════════════════════════
 // ImageUploadField Component
@@ -93,12 +94,21 @@ function ImageUploadField({
 
 export default function ScanNOrder() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [config, setConfig] = useState<OnlineOrdersConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [bannerPreview, setBannerPreview] = useState<string>('');
   const [activeTab, setActiveTab] = useState('appearance');
+  const accessUrl = 'https://app.scanorder.com';
+  
+  // Mock KPI data
+  const kpis = {
+    revenue: 2450000, // €24,500
+    orders: 156,
+    avg_basket: 1571, // €15.71
+  };
 
   useEffect(() => {
     fetchConfig();
@@ -175,6 +185,23 @@ export default function ScanNOrder() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(accessUrl);
+    toast({
+      title: 'Copié !',
+      description: 'L\'URL d\'accès a été copiée dans le presse-papiers.',
+    });
+  };
+
+  const openInNewTab = () => {
+    window.open(accessUrl, '_blank');
+  };
+
+  const handleDisable = async () => {
+    // TODO: Implement disable functionality
+    console.log('ScanNOrder integration disabled');
   };
 
   const renderAppearanceTab = () => (
@@ -571,22 +598,117 @@ export default function ScanNOrder() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => navigate('/integrations/overview')}
-              className="rounded-lg p-2 hover:bg-muted"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
+          <div className="flex items-start justify-between gap-6">
             <div>
               <h1 className="text-3xl font-bold">ScanNOrder</h1>
               <p className="text-sm text-muted-foreground">
                 Configurez votre plateforme de commande en ligne
               </p>
             </div>
+            <div className="flex flex-col gap-2 items-end">
+              <p className="text-sm text-muted-foreground">URL d'accès:</p>
+              <div className="flex items-center gap-2">
+                <code className="px-3 py-2 bg-muted rounded text-sm font-mono text-foreground truncate max-w-xs">
+                  {accessUrl}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyToClipboard}
+                  title="Copier l'URL"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={openInNewTab}
+                  title="Ouvrir dans un nouvel onglet"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </div>
         }
       >
+        {/* Status Card */}
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                <CardTitle className="text-foreground">
+                  Intégration active
+                </CardTitle>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDisable}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                <Power className="h-4 w-4 mr-2" />
+                Désactiver
+              </Button>
+            </div>
+          </CardHeader>
+        </Card>
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-8">
+          {/* Revenue */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Chiffre d'affaires
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat('fr-FR', {
+                  style: 'currency',
+                  currency: 'EUR',
+                  minimumFractionDigits: 0,
+                }).format(kpis.revenue / 100)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Par ScanNOrder</p>
+            </CardContent>
+          </Card>
+
+          {/* Orders */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Commandes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{kpis.orders}</div>
+              <p className="text-xs text-muted-foreground mt-1">Commandes totales</p>
+            </CardContent>
+          </Card>
+
+          {/* Average Basket */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Panier moyen
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {new Intl.NumberFormat('fr-FR', {
+                  style: 'currency',
+                  currency: 'EUR',
+                  minimumFractionDigits: 0,
+                }).format(kpis.avg_basket / 100)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">Montant moyen</p>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Tabs */}
         <div className="mb-8">
           <TabSystem

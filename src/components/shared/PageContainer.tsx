@@ -20,22 +20,27 @@ import { cn } from '@/lib/utils';
 
 interface PageContainerProps {
   header?: ReactNode;
+  description?: ReactNode;
   children: ReactNode;
   className?: string;
 }
 
 export const PageContainer = ({
   header,
+  description,
   children,
   className,
 }: PageContainerProps) => {
   return (
     <div className="w-full">
       {/* Header Section - Same max-width as content */}
-      {header && (
+      {(header || description) && (
         <div className="w-full border-b border-border">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {header}
+            {description && (
+              <p className="text-sm text-muted-foreground mt-2">{description}</p>
+            )}
           </div>
         </div>
       )}

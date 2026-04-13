@@ -4,8 +4,10 @@ import { PageContainer } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
+import { RegisterXClosureDialog } from '@/components/cash/RegisterXClosureDialog';
 import { Tile } from '@/components/shared/Tile';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -20,6 +22,7 @@ import {
   FileText,
   Receipt,
   DollarSign,
+  Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +45,8 @@ const CashRegisterHistory = () => {
     total_revenue: 0,
     total_transactions: 0,
   });
+  const [selectedRegisterX, setSelectedRegisterX] = useState<CashRegisterHistoryRecord | null>(null);
+  const [closureDialogOpen, setClosureDialogOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -205,6 +210,27 @@ const CashRegisterHistory = () => {
                     sortable: true,
                     align: 'right',
                   },
+                  {
+                    key: 'id',
+                    label: 'Actions',
+                    render: (val: string, row: CashRegisterHistoryRecord) => 
+                      row.type === 'X' ? (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedRegisterX(row);
+                            setClosureDialogOpen(true);
+                          }}
+                          className="gap-2"
+                        >
+                          <Lock className="h-4 w-4" />
+                          Clôturer
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )
+                  },
                 ]}
                 data={sortedRegisters}
                 expandableRowKey="id"
@@ -266,6 +292,13 @@ const CashRegisterHistory = () => {
         </Card>
         </div>
       </PageContainer>
+
+      <RegisterXClosureDialog
+        register={selectedRegisterX}
+        open={closureDialogOpen}
+        onOpenChange={setClosureDialogOpen}
+        onSuccess={loadRegisters}
+      />
     </DashboardLayout>
   );
 };

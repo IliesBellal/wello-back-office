@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock } from "lucide-react";
+import { Store, ShoppingCart, Clock, Calendar } from "lucide-react";
 import { useEstablishmentSettings } from "@/hooks/useSettings";
+import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
 import { OpeningHours } from "./OpeningHours";
 import { EstablishmentSettings } from "@/types/settings";
@@ -17,6 +18,7 @@ import {
 export const EstablishmentTab = () => {
   const { settings, isLoading, isSaving, updateSettings } = useEstablishmentSettings();
   const [formData, setFormData] = useState<EstablishmentSettings | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("general");
 
   useEffect(() => {
     if (settings) {
@@ -45,98 +47,156 @@ export const EstablishmentTab = () => {
     return <div className="text-center py-8">Chargement...</div>;
   }
 
-  return (
-    <div className="w-full max-w-7xl mx-auto px-6 md:px-8 py-10">
-      {/* Status Card */}
-      <Card className="mb-10">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="flex items-center gap-3">
-                <span className="font-semibold text-foreground">Statut</span>
-                <Badge variant={formData.info.is_open ? "default" : "destructive"} className="text-sm">
-                  {formData.info.is_open ? "🟢 Ouvert" : "🔴 Fermé"}
-                </Badge>
+  const renderTabContent = (tabId: string) => {
+    if (tabId === "general") {
+      return (
+        <div className="space-y-6">
+          {/* Status Card */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="font-semibold text-foreground">Statut</span>
+                    <Badge variant={formData.info.is_open ? "default" : "destructive"} className="text-sm">
+                      {formData.info.is_open ? "🟢 Ouvert" : "🔴 Fermé"}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {formData.info.is_open 
+                      ? "Selon horaires d'ouverture" 
+                      : "Fermeture forcée"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={formData.info.is_open}
+                    onCheckedChange={(checked) => handleFieldChange('info', 'is_open', checked)}
+                  />
+                </div>
               </div>
-              <p className="text-sm text-muted-foreground">
-                {formData.info.is_open 
-                  ? "Selon horaires d'ouverture" 
-                  : "Fermeture forcée"}
-              </p>
-            </div>
-            <div className="flex items-center gap-4">
-              <Switch
-                checked={formData.info.is_open}
-                onCheckedChange={(checked) => handleFieldChange('info', 'is_open', checked)}
+            </CardContent>
+          </Card>
+
+          {/* Identity Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Store className="h-5 w-5" />
+                Identité
+              </CardTitle>
+              <CardDescription>Informations générales</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SettingsSection
+                fields={establishmentInfoFields}
+                values={formData.info}
+                onChange={(key, value) => handleFieldChange('info', key, value)}
+                useGrid={true}
               />
-              <Button onClick={handleSave} disabled={isSaving} className="bg-gradient-primary">
-                {isSaving ? "Enregistrement..." : "Enregistrer"}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
 
-      {/* Grille de sections: 2 colonnes sur desktop */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 xl:gap-12 mb-10">
-        {/* Identity Card - Pleine largeur */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Store className="h-5 w-5" />
-              Identité
-            </CardTitle>
-            <CardDescription>Informations générales</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SettingsSection
-              fields={establishmentInfoFields}
-              values={formData.info}
-              onChange={(key, value) => handleFieldChange('info', key, value)}
-              useGrid={true}
-            />
-          </CardContent>
-        </Card>
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
+            {isSaving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      );
+    }
 
-        {/* Timings Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Temps d'attente
-            </CardTitle>
-            <CardDescription>Configurez les délais de livraison</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SettingsSection
-              fields={establishmentTimingsFields}
-              values={formData.timings}
-              onChange={(key, value) => handleFieldChange('timings', key, value)}
-            />
-          </CardContent>
-        </Card>
+    if (tabId === "ordering") {
+      return (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShoppingCart className="h-5 w-5" />
+                Options de commande
+              </CardTitle>
+              <CardDescription>Paramètres de gestion des commandes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SettingsSection
+                fields={establishmentOrderingFields}
+                values={formData.ordering}
+                onChange={(key, value) => handleFieldChange('ordering', key, value)}
+              />
+            </CardContent>
+          </Card>
 
-        {/* Ordering Options Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Options de commande
-            </CardTitle>
-            <CardDescription>Paramètres de gestion</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <SettingsSection
-              fields={establishmentOrderingFields}
-              values={formData.ordering}
-              onChange={(key, value) => handleFieldChange('ordering', key, value)}
-            />
-          </CardContent>
-        </Card>
-      </div>
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
+            {isSaving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      );
+    }
 
-      {/* Opening Hours - Full Width */}
-      <OpeningHours />
+    if (tabId === "production") {
+      return (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Clock className="h-5 w-5" />
+                Temps d'attente
+              </CardTitle>
+              <CardDescription>Configurez les délais de livraison</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SettingsSection
+                fields={establishmentTimingsFields}
+                values={formData.timings}
+                onChange={(key, value) => handleFieldChange('timings', key, value)}
+              />
+            </CardContent>
+          </Card>
+
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
+            {isSaving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      );
+    }
+
+    if (tabId === "hours") {
+      return (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="h-5 w-5" />
+                Horaires d'ouvertures
+              </CardTitle>
+              <CardDescription>Gérez vos horaires d'ouverture</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OpeningHours />
+            </CardContent>
+          </Card>
+
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
+            {isSaving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="w-full space-y-6 px-4 sm:px-6 md:px-8 py-6">
+      <TabSystem
+        tabs={[
+          { id: "general", label: "Général" },
+          { id: "ordering", label: "Prise de commande" },
+          { id: "production", label: "Production" },
+          { id: "hours", label: "Horaires d'ouvertures" }
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        renderContent={renderTabContent}
+      />
     </div>
   );
 };

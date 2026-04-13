@@ -35,7 +35,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X, Search } from 'lucide-react';
 import { promotionsService } from '@/services/promotionsService';
 import { menuService } from '@/services/menuService';
 import { Promotion, Availability, DayOfWeek, TimeSlot } from '@/types/promotions';
@@ -79,6 +79,7 @@ const emptyAvailability = (): Omit<Availability, 'id'> => ({
   start_time: '11:00',
   end_time: '14:00',
   active: true,
+  product_ids: [],
 });
 
 // ─── Delete confirmation dialog ───────────────────────────────────────────────
@@ -699,10 +700,27 @@ function AvailabilityFormDialog({
     initial ? { ...initial, days: [...initial.days] } : emptyAvailability()
   );
   const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   useEffect(() => {
     setForm(initial ? { ...initial, days: [...initial.days] } : emptyAvailability());
+    setActiveTab('general');
+    setProductSearch('');
   }, [open, initial]);
+
+  // Load products when dialog opens
+  useEffect(() => {
+    if (open && products.length === 0) {
+      setLoadingProducts(true);
+      menuService.getProducts().then(data => {
+        setProducts(data);
+        setLoadingProducts(false);
+      }).catch(() => setLoadingProducts(false));
+    }
+  }, [open, products.length]);
 
   const set = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
@@ -732,88 +750,195 @@ function AvailabilityFormDialog({
     }
   };
 
+  // ─── TAB: GÉNÉRAL ──────────────────────────────────────────────────────────
+  const renderGeneralTab = () => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="avail-name">Nom *</Label>
+        <Input
+          id="avail-name"
+          value={form.name}
+          onChange={e => set('name', e.target.value)}
+          placeholder="Ex: Service du midi, Brunch week-end…"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Jours *</Label>
+        <div className="flex flex-wrap gap-2">
+          {ALL_DAYS.map(day => (
+            <button
+              key={day.key}
+              type="button"
+              onClick={() => toggleDay(day.key)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                form.days.includes(day.key)
+                  ? 'bg-primary text-white border-primary'
+                  : 'border-border text-muted-foreground hover:bg-muted/50'
+              }`}
+            >
+              {day.short}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="avail-start">Heure de début *</Label>
+          <Input
+            id="avail-start"
+            type="time"
+            value={form.start_time}
+            onChange={e => set('start_time', e.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="avail-end">Heure de fin *</Label>
+          <Input
+            id="avail-end"
+            type="time"
+            value={form.end_time}
+            onChange={e => set('end_time', e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 pt-2 border-t border-border">
+        <Switch
+          id="avail-active"
+          checked={form.active}
+          onCheckedChange={v => set('active', v)}
+        />
+        <Label htmlFor="avail-active" className="cursor-pointer">
+          Disponibilité active
+        </Label>
+      </div>
+    </div>
+  );
+
+  // ─── TAB: PRODUITS ────────────────────────────────────────────────────────
+  const filteredProducts = products.filter(p =>
+    p.name.toLowerCase().includes(productSearch.toLowerCase())
+  );
+
+  const renderProduitsTabContent = () => (
+    <>
+      {loadingProducts ? (
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="h-12" />
+          ))}
+        </div>
+      ) : (
+        <div className="border border-border rounded-lg p-2 space-y-1">
+          {filteredProducts.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              {products.length === 0 ? 'Aucun produit disponible' : 'Aucun résultat pour votre recherche'}
+            </p>
+          ) : (
+            filteredProducts.map(product => (
+              <div
+                key={product.product_id}
+                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
+              >
+                <Avatar className="h-8 w-8 flex-shrink-0">
+                  <AvatarImage src={product.image_url} alt={product.name} />
+                  <AvatarFallback
+                    style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
+                  />
+                </Avatar>
+                <span className="text-sm font-medium flex-1 truncate">{product.name}</span>
+                <Switch
+                  checked={(form.product_ids ?? []).includes(product.product_id)}
+                  onCheckedChange={checked => {
+                    const updated = [...(form.product_ids ?? [])];
+                    if (checked && !updated.includes(product.product_id)) {
+                      updated.push(product.product_id);
+                    } else if (!checked) {
+                      const idx = updated.indexOf(product.product_id);
+                      if (idx > -1) updated.splice(idx, 1);
+                    }
+                    set('product_ids', updated);
+                  }}
+                />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </>
+  );
+
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl h-[800px] flex flex-col p-0">
+        {/* Fixed Header */}
+        <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
           <DialogTitle>{initial ? 'Modifier la disponibilité' : 'Nouvelle disponibilité'}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label htmlFor="avail-name">Nom *</Label>
-            <Input
-              id="avail-name"
-              value={form.name}
-              onChange={e => set('name', e.target.value)}
-              placeholder="Ex: Service du midi, Brunch week-end…"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Jours *</Label>
-            <div className="flex flex-wrap gap-2">
-              {ALL_DAYS.map(day => (
-                <button
-                  key={day.key}
-                  type="button"
-                  onClick={() => toggleDay(day.key)}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                    form.days.includes(day.key)
-                      ? 'bg-primary text-white border-primary'
-                      : 'border-border text-muted-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  {day.short}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="avail-start">Heure de début *</Label>
-              <Input
-                id="avail-start"
-                type="time"
-                value={form.start_time}
-                onChange={e => set('start_time', e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="avail-end">Heure de fin *</Label>
-              <Input
-                id="avail-end"
-                type="time"
-                value={form.end_time}
-                onChange={e => set('end_time', e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 pt-1">
-            <Switch
-              id="avail-active"
-              checked={form.active}
-              onCheckedChange={v => set('active', v)}
-            />
-            <Label htmlFor="avail-active" className="cursor-pointer">
-              Disponibilité active
-            </Label>
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <Button variant="outline" onClick={onClose} className="flex-1" disabled={saving}>
-              Annuler
-            </Button>
-            <Button
-              onClick={handleSubmit}
-              className="flex-1 bg-gradient-primary"
-              disabled={!isValid || saving}
+        {/* Tabs Container */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+          {/* Tabs Navigation - Always Visible */}
+          <TabsList className="w-full justify-start px-6 py-0 h-auto rounded-none border-b bg-transparent gap-6 flex-shrink-0">
+            <TabsTrigger 
+              value="general" 
+              className="rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-primary pb-3 pt-3"
             >
-              {saving ? 'Enregistrement…' : initial ? 'Enregistrer' : 'Créer'}
-            </Button>
+              Général
+            </TabsTrigger>
+            <TabsTrigger 
+              value="produits" 
+              className="rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-primary pb-3 pt-3"
+            >
+              Produits
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Tab Contents Container */}
+          <div className="flex-1 overflow-auto">
+            {/* Général Tab */}
+            <TabsContent 
+              value="general" 
+              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden"
+            >
+              {renderGeneralTab()}
+            </TabsContent>
+
+            {/* Produits Tab - Fixed search + scrollable list */}
+            <TabsContent 
+              value="produits" 
+              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden flex flex-col"
+            >
+              <div className="relative mb-3 flex-shrink-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Rechercher un produit…"
+                  value={productSearch}
+                  onChange={e => setProductSearch(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <div className="overflow-y-auto flex-1 pr-2">
+                {renderProduitsTabContent()}
+              </div>
+            </TabsContent>
           </div>
+        </Tabs>
+
+        {/* Fixed Action Buttons */}
+        <div className="px-6 py-4 border-t flex gap-3 flex-shrink-0">
+          <Button variant="outline" onClick={onClose} className="flex-1" disabled={saving}>
+            Annuler
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            className="flex-1 bg-gradient-primary"
+            disabled={!isValid || saving}
+          >
+            {saving ? 'Enregistrement…' : initial ? 'Enregistrer' : 'Créer'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

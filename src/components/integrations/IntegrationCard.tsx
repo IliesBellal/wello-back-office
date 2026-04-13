@@ -16,7 +16,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import type { IntegrationStatus } from '@/services/integrationsService';
-import { Loader2, CheckCircle, AlertCircle, RefreshCw, Power } from 'lucide-react';
+import { Loader2, AlertCircle, RefreshCw, Power } from 'lucide-react';
 
 interface IntegrationCardProps {
   name: string;
@@ -133,27 +133,28 @@ export const IntegrationCard = ({
   return (
     <div className="space-y-6">
       {/* Status Card */}
-      <Card className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
+      <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+              <div className="h-3 w-3 rounded-full bg-green-500"></div>
               <div>
-                <CardTitle className="text-green-700 dark:text-green-300">
+                <CardTitle className="text-foreground">
                   Intégration active
                 </CardTitle>
                 {status.last_sync && (
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                  <p className="text-xs text-muted-foreground mt-1">
                     Dernière synchronisation: {new Date(status.last_sync).toLocaleString('fr-FR')}
                   </p>
                 )}
               </div>
             </div>
             <Button
-              variant="destructive"
+              variant="ghost"
               size="sm"
               onClick={() => setShowDisableDialog(true)}
               disabled={disabling}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
             >
               {disabling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               <Power className="h-4 w-4 mr-2" />
@@ -220,19 +221,7 @@ export const IntegrationCard = ({
       {/* Configuration Card */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Configuration</CardTitle>
-            {editMode && (
-              <Button
-                size="sm"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Enregistrer
-              </Button>
-            )}
-          </div>
+          <CardTitle>Configuration</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {/* Sync Button */}

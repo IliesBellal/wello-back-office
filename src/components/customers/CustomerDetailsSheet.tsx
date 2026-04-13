@@ -172,24 +172,26 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
           <TabsContent value="general" className="space-y-4 mt-4">
             {/* Contact Info */}
             <Card>
-              <CardContent className="p-4 space-y-3">
-                {customer.phone && (
-                  <a href={`tel:${customer.phone}`} className="flex items-center gap-3 text-sm hover:text-primary transition-colors">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{customer.phone}</span>
-                  </a>
-                )}
-                {customer.email && (
-                  <a href={`mailto:${customer.email}`} className="flex items-center gap-3 text-sm hover:text-primary transition-colors">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>{customer.email}</span>
-                  </a>
-                )}
+              <CardContent className="p-4 space-y-3 flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-3 flex-1">
+                  {customer.phone && (
+                    <a href={`tel:${customer.phone}`} className="flex items-center gap-3 text-sm hover:text-primary transition-colors">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span className="break-all">{customer.phone}</span>
+                    </a>
+                  )}
+                  {customer.email && (
+                    <a href={`mailto:${customer.email}`} className="flex items-center gap-3 text-sm hover:text-primary transition-colors">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <span className="break-all">{customer.email}</span>
+                    </a>
+                  )}
+                </div>
                 {fullAddress && googleMapsUrl && (
                   <a href={googleMapsUrl} target="_blank" rel="noopener noreferrer" className="flex items-start gap-3 text-sm hover:text-primary transition-colors">
-                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
                     <span className="flex-1">{fullAddress}</span>
-                    <ExternalLink className="h-3.5 w-3.5" />
+                    <ExternalLink className="h-3.5 w-3.5 flex-shrink-0" />
                   </a>
                 )}
               </CardContent>
@@ -199,12 +201,12 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
             {customer.address?.lat && customer.address?.lng && (
               <Card>
                 <CardContent className="p-0">
-                  <div className="h-40 bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
+                  <div className="h-28 sm:h-40 bg-muted rounded-lg flex items-center justify-center relative overflow-hidden">
                     <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-primary/5" />
-                    <div className="text-center z-10">
-                      <MapPin className="h-8 w-8 text-primary mx-auto mb-2" />
-                      <p className="text-sm text-muted-foreground">Distance: ~2.5km</p>
-                      <Badge variant="outline" className="mt-1">Zone de Livraison A</Badge>
+                    <div className="text-center z-10 px-4">
+                      <MapPin className="h-6 sm:h-8 w-6 sm:w-8 text-primary mx-auto mb-1 sm:mb-2" />
+                      <p className="text-xs sm:text-sm text-muted-foreground">Distance: ~2.5km</p>
+                      <Badge variant="outline" className="mt-1 text-xs">Zone de Livraison A</Badge>
                     </div>
                   </div>
                 </CardContent>
@@ -212,7 +214,7 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Card>
                 <CardContent className="p-4 text-center">
                   <ShoppingBag className="h-5 w-5 text-primary mx-auto mb-1" />

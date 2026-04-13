@@ -37,16 +37,16 @@ const mockIntegrations: Record<string, IntegrationStatus> = {
   },
   deliveroo: {
     platform: 'deliveroo',
-    active: false,
-    commission_rate: 0,
-    auto_accept_orders: false,
+    active: true,
+    commission_rate: 18,
+    auto_accept_orders: true,
     kpis: {
-      revenue: 0,
-      orders: 0,
-      avg_basket: 0,
+      revenue: 5320000,
+      orders: 287,
+      avg_basket: 1853,
     },
-    last_sync: '',
-    synced_items: 0,
+    last_sync: '2024-04-08T10:15:00Z',
+    synced_items: 76,
   },
 };
 

@@ -140,6 +140,7 @@ const Customers = () => {
             </Button>
           </div>
         }
+        description="Gérez vos clients, consultez leur historique de commandes et programmes de fidélité"
       >
         {/* Search */}
         <div className="relative w-full sm:max-w-xs">

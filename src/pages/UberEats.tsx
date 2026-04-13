@@ -93,11 +93,9 @@ export default function UberEatsPage() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Uber Eats</h1>
-            <p className="text-muted-foreground mt-1">Gérez votre intégration Uber Eats</p>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">Uber Eats</h1>
         }
+        description="Gérez votre intégration Uber Eats, commandes et synchronisation du menu"
       >
         <IntegrationCard
           name="Uber Eats"
