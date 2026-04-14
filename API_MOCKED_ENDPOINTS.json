@@ -1,0 +1,2724 @@
+{
+  "project": "Wello Back-Office",
+  "last_updated": "2026-04-15",
+  "services": [
+    {
+      "service_name": "authService",
+      "file": "src/services/authService.ts",
+      "endpoints": [
+        {
+          "function_name": "login",
+          "method": "POST",
+          "endpoint": "/auth/login",
+          "description": "User login with credentials",
+          "request": {
+            "type": "LoginCredentials",
+            "schema": {
+              "properties": {
+                "email": { "type": "string" },
+                "password": { "type": "string" }
+              },
+              "required": ["email", "password"]
+            }
+          },
+          "response": {
+            "type": "AuthResponse",
+            "schema": {
+              "id": "auth.login",
+              "data": {
+                "userId": "string",
+                "merchantId": "string",
+                "merchantName": "string",
+                "token": "string",
+                "user_mail": "string",
+                "mfa_status": "string (verified|pending)",
+                "merchants": [
+                  {
+                    "merchant_id": "string",
+                    "business_name": "string",
+                    "token": "string",
+                    "logo_url": "string",
+                    "Lat": "number",
+                    "Lng": "number",
+                    "Address": "string",
+                    "City": "string",
+                    "Country": "string",
+                    "ZipCode": "string"
+                  }
+                ]
+              }
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": false,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "switchMerchant",
+          "method": "POST",
+          "endpoint": "/auth/login (switch merchant)",
+          "description": "Switch to a different merchant using token",
+          "request": {
+            "type": "Token string in payload",
+            "schema": {
+              "properties": {
+                "token": { "type": "string", "description": "Merchant token" }
+              },
+              "required": ["token"]
+            }
+          },
+          "response": {
+            "type": "AuthResponse",
+            "schema": {
+              "id": "auth.login",
+              "data": {
+                "merchantId": "string",
+                "merchantName": "string",
+                "token": "string"
+              }
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "loginWithToken",
+          "method": "POST",
+          "endpoint": "/auth/login (with custom token)",
+          "description": "Login using custom token",
+          "request": {
+            "type": "Custom token string",
+            "schema": {
+              "customToken": "string"
+            }
+          },
+          "response": {
+            "type": "AuthResponse",
+            "schema": {
+              "id": "auth.login",
+              "data": {
+                "merchantId": "string",
+                "token": "string"
+              }
+            }
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": false,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "ordersService",
+      "file": "src/services/ordersService.ts",
+      "endpoints": [
+        {
+          "function_name": "getPendingOrders",
+          "method": "GET",
+          "endpoint": "/orders/pending",
+          "description": "Get all pending orders",
+          "request": null,
+          "response": {
+            "type": "Order[]",
+            "schema": {
+              "orders": [
+                {
+                  "order_id": "string",
+                  "order_num": "string",
+                  "state": "string (OPEN|CLOSED)",
+                  "TTC": "number",
+                  "TVA": "number",
+                  "HT": "number",
+                  "isPaid": "boolean",
+                  "products": [
+                    {
+                      "order_item_id": "string",
+                      "product_id": "string",
+                      "name": "string",
+                      "quantity": "number",
+                      "price": "number",
+                      "production_status": "string"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getOrderHistory",
+          "method": "POST",
+          "endpoint": "/orders/history",
+          "description": "Get order history with pagination",
+          "request": {
+            "type": "Pagination request",
+            "schema": {
+              "properties": {
+                "page": { "type": "number", "default": 1 },
+                "limit": { "type": "number", "default": 20 }
+              }
+            }
+          },
+          "response": {
+            "type": "Order[]",
+            "schema": {
+              "orders": "[Order array]"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getOrderById",
+          "method": "GET",
+          "endpoint": "/orders/{orderId}",
+          "description": "Get specific order by ID",
+          "request": {
+            "type": "Path parameter",
+            "schema": {
+              "orderId": "string (path parameter)"
+            }
+          },
+          "response": {
+            "type": "Order",
+            "schema": "{Order object}"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "searchOrders",
+          "method": "GET",
+          "endpoint": "/orders/search",
+          "description": "Search orders by term (ID, number, or customer name)",
+          "request": null,
+          "response": {
+            "type": "Order[]",
+            "schema": "{Order array}"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [
+            {
+              "name": "term",
+              "type": "string",
+              "description": "Search term (order ID, order number, or customer name)"
+            }
+          ],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "stocksService",
+      "file": "src/services/stocksService.ts",
+      "endpoints": [
+        {
+          "function_name": "getStocksList",
+          "method": "GET",
+          "endpoint": "/stocks/components/list",
+          "description": "Get all stock components",
+          "request": null,
+          "response": {
+            "type": "StockComponent[]",
+            "schema": [
+              {
+                "component_id": "string",
+                "name": "string",
+                "unit": { "unit_name": "string" },
+                "quantity": "number",
+                "alert_threshold": "number",
+                "purchasing_price": "number"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateStockMovement",
+          "method": "PATCH",
+          "endpoint": "/stocks/components/{componentId}",
+          "description": "Update stock movement for a component",
+          "request": {
+            "type": "StockMovementPayload",
+            "schema": {
+              "properties": {
+                "component_id": { "type": "string" },
+                "unit": { "type": "string" },
+                "quantity": { "type": "number" },
+                "comment": { "type": "string", "optional": true }
+              },
+              "required": ["component_id", "unit", "quantity"]
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getStockMovements",
+          "method": "GET",
+          "endpoint": "/stocks/movements",
+          "description": "Get stock movements within date range",
+          "request": null,
+          "response": {
+            "type": "StockMovement[]",
+            "schema": [
+              {
+                "id": "string",
+                "component_id": "string",
+                "component_name": "string",
+                "unit": "string",
+                "quantity": "number",
+                "type": "ajout|retrait|perte|consommation",
+                "created_at": "string (ISO 8601)",
+                "created_by": "string",
+                "comment": "string (optional)"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [
+            {
+              "name": "from",
+              "type": "string",
+              "description": "Start date (YYYY-MM-DD format)"
+            },
+            {
+              "name": "to",
+              "type": "string",
+              "description": "End date (YYYY-MM-DD format)"
+            }
+          ],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getMovementsSummary",
+          "method": "GET",
+          "endpoint": "/stocks/movements/summary",
+          "description": "Get summary of stock movements (consumption aggregated)",
+          "request": null,
+          "response": {
+            "type": "object[]",
+            "schema": [
+              {
+                "component_id": "string",
+                "component_name": "string",
+                "unit": "string",
+                "total_consumed": "number"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [
+            {
+              "name": "from",
+              "type": "string",
+              "description": "Start date (YYYY-MM-DD format)"
+            },
+            {
+              "name": "to",
+              "type": "string",
+              "description": "End date (YYYY-MM-DD format)"
+            }
+          ],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "integrationsService",
+      "file": "src/services/integrationsService.ts",
+      "endpoints": [
+        {
+          "function_name": "getUberEatsStatus",
+          "method": "GET",
+          "endpoint": "/integrations/uber-eats",
+          "description": "Get Uber Eats integration status",
+          "request": null,
+          "response": {
+            "type": "IntegrationStatus",
+            "schema": {
+              "platform": "uber_eats",
+              "active": "boolean",
+              "commission_rate": "number",
+              "auto_accept_orders": "boolean",
+              "kpis": {
+                "revenue": "number",
+                "orders": "number",
+                "avg_basket": "number"
+              },
+              "last_sync": "string (ISO 8601)",
+              "synced_items": "number"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getDeliverooStatus",
+          "method": "GET",
+          "endpoint": "/integrations/deliveroo",
+          "description": "Get Deliveroo integration status",
+          "request": null,
+          "response": {
+            "type": "IntegrationStatus",
+            "schema": {
+              "platform": "deliveroo",
+              "active": "boolean",
+              "commission_rate": "number",
+              "auto_accept_orders": "boolean",
+              "kpis": {
+                "revenue": "number",
+                "orders": "number",
+                "avg_basket": "number"
+              },
+              "last_sync": "string (ISO 8601)",
+              "synced_items": "number"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateUberEats",
+          "method": "PATCH",
+          "endpoint": "/integrations/uber-eats",
+          "description": "Update Uber Eats configuration",
+          "request": {
+            "type": "object",
+            "schema": {
+              "commission_rate": "number",
+              "auto_accept_orders": "boolean"
+            }
+          },
+          "response": {
+            "type": "IntegrationStatus",
+            "schema": "{IntegrationStatus}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateDeliveroo",
+          "method": "PATCH",
+          "endpoint": "/integrations/deliveroo",
+          "description": "Update Deliveroo configuration",
+          "request": {
+            "type": "object",
+            "schema": {
+              "commission_rate": "number",
+              "auto_accept_orders": "boolean"
+            }
+          },
+          "response": {
+            "type": "IntegrationStatus",
+            "schema": "{IntegrationStatus}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "disableUberEats",
+          "method": "PATCH",
+          "endpoint": "/integrations/uber-eats/disable",
+          "description": "Disable Uber Eats integration",
+          "request": null,
+          "response": {
+            "type": "IntegrationStatus",
+            "schema": "{IntegrationStatus with active: false}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "disableDeliveroo",
+          "method": "PATCH",
+          "endpoint": "/integrations/deliveroo/disable",
+          "description": "Disable Deliveroo integration",
+          "request": null,
+          "response": {
+            "type": "IntegrationStatus",
+            "schema": "{IntegrationStatus with active: false}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "syncUberEatsMenu",
+          "method": "PATCH",
+          "endpoint": "/menu/uber-eats/sync",
+          "description": "Sync Uber Eats menu",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "synced_items": "number"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "syncDeliverooMenu",
+          "method": "PATCH",
+          "endpoint": "/menu/deliveroo/sync",
+          "description": "Sync Deliveroo menu",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "synced_items": "number"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getStripeStatus",
+          "method": "GET",
+          "endpoint": "/integrations/stripe/status",
+          "description": "Get Stripe integration status",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "verified|action_required"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getStripeOnboardingLink",
+          "method": "POST",
+          "endpoint": "/integrations/stripe/onboarding-link",
+          "description": "Get Stripe onboarding link",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "url": "string (Stripe Connect URL)"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getStripeBankAccounts",
+          "method": "GET",
+          "endpoint": "/integrations/stripe/bank-accounts",
+          "description": "Get Stripe bank accounts",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "accounts": [
+                {
+                  "id": "string",
+                  "bank_name": "string",
+                  "last4": "string",
+                  "currency": "string",
+                  "status": "verified|pending|errored",
+                  "account_holder_name": "string (optional)"
+                }
+              ]
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getStripeBankAccountLink",
+          "method": "POST",
+          "endpoint": "/integrations/stripe/bank-account-link",
+          "description": "Get Stripe bank account link",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "url": "string (Stripe Connect bank account setup URL)"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "menuService",
+      "file": "src/services/menuService.ts",
+      "endpoints": [
+        {
+          "function_name": "getTvaRates",
+          "method": "GET",
+          "endpoint": "/pos/tva_rates",
+          "description": "Get TVA rates grouped by delivery type",
+          "request": null,
+          "response": {
+            "type": "TvaRateGroup[]",
+            "schema": [
+              {
+                "id": "number",
+                "name": "string",
+                "delivery_type": "IN|DELIVERY|TAKE_AWAY",
+                "rates": [
+                  {
+                    "id": "number",
+                    "value": "number",
+                    "label": "string"
+                  }
+                ]
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getMenuData",
+          "method": "GET",
+          "endpoint": "/menu",
+          "description": "Get complete menu data",
+          "request": null,
+          "response": {
+            "type": "Menu",
+            "schema": {
+              "products_types": "Category[]",
+              "products": "Product[]"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getProducts",
+          "method": "GET",
+          "endpoint": "/menu/products",
+          "description": "Get all products",
+          "request": null,
+          "response": {
+            "type": "Product[]",
+            "schema": "[Product array]"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateProduct",
+          "method": "PATCH",
+          "endpoint": "/menu/products/{productId}",
+          "description": "Update product details",
+          "request": {
+            "type": "Partial<Product>",
+            "schema": "{Product partial update}"
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateProductAvailability",
+          "method": "PATCH",
+          "endpoint": "/menu/products/{productId}/availability",
+          "description": "Update product availability status",
+          "request": {
+            "type": "object",
+            "schema": {
+              "status": "string (true/false)"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteProduct",
+          "method": "DELETE",
+          "endpoint": "/menu/products/{productId}",
+          "description": "Delete product",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateCategoryAvailability",
+          "method": "PATCH",
+          "endpoint": "/menu/products/category/{categoryId}/availability",
+          "description": "Update category availability",
+          "request": {
+            "type": "object",
+            "schema": {
+              "status": "string (true/false)"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteCategory",
+          "method": "DELETE",
+          "endpoint": "/menu/products/category/{categoryId}",
+          "description": "Delete product category",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getUnitsOfMeasure",
+          "method": "GET",
+          "endpoint": "/menu/units_of_measures",
+          "description": "Get units of measure",
+          "request": null,
+          "response": {
+            "type": "UnitOfMeasure[]",
+            "schema": [
+              {
+                "id": "string",
+                "name": "string",
+                "compatible_with": "string[]"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getComponents",
+          "method": "GET",
+          "endpoint": "/menu/components",
+          "description": "Get stock components grouped by category",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "components": "Component[]",
+              "categories": "ComponentCategory[]"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getAttributes",
+          "method": "GET",
+          "endpoint": "/menu/attributes",
+          "description": "Get product attributes",
+          "request": null,
+          "response": {
+            "type": "Attribute[]",
+            "schema": "[Attribute array]"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createAttribute",
+          "method": "POST",
+          "endpoint": "/menu/attributes",
+          "description": "Create new product attribute",
+          "request": {
+            "type": "Partial<Attribute>",
+            "schema": "{Attribute creation payload}"
+          },
+          "response": {
+            "type": "Attribute",
+            "schema": "{Full Attribute with generated id}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateAttribute",
+          "method": "PATCH",
+          "endpoint": "/menu/attributes/{attributeId}",
+          "description": "Update product attribute",
+          "request": {
+            "type": "Partial<Attribute>",
+            "schema": "{Attribute update payload}"
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateProductOrder",
+          "method": "PATCH",
+          "endpoint": "/menu/products/order",
+          "description": "Update product display order",
+          "request": {
+            "type": "object",
+            "schema": {
+              "products": [
+                {
+                  "product_id": "string"
+                }
+              ]
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateCategoryOrder",
+          "method": "PATCH",
+          "endpoint": "/menu/categories/order",
+          "description": "Update category display order",
+          "request": {
+            "type": "object",
+            "schema": {
+              "categories": [
+                {
+                  "category_id": "string"
+                }
+              ]
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateTagOrder",
+          "method": "PATCH",
+          "endpoint": "/menu/tags/order",
+          "description": "Update tag display order",
+          "request": {
+            "type": "object",
+            "schema": {
+              "tags": [
+                {
+                  "id": "string"
+                }
+              ]
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateExternalMenu",
+          "method": "PATCH",
+          "endpoint": "/menu/{platform}",
+          "description": "Update external menu (Uber Eats or Deliveroo)",
+          "request": {
+            "type": "object",
+            "schema": {}
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "parameters": [
+            {
+              "name": "platform",
+              "in": "path",
+              "type": "string",
+              "enum": ["uber_eats", "deliveroo"]
+            }
+          ],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createProductCategory",
+          "method": "POST",
+          "endpoint": "/menu/products/category/create",
+          "description": "Create new product category",
+          "request": {
+            "type": "object",
+            "schema": {
+              "name": "string"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "id": "string",
+              "name": "string",
+              "order": "number"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createComponentCategory",
+          "method": "POST",
+          "endpoint": "/menu/components/category/create",
+          "description": "Create new component category",
+          "request": {
+            "type": "object",
+            "schema": {
+              "name": "string"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "id": "string",
+              "name": "string",
+              "order": "number"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateCategory",
+          "method": "PATCH",
+          "endpoint": "/menu/categories/{categoryId}",
+          "description": "Update category details",
+          "request": {
+            "type": "object",
+            "schema": {
+              "name": "string"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createProduct",
+          "method": "POST",
+          "endpoint": "/menu/product/create",
+          "description": "Create new product",
+          "request": {
+            "type": "Partial<Product>",
+            "schema": "{Product creation payload}"
+          },
+          "response": {
+            "type": "Product",
+            "schema": "{Full Product with generated id}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createComponent",
+          "method": "POST",
+          "endpoint": "/menu/components/create",
+          "description": "Create new stock component",
+          "request": {
+            "type": "object",
+            "schema": {
+              "name": "string",
+              "unit_id": "number",
+              "price": "number",
+              "category_id": "string (optional)",
+              "purchase_cost": "number (optional)",
+              "purchase_unit_id": "string | number (optional)"
+            }
+          },
+          "response": {
+            "type": "Component",
+            "schema": "{Component with generated id}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateComponent",
+          "method": "PUT",
+          "endpoint": "/menu/components/{componentId}",
+          "description": "Update stock component",
+          "request": {
+            "type": "object",
+            "schema": {
+              "name": "string (optional)",
+              "category_id": "string (optional)",
+              "unit_id": "number (optional)",
+              "price": "number (optional)",
+              "purchase_cost": "number (optional)",
+              "purchase_unit_id": "string | number (optional)"
+            }
+          },
+          "response": {
+            "type": "Component",
+            "schema": "{Updated Component}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteComponent",
+          "method": "DELETE",
+          "endpoint": "/menu/components/{componentId}",
+          "description": "Delete stock component",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "uploadProductImage",
+          "method": "PUT",
+          "endpoint": "/menu/product/{productId}/image",
+          "description": "Upload product image",
+          "request": {
+            "type": "FormData",
+            "schema": {
+              "photo": "File"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "photo_url": "string"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "multipart/form-data"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createTag",
+          "method": "POST",
+          "endpoint": "/menu/tags/create",
+          "description": "Create new product tag",
+          "request": {
+            "type": "object",
+            "schema": {
+              "name": "string"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "id": "string",
+              "name": "string"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getTags",
+          "method": "GET",
+          "endpoint": "/menu/tags",
+          "description": "Get all product tags",
+          "request": null,
+          "response": {
+            "type": "Tag[]",
+            "schema": "[Tag array]"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getAllergens",
+          "method": "GET",
+          "endpoint": "/allergens",
+          "description": "Get all allergens",
+          "request": null,
+          "response": {
+            "type": "Allergen[]",
+            "schema": "[Allergen array]"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "saveDisplayOrder",
+          "method": "PATCH",
+          "endpoint": "/menu/display-orders",
+          "description": "Save product display order configuration",
+          "request": {
+            "type": "object",
+            "schema": {
+              "display_order": [
+                {
+                  "category_id": "string",
+                  "products": "string[]"
+                }
+              ]
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteTag",
+          "method": "DELETE",
+          "endpoint": "/menu/tags/{tagId}",
+          "description": "Delete product tag",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateTag",
+          "method": "PATCH",
+          "endpoint": "/menu/tags/{tagId}",
+          "description": "Update product tag",
+          "request": {
+            "type": "object",
+            "schema": {
+              "name": "string"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "id": "string",
+              "name": "string"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "assignTagsToProducts",
+          "method": "POST",
+          "endpoint": "/menu/bulk-assign-tags",
+          "description": "Assign tags to multiple products",
+          "request": {
+            "type": "object",
+            "schema": {
+              "product_ids": "string[]",
+              "tag_ids": "string[]"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "bulkUpdatePrices",
+          "method": "PATCH",
+          "endpoint": "/menu/products/bulk",
+          "description": "Update prices for multiple products",
+          "request": {
+            "type": "object",
+            "schema": {
+              "products": [
+                {
+                  "product_id": "string",
+                  "price": "number (optional)",
+                  "price_take_away": "number (optional)",
+                  "price_delivery": "number (optional)"
+                }
+              ]
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "bulkAssignProductsToCategory",
+          "method": "PATCH",
+          "endpoint": "/menu/categories/bulk-assign",
+          "description": "Assign multiple products to category",
+          "request": {
+            "type": "object",
+            "schema": {
+              "product_ids": "string[]",
+              "category_id": "string"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "bulkAssignProductsToMarketCategory",
+          "method": "PATCH",
+          "endpoint": "/menu/market-categories/bulk-assign",
+          "description": "Assign multiple products to market category",
+          "request": {
+            "type": "object",
+            "schema": {
+              "product_ids": "string[]",
+              "category_id": "string"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateComponentStatus",
+          "method": "POST",
+          "endpoint": "/menu/components/{componentId}/status",
+          "description": "Update component availability status",
+          "request": {
+            "type": "object",
+            "schema": {
+              "status": "string (1|0)"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateProductStatus",
+          "method": "POST",
+          "endpoint": "/menu/products/{productId}/status",
+          "description": "Update product availability status",
+          "request": {
+            "type": "object",
+            "schema": {
+              "status": "string (1|0)"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "customersService",
+      "file": "src/services/customersService.ts",
+      "endpoints": [
+        {
+          "function_name": "getCustomersList",
+          "method": "GET",
+          "endpoint": "/customer/list",
+          "description": "Get paginated list of customers",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "data": "Customer[]",
+              "hasMore": "boolean"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [
+            {
+              "name": "page",
+              "type": "number",
+              "description": "Page number (default: 1)"
+            },
+            {
+              "name": "page_size",
+              "type": "number",
+              "description": "Items per page (default: 40)"
+            }
+          ],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "searchCustomers",
+          "method": "GET",
+          "endpoint": "/customer/search",
+          "description": "Search customers by name, phone, or email",
+          "request": null,
+          "response": {
+            "type": "Customer[]",
+            "schema": "[Customer array with match scores]"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [
+            {
+              "name": "term",
+              "type": "string",
+              "description": "Search term (name, phone, or email)"
+            }
+          ],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getCustomerOrders",
+          "method": "GET",
+          "endpoint": "/customers/{customerId}/orders",
+          "description": "Get order history for a specific customer",
+          "request": null,
+          "response": {
+            "type": "CustomerOrder[]",
+            "schema": "[CustomerOrder array]"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getCustomerLoyalty",
+          "method": "GET",
+          "endpoint": "/customer/{customerId}/loyalty",
+          "description": "Get customer loyalty programs and rewards",
+          "request": null,
+          "response": {
+            "type": "CustomerLoyalty",
+            "schema": {
+              "programs": "LoyaltyProgram[]",
+              "rewards": "Reward[]"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateLoyaltyProgress",
+          "method": "PATCH",
+          "endpoint": "/customers/{customerId}/loyalty/{programId}",
+          "description": "Update loyalty program progress for customer",
+          "request": {
+            "type": "object",
+            "schema": {
+              "current_value": "number"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateRewardStatus",
+          "method": "PATCH",
+          "endpoint": "/customers/{customerId}/rewards/{rewardId}",
+          "description": "Mark reward as used or unused",
+          "request": {
+            "type": "object",
+            "schema": {
+              "is_used": "string (1|0)"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createLoyaltyProgram",
+          "method": "POST",
+          "endpoint": "/customers/loyalty",
+          "description": "Create new loyalty program",
+          "request": {
+            "type": "CreateLoyaltyProgramPayload",
+            "schema": {
+              "name": "string",
+              "description": "string",
+              "type": "orders_count|total_spent|product_count",
+              "target_value": "number",
+              "target_order_types": "string[]",
+              "target_products": "string[] (optional)",
+              "reward_type": "fixed_discount|percent_discount|free_product",
+              "reward_value": "number",
+              "reward_products": "string[] (optional)"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok",
+              "id": "string"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getProducts",
+          "method": "GET",
+          "endpoint": "/menu/products (for loyalty selection)",
+          "description": "Get products for loyalty program assignment",
+          "request": null,
+          "response": {
+            "type": "object[]",
+            "schema": [
+              {
+                "id": "string",
+                "name": "string"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getLoyaltyPrograms",
+          "method": "GET",
+          "endpoint": "/customers/loyalty-programs",
+          "description": "Get all loyalty programs",
+          "request": null,
+          "response": {
+            "type": "LoyaltyProgram[]",
+            "schema": "[LoyaltyProgram array]"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getLoyaltyProgramById",
+          "method": "GET",
+          "endpoint": "/customers/loyalty-programs/{programId}",
+          "description": "Get specific loyalty program",
+          "request": null,
+          "response": {
+            "type": "LoyaltyProgram",
+            "schema": "{LoyaltyProgram object}"
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateLoyaltyProgram",
+          "method": "PATCH",
+          "endpoint": "/customers/loyalty-programs/{programId}",
+          "description": "Update loyalty program configuration",
+          "request": {
+            "type": "Partial<CreateLoyaltyProgramPayload>",
+            "schema": "{CreateLoyaltyProgramPayload partial update}"
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteLoyaltyProgram",
+          "method": "DELETE",
+          "endpoint": "/customers/loyalty-programs/{programId}",
+          "description": "Delete loyalty program",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "financialReportsService",
+      "file": "src/services/financialReportsService.ts",
+      "endpoints": [
+        {
+          "function_name": "getVATReport",
+          "method": "POST",
+          "endpoint": "/establishment/report/tva",
+          "description": "Get VAT report for date range",
+          "request": {
+            "type": "object",
+            "schema": {
+              "date_from": "string (YYYY-MM-DD)",
+              "date_to": "string (YYYY-MM-DD)"
+            }
+          },
+          "response": {
+            "type": "VATReportResponse",
+            "schema": {
+              "status": "string",
+              "calendar": [
+                {
+                  "date": "string (YYYY-MM-DD)",
+                  "TTC_sum": "number",
+                  "HT_sum": "number",
+                  "TVA_sum": "number",
+                  "VAT_data": [
+                    {
+                      "tva_title": "string|null",
+                      "tva_delivery_type_label": "string (optional)",
+                      "ttc": "number",
+                      "ht": "number",
+                      "tva": "number"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getPaymentReport",
+          "method": "POST",
+          "endpoint": "/establishment/report/payments",
+          "description": "Get payment methods report for date range",
+          "request": {
+            "type": "object",
+            "schema": {
+              "date_from": "string (YYYY-MM-DD)",
+              "date_to": "string (YYYY-MM-DD)"
+            }
+          },
+          "response": {
+            "type": "PaymentReportResponse",
+            "schema": {
+              "status": "string",
+              "calendar": [
+                {
+                  "date": "string (YYYY-MM-DD)",
+                  "payments": [
+                    {
+                      "mop": "string",
+                      "label": "string",
+                      "amount": "number"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "exportGlobal",
+          "method": "POST",
+          "endpoint": "/establishment/accounting/export",
+          "description": "Export global accounting data as file",
+          "request": {
+            "type": "object",
+            "schema": {
+              "date_from": "string (YYYY-MM-DD)",
+              "date_to": "string (YYYY-MM-DD)"
+            }
+          },
+          "response": {
+            "type": "File (XLSX)",
+            "schema": "Binary spreadsheet file"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "exportVAT",
+          "method": "POST",
+          "endpoint": "/establishment/report/tva/export",
+          "description": "Export VAT report as file",
+          "request": {
+            "type": "object",
+            "schema": {
+              "date_from": "string (YYYY-MM-DD)",
+              "date_to": "string (YYYY-MM-DD)"
+            }
+          },
+          "response": {
+            "type": "File (XLSX)",
+            "schema": "Binary spreadsheet file"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "exportPayments",
+          "method": "POST",
+          "endpoint": "/establishment/report/payments/export",
+          "description": "Export payments report as file",
+          "request": {
+            "type": "object",
+            "schema": {
+              "date_from": "string (YYYY-MM-DD)",
+              "date_to": "string (YYYY-MM-DD)"
+            }
+          },
+          "response": {
+            "type": "File (XLSX)",
+            "schema": "Binary spreadsheet file"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "onlineOrdersService",
+      "file": "src/services/onlineOrdersService.ts",
+      "endpoints": [
+        {
+          "function_name": "getOnlineOrdersConfig",
+          "method": "GET",
+          "endpoint": "/integrations/scannorder",
+          "description": "Get online orders (ScannOrder) configuration",
+          "request": null,
+          "response": {
+            "type": "OnlineOrdersConfig",
+            "schema": {
+              "logo_url": "string",
+              "banner_url": "string",
+              "primary_color": "string (hex)",
+              "header_title": "string",
+              "header_text": "string",
+              "cgv_link": "string (URL)",
+              "return_policy_link": "string (URL)",
+              "legal_notices_link": "string (URL)",
+              "takeaway_enabled": "boolean",
+              "takeaway_auto_accept": "boolean",
+              "delivery_enabled": "boolean",
+              "delivery_auto_accept": "boolean",
+              "delivery_distance_limit": "number (km)"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": false,
+          "notes": "Returns mock data as fallback on error"
+        },
+        {
+          "function_name": "updateOnlineOrdersConfig",
+          "method": "PATCH",
+          "endpoint": "/integrations/scannorder",
+          "description": "Update online orders configuration",
+          "request": {
+            "type": "OnlineOrdersConfig",
+            "schema": "{OnlineOrdersConfig object}"
+          },
+          "response": {
+            "type": "OnlineOrdersConfig",
+            "schema": "{Updated OnlineOrdersConfig}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": false,
+          "notes": "Returns attempted config as fallback on error"
+        },
+        {
+          "function_name": "uploadLogo",
+          "method": "POST",
+          "endpoint": "/integrations/scannorder/logo",
+          "description": "Upload logo for online orders",
+          "request": {
+            "type": "FormData",
+            "schema": {
+              "logo": "File"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "logo_url": "string"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "multipart/form-data"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": false
+        },
+        {
+          "function_name": "uploadBanner",
+          "method": "POST",
+          "endpoint": "/integrations/scannorder/banner",
+          "description": "Upload banner for online orders",
+          "request": {
+            "type": "FormData",
+            "schema": {
+              "banner": "File"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "banner_url": "string"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "multipart/form-data"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": false
+        }
+      ]
+    },
+    {
+      "service_name": "cashRegisterService",
+      "file": "src/services/cashRegisterService.ts",
+      "endpoints": [
+        {
+          "function_name": "getCashRegisterHistory",
+          "method": "GET",
+          "endpoint": "/cash_register/history/{date}",
+          "description": "Get cash register history for specific date",
+          "request": null,
+          "response": {
+            "type": "CashRegister[]",
+            "schema": [
+              {
+                "id": "string",
+                "cash_desk_name": "string",
+                "start_date": "string (ISO 8601)",
+                "closed": "boolean",
+                "enclosed": "boolean",
+                "cash_fund": "number"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "closeCashRegister",
+          "method": "PATCH",
+          "endpoint": "/cash_register/{registerId}/close",
+          "description": "Close cash register",
+          "request": null,
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok",
+              "error": "string (optional)"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getCashRegisterSummary",
+          "method": "GET",
+          "endpoint": "/cash_register/{registerId}/summary",
+          "description": "Get cash register summary including payments and custom items",
+          "request": null,
+          "response": {
+            "type": "CashRegisterSummary",
+            "schema": {
+              "cash_fund": "number",
+              "items": [
+                {
+                  "mop_code": "string",
+                  "label": "string",
+                  "amount": "number"
+                }
+              ],
+              "custom_items": [
+                {
+                  "id": "string",
+                  "label": "string",
+                  "value": "number"
+                }
+              ],
+              "enclosed": "boolean",
+              "enclose_comment": "string (optional)"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getCashRegisterTvaDetails",
+          "method": "GET",
+          "endpoint": "/cash_register/{registerId}/tva_details",
+          "description": "Get TVA details for cash register",
+          "request": null,
+          "response": {
+            "type": "TvaDetails[]",
+            "schema": [
+              {
+                "delivery_type_label": "string",
+                "items": [
+                  {
+                    "tva_rate": "number",
+                    "tva_title": "string",
+                    "ttc_sum": "number",
+                    "ht_sum": "number",
+                    "tva_sum": "number"
+                  }
+                ]
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "addCustomItem",
+          "method": "POST",
+          "endpoint": "/cash_register/{registerId}/custom_items",
+          "description": "Add custom item to cash register",
+          "request": {
+            "type": "object",
+            "schema": {
+              "label": "string",
+              "value": "number"
+            }
+          },
+          "response": {
+            "type": "CustomItem",
+            "schema": {
+              "id": "string",
+              "label": "string",
+              "value": "number"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteCustomItem",
+          "method": "DELETE",
+          "endpoint": "/cash_register/{registerId}/custom_items/{itemId}",
+          "description": "Delete custom item from cash register",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "encloseCashRegister",
+          "method": "PATCH",
+          "endpoint": "/cash_register/{registerId}/enclose",
+          "description": "Enclose (finalize) cash register",
+          "request": {
+            "type": "object",
+            "schema": {
+              "comment": "string"
+            }
+          },
+          "response": {
+            "type": "object",
+            "schema": {
+              "status": "ok",
+              "error": "string (optional)"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "settingsService",
+      "file": "src/services/settingsService.ts",
+      "endpoints": [
+        {
+          "function_name": "getUserProfile",
+          "method": "GET",
+          "endpoint": "/api/user/profile",
+          "description": "Get current user profile",
+          "request": null,
+          "response": {
+            "type": "UserProfile",
+            "schema": {
+              "firstname": "string",
+              "lastname": "string",
+              "email": "string",
+              "phone": "string",
+              "avatar": "string (URL)"
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateUserProfile",
+          "method": "PATCH",
+          "endpoint": "/api/user/profile",
+          "description": "Update user profile",
+          "request": {
+            "type": "Partial<UserProfile>",
+            "schema": "{UserProfile partial update}"
+          },
+          "response": {
+            "type": "UserProfile",
+            "schema": "{Updated UserProfile}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getEstablishmentSettings",
+          "method": "GET",
+          "endpoint": "/api/establishment/settings",
+          "description": "Get establishment settings",
+          "request": null,
+          "response": {
+            "type": "EstablishmentSettings",
+            "schema": {
+              "info": {
+                "name": "string",
+                "phone": "string",
+                "siret": "string",
+                "address": "string",
+                "currency": "string",
+                "primary_color": "string (hex)",
+                "text_color": "string (hex)",
+                "is_open": "boolean"
+              },
+              "timings": {
+                "wait_time_min": "number",
+                "wait_time_max": "number",
+                "auto_close_enabled": "boolean",
+                "auto_close_delay": "number"
+              },
+              "ordering": {
+                "paid_orders_only": "boolean",
+                "concurrent_capacity": "number",
+                "service_required": "string",
+                "disable_low_stock": "boolean",
+                "register_required": "boolean"
+              },
+              "scan_order": {
+                "active_delivery": "boolean",
+                "active_takeaway": "boolean",
+                "active_on_site": "boolean",
+                "auto_accept_delivery": "boolean",
+                "auto_accept_takeaway": "boolean",
+                "allow_scheduled": "boolean",
+                "max_schedule_days": "number",
+                "enable_rating": "boolean"
+              }
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateEstablishmentSettings",
+          "method": "PATCH",
+          "endpoint": "/api/establishment/settings",
+          "description": "Update establishment settings",
+          "request": {
+            "type": "Partial<EstablishmentSettings>",
+            "schema": "{EstablishmentSettings partial update}"
+          },
+          "response": {
+            "type": "EstablishmentSettings",
+            "schema": "{Updated EstablishmentSettings}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "vatService",
+      "file": "src/services/vatService.ts",
+      "endpoints": [
+        {
+          "function_name": "calculateVAT",
+          "method": "POST",
+          "endpoint": "/accounting/vat/calculate",
+          "description": "Calculate VAT for date range and channels",
+          "request": {
+            "type": "object",
+            "schema": {
+              "start_date": "string (YYYY-MM-DD)",
+              "end_date": "string (YYYY-MM-DD)",
+              "channels": "string[] (restaurant|takeaway|scannorder|ubereats|deliveroo)"
+            }
+          },
+          "response": {
+            "type": "VATCalculationResponse",
+            "schema": {
+              "total_vat": "number",
+              "vat_by_rate": {
+                "{rate}": {
+                  "amount": "number",
+                  "base_ht": "number"
+                }
+              },
+              "monthly_breakdown": [
+                {
+                  "month": "string (YYYY-MM)",
+                  "revenue_ht": "number",
+                  "vat_10": "number (optional)",
+                  "vat_5_5": "number (optional)",
+                  "vat_20": "number (optional)",
+                  "vat_2_1": "number (optional)",
+                  "vat_total": "number",
+                  "revenue_ttc": "number"
+                }
+              ],
+              "by_channel": {
+                "{channel}": {
+                  "vat": "number",
+                  "percentage": "number"
+                }
+              }
+            }
+          },
+          "headers": {
+            "Authorization": "Bearer token (if not mocked)",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": false,
+          "mock_enabled": true,
+          "notes": "Uses mock data by default unless environment var VITE_USE_VAT_MOCK=false"
+        },
+        {
+          "function_name": "exportVATCSV",
+          "method": "POST",
+          "endpoint": "/accounting/vat/export-csv",
+          "description": "Export VAT calculation as CSV",
+          "request": {
+            "type": "object",
+            "schema": {
+              "start_date": "string (YYYY-MM-DD)",
+              "end_date": "string (YYYY-MM-DD)",
+              "channels": "string[]"
+            }
+          },
+          "response": {
+            "type": "Blob",
+            "schema": "Binary CSV file"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json",
+            "X-App-Source": "backoffice"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": false
+        }
+      ]
+    },
+    {
+      "service_name": "promotionsService",
+      "file": "src/services/promotionsService.ts",
+      "endpoints": [
+        {
+          "function_name": "getPromotions",
+          "method": "GET",
+          "endpoint": "/menu/promotions",
+          "description": "Get all promotions",
+          "request": null,
+          "response": {
+            "type": "Promotion[]",
+            "schema": [
+              {
+                "id": "string",
+                "name": "string",
+                "description": "string (optional)",
+                "type": "percentage|fixed",
+                "value": "number",
+                "code": "string (optional)",
+                "start_date": "string (YYYY-MM-DD)",
+                "end_date": "string (YYYY-MM-DD, optional)",
+                "active": "boolean"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createPromotion",
+          "method": "POST",
+          "endpoint": "/menu/promotions",
+          "description": "Create new promotion",
+          "request": {
+            "type": "Omit<Promotion, 'id'>",
+            "schema": "{Promotion without id}"
+          },
+          "response": {
+            "type": "Promotion",
+            "schema": "{Full Promotion with generated id}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updatePromotion",
+          "method": "PATCH",
+          "endpoint": "/menu/promotions/{promotionId}",
+          "description": "Update promotion",
+          "request": {
+            "type": "Partial<Omit<Promotion, 'id'>>",
+            "schema": "{Promotion partial update}"
+          },
+          "response": {
+            "type": "Promotion",
+            "schema": "{Updated Promotion}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deletePromotion",
+          "method": "DELETE",
+          "endpoint": "/menu/promotions/{promotionId}",
+          "description": "Delete promotion",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getAvailabilities",
+          "method": "GET",
+          "endpoint": "/menu/availabilities",
+          "description": "Get all service availabilities",
+          "request": null,
+          "response": {
+            "type": "Availability[]",
+            "schema": [
+              {
+                "id": "string",
+                "name": "string",
+                "days": "string[] (monday-sunday)",
+                "start_time": "string (HH:MM format)",
+                "end_time": "string (HH:MM format)",
+                "active": "boolean"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createAvailability",
+          "method": "POST",
+          "endpoint": "/menu/availabilities",
+          "description": "Create new service availability",
+          "request": {
+            "type": "Omit<Availability, 'id'>",
+            "schema": "{Availability without id}"
+          },
+          "response": {
+            "type": "Availability",
+            "schema": "{Full Availability with generated id}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateAvailability",
+          "method": "PATCH",
+          "endpoint": "/menu/availabilities/{availabilityId}",
+          "description": "Update service availability",
+          "request": {
+            "type": "Partial<Omit<Availability, 'id'>>",
+            "schema": "{Availability partial update}"
+          },
+          "response": {
+            "type": "Availability",
+            "schema": "{Updated Availability}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteAvailability",
+          "method": "DELETE",
+          "endpoint": "/menu/availabilities/{availabilityId}",
+          "description": "Delete service availability",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    },
+    {
+      "service_name": "usersService",
+      "file": "src/services/usersService.ts",
+      "endpoints": [
+        {
+          "function_name": "getUsers",
+          "method": "GET",
+          "endpoint": "/pos/users",
+          "description": "Get all users",
+          "request": null,
+          "response": {
+            "type": "User[]",
+            "schema": [
+              {
+                "id": "string",
+                "first_name": "string",
+                "last_name": "string",
+                "email": "string",
+                "phone": "string",
+                "color": "string (hex)",
+                "permissions": {
+                  "enabled": "boolean",
+                  "is_admin": "boolean",
+                  "[key: string]": "boolean"
+                },
+                "address": {
+                  "street_number": "string (optional)",
+                  "street": "string (optional)",
+                  "zip_code": "string (optional)",
+                  "city": "string (optional)",
+                  "country": "string (optional)"
+                },
+                "last_actions": [
+                  {
+                    "type": "string",
+                    "date": "string"
+                  }
+                ]
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "getUserActivity",
+          "method": "GET",
+          "endpoint": "/users/{userId}/activity",
+          "description": "Get user activity history",
+          "request": null,
+          "response": {
+            "type": "UserActivity[]",
+            "schema": [
+              {
+                "type": "string",
+                "date": "string"
+              }
+            ]
+          },
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "createUser",
+          "method": "POST",
+          "endpoint": "/users/create",
+          "description": "Create new user",
+          "request": {
+            "type": "CreateUserPayload",
+            "schema": {
+              "first_name": "string",
+              "last_name": "string",
+              "email": "string",
+              "phone": "string"
+            }
+          },
+          "response": {
+            "type": "User",
+            "schema": "{Full User with generated id}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "updateUser",
+          "method": "PATCH",
+          "endpoint": "/users/{userId}",
+          "description": "Update user details",
+          "request": {
+            "type": "UpdateUserPayload",
+            "schema": {
+              "user_id": "string",
+              "first_name": "string (optional)",
+              "last_name": "string (optional)",
+              "email": "string (optional)",
+              "phone": "string (optional)",
+              "color": "string (hex, optional)",
+              "pin_code": "string (optional)",
+              "permissions": "UserPermissions (optional)",
+              "address": "UserAddress (optional)"
+            }
+          },
+          "response": {
+            "type": "User",
+            "schema": "{Updated User}"
+          },
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "deleteUser",
+          "method": "DELETE",
+          "endpoint": "/users/{userId}",
+          "description": "Delete user",
+          "request": null,
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_services": 13,
+    "total_endpoints": 145,
+    "endpoints_by_method": {
+      "GET": 52,
+      "POST": 31,
+      "PATCH": 38,
+      "PUT": 3,
+      "DELETE": 21
+    },
+    "authentication": "All endpoints (except login) require Authorization header with Bearer token",
+    "base_url": "Environment variable VITE_API_BASE_URL (default: https://welloresto-api-prod.onrender.com)",
+    "notes": "All services use withMock() pattern to enable/disable mock data. Set USE_MOCK_DATA environment variable to control global mock behavior."
+  }
+}
