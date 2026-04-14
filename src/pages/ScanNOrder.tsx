@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { TabSystem, PageContainer } from '@/components/shared';
+import { StripeStatusCard } from '@/components/integrations/StripeStatusCard';
+import { BankAccountsTab } from '@/components/integrations/BankAccountsTab';
 import {
   getOnlineOrdersConfig,
   updateOnlineOrdersConfig,
@@ -546,6 +548,8 @@ export default function ScanNOrder() {
         return renderAppearanceTab();
       case 'modes':
         return renderModesTab();
+      case 'bank-accounts':
+        return <BankAccountsTab />;
       default:
         return null;
     }
@@ -554,6 +558,7 @@ export default function ScanNOrder() {
   const tabs = [
     { id: 'appearance', label: 'Apparence' },
     { id: 'modes', label: 'Commandes' },
+    { id: 'bank-accounts', label: 'Compte bancaire' },
   ];
 
   if (loading) {
@@ -598,37 +603,42 @@ export default function ScanNOrder() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <h1 className="text-3xl font-bold">ScanNOrder</h1>
-              <p className="text-sm text-muted-foreground">
+          <div className="space-y-4">
+            <h1 className="text-3xl font-bold">ScanNOrder</h1>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-muted-foreground mb-2">URL d'accès:</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <code className="px-3 py-2 bg-muted rounded text-sm font-mono text-foreground truncate">
+                    {accessUrl}
+                  </code>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={copyToClipboard}
+                    title="Copier l'URL"
+                    className="flex-shrink-0"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={openInNewTab}
+                    title="Ouvrir dans un nouvel onglet"
+                    className="flex-shrink-0"
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground md:hidden">
                 Configurez votre plateforme de commande en ligne
               </p>
             </div>
-            <div className="flex flex-col gap-2 items-end">
-              <p className="text-sm text-muted-foreground">URL d'accès:</p>
-              <div className="flex items-center gap-2">
-                <code className="px-3 py-2 bg-muted rounded text-sm font-mono text-foreground truncate max-w-xs">
-                  {accessUrl}
-                </code>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={copyToClipboard}
-                  title="Copier l'URL"
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={openInNewTab}
-                  title="Ouvrir dans un nouvel onglet"
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground hidden md:block">
+              Configurez votre plateforme de commande en ligne
+            </p>
           </div>
         }
       >
@@ -654,6 +664,9 @@ export default function ScanNOrder() {
             </div>
           </CardHeader>
         </Card>
+
+        {/* ═══ Stripe Status Card ═══ */}
+        <StripeStatusCard />
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-8">

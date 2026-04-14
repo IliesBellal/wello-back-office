@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock, Calendar } from "lucide-react";
+import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck } from "lucide-react";
 import { useEstablishmentSettings } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
@@ -107,20 +107,62 @@ export const EstablishmentTab = () => {
     if (tabId === "ordering") {
       return (
         <div className="space-y-6">
+          {/* Modes de commandes */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
-                <ShoppingCart className="h-5 w-5" />
-                Options de commande
+                <Utensils className="h-5 w-5" />
+                Modes de commandes
               </CardTitle>
-              <CardDescription>Paramètres de gestion des commandes</CardDescription>
+              <CardDescription>Activez ou désactivez les modes de service</CardDescription>
             </CardHeader>
             <CardContent>
-              <SettingsSection
-                fields={establishmentOrderingFields}
-                values={formData.ordering}
-                onChange={(key, value) => handleFieldChange('ordering', key, value)}
-              />
+              <div className="space-y-4">
+                {/* Sur Place */}
+                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      <Utensils className="h-4 w-4" />
+                      Sur Place
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Les clients peuvent manger sur place</p>
+                  </div>
+                  <Switch
+                    checked={formData.ordering.active_on_site}
+                    onCheckedChange={(checked) => handleFieldChange('ordering', 'active_on_site', checked)}
+                  />
+                </div>
+
+                {/* A Emporter */}
+                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      A Emporter
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Les clients peuvent retirer leur commande</p>
+                  </div>
+                  <Switch
+                    checked={formData.ordering.active_takeaway}
+                    onCheckedChange={(checked) => handleFieldChange('ordering', 'active_takeaway', checked)}
+                  />
+                </div>
+
+                {/* Livraison */}
+                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      <Truck className="h-4 w-4" />
+                      Livraison
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">Livraison disponible aux clients</p>
+                  </div>
+                  <Switch
+                    checked={formData.ordering.active_delivery}
+                    onCheckedChange={(checked) => handleFieldChange('ordering', 'active_delivery', checked)}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
@@ -147,6 +189,24 @@ export const EstablishmentTab = () => {
                 fields={establishmentTimingsFields}
                 values={formData.timings}
                 onChange={(key, value) => handleFieldChange('timings', key, value)}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Cuisine */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShoppingCart className="h-5 w-5" />
+                Cuisine
+              </CardTitle>
+              <CardDescription>Paramètres de gestion des commandes</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SettingsSection
+                fields={establishmentOrderingFields}
+                values={formData.ordering}
+                onChange={(key, value) => handleFieldChange('ordering', key, value)}
               />
             </CardContent>
           </Card>

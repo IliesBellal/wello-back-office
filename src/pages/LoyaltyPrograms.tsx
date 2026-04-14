@@ -217,11 +217,8 @@ const LoyaltyPrograms = () => {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Gift className="h-8 w-8 text-primary" />
-              <h1 className="text-3xl font-bold text-foreground">Programmes de fidélité</h1>
-            </div>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <h1 className="text-3xl font-bold text-foreground">Programmes de fidélité</h1>
             <Button onClick={() => handleOpenDialog()} className="bg-gradient-primary">
               <Plus className="w-4 h-4 mr-2" />
               Nouveau programme

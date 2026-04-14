@@ -363,7 +363,7 @@ export const IntegrationCard = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Synchroniser le menu {name}</AlertDialogTitle>
             <AlertDialogDescription>
-              Synchroniser votre menu Wello Resto avec {name}? Cela mettra à jour via les articles et prix.
+              Synchroniser votre menu Wello Resto avec {name}? Cela mettra à jour votre carte Uber Eats avec les articles et prix définis via Wello Resto.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-3">

@@ -315,7 +315,7 @@ export default function CategoriesTable() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold text-foreground">Catégories Caisse</h1>
             <Button className="bg-gradient-primary" onClick={() => setCreateDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />

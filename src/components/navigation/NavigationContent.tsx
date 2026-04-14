@@ -4,6 +4,11 @@ import { NavLink } from '@/components/NavLink';
 import { NAV_ITEMS, NavItem } from '@/config/navConfig';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -176,8 +181,65 @@ export const NavigationContent: React.FC<NavigationContentProps> = ({
           };
 
           if (variant === 'desktop' && isCollapsed) {
-            // Desktop collapsed - don't show collapsibles
-            return null;
+            // Desktop collapsed - show popover with icon
+            return (
+              <Popover key={item.id}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={cn(
+                      'w-11 h-11 rounded-lg transition-all duration-200',
+                      'hover:bg-sidebar-accent/80 hover:shadow-sm',
+                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                      hasActiveChild(item) && 'bg-sidebar-accent/80',
+                    )}
+                    title={item.title}
+                    aria-label={item.title}
+                  >
+                    <Icon className="w-5 h-5" />
+                  </Button>
+                </PopoverTrigger>
+
+                <PopoverContent
+                  side="right"
+                  align="start"
+                  className="w-56 p-3 rounded-lg shadow-lg border border-sidebar-border"
+                >
+                  <div className="space-y-1">
+                    <div className="px-3 py-2 mb-2">
+                      <p className="text-xs font-bold text-sidebar-foreground/60 uppercase tracking-wide">
+                        {item.title}
+                      </p>
+                    </div>
+
+                    {item.children?.map((child) => {
+                      const ChildIcon = child.icon;
+
+                      return (
+                        <NavLink
+                          key={child.id}
+                          to={child.href}
+                          className={cn(
+                            'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
+                            'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
+                          )}
+                          activeClassName="bg-sidebar-accent/80 text-sidebar-foreground font-medium"
+                        >
+                          <ChildIcon className="w-4 h-4 shrink-0 flex-none" />
+                          <span className="truncate">{child.title}</span>
+                          {child.badge && child.badge > 0 && (
+                            <span className="ml-auto inline-flex items-center rounded-full bg-destructive/80 px-2 py-1 text-xs font-medium text-destructive-foreground">
+                              {child.badge}
+                            </span>
+                          )}
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            );
           }
 
           if (variant === 'desktop') {

@@ -26,7 +26,7 @@ export const establishmentTimingsFields: FieldConfig[] = [
 ];
 
 export const establishmentOrderingFields: FieldConfig[] = [
-  { key: 'concurrent_capacity', label: 'Capacité simultanée', type: 'number', group: 'ordering', min: 1, max: 200 },
+  { key: 'concurrent_capacity', label: 'Chaines de production', type: 'number', group: 'ordering', min: 1, max: 200 },
   { key: 'disable_low_stock', label: 'Désactiver articles en rupture', type: 'switch', group: 'ordering' },
 ];
 

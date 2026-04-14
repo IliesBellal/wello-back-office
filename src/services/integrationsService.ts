@@ -129,4 +129,69 @@ export const integrationsService = {
       () => apiClient.patch<WelloApiResponse<{ synced_items: number }>>('/menu/deliveroo/sync', {}).then(res => res.data)
     );
   },
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // STRIPE PAYMENT INTEGRATION
+  // ════════════════════════════════════════════════════════════════════════════
+
+  getStripeStatus: async (): Promise<{ status: 'verified' | 'action_required' }> => {
+    logAPI('GET', '/integrations/stripe/status');
+    
+    return withMock(
+      () => ({ status: 'verified' as const }),
+      () => apiClient.get<WelloApiResponse<{ status: 'verified' | 'action_required' }>>('/integrations/stripe/status').then(res => res.data.data)
+    );
+  },
+
+  getStripeOnboardingLink: async (): Promise<{ url: string }> => {
+    logAPI('POST', '/integrations/stripe/onboarding-link');
+    
+    return withMock(
+      () => ({ url: 'https://connect.stripe.com/setup/mock/' }),
+      () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/stripe/onboarding-link', {}).then(res => res.data.data)
+    );
+  },
+
+  getStripeBankAccounts: async (): Promise<{ accounts: Array<{
+    id: string;
+    bank_name: string;
+    last4: string;
+    currency: string;
+    status: 'verified' | 'pending' | 'errored';
+    account_holder_name?: string;
+  }> }> => {
+    logAPI('GET', '/integrations/stripe/bank-accounts');
+    
+    return withMock(
+      () => ({
+        accounts: [
+          {
+            id: 'ba_mock_1',
+            bank_name: 'Crédit Agricole',
+            last4: '1234',
+            currency: 'EUR',
+            status: 'verified',
+            account_holder_name: 'Restaurant Nom',
+          },
+          {
+            id: 'ba_mock_2',
+            bank_name: 'BNP Paribas',
+            last4: '5678',
+            currency: 'EUR',
+            status: 'pending',
+          },
+        ]
+      }),
+      () => apiClient.get<WelloApiResponse<{ accounts: any[] }>>('/integrations/stripe/bank-accounts').then(res => res.data.data)
+    );
+  },
+
+  getStripeBankAccountLink: async (): Promise<{ url: string }> => {
+    logAPI('POST', '/integrations/stripe/bank-account-link');
+    
+    return withMock(
+      () => ({ url: 'https://connect.stripe.com/setup/bank-account/mock/' }),
+      () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/stripe/bank-account-link', {}).then(res => res.data.data)
+    );
+  },
 };

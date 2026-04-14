@@ -557,7 +557,7 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
     <div className="space-y-5">
       {/* KPI row */}
       {kpis && (
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col md:flex-row flex-wrap gap-3">
           <KpiCard
             label="Marge moyenne"
             value={fmt(Math.round(kpis.avgMargin))}

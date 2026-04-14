@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -6,10 +6,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import { Button } from '@/components/ui/button';
 import { OTPInput } from './OTPInput';
 import { useOTPVerification } from './useOTPVerification';
-import { Shield, Mail, Phone, Loader2 } from 'lucide-react';
+import { Shield, Mail, Phone, Loader2, X } from 'lucide-react';
 
 type OTPMode = 'mfa' | 'email' | 'tel';
 
@@ -46,6 +53,8 @@ export function OTPVerification({
   onCancel,
   token,
 }: OTPVerificationProps) {
+  const [isMobile, setIsMobile] = useState(false);
+  
   const {
     code,
     setCode,
@@ -63,6 +72,17 @@ export function OTPVerification({
   const config = MODE_CONFIG[mode];
   const Icon = config.icon;
 
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Reset code when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -76,6 +96,138 @@ export function OTPVerification({
     }
   };
 
+  // ═══ Content Component (shared between Dialog and Drawer) ═══
+  const content = (
+    <div className="space-y-6 py-4">
+      {/* OTP Input */}
+      <div className="space-y-2">
+        <OTPInput
+          value={code}
+          onChange={setCode}
+          onComplete={handleComplete}
+          disabled={isVerifying}
+          error={!!error}
+        />
+        {error && (
+          <p className="text-sm text-destructive text-center animate-in fade-in">
+            {error}
+          </p>
+        )}
+        {isVerifying && (
+          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>Vérification en cours...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Resend Code Button */}
+      <div className="flex flex-col items-center gap-2">
+        <p className="text-sm text-muted-foreground">
+          Vous n&apos;avez pas reçu le code ?
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={resendCode}
+          disabled={cooldown > 0 || isResending || isVerifying}
+          className="min-w-[180px]"
+        >
+          {isResending ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Envoi en cours...
+            </>
+          ) : cooldown > 0 ? (
+            `Renvoyer (${cooldown}s)`
+          ) : (
+            'Renvoyer le code'
+          )}
+        </Button>
+      </div>
+
+      {/* SMS Fallback (MFA only) */}
+      {mode === 'mfa' && (
+        <div className="flex flex-col items-center gap-2 pt-2 border-t">
+          <p className="text-sm text-muted-foreground text-center">
+            Vous ne recevez pas l&apos;email ?
+          </p>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={sendSMSFallback}
+            disabled={cooldown > 0 || isSendingSMS || isVerifying}
+            className="text-primary hover:text-primary/90"
+          >
+            {isSendingSMS ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Envoi SMS...
+              </>
+            ) : (
+              'Envoyer par SMS'
+            )}
+          </Button>
+          {maskedPhone && (
+            <p className="text-xs text-muted-foreground animate-in fade-in">
+              SMS envoyé au {maskedPhone}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Cancel Button */}
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onCancel}
+        disabled={isVerifying}
+        className="w-full"
+      >
+        Annuler
+      </Button>
+    </div>
+  );
+
+  // ═══ MOBILE: Drawer ═══
+  if (isMobile) {
+    return (
+      <Drawer open={isOpen} onOpenChange={handleOpenChange}>
+        <DrawerContent className="px-0">
+          <DrawerHeader className="px-4 pb-0 flex items-center justify-between">
+            <div className="flex items-center gap-3 flex-1">
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Icon className="w-5 h-5 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <DrawerTitle className="text-lg">{config.title}</DrawerTitle>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onCancel}
+              disabled={isVerifying}
+              className="h-8 w-8 flex-shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </DrawerHeader>
+          <DrawerDescription className="px-4 pt-2 text-left">
+            {config.description}
+          </DrawerDescription>
+          <div className="px-4 pb-6">
+            {content}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    );
+  }
+
+  // ═══ DESKTOP: Dialog ═══
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
@@ -91,97 +243,7 @@ export function OTPVerification({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* OTP Input */}
-          <div className="space-y-2">
-            <OTPInput
-              value={code}
-              onChange={setCode}
-              onComplete={handleComplete}
-              disabled={isVerifying}
-              error={!!error}
-            />
-            {error && (
-              <p className="text-sm text-destructive text-center animate-in fade-in">
-                {error}
-              </p>
-            )}
-            {isVerifying && (
-              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Vérification en cours...</span>
-              </div>
-            )}
-          </div>
-
-          {/* Resend Code Button */}
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-sm text-muted-foreground">
-              Vous n&apos;avez pas reçu le code ?
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={resendCode}
-              disabled={cooldown > 0 || isResending || isVerifying}
-              className="min-w-[180px]"
-            >
-              {isResending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Envoi en cours...
-                </>
-              ) : cooldown > 0 ? (
-                `Renvoyer (${cooldown}s)`
-              ) : (
-                'Renvoyer le code'
-              )}
-            </Button>
-          </div>
-
-          {/* SMS Fallback (MFA only) */}
-          {mode === 'mfa' && (
-            <div className="flex flex-col items-center gap-2 pt-2 border-t">
-              <p className="text-sm text-muted-foreground text-center">
-                Vous ne recevez pas l&apos;email ?
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={sendSMSFallback}
-                disabled={cooldown > 0 || isSendingSMS || isVerifying}
-                className="text-primary hover:text-primary/90"
-              >
-                {isSendingSMS ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Envoi SMS...
-                  </>
-                ) : (
-                  'Envoyer par SMS'
-                )}
-              </Button>
-              {maskedPhone && (
-                <p className="text-xs text-muted-foreground animate-in fade-in">
-                  SMS envoyé au {maskedPhone}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Cancel Button */}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onCancel}
-            disabled={isVerifying}
-            className="w-full"
-          >
-            Annuler
-          </Button>
-        </div>
+        {content}
       </DialogContent>
     </Dialog>
   );

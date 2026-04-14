@@ -222,7 +222,7 @@ export default function Components() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold text-foreground">
               Ingrédients
             </h1>

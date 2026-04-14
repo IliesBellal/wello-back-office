@@ -33,6 +33,9 @@ export interface EstablishmentOrdering {
   service_required: string;
   disable_low_stock: boolean;
   register_required: boolean;
+  active_on_site: boolean;
+  active_takeaway: boolean;
+  active_delivery: boolean;
 }
 
 export interface EstablishmentScanOrder {
