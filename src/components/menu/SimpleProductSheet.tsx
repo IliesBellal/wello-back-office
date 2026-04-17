@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,9 +38,13 @@ import { CategorySelector } from '@/components/shared/CategorySelector';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
 import { useProductEditData } from '@/hooks/useProductEditData';
+import { useProductData } from '@/hooks/useProductData';
 
 interface SimpleProductSheetProps {
-  product: Product | null;
+  /** Product ID to load - if provided, product data will be fetched automatically */
+  productId?: string | null;
+  /** Pre-loaded product data (optional, can be overridden by productId) */
+  product?: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   units: UnitOfMeasure[];
@@ -54,7 +59,8 @@ interface SimpleProductSheetProps {
 }
 
 export const SimpleProductSheet = ({
-  product,
+  productId,
+  product: initialProduct = null,
   open,
   onOpenChange,
   units,
@@ -67,7 +73,20 @@ export const SimpleProductSheet = ({
   onCreateCategory,
   onTagCreated
 }: SimpleProductSheetProps) => {
-  const { tvaRates } = useProductEditData(open);
+  // Load product data if productId is provided
+  const { product: loadedProduct, loading } = useProductData(productId || null, open);
+  
+  // Use loaded product if available, otherwise use initial product prop
+  const product = loadedProduct || initialProduct;
+  
+  // Load sheet-specific data (TVA rates, tags, allergens, units)
+  const { tvaRates, tags: loadedTags, allergens: loadedAllergens, units: loadedUnits } = useProductEditData(open);
+  
+  // Use loaded data or props (props take priority for backward compatibility)
+  const tagsData = tags || loadedTags;
+  const allergensData = allergens || loadedAllergens;
+  const unitsData = units.length > 0 ? units : loadedUnits;
+  
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
@@ -149,6 +168,22 @@ export const SimpleProductSheet = ({
       percentage: foodCost.toFixed(1),
       label: `${foodCost.toFixed(1)}%`
     };
+  };
+
+  // Helper to get TVA rate value by ID
+  const getTvaRateValue = (tvaId: number | string | undefined): number | null => {
+    if (!tvaId) return null;
+    
+    const tvaIdNum = typeof tvaId === 'string' ? parseInt(tvaId) : tvaId;
+    
+    for (const group of tvaRates) {
+      const rate = group.rates.find(r => r.id === tvaIdNum);
+      if (rate) {
+        return rate.value;
+      }
+    }
+    
+    return null;
   };
 
   useEffect(() => {
@@ -343,566 +378,688 @@ export const SimpleProductSheet = ({
     fileInputRef.current?.click();
   };
 
-  if (!product) return null;
+  if (!product && !loading) return null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-2xl overflow-y-auto">
-        <SheetHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <SheetTitle>{product.name}</SheetTitle>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                <Badge variant={product.integrations?.uber_eats?.enabled ? "default" : "secondary"}>
-                  Uber Eats
-                </Badge>
-                <Badge variant={product.integrations?.deliveroo?.enabled ? "default" : "secondary"}>
-                  Deliveroo
-                </Badge>
-                {/* Cost and Food Cost Info */}
-                {product.cost_price && (
-                  <div className="flex items-center gap-3 ml-2 text-sm border-l pl-2">
-                    <span className="text-muted-foreground">
-                      Prix reviens: <span className="font-semibold">{(product.cost_price / 100).toFixed(2)} €</span>
-                    </span>
-                    <span className={`font-semibold ${getFoodCostIndicator(product).color}`}>
-                      FC: {getFoodCostIndicator(product).label}
-                    </span>
+      <SheetContent className="sm:max-w-2xl overflow-y-auto p-0 flex flex-col">
+        {/* Professional Header */}
+        <div className="sticky top-0 z-10 bg-white border-b border-border">
+          <div className="px-6 py-4">
+            {loading ? (
+              <Skeleton className="h-8 w-48" />
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-lg font-bold text-foreground truncate">{product?.name || 'Produit'}</h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {categories.find(c => c.category_id === product?.category_id)?.category_name || 'Catégorie non définie'}
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={product?.available ? "default" : "secondary"}
+                    className="whitespace-nowrap"
+                  >
+                    {product?.available ? 'Disponible' : 'Indisponible'}
+                  </Badge>
+                </div>
+
+                {/* Integration Badges */}
+                <div className="flex gap-2 mt-3 flex-wrap">
+                  <Badge variant={product?.integrations?.uber_eats?.enabled ? "default" : "outline"} className="text-xs">
+                    <img src="/uber_eats_logo.png" alt="Uber Eats" className="w-3 h-3 mr-1 object-contain rounded" />
+                    Uber Eats
+                  </Badge>
+                  <Badge variant={product?.integrations?.deliveroo?.enabled ? "default" : "outline"} className="text-xs">
+                    <img src="/deliveroo_logo.png" alt="Deliveroo" className="w-3 h-3 mr-1 object-contain rounded" />
+                    Deliveroo
+                  </Badge>
+                  {product?.is_available_on_sno && (
+                    <Badge variant="outline" className="text-xs">
+                      <span className="mr-1">📱</span>ScanNOrder
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Cost Info */}
+                {product?.cost_price && (
+                  <div className="mt-3 p-2 bg-muted/50 rounded-md border border-muted-foreground/10">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Prix reviens:</span>
+                        <span className="ml-2 font-semibold text-foreground">{(product.cost_price / 100).toFixed(2)} €</span>
+                      </div>
+                      <div className="text-xs">
+                        <span className="text-muted-foreground">Marge FC:</span>
+                        <span className={`ml-2 font-semibold ${getFoodCostIndicator(product).color}`}>
+                          {getFoodCostIndicator(product).label}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 )}
-              </div>
-            </div>
-            <div className="flex gap-2">
+              </>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          {!loading && (
+            <div className="px-6 py-3 border-t border-border bg-muted/30 flex gap-2">
               {!isEditMode ? (
                 <>
                   <Button 
-                    variant="destructive" 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={() => setIsEditMode(true)}
+                  >
+                    <Edit className="w-4 h-4 mr-2" />
+                    Modifier
+                  </Button>
+                  <Button 
+                    variant="ghost" 
                     size="icon"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
                     onClick={() => setShowDeleteDialog(true)}
                     title="Supprimer le produit"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
-                  <Button variant="outline" onClick={() => setIsEditMode(true)}>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Modifier
-                  </Button>
                 </>
               ) : (
                 <>
-                  <Button variant="outline" onClick={handleCancel}>
+                  <Button 
+                    variant="outline" 
+                    className="flex-1"
+                    onClick={handleCancel}
+                  >
                     <X className="w-4 h-4 mr-2" />
                     Annuler
                   </Button>
-                  <Button onClick={handleSave}>
+                  <Button 
+                    className="flex-1 bg-gradient-primary"
+                    onClick={handleSave}
+                    disabled={isUploadingImage}
+                  >
                     <Save className="w-4 h-4 mr-2" />
                     Enregistrer
                   </Button>
                 </>
               )}
             </div>
+          )}
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto px-6 py-6">
+
+        {loading ? (
+          // Loading skeleton state
+          <div className="space-y-6">
+            <Skeleton className="h-40 w-full rounded-lg" />
+            <Skeleton className="h-24 w-full rounded-lg" />
+            <Skeleton className="h-20 w-full rounded-lg" />
           </div>
-        </SheetHeader>
+        ) : product ? (
+          // Loaded content
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList className="grid w-full grid-cols-5 sticky top-0 bg-white mb-6 border-b">
+              <TabsTrigger value="general" className="text-xs">Général</TabsTrigger>
+              <TabsTrigger value="price" className="text-xs">Tarifs</TabsTrigger>
+              <TabsTrigger value="composition" className="text-xs">Composition</TabsTrigger>
+              <TabsTrigger value="options" className="text-xs">Options</TabsTrigger>
+              <TabsTrigger value="tags" className="text-xs">Tags</TabsTrigger>
+            </TabsList>
 
-        <Tabs defaultValue="general" className="mt-6">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="general">Général</TabsTrigger>
-            <TabsTrigger value="price">Tarifs</TabsTrigger>
-            <TabsTrigger value="composition">Composition</TabsTrigger>
-            <TabsTrigger value="options">Options</TabsTrigger>
-            <TabsTrigger value="tags">Tags & Allergènes</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="general" className="space-y-4">
-            {!isEditMode ? (
-              <div className="space-y-4">
-                {/* Image and Name/Description Side by Side */}
-                <div className="flex gap-4">
-                  <div className="flex-shrink-0 w-32 h-32">
-                    <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center overflow-hidden">
-                      {product.image_url ? (
-                        <img 
-                          src={product.image_url} 
-                          alt={product.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : product.bg_color ? (
-                        <div 
-                          className="w-full h-full rounded-lg" 
-                          style={{ backgroundColor: product.bg_color }}
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center gap-2 text-muted-foreground text-xs">
-                          <ImageIcon className="w-8 h-8" />
-                          <p>Aucune image</p>
+            <TabsContent value="general" className="space-y-5 mt-0">
+              {!isEditMode ? (
+                <>
+                  {/* Product Image & Basic Info */}
+                  <Card className="border-none bg-muted/50">
+                    <CardContent className="pt-6">
+                      <div className="flex gap-5">
+                        {/* Image */}
+                        <div className="flex-shrink-0">
+                          <div className="w-40 h-40 rounded-lg bg-white border border-border overflow-hidden flex items-center justify-center">
+                            {product.image_url ? (
+                              <img 
+                                src={product.image_url} 
+                                alt={product.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : product.bg_color ? (
+                              <div 
+                                className="w-full h-full" 
+                                style={{ backgroundColor: product.bg_color }}
+                              />
+                            ) : (
+                              <div className="text-muted-foreground">
+                                <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                              </div>
+                            )}
+                          </div>
                         </div>
+                        
+                        {/* Info */}
+                        <div className="flex-1 space-y-4">
+                          <div>
+                            <Label className="text-xs font-semibold text-muted-foreground uppercase">Description</Label>
+                            <p className="mt-1 text-sm text-foreground leading-relaxed">
+                              {product.description || '—'}
+                            </p>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 pt-2">
+                            <div>
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase">Couleur fond</Label>
+                              <div className="mt-2 flex items-center gap-2">
+                                <div 
+                                  className="w-6 h-6 rounded border border-border"
+                                  style={{ backgroundColor: product.bg_color || '#ffffff' }}
+                                />
+                                <span className="text-xs text-foreground font-mono">{product.bg_color || '—'}</span>
+                              </div>
+                            </div>
+                            <div>
+                              <Label className="text-xs font-semibold text-muted-foreground uppercase">Couleur production</Label>
+                              <div className="mt-2 flex items-center gap-2">
+                                <div 
+                                  className="w-6 h-6 rounded border border-border"
+                                  style={{ backgroundColor: product.production_color || '#ffffff' }}
+                                />
+                                <span className="text-xs text-foreground font-mono">{product.production_color || '—'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              ) : (
+                <>
+                  {/* Edit Mode - General Tab */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="flex gap-5">
+                        {/* Image Upload */}
+                        <div 
+                          className="flex-shrink-0 cursor-pointer"
+                          onClick={handleImageClick}
+                        >
+                          <div className="w-40 h-40 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30 relative">
+                            {isUploadingImage && (
+                              <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                                <Loader2 className="w-6 h-6 animate-spin text-white" />
+                              </div>
+                            )}
+                            {imagePreviewUrl ? (
+                              <img 
+                                src={imagePreviewUrl} 
+                                alt="Preview" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : formData.image_url ? (
+                              <img 
+                                src={formData.image_url} 
+                                alt={formData.name} 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="text-center">
+                                <ImageIcon className="w-8 h-8 mx-auto mb-1 text-muted-foreground/50" />
+                                <p className="text-xs text-muted-foreground/70">Cliquer</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Form Fields */}
+                        <div className="flex-1 space-y-4">
+                          <div>
+                            <Label>Nom du produit</Label>
+                            <Input
+                              value={formData.name || ''}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                              placeholder="ex. Pizza Margherita"
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label>Description</Label>
+                            <Textarea
+                              value={formData.description || ''}
+                              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                              placeholder="Détails du produit..."
+                              className="mt-1 resize-none"
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Hidden file input */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".jpg,.jpeg,.png,.webp"
+                    onChange={handleImageSelect}
+                    disabled={isUploadingImage}
+                    className="hidden"
+                  />
+
+                  {/* Metadata */}
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="grid grid-cols-2 gap-5">
+                        <div>
+                          <Label>Catégorie</Label>
+                          <CategorySelector
+                            categories={categories}
+                            value={formData.category_id || ''}
+                            onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId })}
+                            onCreateCategory={onCreateCategory}
+                          />
+                        </div>
+                        <div>
+                          <Label>Statut</Label>
+                          <Select 
+                            value={String(formData.status || 'available')}
+                            onValueChange={(value) => setFormData({ ...formData, status: value })}
+                          >
+                            <SelectTrigger className="mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="available">Disponible</SelectItem>
+                              <SelectItem value="out_of_stock">Hors stock</SelectItem>
+                              <SelectItem value="not_available">Indisponible</SelectItem>
+                              <SelectItem value="removed_from_menu">Retiré</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label>Couleur fond</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="color"
+                              value={formData.bg_color || '#ffffff'}
+                              onChange={(e) => setFormData({ ...formData, bg_color: e.target.value })}
+                              className="w-12 h-10 rounded cursor-pointer border border-input"
+                            />
+                            <Input
+                              value={formData.bg_color || '#ffffff'}
+                              onChange={(e) => setFormData({ ...formData, bg_color: e.target.value })}
+                              className="font-mono text-sm flex-1"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label>Couleur production</Label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <input
+                              type="color"
+                              value={formData.production_color || '#ffffff'}
+                              onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
+                              className="w-12 h-10 rounded cursor-pointer border border-input"
+                            />
+                            <Input
+                              value={formData.production_color || '#ffffff'}
+                              onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
+                              className="font-mono text-sm flex-1"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
+            </TabsContent>
+
+<TabsContent value="price" className="space-y-5 mt-0">
+              {/* Base Pricing Section */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-sm text-foreground">Services de Livraison</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {/* On-Site */}
+                  <Card className="border">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        Sur Place
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {!isEditMode ? (
+                        <>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Prix</p>
+                            <p className="text-lg font-semibold text-foreground">{((product.price || 0) / 100).toFixed(2)} €</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">TVA</p>
+                            <p className="text-sm text-foreground">{getTvaRateValue(product.tva_ids?.on_site) ? `${getTvaRateValue(product.tva_ids?.on_site)}%` : '—'}</p>
+                          </div>
+                          <div className="pt-2 border-t">
+                            <p className="text-xs text-muted-foreground mb-1">Disponible</p>
+                            <Badge variant={product.available_in ? "default" : "secondary"} className="text-xs">
+                              {product.available_in ? '✓ Oui' : '✗ Non'}
+                            </Badge>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <Label className="text-xs">Prix (€)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={((formData.price || 0) / 100).toFixed(2)}
+                              onChange={(e) => setFormData({ ...formData, price: Math.round(parseFloat(e.target.value || '0') * 100) })}
+                              className="mt-1 text-sm font-semibold h-9"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Taux TVA</Label>
+                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{getTvaRateValue(product.tva_ids?.on_site) ? `${getTvaRateValue(product.tva_ids?.on_site)}%` : '—'}</p>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <Label className="text-xs">Disponible</Label>
+                            <Switch
+                              checked={formData.available_in || false}
+                              onCheckedChange={(checked) => setFormData({
+                                ...formData,
+                                available_in: checked
+                              })}
+                            />
+                          </div>
+                        </>
                       )}
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <Label className="text-xs font-semibold">Nom</Label>
-                      <p className="mt-1 text-foreground font-medium">{product.name}</p>
-                    </div>
-                    <div>
-                      <Label className="text-xs font-semibold">Description</Label>
-                      <p className="mt-1 text-foreground text-sm">{product.description || 'Aucune description'}</p>
-                    </div>
-                  </div>
-                </div>
-                {/* Category and Background Color */}
-                <div className="grid grid-cols-2 gap-6 md:gap-8">
-                  <div>
-                    <Label className="text-xs font-semibold">Catégorie</Label>
-                    <p className="mt-1 text-foreground">
-                      {categories.find(c => c.category_id === product.category_id)?.category_name || 'Non défini'}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-semibold">Couleur de fond</Label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <div 
-                        className="w-8 h-8 rounded-full border border-input"
-                        style={{ backgroundColor: product.bg_color || '#ffffff' }}
-                      />
-                      <p className="text-foreground text-sm">{product.bg_color || '#ffffff'}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-semibold">Statut</Label>
-                    <p className="mt-1">
-                      <Badge variant={product.status === 'available' ? 'default' : product.status === 'out_of_stock' ? 'secondary' : product.status === 'removed_from_menu' ? 'outline' : 'destructive'}>
-                        {product.status === 'available' ? 'Disponible' : product.status === 'out_of_stock' ? 'Hors stock' : product.status === 'removed_from_menu' ? 'Retiré de la carte' : 'Indisponible'}
-                      </Badge>
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-xs font-semibold">Couleur de production</Label>
-                    <div className="mt-1 flex items-center gap-2">
-                      <div 
-                        className="w-8 h-8 rounded-full border border-input"
-                        style={{ backgroundColor: product.production_color || '#ffffff' }}
-                      />
-                      <p className="text-foreground text-sm">{product.production_color || 'Non d\u00e9fini'}</p>
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Takeaway */}
+                  <Card className="border">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                        Emporter
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {!isEditMode ? (
+                        <>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Prix</p>
+                            <p className="text-lg font-semibold text-foreground">{((product.price_take_away || 0) / 100).toFixed(2)} €</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">TVA</p>
+                            <p className="text-sm text-foreground">{getTvaRateValue(product.tva_ids?.takeaway) ? `${getTvaRateValue(product.tva_ids?.takeaway)}%` : '—'}</p>
+                          </div>
+                          <div className="pt-2 border-t">
+                            <p className="text-xs text-muted-foreground mb-1">Disponible</p>
+                            <Badge variant={product.available_take_away ? "default" : "secondary"} className="text-xs">
+                              {product.available_take_away ? '✓ Oui' : '✗ Non'}
+                            </Badge>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <Label className="text-xs">Prix (€)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={((formData.price_take_away || 0) / 100).toFixed(2)}
+                              onChange={(e) => setFormData({ ...formData, price_take_away: Math.round(parseFloat(e.target.value || '0') * 100) })}
+                              className="mt-1 text-sm font-semibold h-9"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Taux TVA</Label>
+                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{getTvaRateValue(product.tva_ids?.takeaway) ? `${getTvaRateValue(product.tva_ids?.takeaway)}%` : '—'}</p>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <Label className="text-xs">Disponible</Label>
+                            <Switch
+                              checked={formData.available_take_away || false}
+                              onCheckedChange={(checked) => setFormData({
+                                ...formData,
+                                available_take_away: checked
+                              })}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Delivery */}
+                  <Card className="border">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                        Livraison
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {!isEditMode ? (
+                        <>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Prix</p>
+                            <p className="text-lg font-semibold text-foreground">{((product.price_delivery || 0) / 100).toFixed(2)} €</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">TVA</p>
+                            <p className="text-sm text-foreground">{getTvaRateValue(product.tva_ids?.delivery) ? `${getTvaRateValue(product.tva_ids?.delivery)}%` : '—'}</p>
+                          </div>
+                          <div className="pt-2 border-t">
+                            <p className="text-xs text-muted-foreground mb-1">Disponible</p>
+                            <Badge variant={product.available_delivery ? "default" : "secondary"} className="text-xs">
+                              {product.available_delivery ? '✓ Oui' : '✗ Non'}
+                            </Badge>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <Label className="text-xs">Prix (€)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={((formData.price_delivery || 0) / 100).toFixed(2)}
+                              onChange={(e) => setFormData({ ...formData, price_delivery: Math.round(parseFloat(e.target.value || '0') * 100) })}
+                              className="mt-1 text-sm font-semibold h-9"
+                            />
+                          </div>
+                          <div>
+                            <Label className="text-xs">Taux TVA</Label>
+                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{getTvaRateValue(product.tva_ids?.delivery) ? `${getTvaRateValue(product.tva_ids?.delivery)}%` : '—'}</p>
+                          </div>
+                          <div className="flex items-center justify-between pt-2 border-t">
+                            <Label className="text-xs">Disponible</Label>
+                            <Switch
+                              checked={formData.available_delivery || false}
+                              onCheckedChange={(checked) => setFormData({
+                                ...formData,
+                                available_delivery: checked
+                              })}
+                            />
+                          </div>
+                        </>
+                      )}
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
-                {/* Image and Name/Description Side by Side */}
-                <div className="flex gap-4">
-                  <div 
-                    className="flex-shrink-0 w-32 h-32 cursor-pointer"
-                    onClick={handleImageClick}
-                  >
-                    <div className="w-full h-full bg-muted rounded-lg flex items-center justify-center overflow-hidden border-2 border-dashed hover:border-primary transition-colors">
-                      {isUploadingImage && (
-                        <div className="absolute inset-0 bg-black/20 flex items-center justify-center rounded-lg">
-                          <Loader2 className="w-6 h-6 animate-spin text-white" />
+
+              {/* Integrations Section */}
+              <div className="space-y-3 pt-3">
+                <h3 className="font-semibold text-sm text-foreground">Plateformes Externes</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {/* Uber Eats */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <img src="/uber_eats_logo.png" alt="Uber Eats" className="w-5 h-5 object-contain rounded" />
+                        Uber Eats
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Actif</Label>
+                        {isEditMode ? (
+                          <Switch
+                            checked={formData.integrations?.uber_eats?.enabled || false}
+                            onCheckedChange={(checked) => setFormData({
+                              ...formData,
+                              integrations: {
+                                ...formData.integrations,
+                                uber_eats: {
+                                  ...formData.integrations?.uber_eats,
+                                  enabled: checked,
+                                  id: formData.integrations?.uber_eats?.id || ''
+                                }
+                              }
+                            })}
+                          />
+                        ) : (
+                          <Badge variant={product.integrations?.uber_eats?.enabled ? "default" : "secondary"} className="text-xs">
+                            {product.integrations?.uber_eats?.enabled ? '✓' : '✗'}
+                          </Badge>
+                        )}
+                      </div>
+                      {(product.integrations?.uber_eats?.enabled || formData.integrations?.uber_eats?.enabled) && (
+                        <div>
+                          <Label className="text-xs">Prix (€)</Label>
+                          {isEditMode ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={((formData.integrations?.uber_eats?.price_override || formData.price || 0) / 100).toFixed(2)}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                integrations: {
+                                  ...formData.integrations,
+                                  uber_eats: {
+                                    ...(formData.integrations?.uber_eats || {}),
+                                    price_override: Math.round(parseFloat(e.target.value || '0') * 100)
+                                  }
+                                }
+                              })}
+                              className="mt-1 text-sm font-semibold h-9"
+                            />
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold">{((product.integrations?.uber_eats?.price_override || product.price || 0) / 100).toFixed(2)} €</p>
+                          )}
                         </div>
                       )}
-                      {imagePreviewUrl ? (
-                        <img 
-                          src={imagePreviewUrl} 
-                          alt="Preview" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : formData.image_url ? (
-                        <img 
-                          src={formData.image_url} 
-                          alt={formData.name} 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : formData.bg_color ? (
-                        <div 
-                          className="w-full h-full rounded-lg" 
-                          style={{ backgroundColor: formData.bg_color }}
-                        />
-                      ) : (
-                        <div className="flex flex-col items-center gap-1 text-muted-foreground text-xs">
-                          <ImageIcon className="w-6 h-6" />
-                          <p>Cliquer pour ajouter</p>
+                    </CardContent>
+                  </Card>
+
+                  {/* Deliveroo */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <img src="/deliveroo_logo.png" alt="Deliveroo" className="w-5 h-5 object-contain rounded" />
+                        Deliveroo
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Actif</Label>
+                        {isEditMode ? (
+                          <Switch
+                            checked={formData.integrations?.deliveroo?.enabled || false}
+                            onCheckedChange={(checked) => setFormData({
+                              ...formData,
+                              integrations: {
+                                ...formData.integrations,
+                                deliveroo: {
+                                  ...formData.integrations?.deliveroo,
+                                  enabled: checked,
+                                  id: formData.integrations?.deliveroo?.id || ''
+                                }
+                              }
+                            })}
+                          />
+                        ) : (
+                          <Badge variant={product.integrations?.deliveroo?.enabled ? "default" : "secondary"} className="text-xs">
+                            {product.integrations?.deliveroo?.enabled ? '✓' : '✗'}
+                          </Badge>
+                        )}
+                      </div>
+                      {(product.integrations?.deliveroo?.enabled || formData.integrations?.deliveroo?.enabled) && (
+                        <div>
+                          <Label className="text-xs">Prix (€)</Label>
+                          {isEditMode ? (
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              value={((formData.integrations?.deliveroo?.price_override || formData.price || 0) / 100).toFixed(2)}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                integrations: {
+                                  ...formData.integrations,
+                                  deliveroo: {
+                                    ...(formData.integrations?.deliveroo || {}),
+                                    price_override: Math.round(parseFloat(e.target.value || '0') * 100)
+                                  }
+                                }
+                              })}
+                              className="mt-1 text-sm font-semibold h-9"
+                            />
+                          ) : (
+                            <p className="mt-1 text-sm font-semibold">{((product.integrations?.deliveroo?.price_override || product.price || 0) / 100).toFixed(2)} €</p>
+                          )}
                         </div>
                       )}
-                    </div>
-                  </div>
-                  <div className="flex-1 space-y-3">
-                    <div>
-                      <Label>Nom</Label>
-                      <Input
-                        value={formData.name || ''}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Description</Label>
-                      <Textarea
-                        value={formData.description || ''}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="resize-none"
-                        rows={3}
-                      />
-                    </div>
-                  </div>
-                </div>
+                    </CardContent>
+                  </Card>
 
-                {/* Hidden file input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".jpg,.jpeg,.png,.webp"
-                  onChange={handleImageSelect}
-                  disabled={isUploadingImage}
-                  className="hidden"
-                />
-
-                {/* Category and Background Color */}
-                <div className="grid grid-cols-2 gap-6 md:gap-8">
-                  <div>
-                    <Label>Catégorie</Label>
-                    <CategorySelector
-                      categories={categories}
-                      value={formData.category_id || ''}
-                      onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId })}
-                      onCreateCategory={onCreateCategory}
-                    />
-                  </div>
-                  <div>
-                    <Label>Couleur de fond</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={formData.bg_color || '#ffffff'}
-                        onChange={(e) => setFormData({ ...formData, bg_color: e.target.value })}
-                        className="w-12 h-10 rounded-full cursor-pointer"
-                      />
-                      <Input
-                        value={formData.bg_color || '#ffffff'}
-                        onChange={(e) => setFormData({ ...formData, bg_color: e.target.value })}
-                        className="flex-1 font-mono text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label>Statut</Label>
-                    <Select 
-                      value={formData.status || 'available'}
-                      onValueChange={(value) => setFormData({ ...formData, status: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="available">Disponible</SelectItem>
-                        <SelectItem value="out_of_stock">Hors stock</SelectItem>
-                        <SelectItem value="not_available">Indisponible</SelectItem>
-                        <SelectItem value="removed_from_menu">Retiré de la carte</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label>Couleur de production</Label>
-                    <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={formData.production_color || '#ffffff'}
-                        onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
-                        className="w-12 h-10 rounded-full cursor-pointer"
-                      />
-                      <Input
-                        value={formData.production_color || '#ffffff'}
-                        onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
-                        className="flex-1 font-mono text-sm"
-                      />
-                    </div>
-                  </div>
+                  {/* ScanNOrder */}
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <span className="text-lg">📱</span>
+                        ScanNOrder
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Actif</Label>
+                        {isEditMode ? (
+                          <Switch
+                            checked={formData.is_available_on_sno || false}
+                            onCheckedChange={(checked) => setFormData({
+                              ...formData,
+                              is_available_on_sno: checked
+                            })}
+                          />
+                        ) : (
+                          <Badge variant={product.is_available_on_sno ? "default" : "secondary"} className="text-xs">
+                            {product.is_available_on_sno ? '✓' : '✗'}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="price" className="space-y-4">
-            {/* Base Pricing - Always Visible */}
-            <div className="space-y-4">
-              {/* On-Site / Restaurant */}
-              <Card className="border-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Sur Place</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Disponible</Label>
-                    {isEditMode ? (
-                      <Switch
-                        checked={formData.availability?.on_site || false}
-                        onCheckedChange={(checked) => setFormData({
-                          ...formData,
-                          availability: { ...formData.availability!, on_site: checked }
-                        })}
-                      />
-                    ) : (
-                      <span className="font-medium">{product.availability?.on_site ? '✓' : '✗'}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Prix (€)</Label>
-                    {isEditMode ? (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        className="w-28"
-                        value={((formData.price || 0) / 100).toFixed(2)}
-                        onChange={(e) => setFormData({ ...formData, price: Math.round(parseFloat(e.target.value) * 100) })}
-                      />
-                    ) : (
-                      <span className="font-medium">{((product.price || 0) / 100).toFixed(2)} €</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <Label>TVA (%)</Label>
-                    <span className="text-muted-foreground">{product.tva_rate_in ? `${product.tva_rate_in}%` : '—'}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Takeaway */}
-              <Card className="border-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Emporter</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Disponible</Label>
-                    {isEditMode ? (
-                      <Switch
-                        checked={formData.availability?.takeaway || false}
-                        onCheckedChange={(checked) => setFormData({
-                          ...formData,
-                          availability: { ...formData.availability!, takeaway: checked }
-                        })}
-                      />
-                    ) : (
-                      <span className="font-medium">{product.availability?.takeaway ? '✓' : '✗'}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Prix (€)</Label>
-                    {isEditMode ? (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        className="w-28"
-                        value={((formData.price_take_away || 0) / 100).toFixed(2)}
-                        onChange={(e) => setFormData({ ...formData, price_take_away: Math.round(parseFloat(e.target.value) * 100) })}
-                      />
-                    ) : (
-                      <span className="font-medium">{((product.price_take_away || 0) / 100).toFixed(2)} €</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <Label>TVA (%)</Label>
-                    <span className="text-muted-foreground">{product.tva_rate_take_away ? `${product.tva_rate_take_away}%` : '—'}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Delivery */}
-              <Card className="border-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Livraison</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Disponible</Label>
-                    {isEditMode ? (
-                      <Switch
-                        checked={formData.availability?.delivery || false}
-                        onCheckedChange={(checked) => setFormData({
-                          ...formData,
-                          availability: { ...formData.availability!, delivery: checked }
-                        })}
-                      />
-                    ) : (
-                      <span className="font-medium">{product.availability?.delivery ? '✓' : '✗'}</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Label>Prix (€)</Label>
-                    {isEditMode ? (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        className="w-28"
-                        value={((formData.price_delivery || 0) / 100).toFixed(2)}
-                        onChange={(e) => setFormData({ ...formData, price_delivery: Math.round(parseFloat(e.target.value) * 100) })}
-                      />
-                    ) : (
-                      <span className="font-medium">{((product.price_delivery || 0) / 100).toFixed(2)} €</span>
-                    )}
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <Label>TVA (%)</Label>
-                    <span className="text-muted-foreground">{product.tva_rate_delivery ? `${product.tva_rate_delivery}%` : '—'}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Uber Eats - Always Visible */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <div className="w-8 h-8 bg-black rounded flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">UE</span>
-                  </div>
-                  Uber Eats
-                </CardTitle>
-                <CardDescription>
-                  Configuration de synchronisation et prix
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Activer sur Uber Eats</Label>
-                  {isEditMode ? (
-                    <Switch
-                      checked={formData.integrations?.uber_eats?.enabled || false}
-                      onCheckedChange={(checked) => setFormData({
-                        ...formData,
-                        integrations: {
-                          ...formData.integrations,
-                          uber_eats: {
-                            ...formData.integrations?.uber_eats,
-                            enabled: checked,
-                            id: formData.integrations?.uber_eats?.id || ''
-                          }
-                        }
-                      })}
-                    />
-                  ) : (
-                    <span className="font-medium">{product.integrations?.uber_eats?.enabled ? '✓' : '✗'}</span>
-                  )}
-                </div>
-                {(product.integrations?.uber_eats?.enabled || formData.integrations?.uber_eats?.enabled) && (
-                  <div>
-                    <Label>Prix Uber Eats (€)</Label>
-                    {isEditMode ? (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={((formData.integrations?.uber_eats?.price_override || formData.price || 0) / 100).toFixed(2)}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          integrations: {
-                            ...formData.integrations,
-                            uber_eats: {
-                              ...(formData.integrations?.uber_eats || {}),
-                              price_override: Math.round(parseFloat(e.target.value) * 100)
-                            }
-                          }
-                        })}
-                      />
-                    ) : (
-                      <p className="mt-1 text-foreground font-medium">{((product.integrations?.uber_eats?.price_override || product.price || 0) / 100).toFixed(2)} €</p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Deliveroo - Always Visible */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <div className="w-8 h-8 bg-[#00CCBC] rounded flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">D</span>
-                  </div>
-                  Deliveroo
-                </CardTitle>
-                <CardDescription>
-                  Configuration de synchronisation et prix
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Activer sur Deliveroo</Label>
-                  {isEditMode ? (
-                    <Switch
-                      checked={formData.integrations?.deliveroo?.enabled || false}
-                      onCheckedChange={(checked) => setFormData({
-                        ...formData,
-                        integrations: {
-                          ...formData.integrations,
-                          deliveroo: {
-                            ...formData.integrations?.deliveroo,
-                            enabled: checked,
-                            id: formData.integrations?.deliveroo?.id || ''
-                          }
-                        }
-                      })}
-                    />
-                  ) : (
-                    <span className="font-medium">{product.integrations?.deliveroo?.enabled ? '✓' : '✗'}</span>
-                  )}
-                </div>
-                {(product.integrations?.deliveroo?.enabled || formData.integrations?.deliveroo?.enabled) && (
-                  <div>
-                    <Label>Prix Deliveroo (€)</Label>
-                    {isEditMode ? (
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={((formData.integrations?.deliveroo?.price_override || formData.price || 0) / 100).toFixed(2)}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          integrations: {
-                            ...formData.integrations,
-                            deliveroo: {
-                              ...(formData.integrations?.deliveroo || {}),
-                              price_override: Math.round(parseFloat(e.target.value) * 100)
-                            }
-                          }
-                        })}
-                      />
-                    ) : (
-                      <p className="mt-1 text-foreground font-medium">{((product.integrations?.deliveroo?.price_override || product.price || 0) / 100).toFixed(2)} €</p>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* ScanNOrder - Always Visible */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <div className="w-8 h-8 bg-purple-600 rounded flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">SN</span>
-                  </div>
-                  ScanNOrder
-                </CardTitle>
-                <CardDescription>
-                  Configuration ScanNOrder
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Disponible sur ScanNOrder</Label>
-                  {isEditMode ? (
-                    <Switch
-                      checked={formData.is_available_on_sno || false}
-                      onCheckedChange={(checked) => setFormData({
-                        ...formData,
-                        is_available_on_sno: checked
-                      })}
-                    />
-                  ) : (
-                    <span className="font-medium">{product.is_available_on_sno ? '✓' : '✗'}</span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="composition">
@@ -924,130 +1081,147 @@ export const SimpleProductSheet = ({
             />
           </TabsContent>
 
-          <TabsContent value="tags" className="space-y-4">
-            <div className="grid grid-cols-2 gap-6">
-              {/* Allergens Column */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Allergènes ({(allergens ?? []).length})</h3>
-                <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-3">
-                  {(allergens ?? []).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun allergène disponible</p>
-                  ) : (
-                    (allergens ?? []).map((allergen) => (
-                      <div key={allergen.allergen_id} className="flex items-center gap-2">
-                        {isEditMode ? (
-                          <input
-                            type="checkbox"
-                            id={`allergen-${allergen.allergen_id}`}
-                            checked={formData.allergens?.includes(allergen.allergen_id) || false}
-                            onChange={(e) => {
-                              const newAllergens = e.target.checked
-                                ? [...(formData.allergens || []), allergen.allergen_id]
-                                : (formData.allergens || []).filter(a => a !== allergen.allergen_id);
-                              setFormData({ ...formData, allergens: newAllergens });
-                            }}
-                            className="rounded"
-                          />
-                        ) : (
-                          <input
-                            type="checkbox"
-                            id={`allergen-${allergen.allergen_id}`}
-                            checked={formData.allergens?.includes(allergen.allergen_id) || false}
-                            disabled
-                            className="rounded"
-                          />
-                        )}
-                        <label
-                          htmlFor={`allergen-${allergen.allergen_id}`}
-                          className="text-sm cursor-pointer flex-1"
-                        >
-                          {allergen.name}
-                          {allergen.icon && <span className="ml-1">{allergen.icon}</span>}
-                        </label>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-
-              {/* Tags Column */}
-              <div className="space-y-3">
-                <h3 className="font-semibold text-sm">Tags</h3>
-                
-                {/* Create Tag Form - Only in edit mode */}
-                {isEditMode && (
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Ajouter un tag"
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          handleCreateTag();
-                        }
-                      }}
-                      disabled={isCreatingTag}
-                      className="text-sm"
-                    />
-                    <Button
-                      onClick={handleCreateTag}
-                      disabled={isCreatingTag || !newTagName.trim()}
-                      size="sm"
-                      variant="outline"
-                      className="px-3"
-                    >
-                      {isCreatingTag ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+            <TabsContent value="tags" className="space-y-5 mt-0">
+              <div className="grid grid-cols-2 gap-5">
+                {/* Allergens */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Allergènes</CardTitle>
+                    <CardDescription>{(allergensData ?? []).length} disponibles</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                      {(allergensData ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-4 text-center">Aucun allergène</p>
                       ) : (
-                        <Plus className="w-4 h-4" />
+                        (allergensData ?? []).map((allergen) => (
+                          <div key={allergen.allergen_id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 transition-colors">
+                            {isEditMode ? (
+                              <input
+                                type="checkbox"
+                                id={`allergen-${allergen.allergen_id}`}
+                                checked={formData.allergens?.includes(allergen.allergen_id) || false}
+                                onChange={(e) => {
+                                  const newAllergens = e.target.checked
+                                    ? [...(formData.allergens || []), allergen.allergen_id]
+                                    : (formData.allergens || []).filter(a => a !== allergen.allergen_id);
+                                  setFormData({ ...formData, allergens: newAllergens });
+                                }}
+                                className="rounded cursor-pointer"
+                              />
+                            ) : (
+                              <input
+                                type="checkbox"
+                                id={`allergen-${allergen.allergen_id}`}
+                                checked={formData.allergens?.includes(allergen.allergen_id) || false}
+                                disabled
+                                className="rounded"
+                              />
+                            )}
+                            <label
+                              htmlFor={`allergen-${allergen.allergen_id}`}
+                              className="text-sm cursor-pointer flex-1 flex items-center gap-2"
+                            >
+                              {allergen.icon && <span>{allergen.icon}</span>}
+                              {allergen.name}
+                            </label>
+                          </div>
+                        ))
                       )}
-                    </Button>
-                  </div>
-                )}
+                    </div>
+                  </CardContent>
+                </Card>
 
-                {/* Tags List */}
-                <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-3">
-                  {(tags ?? []).length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Aucun tag disponible</p>
-                  ) : (
-                    (tags ?? []).map((tag) => (
-                      <div key={tag.id} className="flex items-center gap-2">
-                        {isEditMode ? (
-                          <input
-                            type="checkbox"
-                            id={`tag-${tag.id}`}
-                            checked={formData.tags?.includes(tag.id) || false}
-                            onChange={(e) => {
-                              const newTags = e.target.checked
-                                ? [...(formData.tags || []), tag.id]
-                                : (formData.tags || []).filter(t => t !== tag.id);
-                              setFormData({ ...formData, tags: newTags });
-                            }}
-                            className="rounded"
-                          />
-                        ) : (
-                          <input
-                            type="checkbox"
-                            id={`tag-${tag.id}`}
-                            checked={formData.tags?.includes(tag.id) || false}
-                            disabled
-                            className="rounded"
-                          />
-                        )}
-                        <label
-                          htmlFor={`tag-${tag.id}`}
-                          className="text-sm cursor-pointer flex-1"
+                {/* Tags */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Tags</CardTitle>
+                    <CardDescription>{(tagsData ?? []).length} disponibles</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Create Tag Form - Only in edit mode */}
+                    {isEditMode && (
+                      <div className="flex gap-2 pb-3 border-b">
+                        <Input
+                          placeholder="Nouveau tag"
+                          value={newTagName}
+                          onChange={(e) => setNewTagName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              handleCreateTag();
+                            }
+                          }}
+                          disabled={isCreatingTag}
+                          className="text-sm h-8"
+                        />
+                        <Button
+                          onClick={handleCreateTag}
+                          disabled={isCreatingTag || !newTagName.trim()}
+                          size="sm"
+                          variant="outline"
+                          className="px-2"
                         >
-                          {tag.name}
-                        </label>
+                          {isCreatingTag ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Plus className="w-3 h-3" />
+                          )}
+                        </Button>
                       </div>
-                    ))
-                  )}
-                </div>
+                    )}
+
+                    {/* Tags List */}
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                      {(tagsData ?? []).length === 0 ? (
+                        <p className="text-xs text-muted-foreground py-4 text-center">Aucun tag</p>
+                      ) : (
+                        (tagsData ?? []).map((tag) => (
+                          <div key={tag.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 transition-colors">
+                            {isEditMode ? (
+                              <input
+                                type="checkbox"
+                                id={`tag-${tag.id}`}
+                                checked={formData.tags?.includes(tag.id) || false}
+                                onChange={(e) => {
+                                  const newTags = e.target.checked
+                                    ? [...(formData.tags || []), tag.id]
+                                    : (formData.tags || []).filter(t => t !== tag.id);
+                                  setFormData({ ...formData, tags: newTags });
+                                }}
+                                className="rounded cursor-pointer"
+                              />
+                            ) : (
+                              <input
+                                type="checkbox"
+                                id={`tag-${tag.id}`}
+                                checked={formData.tags?.includes(tag.id) || false}
+                                disabled
+                                className="rounded"
+                              />
+                            )}
+                            <label
+                              htmlFor={`tag-${tag.id}`}
+                              className="text-sm cursor-pointer flex-1"
+                            >
+                              <Badge variant="outline" className="text-xs">
+                                {tag.name}
+                              </Badge>
+                            </label>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-            </div>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Impossible de charger le produit</p>
+          </div>
+        )}
+        </div>
 
         {/* Delete Product Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

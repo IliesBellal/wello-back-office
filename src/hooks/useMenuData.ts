@@ -20,52 +20,46 @@ export const useMenuData = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [menuResponse, productsData, unitsData, componentsData, attributesData] = await Promise.all([
-        menuService.getMenuData(),
-        menuService.getProducts(),
+      // ✅ CONSOLIDATED: Single API call to getMenuData()
+      // Now returns categories with nested products directly
+      const [categoriesData, unitsData, componentsData, attributesData] = await Promise.all([
+        menuService.getMenuData(),  // Returns Category[] with nested products (replaces both getMenuData() and getProducts())
         menuService.getUnitsOfMeasure(),
         menuService.getComponents(),
         menuService.getAttributes()
       ]);
 
-      // Handle both API formats: { id, data: { ... } } or direct { products_types, products }
-      let apiData: MenuData;
-      if (menuResponse.data) {
-        apiData = menuResponse.data;
-      } else if (menuResponse.products_types) {
-        apiData = menuResponse as unknown as MenuData;
-      } else {
-        apiData = { products_types: [], products: [] };
-      }
-      
-      // Normalize categories to have consistent properties
-      const productsTypes = (apiData.products_types || []).map((cat: Category) => {
-        // Find products for this category from the products API callZ
-        const categoryProducts = productsData.filter(p => p.category_id === cat.category_id || p.category_id === cat.id);
-        return {
-          category_id: cat.category_id || cat.id || '',
-          category: cat.category || cat.name || '',
-          category_name: cat.category_name || cat.category || cat.name || '',
-          id: cat.id || cat.category_id || '',
-          name: cat.name || cat.category || '',
-          order: cat.order || 0,
-          bg_color: cat.bg_color,
-          products: categoryProducts.length > 0 ? categoryProducts : (cat.products || [])
-        };
-      });
+      // Categories already come with nested products, no need to filter/remap
+      const productsTypes = categoriesData.map((cat: Category) => ({
+        category_id: cat.category_id || cat.id || '',
+        category: cat.category || cat.name || '',
+        category_name: cat.category_name || cat.category || cat.name || '',
+        id: cat.id || cat.category_id || '',
+        name: cat.name || cat.category || '',
+        order: cat.order || 0,
+        bg_color: cat.bg_color,
+        available: cat.available ?? cat.availability,
+        products: cat.products || []
+      }));
 
-      const allProducts = productsTypes.flatMap((cat: Category) => cat.products || []);
+      // Flatten all products from categories (including sub-products)
+      const allProducts: Product[] = [];
+      productsTypes.forEach((cat: Category) => {
+        (cat.products || []).forEach((product: Product) => {
+          allProducts.push(product);
+          // Also include sub-products in the flat array (cast to Product for compatibility)
+          if (product.sub_products && Array.isArray(product.sub_products)) {
+            allProducts.push(...(product.sub_products as Product[]));
+          }
+        });
+      });
 
       // Extract components and categories from the API response
       const { components: flattenedComponents, categories: componentCategoriesFromApi } = componentsData;
 
       setMenuData({
-        status: apiData.status,
-        last_menu_update: apiData.last_menu_update,
         products_types: productsTypes,
-        products: allProducts,
-        components_types: apiData.components_types,
-        delays: apiData.delays
+        products: allProducts
       });
       setUnits(unitsData);
       setComponents(flattenedComponents);

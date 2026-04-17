@@ -13,12 +13,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Edit, Save, X } from 'lucide-react';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
+import { useProductData } from '@/hooks/useProductData';
 
 interface ProductDetailsSheetProps {
-  product: Product | null;
+  /** Product ID to load - if provided, product data will be fetched automatically */
+  productId?: string | null;
+  /** Pre-loaded product data (optional, can be overridden by productId) */
+  product?: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tvaRates: TvaRateGroup[];
@@ -31,7 +36,8 @@ interface ProductDetailsSheetProps {
 }
 
 export const ProductDetailsSheet = ({
-  product,
+  productId,
+  product: initialProduct = null,
   open,
   onOpenChange,
   tvaRates,
@@ -42,6 +48,12 @@ export const ProductDetailsSheet = ({
   allergens,
   onSave
 }: ProductDetailsSheetProps) => {
+  // Load product data if productId is provided
+  const { product: loadedProduct, loading } = useProductData(productId || null, open);
+  
+  // Use loaded product if available, otherwise use initial product prop
+  const product = loadedProduct || initialProduct;
+  
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
 
@@ -134,36 +146,61 @@ export const ProductDetailsSheet = ({
     }
   };
 
-  if (!product) return null;
+  if (!product && !loading) return null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-2xl overflow-y-auto">
         <SheetHeader>
           <div className="flex items-center justify-between">
-            <SheetTitle>{product.name}</SheetTitle>
-            <div className="flex gap-2">
-              {!isEditMode ? (
-                <Button variant="outline" onClick={() => setIsEditMode(true)}>
-                  <Edit className="w-4 h-4 mr-2" />
-                  Modifier
-                </Button>
-              ) : (
-                <>
-                  <Button variant="outline" onClick={handleCancel}>
-                    <X className="w-4 h-4 mr-2" />
-                    Annuler
+            {loading ? (
+              <Skeleton className="h-8 w-48" />
+            ) : (
+              <SheetTitle>{product?.name || 'Produit'}</SheetTitle>
+            )}
+            {!loading && (
+              <div className="flex gap-2">
+                {!isEditMode ? (
+                  <Button variant="outline" onClick={() => setIsEditMode(true)}>
+                    <Edit className="w-4 h-4 mr-2" />
+                    Modifier
                   </Button>
-                  <Button onClick={handleSave}>
-                    <Save className="w-4 h-4 mr-2" />
-                    Enregistrer
-                  </Button>
-                </>
-              )}
-            </div>
+                ) : (
+                  <>
+                    <Button variant="outline" onClick={handleCancel}>
+                      <X className="w-4 h-4 mr-2" />
+                      Annuler
+                    </Button>
+                    <Button onClick={handleSave}>
+                      <Save className="w-4 h-4 mr-2" />
+                      Enregistrer
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </SheetHeader>
 
+        {loading ? (
+          // Loading skeleton state
+          <div className="space-y-6 mt-6">
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-32" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          </div>
+        ) : product ? (
+          // Loaded content
+          <>
         <Tabs defaultValue="general" className="mt-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="general">Général</TabsTrigger>
@@ -620,6 +657,12 @@ export const ProductDetailsSheet = ({
             </div>
           </TabsContent>
         </Tabs>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Impossible de charger le produit</p>
+          </div>
+        )}
       </SheetContent>
     </Sheet>
   );

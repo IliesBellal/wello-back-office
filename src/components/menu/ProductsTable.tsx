@@ -49,12 +49,28 @@ const getProductStatus = (product: Product) => {
   return statusMap[statusValue] || { label: 'Disponible', color: 'bg-green-100 text-green-800' };
 };
 
-const getTagLabel = (tagId: string, tags?: Tag[]) => {
-  return tags?.find(t => t.id === tagId)?.name || tagId;
+const getTagLabel = (tag: string | Tag, tags?: Tag[]) => {
+  // If tag is already a Tag object with name, return name
+  if (typeof tag === 'object' && tag !== null && 'name' in tag) {
+    return tag.name;
+  }
+  // If tag is a string ID, look it up in tags array
+  if (typeof tag === 'string') {
+    return tags?.find(t => t.id === tag)?.name || tag;
+  }
+  return 'Unknown tag';
 };
 
-const getAllergenLabel = (allergenId: string, allergens?: Allergen[]) => {
-  return allergens?.find(a => a.allergen_id === allergenId)?.name || allergenId;
+const getAllergenLabel = (allergen: string | Allergen, allergens?: Allergen[]) => {
+  // If allergen is already an Allergen object with name, return name
+  if (typeof allergen === 'object' && allergen !== null && 'name' in allergen) {
+    return allergen.name;
+  }
+  // If allergen is a string ID, look it up in allergens array
+  if (typeof allergen === 'string') {
+    return allergens?.find(a => a.allergen_id === allergen)?.name || allergen;
+  }
+  return 'Unknown allergen';
 };
 
 export const ProductsTable = ({
@@ -167,11 +183,14 @@ export const ProductsTable = ({
           >
             <div className="flex flex-wrap gap-1">
               {productTags.length > 0 ? (
-                productTags.slice(0, 2).map((tagId) => (
-                  <Badge key={tagId} variant="outline" className="text-xs">
-                    {getTagLabel(tagId, tags)}
-                  </Badge>
-                ))
+                productTags.slice(0, 2).map((tag, idx) => {
+                  const tagKey = typeof tag === 'string' ? tag : (tag as Tag)?.id || `tag-${idx}`;
+                  return (
+                    <Badge key={tagKey} variant="outline" className="text-xs">
+                      {getTagLabel(tag, tags)}
+                    </Badge>
+                  );
+                })
               ) : (
                 <span className="text-muted-foreground text-sm">—</span>
               )}
@@ -190,15 +209,18 @@ export const ProductsTable = ({
           >
             <div className="flex flex-wrap gap-1">
               {productAllergens.length > 0 ? (
-                productAllergens.slice(0, 2).map((allergenId) => (
-                  <Badge
-                    key={allergenId}
-                    variant="destructive"
-                    className="text-xs opacity-80"
-                  >
-                    {getAllergenLabel(allergenId, allergens)}
-                  </Badge>
-                ))
+                productAllergens.slice(0, 2).map((allergen, idx) => {
+                  const allergenKey = typeof allergen === 'string' ? allergen : (allergen as Allergen)?.allergen_id || `allergen-${idx}`;
+                  return (
+                    <Badge
+                      key={allergenKey}
+                      variant="destructive"
+                      className="text-xs opacity-80"
+                    >
+                      {getAllergenLabel(allergen, allergens)}
+                    </Badge>
+                  );
+                })
               ) : (
                 <span className="text-muted-foreground text-sm">Aucun</span>
               )}

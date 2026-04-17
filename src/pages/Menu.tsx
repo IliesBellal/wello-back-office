@@ -275,7 +275,7 @@ export default function Menu() {
         </div>
 
         <SimpleProductSheet
-          product={selectedProduct && !selectedProduct.is_product_group ? selectedProduct : null}
+          productId={selectedProduct && !selectedProduct.is_product_group ? selectedProduct.product_id : null}
           open={sheetOpen && selectedProduct !== null && !selectedProduct.is_product_group}
           onOpenChange={setSheetOpen}
           units={units}

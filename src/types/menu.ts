@@ -12,9 +12,29 @@ export interface TvaRateGroup {
 }
 
 export interface SubProduct {
-  id: string;
+  product_id?: string;  // From new API format
+  id?: string;           // Legacy format
   name: string;
-  price: number;
+  price?: number;
+  price_take_away?: number;
+  price_delivery?: number;
+  price_uber_eats?: number;
+  price_deliveroo?: number;
+  image_url?: string;
+  description?: string;
+  category_id?: string;
+  category_name?: string;
+  cost_price?: number;
+  foodcost_percent?: number;
+  margin_percent?: number;
+  is_product_group?: boolean;
+  is_available_on_sno?: boolean;
+  status?: string;
+  by_product_of?: string;  // Parent product ID
+  configuration?: Record<string, unknown>;
+  display_order?: number;
+  tags?: (string | Tag)[] | null;      // Support both ID array and Tag objects
+  allergens?: (string | Allergen)[] | null;  // Support both ID array and Allergen objects
 }
 
 export interface UnitOfMeasure {
@@ -141,17 +161,21 @@ export interface Tag {
   merchant_id?: string;
   name: string;
   order?: number;
+  color?: string;  // From new API format
 }
 
 export interface Product {
   product_id: string;
   category_id?: string;
   category?: string;
+  category_name?: string;  // From new API format
   name: string;
   description?: string;
   price?: number;
   price_take_away?: number;
   price_delivery?: number;
+  price_uber_eats?: number;     // From new API format
+  price_deliveroo?: number;     // From new API format
   image_url?: string;
   bg_color?: string;
   is_product_group?: boolean;
@@ -160,7 +184,7 @@ export interface Product {
   is_available_on_sno?: boolean;
   order?: number;
   display_order?: number;  // Sort order for products
-  status?: number;
+  status?: string | number;  // Can be string (e.g., "available", "unavailable") or number
   available?: boolean;
   available_in?: boolean;
   available_take_away?: boolean;
@@ -173,7 +197,7 @@ export interface Product {
   margin_percent?: number;  // Margin percentage
   components?: ProductComposition[];
   attributes?: ProductAttribute[];
-  configuration?: (string[] | { attributes?: Attribute[] });  // Pre-configured attributes from API or IDs array for payload
+  configuration?: (string[] | { attributes?: Attribute[] } | null);  // Pre-configured attributes from API or IDs array for payload
   sub_products?: SubProduct[];
   quantity?: number;
   paid_quantity?: number;
@@ -193,8 +217,9 @@ export interface Product {
   availability?: ProductAvailability;
   integrations?: ProductIntegrations;
   tva_ids?: ProductTvaIds;
-  tags?: string[]; // Array of tag IDs
-  allergens?: string[]; // Array of allergen IDs
+  tags?: (string | Tag)[] | null;        // Support both ID array and Tag objects + null
+  allergens?: (string | Allergen)[] | null;  // Support both ID array and Allergen objects + null
+  by_product_of?: string;  // Parent product ID (from new API format)
 }
 
 // Category can come from API in two formats
@@ -211,6 +236,7 @@ export interface Category {
   categ_order?: number;  // Sort order for categories
   bg_color?: string;
   availability?: boolean;  // Availability status for the category
+  available?: boolean;     // From new API format
   products: Product[];
 }
 
@@ -250,7 +276,7 @@ export interface ProductCreatePayload {
 
 export interface Menu {
   id?: string;
-  data?: MenuData;
+  data?: MenuData | Category[];  // Can be MenuData or array of categories (new API format)
   // Direct properties (mock data format)
   products_types?: Category[];
   products?: Product[];
@@ -263,4 +289,10 @@ export interface MenuData {
   products?: Product[];
   components_types?: ComponentCategory[];
   delays?: Record<string, number>[];
+}
+
+// Response type for new consolidated GET /menu/products endpoint
+export interface MenuProductsResponse {
+  id: string;  // e.g., "menu.get_all_products"
+  data: Category[];  // Array of categories with nested products
 }

@@ -41,9 +41,13 @@ export const useProductCreateData = (isOpen: boolean) => {
 
         setTvaRates(rates);
         
-        // Normalize categories from API response
-        const apiData = menuResponse.data || menuResponse;
-        const normalizedCategories = (apiData.products_types || []).map((cat: ApiCategory) => ({
+        // After API consolidation, getMenuData() returns Category[] directly
+        // (Previously it returned { products_types: Category[] })
+        const categoriesArray = Array.isArray(menuResponse) 
+          ? menuResponse 
+          : (menuResponse.data || menuResponse.products_types || []);
+
+        const normalizedCategories = categoriesArray.map((cat: ApiCategory) => ({
           category_id: cat.category_id || cat.id || '',
           category: cat.category || cat.name || '',
           category_name: cat.category_name || cat.category || cat.name || '',

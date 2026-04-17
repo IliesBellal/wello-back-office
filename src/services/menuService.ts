@@ -73,7 +73,8 @@ const mockComponentCategories: ComponentCategory[] = [
 
 const mockAttributes: Attribute[] = [
   { 
-    id: "attr_1", 
+    id: "attr_1",
+    name: "pizza_size",
     title: "Taille Pizza", 
     type: "CHECK", 
     min: 1, 
@@ -85,7 +86,8 @@ const mockAttributes: Attribute[] = [
     ]
   },
   { 
-    id: "attr_2", 
+    id: "attr_2",
+    name: "supplements",
     title: "Suppléments", 
     type: "CHECK", 
     min: 0, 
@@ -228,38 +230,281 @@ export const menuService = {
     );
   },
 
-  async getMenuData(): Promise<Menu> {
-    logAPI('GET', '/menu');
+  async getMenuData(): Promise<Category[]> {
+    // ✅ CONSOLIDATED: Now uses GET /menu/products endpoint
+    // Replaces the old GET /menu endpoint
+    // Returns categories with nested products (hierarchical structure)
+    logAPI('GET', '/menu/products');
     return withMock(
-      () => ({ 
-        ...mockMenuData, 
-        products_types: [...mockMenuData.products_types!], 
-        products: [...mockMenuData.products!] 
-      }),
-      () => apiClient.get<Menu>('/menu')
+      () => {
+        // Create mock categories with nested products
+        const cat1: Category = {
+          category_id: "cat1",
+          category: "Pizzas",
+          category_name: "Pizzas",
+          id: "cat1",
+          name: "Pizzas",
+          order: 1,
+          bg_color: "#e20000",
+          products: [
+            {
+              product_id: "p1",
+              category_id: "cat1",
+              category_name: "Pizzas",
+              name: "Margherita",
+              description: "Tomate, Mozza",
+              price: 1200,
+              price_take_away: 1200,
+              price_delivery: 1300,
+              price_uber_eats: 1490,
+              price_deliveroo: 1490,
+              cost_price: 380,
+              foodcost_percent: 31.67,
+              margin_percent: 68.33,
+              bg_color: "#ffffff",
+              is_product_group: false,
+              status: "available",
+              available: true,
+              display_order: 1,
+              tags: ["tag_2"],
+              allergens: ["allergen-milk"],
+              tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
+              availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
+              integrations: {
+                uber_eats: { enabled: true, price_override: 1490, id: "ue_123" },
+                deliveroo: { enabled: true, price_override: 1490 }
+              }
+            },
+            {
+              product_id: "p1b",
+              category_id: "cat1",
+              category_name: "Pizzas",
+              name: "Regina",
+              description: "Tomate, Mozza, Jambon, Champignons",
+              price: 1400,
+              price_take_away: 1400,
+              price_delivery: 1500,
+              price_uber_eats: 1690,
+              price_deliveroo: 1690,
+              cost_price: 520,
+              foodcost_percent: 37.14,
+              margin_percent: 62.86,
+              bg_color: "#ffffff",
+              is_product_group: false,
+              status: "available",
+              available: true,
+              display_order: 2,
+              tags: ["tag_1"],
+              allergens: ["allergen-milk", "allergen-gluten"],
+              tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
+              availability: { on_site: true, takeaway: true, delivery: false, scan_order: true },
+              integrations: {
+                uber_eats: { enabled: true, price_override: 1690 },
+                deliveroo: { enabled: false }
+              }
+            }
+          ]
+        };
+
+        const cat2: Category = {
+          category_id: "cat2",
+          category: "Boissons",
+          category_name: "Boissons",
+          id: "cat2",
+          name: "Boissons",
+          order: 2,
+          bg_color: "#3b82f6",
+          products: [
+            {
+              product_id: "p2",
+              category_id: "cat2",
+              category_name: "Boissons",
+              name: "Softs 33cl",
+              is_product_group: true,
+              status: "available",
+              available: true,
+              display_order: 1,
+              bg_color: "#f0f9ff",
+              tags: [],
+              allergens: [],
+              sub_products: [
+                {
+                  product_id: "p2_1",
+                  name: "Coca Cola",
+                  price: 200,
+                  price_take_away: 200,
+                  price_delivery: 250,
+                  price_uber_eats: 250,
+                  price_deliveroo: 250,
+                  category_id: "cat2",
+                  category_name: "Boissons",
+                  is_product_group: false,
+                  status: "available",
+                  display_order: 0,
+                  by_product_of: "p2"
+                },
+                {
+                  product_id: "p2_2",
+                  name: "Fanta",
+                  price: 200,
+                  price_take_away: 200,
+                  price_delivery: 250,
+                  price_uber_eats: 250,
+                  price_deliveroo: 250,
+                  category_id: "cat2",
+                  category_name: "Boissons",
+                  is_product_group: false,
+                  status: "available",
+                  display_order: 1,
+                  by_product_of: "p2"
+                }
+              ]
+            },
+            {
+              product_id: "p3",
+              category_id: "cat2",
+              category_name: "Boissons",
+              name: "Eau Minérale",
+              description: "50cl",
+              price: 150,
+              price_take_away: 150,
+              price_delivery: 200,
+              price_uber_eats: 250,
+              price_deliveroo: 200,
+              cost_price: 25,
+              foodcost_percent: 16.67,
+              margin_percent: 83.33,
+              bg_color: "#ffffff",
+              is_product_group: false,
+              status: "available",
+              available: true,
+              display_order: 2,
+              tags: [],
+              allergens: [],
+              tva_ids: { on_site: 10, takeaway: 5, delivery: 20 },
+              availability: { on_site: true, takeaway: true, delivery: true, scan_order: true },
+              integrations: {
+                uber_eats: { enabled: true, price_override: 250 },
+                deliveroo: { enabled: false }
+              }
+            }
+          ]
+        };
+
+        return [cat1, cat2];
+      },
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<Category[]>>('/menu/products');
+        return response.data;
+      }
     );
   },
 
   async getProducts(): Promise<Product[]> {
-    logAPI('GET', '/menu/products');
+    // ✅ CONSOLIDATED: Now calls getMenuData() internally
+    // Returns a flattened array of Product[] for backward compatibility
+    // Gets categories from the consolidated endpoint and flattens them
+    const categories = await this.getMenuData();
+    
+    const products: Product[] = [];
+    categories.forEach((category) => {
+      if (category.products && Array.isArray(category.products)) {
+        category.products.forEach(product => {
+          products.push(product);
+          // Also add sub-products if they exist
+          if (product.sub_products && Array.isArray(product.sub_products)) {
+            products.push(...product.sub_products);
+          }
+        });
+      }
+    });
+    
+    return products;
+  },
+
+  async getProduct(productId: string): Promise<Product> {
+    // GET /menu/products/{product_id}
+    // Retrieves detailed information for a single product
+    logAPI('GET', `/menu/products/${productId}`);
     return withMock(
-      () => [...mockProducts],
-      async () => {
-        const response = await apiClient.get<WelloApiResponse<Category[]>>('/menu/products');
-        const data = response.data;
-        
-        // Flatten products from categories - the API returns categories with nested products
-        const products: Product[] = [];
-        
-        if (Array.isArray(data)) {
-          data.forEach((category) => {
-            if (category.products && Array.isArray(category.products)) {
-              products.push(...category.products);
+      () => {
+        // Mock: return detailed product data
+        return {
+          product_id: "69",
+          merchant_id: "2",
+          name: "Pizza Jambon",
+          image_url: "https://pub-528ad8f1b1df4b8f9744fedd19777689.r2.dev/wello_resto_images_storage/merchants/2/products/69.png",
+          is_available_on_sno: true,
+          available: false,
+          components: [
+            {
+              component_id: "68",
+              name: "Tomate",
+              quantity: 20,
+              unit_of_measure: "Grammes",
+              unit_of_measure_id: "2"
+            },
+            {
+              component_id: "69",
+              name: "Mozarella",
+              quantity: 60,
+              unit_of_measure: "Grammes",
+              unit_of_measure_id: "2"
+            },
+            {
+              component_id: "70",
+              name: "Olives",
+              quantity: 10,
+              unit_of_measure: "Grammes",
+              unit_of_measure_id: "2"
+            },
+            {
+              component_id: "71",
+              name: "Jambon",
+              quantity: 40,
+              unit_of_measure: "Grammes",
+              unit_of_measure_id: "2"
+            },
+            {
+              component_id: "72",
+              name: "Champignon",
+              quantity: 30,
+              unit_of_measure: "Grammes",
+              unit_of_measure_id: "2"
             }
-          });
-        }
-        
-        return products;
+          ],
+          description: "Base tomate, mozzarella, jambon, olives",
+          price: 740,
+          price_take_away: 720,
+          price_delivery: 720,
+          price_uber_eats: 0,
+          price_deliveroo: 0,
+          tva_rate_in: 5,
+          tva_rate_delivery: 7,
+          tva_rate_take_away: 2,
+          available_in: true,
+          available_take_away: true,
+          available_delivery: true,
+          category: "1",
+          category_id: "1",
+          is_product_group: false,
+          bg_color: "#ed8ec4",
+          status: "1",
+          configuration: {
+            attributes: []
+          },
+          production_color: "#ed8ec4",
+          display_order: null,
+          sync_deliveroo: true,
+          sync_ubereats: true,
+          tags: [],
+          allergens: []
+        } as Product;
+      },
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<{ product: Product }>>(`/menu/products/${productId}`);
+        // API returns wrapped in { product: ... }, extract it
+        return response.data.product || response.data as Product;
       }
     );
   },

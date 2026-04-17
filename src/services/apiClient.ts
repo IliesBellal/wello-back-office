@@ -1,7 +1,7 @@
 import { toast } from "@/hooks/use-toast";
 
 // ============= Configuration =============
-export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK??'true' === 'true' ;
+export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK === 'true';
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com";
 export const ENABLE_LOGS = import.meta.env.VITE_ENABLE_LOGS !== 'false';
 
