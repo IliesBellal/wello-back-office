@@ -330,6 +330,31 @@ export const useMenuData = () => {
     }
   };
 
+  const deleteProduct = async (productId: string) => {
+    try {
+      await menuService.deleteProduct(productId);
+      setMenuData(prev => ({
+        ...prev,
+        products: prev.products?.filter(p => p.product_id !== productId),
+        products_types: prev.products_types.map(cat => ({
+          ...cat,
+          products: cat.products?.filter(p => p.product_id !== productId) || []
+        }))
+      }));
+      toast({
+        title: "Succès",
+        description: "Produit supprimé avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le produit",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const deleteCategory = async (categoryId: string) => {
     try {
       await menuService.deleteCategory(categoryId);
@@ -366,6 +391,7 @@ export const useMenuData = () => {
     createProductCategory,
     createComponentCategory,
     updateCategory,
+    deleteProduct,
     createProduct,
     createComponent,
     updateComponent,

@@ -54,6 +54,7 @@ interface SimpleProductSheetProps {
   tags?: Tag[];
   allergens?: Allergen[];
   onSave: (productId: string, data: Partial<Product>) => Promise<void>;
+  onDelete?: (productId: string) => Promise<void>;
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   onTagCreated?: (newTag: { id: string; name: string }) => void;
 }
@@ -70,25 +71,17 @@ export const SimpleProductSheet = ({
   tags,
   allergens,
   onSave,
+  onDelete,
   onCreateCategory,
   onTagCreated
 }: SimpleProductSheetProps) => {
   // Load product data if productId is provided
   const { product: loadedProduct, loading } = useProductData(productId || null, open);
   
-  // Use loaded product if available, otherwise use initial product prop
-  const product = loadedProduct || initialProduct;
-  
-  // Load sheet-specific data (TVA rates, tags, allergens, units)
-  const { tvaRates, tags: loadedTags, allergens: loadedAllergens, units: loadedUnits } = useProductEditData(open);
-  
-  // Use loaded data or props (props take priority for backward compatibility)
-  const tagsData = tags || loadedTags;
-  const allergensData = allergens || loadedAllergens;
-  const unitsData = units.length > 0 ? units : loadedUnits;
-  
+  // Declare all state hooks FIRST before using them
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
+  const [displayedProduct, setDisplayedProduct] = useState<Product | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
@@ -97,6 +90,38 @@ export const SimpleProductSheet = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
+  
+  // Use loaded product if available, otherwise use initial product prop
+  const baseProduct = loadedProduct || initialProduct;
+  // Use displayedProduct for rendering (updated after save), fallback to baseProduct
+  const product = displayedProduct || baseProduct;
+  
+  // Load sheet-specific data (TVA rates, tags, allergens, units)
+  const { tvaRates, tags: loadedTags, allergens: loadedAllergens, units: loadedUnits } = useProductEditData(open);
+  
+  // Use loaded data or props (props take priority for backward compatibility)
+  const tagsData = tags || loadedTags;
+  const allergensData = allergens || loadedAllergens;
+  const unitsData = units.length > 0 ? units : loadedUnits;
+
+  // Reset and update when baseProduct changes (e.g., switching to new product)
+  useEffect(() => {
+    if (baseProduct) {
+      // Reset displayedProduct to show the fresh product data
+      setDisplayedProduct(null);
+      // Reset edit mode and form when switching products
+      setIsEditMode(false);
+      setFormData(buildFormDataFromProduct(baseProduct));
+      setSelectedImageFile(null);
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+      setImagePreviewUrl(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  }, [baseProduct, imagePreviewUrl]);
 
   // Helper function to convert configuration attributes to ProductAttribute format
   const buildFormDataFromProduct = (prod: Product): Partial<Product> => {
@@ -238,6 +263,12 @@ export const SimpleProductSheet = ({
       // Save all product data
       await onSave(product.product_id, payloadData);
       
+      // Update displayedProduct with saved data to show changes immediately in header
+      setDisplayedProduct({
+        ...product,
+        ...payloadData
+      } as Product);
+      
       // Clear image state after successful save
       setSelectedImageFile(null);
       if (imagePreviewUrl) {
@@ -324,14 +355,24 @@ export const SimpleProductSheet = ({
     if (!product) return;
     
     try {
-      await menuService.deleteProduct(product.product_id);
+      const response = await menuService.deleteProduct(product.product_id);
       
-      onOpenChange(false);
-      
-      toast({
-        title: "Succès",
-        description: "Produit supprimé définitivement."
-      });
+      // Vérifier que le statut est "success"
+      if (response.status === 'success') {
+        // Appeler le callback onDelete si fourni
+        if (onDelete) {
+          await onDelete(product.product_id);
+        }
+        
+        onOpenChange(false);
+        
+        toast({
+          title: "Succès",
+          description: "Produit supprimé définitivement."
+        });
+      } else {
+        throw new Error('La suppression a échoué: statut ' + response.status);
+      }
     } catch (error) {
       console.error('Error deleting product:', error);
       toast({
@@ -392,32 +433,43 @@ export const SimpleProductSheet = ({
               <>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-lg font-bold text-foreground truncate">{product?.name || 'Produit'}</h2>
+                    <h2 className="text-lg font-bold text-foreground truncate">
+                      {isEditMode ? (formData.name || 'Produit') : (product?.name || 'Produit')}
+                    </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {categories.find(c => c.category_id === product?.category_id)?.category_name || 'Catégorie non définie'}
+                      {categories.find(c => c.category_id === (isEditMode ? formData.category_id : product?.category))?.category_name || 'Catégorie non définie'}
                     </p>
                   </div>
                   <Badge 
-                    variant={product?.available ? "default" : "secondary"}
+                    variant={
+                      (isEditMode ? formData.status : product?.status) === 'available' ? 'default' : 
+                      (isEditMode ? formData.status : product?.status) === 'removed_from_menu' ? 'destructive' : 
+                      'secondary'
+                    }
                     className="whitespace-nowrap"
                   >
-                    {product?.available ? 'Disponible' : 'Indisponible'}
+                    {(isEditMode ? formData.status : product?.status) === 'available' ? 'Disponible' : ((isEditMode ? formData.status : product?.status) === 'out_of_stock' ? 'Hors stock' : ((isEditMode ? formData.status : product?.status) === 'removed_from_menu' ? 'Retiré' : 'Indisponible'))}
                   </Badge>
                 </div>
 
                 {/* Integration Badges */}
                 <div className="flex gap-2 mt-3 flex-wrap">
-                  <Badge variant={product?.integrations?.uber_eats?.enabled ? "default" : "outline"} className="text-xs">
-                    <img src="/uber_eats_logo.png" alt="Uber Eats" className="w-3 h-3 mr-1 object-contain rounded" />
-                    Uber Eats
-                  </Badge>
-                  <Badge variant={product?.integrations?.deliveroo?.enabled ? "default" : "outline"} className="text-xs">
-                    <img src="/deliveroo_logo.png" alt="Deliveroo" className="w-3 h-3 mr-1 object-contain rounded" />
-                    Deliveroo
-                  </Badge>
+                  {product?.integrations?.uber_eats?.enabled && (
+                    <Badge variant="default" className="text-xs">
+                      <img src="/uber_eats_logo.png" alt="Uber Eats" className="w-3 h-3 mr-1 object-contain rounded" />
+                      Uber Eats
+                    </Badge>
+                  )}
+                  {product?.integrations?.deliveroo?.enabled && (
+                    <Badge variant="default" className="text-xs">
+                      <img src="/deliveroo_logo.png" alt="Deliveroo" className="w-3 h-3 mr-1 object-contain rounded" />
+                      Deliveroo
+                    </Badge>
+                  )}
                   {product?.is_available_on_sno && (
-                    <Badge variant="outline" className="text-xs">
-                      <span className="mr-1">📱</span>ScanNOrder
+                    <Badge variant="default" className="text-xs">
+                      <img src="/scannorder_logo.png" alt="ScanNOrder" className="w-3 h-3 mr-1 object-contain rounded" />
+                      ScanNOrder
                     </Badge>
                   )}
                 </div>
@@ -1035,7 +1087,7 @@ export const SimpleProductSheet = ({
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm flex items-center gap-2">
-                        <span className="text-lg">📱</span>
+                        <img src="/scannorder_logo.png" alt="ScanNOrder" className="w-5 h-5 object-contain rounded" />
                         ScanNOrder
                       </CardTitle>
                     </CardHeader>

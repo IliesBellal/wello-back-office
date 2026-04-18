@@ -525,11 +525,11 @@ export const menuService = {
     );
   },
 
-  async deleteProduct(productId: string): Promise<void> {
+  async deleteProduct(productId: string): Promise<{ status: string }> {
     logAPI('DELETE', `/menu/products/${productId}`);
     return withMock(
-      () => undefined,
-      () => apiClient.delete<void>(`/menu/products/${productId}`)
+      () => ({ status: 'success' }),
+      () => apiClient.delete<WelloApiResponse<{ status: string }>>(`/menu/products/${productId}`).then(res => res.data)
     );
   },
 
@@ -787,7 +787,7 @@ export const menuService = {
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/product/${productId}/image`, {
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/products/${productId}/image`, {
           method: 'PUT',
           headers,
           body: formData

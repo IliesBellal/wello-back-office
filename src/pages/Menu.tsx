@@ -58,6 +58,7 @@ export default function Menu() {
     createProductCategory,
     updateCategory,
     deleteCategory,
+    deleteProduct,
     createProduct
   } = useMenuData();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -124,6 +125,16 @@ export default function Menu() {
     } finally {
       // Re-activer le switch
       setUpdatingProductId(null);
+    }
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      await deleteProduct(productId);
+      setSelectedProduct(null);
+      setSheetOpen(false);
+    } catch (error) {
+      console.error('Error deleting product:', error);
     }
   };
 
@@ -283,6 +294,7 @@ export default function Menu() {
           attributes={attributes}
           categories={menuData?.products_types || []}
           onSave={updateProduct}
+          onDelete={handleDeleteProduct}
           onCreateCategory={createProductCategory}
         />
 

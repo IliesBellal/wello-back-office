@@ -41,7 +41,7 @@ const getProductStatus = (product: Product) => {
   const statusMap: Record<string, { label: string; color: string }> = {
     'available': { label: 'Disponible', color: 'bg-green-100 text-green-800' },
     'out_of_stock': { label: 'Rupture de stock', color: 'bg-orange-100 text-orange-800' },
-    'unavailable': { label: 'Indisponible', color: 'bg-red-100 text-red-800' },
+    'not_available': { label: 'Indisponible', color: 'bg-red-100 text-red-800' },
     'removed_from_menu': { label: 'Supprimé du menu', color: 'bg-gray-100 text-gray-800' },
   };
 
@@ -97,6 +97,7 @@ export const ProductsTable = ({
   }
 
   const renderTableRows = (productList: Product[], isSubProduct = false, parentIndent = 0) => {
+    
     return productList.flatMap((product) => {
       const status = getProductStatus(product);
       const productTags = product.tags || [];
@@ -106,10 +107,11 @@ export const ProductsTable = ({
 
       const rows: JSX.Element[] = [];
 
-      // Main row
+      // Main row with unique key combining productId and rowIndex
+      const mainRowKey = `${product.product_id}`;
       rows.push(
         <TableRow
-          key={product.product_id}
+          key={mainRowKey}
           className={`${isSubProduct ? 'bg-muted/30' : ''} hover:bg-muted/50 transition-colors`}
         >
           {/* Chevron (dans la première colonne Image) */}
