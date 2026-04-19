@@ -8,6 +8,7 @@ import { Plus, Pencil, Trash2, LinkIcon, GripVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { menuService } from '@/services/menuService';
+
 import {
   Dialog,
   DialogContent,
@@ -34,11 +35,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { BulkAssignTagsDialog } from '@/components/menu/BulkAssignTagsDialog';
+import { BulkAssignProductsDialog } from '@/components/shared/BulkAssignProductsDialog';
 
 interface SortableTagRowProps {
   tag: Tag;
-  productCount: number;
   onEdit: (tag: Tag) => void;
   onDelete: (tagId: string) => void;
   onBulkAssign: (tag: Tag) => void;
@@ -46,7 +46,6 @@ interface SortableTagRowProps {
 
 const SortableTagRow = ({
   tag,
-  productCount,
   onEdit,
   onDelete,
   onBulkAssign,
@@ -73,12 +72,21 @@ const SortableTagRow = ({
           <GripVertical className="w-4 h-4 text-muted-foreground" />
         </div>
       </TableCell>
+      <TableCell className="w-12">
+        {tag.color && (
+          <div
+            className="w-8 h-8 rounded-full border border-border"
+            style={{ backgroundColor: tag.color }}
+            title={tag.color}
+          />
+        )}
+      </TableCell>
       <TableCell className="font-medium">{tag.name}</TableCell>
       <TableCell className="text-sm text-muted-foreground">
-        {tag.order ?? 0}
+        {tag.display_order ?? 0}
       </TableCell>
       <TableCell className="text-center text-sm text-muted-foreground">
-        {productCount}
+        {tag.product_count ?? 0}
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
@@ -114,11 +122,12 @@ const SortableTagRow = ({
 
 export default function TagsTable() {
   const [tags, setTags] = useState<Tag[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [newTagName, setNewTagName] = useState('');
+  const [newTagColor, setNewTagColor] = useState('#ffffff');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [editingColor, setEditingColor] = useState('');
   const [editingOrder, setEditingOrder] = useState<number>(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [tagToDelete, setTagToDelete] = useState<string | null>(null);
@@ -126,20 +135,19 @@ export default function TagsTable() {
   const [isSaving, setIsSaving] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [selectedTagForBulk, setSelectedTagForBulk] = useState<Tag | null>(null);
+  const [isAssigning, setIsAssigning] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const saveOrderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveOrderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const editingColorRef = useRef('');
+  const newTagColorRef = useRef('#ffffff');
   const { toast } = useToast();
 
   const loadTags = React.useCallback(async () => {
     setLoading(true);
     try {
-      const [tagsData, productsData] = await Promise.all([
-        menuService.getTags(),
-        menuService.getProducts(),
-      ]);
-      const sortedTags = [...tagsData].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const tagsData = await menuService.getTags();
+      const sortedTags = [...tagsData].sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       setTags(sortedTags);
-      setProducts(productsData || []);
     } catch (error) {
       console.error('Error loading tags:', error);
       toast({
@@ -168,9 +176,10 @@ export default function TagsTable() {
     }
 
     try {
-      const newTag = await menuService.createTag(newTagName);
+      const newTag = await menuService.createTag(newTagName, newTagColor);
       setTags([...tags, newTag]);
       setNewTagName('');
+      setNewTagColor('#ffffff');
       setCreateDialogOpen(false);
       toast({
         title: 'Succès',
@@ -193,10 +202,37 @@ export default function TagsTable() {
     setBulkAssignOpen(true);
   };
 
+  const handleBulkAssignConfirm = async (productIds: string[]) => {
+    if (!selectedTagForBulk) return;
+
+    setIsAssigning(true);
+    try {
+      await menuService.bulkAssignProductsToTag(productIds, selectedTagForBulk.id);
+      toast({
+        title: 'Succès',
+        description: `${productIds.length} produit(s) assigné(s) au tag`,
+      });
+      setBulkAssignOpen(false);
+      setSelectedTagForBulk(null);
+    } catch (error) {
+      console.error('Error assigning products to tag:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible d\'assigner les produits',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAssigning(false);
+    }
+  };
+
   const handleEdit = (tag: Tag) => {
     setEditingId(tag.id);
     setEditingName(tag.name);
-    setEditingOrder(tag.order ?? 0);
+    const color = tag.color || '#ffffff';
+    setEditingColor(color);
+    editingColorRef.current = color;
+    setEditingOrder(tag.display_order ?? 0);
   };
 
   const handleUpdateTag = async (tagId: string) => {
@@ -210,27 +246,19 @@ export default function TagsTable() {
     }
 
     try {
-      await menuService.updateTag(tagId, editingName);
+      await menuService.updateTag(tagId, editingName, editingColor, editingOrder);
       
-      // Update order if changed
-      const updatedTag = tags.find(t => t.id === tagId);
-      if (updatedTag && editingOrder !== (updatedTag.order ?? 0)) {
-        const newTags = tags.map(t => 
-          t.id === tagId ? { ...t, order: editingOrder } : t
-        );
-        setTags(newTags);
-        
-        // Debounce save
-        if (saveOrderTimeoutRef.current) {
-          clearTimeout(saveOrderTimeoutRef.current);
-        }
-        saveOrderTimeoutRef.current = setTimeout(() => {
-          debouncedSaveOrder(newTags);
-        }, 500);
-      }
+      // Update local state
+      const updatedTags = tags.map(t => 
+        t.id === tagId 
+          ? { ...t, name: editingName, color: editingColor, display_order: editingOrder }
+          : t
+      );
+      setTags(updatedTags);
       
       setEditingId(null);
       setEditingName('');
+      setEditingColor('');
       setEditingOrder(0);
       toast({
         title: 'Succès',
@@ -271,7 +299,7 @@ export default function TagsTable() {
     const [movedItem] = newTags.splice(oldIndex, 1);
     newTags.splice(newIndex, 0, movedItem);
 
-    const updatedTags = newTags.map((t, i) => ({ ...t, order: i }));
+    const updatedTags = newTags.map((t, i) => ({ ...t, display_order: i }));
     setTags(updatedTags);
 
     // Debounce save
@@ -346,6 +374,7 @@ export default function TagsTable() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10"></TableHead>
+                  <TableHead className="w-12"></TableHead>
                   <TableHead>Nom du Tag</TableHead>
                   <TableHead>Ordre</TableHead>
                   <TableHead>Produits</TableHead>
@@ -363,13 +392,18 @@ export default function TagsTable() {
                   <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                     <SortableContext items={tags.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                       {tags.map((tag) => {
-                        const productCount = products.filter(p => 
-                          Array.isArray(p.tags) && p.tags.includes(tag.id)
-                        ).length;
-
                         return editingId === tag.id ? (
                           <TableRow key={tag.id}>
                             <TableCell></TableCell>
+                            <TableCell>
+                              <input
+                                type="color"
+                                value={editingColor}
+                                onChange={(e) => (editingColorRef.current = e.target.value)}
+                                onBlur={() => setEditingColor(editingColorRef.current)}
+                                className="w-10 h-8 rounded cursor-pointer border border-input"
+                              />
+                            </TableCell>
                             <TableCell>
                               <Input
                                 value={editingName}
@@ -423,7 +457,6 @@ export default function TagsTable() {
                           <SortableTagRow
                             key={tag.id}
                             tag={tag}
-                            productCount={productCount}
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onBulkAssign={handleBulkAssign}
@@ -446,16 +479,38 @@ export default function TagsTable() {
               <DialogTitle>Nouveau tag</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
-              <Input
-                placeholder="Nom du tag"
-                value={newTagName}
-                onChange={(e) => setNewTagName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleCreateNewTag();
-                  }
-                }}
-              />
+              <div>
+                <label className="text-sm font-medium">Nom du tag</label>
+                <Input
+                  placeholder="Nom du tag"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleCreateNewTag();
+                    }
+                  }}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">Couleur</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <input
+                    type="color"
+                    defaultValue={newTagColor}
+                    onChange={(e) => (newTagColorRef.current = e.target.value)}
+                    onBlur={() => setNewTagColor(newTagColorRef.current)}
+                    className="w-12 h-10 rounded cursor-pointer border border-input"
+                  />
+                  <Input
+                    value={newTagColor}
+                    onChange={(e) => setNewTagColor(e.target.value)}
+                    placeholder="#ffffff"
+                    className="font-mono text-sm flex-1"
+                  />
+                </div>
+              </div>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
@@ -481,10 +536,12 @@ export default function TagsTable() {
 
         {/* Bulk Assign Dialog */}
         {selectedTagForBulk && (
-          <BulkAssignTagsDialog
+          <BulkAssignProductsDialog
             open={bulkAssignOpen}
             onOpenChange={setBulkAssignOpen}
-            tags={tags}
+            categoryName={selectedTagForBulk.name}
+            loading={isAssigning}
+            onConfirm={handleBulkAssignConfirm}
           />
         )}
     </DashboardLayout>

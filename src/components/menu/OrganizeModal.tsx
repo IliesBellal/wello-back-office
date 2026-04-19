@@ -258,13 +258,6 @@ export const OrganizeModal = ({
       // Save to API
       await menuService.saveDisplayOrder(displayOrder);
       
-      // Also call the old callback if provided
-      if (onSaveOrder) {
-        const categoryOrder = categories.map(c => c.category_id);
-        const productOrder = products.map(p => p.product_id);
-        await onSaveOrder(categoryOrder, productOrder);
-      }
-      
       toast({
         title: "Succès",
         description: "Ordre sauvegardé avec succès"

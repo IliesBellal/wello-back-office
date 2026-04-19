@@ -75,7 +75,7 @@ export const AttributesManager = ({
       ...formData,
       options: [
         ...(formData.options || []),
-        { id: `opt_${Date.now()}`, title: '', price: 0 }
+        { id: '', title: '', price: 0 }
       ]
     });
   };

@@ -176,6 +176,24 @@ export const useMenuData = () => {
     }
   };
 
+  const deleteAttribute = async (attributeId: string) => {
+    try {
+      await menuService.deleteAttribute(attributeId);
+      setAttributes(prev => prev.filter(a => a.id !== attributeId));
+      toast({
+        title: "Succès",
+        description: "Attribut supprimé avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer l'attribut",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const createProductCategory = async (name: string): Promise<{ category_id: string }> => {
     try {
       const newCategory = await menuService.createProductCategory(name);
@@ -261,7 +279,7 @@ export const useMenuData = () => {
     }
   };
 
-  const createComponent = async (data: { name: string; unit_id: number; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string | number }) => {
+  const createComponent = async (data: { name: string; unit_id: string; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }) => {
     try {
       const newComponent = await menuService.createComponent(data);
       setComponents(prev => [...prev, newComponent]);
@@ -278,7 +296,7 @@ export const useMenuData = () => {
     }
   };
 
-  const updateComponent = async (componentId: string, data: { name?: string; category_id?: string; unit_id?: number; price?: number; purchase_cost?: number; purchase_unit_id?: string | number }) => {
+  const updateComponent = async (componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }) => {
     try {
       const updatedComponent = await menuService.updateComponent(componentId, data);
       setComponents(prev => prev.map(c => c.component_id === componentId ? updatedComponent : c));
@@ -377,6 +395,59 @@ export const useMenuData = () => {
     }
   };
 
+  const deleteComponentCategory = async (categoryId: string) => {
+    try {
+      await menuService.deleteComponentCategory(categoryId);
+      setComponentCategories(prev => prev.filter(c => c.category_id !== categoryId));
+      toast({
+        title: "Succès",
+        description: "Catégorie d'ingrédient supprimée avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la catégorie d'ingrédient",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  const bulkUpdatePrices = async (products: Array<{
+    product_id: string;
+    price?: number;
+    price_take_away?: number;
+    price_delivery?: number;
+  }>) => {
+    try {
+      const priceUpdates = await menuService.bulkUpdatePrices(products);
+      
+      // Create a map of product updates
+      const updatesMap = new Map(priceUpdates.map(p => [p.product_id, p]));
+      
+      // Update menuData by merging the price updates with existing products
+      setMenuData(prev => {
+        return {
+          ...prev,
+          products: prev.products.map(p => {
+            const updates = updatesMap.get(p.product_id);
+            return updates ? { ...p, ...updates } : p;
+          }),
+          products_types: prev.products_types.map(cat => ({
+            ...cat,
+            products: (cat.products || []).map(p => {
+              const updates = updatesMap.get(p.product_id);
+              return updates ? { ...p, ...updates } : p;
+            })
+          }))
+        };
+      });
+    } catch (error) {
+      console.error('Error updating prices:', error);
+      throw error;
+    }
+  };
+
   return {
     menuData,
     units,
@@ -387,6 +458,7 @@ export const useMenuData = () => {
     updateProduct,
     createAttribute,
     updateAttributeData,
+    deleteAttribute,
     saveOrder,
     createProductCategory,
     createComponentCategory,
@@ -396,6 +468,8 @@ export const useMenuData = () => {
     createComponent,
     updateComponent,
     deleteComponent,
-    deleteCategory
+    deleteCategory,
+    deleteComponentCategory,
+    bulkUpdatePrices
   };
 };

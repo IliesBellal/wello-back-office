@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
-import { TvaRateGroup, Menu, UnitOfMeasure, Component, Attribute, Product, Category, ComponentCategory, Tag, Allergen } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, Component, Attribute, Product, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
 
 // ============= Mock Data =============
 const mockTvaRates: TvaRateGroup[] = [
@@ -55,9 +55,9 @@ const mockComponentCategories: ComponentCategory[] = [
     category_name: "Viande",
     order: 0,
     components: [
-      { component_id: "71", name: "Jambon", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" },
-      { component_id: "74", name: "Lardons", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" },
-      { component_id: "79", name: "Poulet", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" }
+      { component_id: "71", name: "Jambon", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1", purchase_cost: 800, purchase_cost_qty: 500 },
+      { component_id: "74", name: "Lardons", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1", purchase_cost: 650, purchase_cost_qty: 250 },
+      { component_id: "79", name: "Poulet", category: "1", price: 100, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1", purchase_cost: 920, purchase_cost_qty: 1000 }
     ]
   },
   {
@@ -65,8 +65,8 @@ const mockComponentCategories: ComponentCategory[] = [
     category_name: "Fromage",
     order: 1,
     components: [
-      { component_id: "85", name: "Mozzarella", category: "2", price: 150, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" },
-      { component_id: "86", name: "Chèvre", category: "2", price: 120, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1" }
+      { component_id: "85", name: "Mozzarella", category: "2", price: 150, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1", purchase_cost: 1200, purchase_cost_qty: 500 },
+      { component_id: "86", name: "Chèvre", category: "2", price: 120, unit_of_measure: "Grammes", unit_of_measure_id: "2", status: "1", purchase_cost: 1100, purchase_cost_qty: 250 }
     ]
   }
 ];
@@ -208,11 +208,11 @@ const mockAllergens: Allergen[] = [
 ];
 
 const mockTags: Tag[] = [
-  { id: "tag_1", name: "Végétarien", order: 0 },
-  { id: "tag_2", name: "Vegan", order: 1 },
-  { id: "tag_3", name: "Spicy", order: 2 },
-  { id: "tag_4", name: "Nouveau", order: 3 },
-  { id: "tag_5", name: "Populaire", order: 4 }
+  { id: "tag_1", name: "Végétarien", display_order: 0, color: "#00ff00", product_count: 3 },
+  { id: "tag_2", name: "Vegan", display_order: 1, color: "#ff9900", product_count: 2 },
+  { id: "tag_3", name: "Spicy", display_order: 2, color: "#ff0000", product_count: 1 },
+  { id: "tag_4", name: "Nouveau", display_order: 3, color: "#0000ff", product_count: 0 },
+  { id: "tag_5", name: "Populaire", display_order: 4, color: "#ffff00", product_count: 5 }
 ];
 
 const mockMenuData: Menu = {
@@ -542,10 +542,18 @@ export const menuService = {
   },
 
   async deleteCategory(categoryId: string): Promise<void> {
-    logAPI('DELETE', `/menu/products/category/${categoryId}`);
+    logAPI('DELETE', `/menu/products/categories/${categoryId}`);
     return withMock(
       () => undefined,
-      () => apiClient.delete<void>(`/menu/products/category/${categoryId}`)
+      () => apiClient.delete<void>(`/menu/products/categories/${categoryId}`)
+    );
+  },
+
+  async deleteComponentCategory(categoryId: string): Promise<void> {
+    logAPI('DELETE', `/menu/components/categories/${categoryId}`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/components/categories/${categoryId}`)
     );
   },
 
@@ -578,18 +586,41 @@ export const menuService = {
         const response = await apiClient.get<WelloApiResponse<ComponentCategory[]>>('/menu/components');
         const data = response.data;
         
-        // Flatten components from categories
+        // Flatten components from categories and map API fields to Component fields
         const components: Component[] = [];
         const categories: ComponentCategory[] = [];
+        
+        interface ApiComponent {
+          component_id: string;
+          name: string;
+          category: string;
+          price: number;
+          unit_of_measure: string;
+          unit_of_measure_id: string;
+          purchase_price?: number;
+          purchase_price_qty?: number;
+          purchase_cost?: number;
+          purchase_cost_qty?: number;
+          status: string;
+        }
         
         if (Array.isArray(data)) {
           data.forEach((category) => {
             categories.push(category);
             if (category.components && Array.isArray(category.components)) {
-              category.components.forEach((comp) => {
+              category.components.forEach((comp: ApiComponent) => {
                 components.push({
-                  ...comp,
+                  component_id: comp.component_id,
+                  name: comp.name,
+                  category: comp.category,
                   category_id: category.category_id,
+                  price: comp.price,
+                  unit_id: parseInt(comp.unit_of_measure_id),
+                  unit_of_measure: comp.unit_of_measure,
+                  unit_of_measure_id: comp.unit_of_measure_id,
+                  purchase_cost: comp.purchase_price || comp.purchase_cost,
+                  purchase_cost_qty: comp.purchase_price_qty || comp.purchase_cost_qty,
+                  status: comp.status,
                   available: comp.status === '1'
                 });
               });
@@ -613,8 +644,18 @@ export const menuService = {
   async createAttribute(data: Partial<Attribute>): Promise<Attribute> {
     logAPI('POST', '/menu/attributes', data);
     return withMock(
-      () => ({ ...data, id: `attr_${Date.now()}` } as Attribute),
-      () => apiClient.post<Attribute>('/menu/attributes', data)
+      () => ({ ...data, id: `attr_${Date.now()}`, options: [] } as Attribute),
+      async () => {
+        const response = await apiClient.post<WelloApiResponse<{ attribute: Attribute }>>('/menu/attributes', data);
+        // Ensure options array exists
+        if (response.data && response.data.attribute) {
+          return {
+            ...response.data.attribute,
+            options: response.data.attribute.options || []
+          };
+        }
+        return { ...data, options: [] } as Attribute;
+      }
     );
   },
 
@@ -623,6 +664,14 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.patch<void>(`/menu/attributes/${attributeId}`, data)
+    );
+  },
+
+  async deleteAttribute(attributeId: string): Promise<void> {
+    logAPI('DELETE', `/menu/attributes/${attributeId}`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/attributes/${attributeId}`)
     );
   },
 
@@ -646,27 +695,27 @@ export const menuService = {
 
   async updateTagOrder(tagIds: string[]): Promise<void> {
     const payload = { tags: tagIds.map(id => ({ id })) };
-    logAPI('PATCH', '/menu/tags/order', payload);
+    logAPI('PATCH', '/menu/tags/display-order', payload);
     return withMock(
       () => undefined,
-      () => apiClient.patch<void>('/menu/tags/order', payload)
+      () => apiClient.patch<void>('/menu/tags/display-order', payload)
     );
   },
 
-  async updateExternalMenu(platform: 'uber_eats' | 'deliveroo'): Promise<void> {
-    logAPI('PATCH', `/menu/${platform}`, {});
+  async updateExternalMenu(platform: 'uber-eats' | 'deliveroo'): Promise<void> {
+    logAPI('PATCH', `/menu/${platform}/sync`, {});
     return withMock(
       () => undefined,
-      () => apiClient.patch<void>(`/menu/${platform}`, {})
+      () => apiClient.patch<void>(`/menu/${platform}/sync`, {})
     );
   },
 
   async createProductCategory(name: string): Promise<{ id: string; name: string; order: number }> {
-    logAPI('POST', '/menu/products/category/create', { name });
+    logAPI('POST', '/menu/products/categories', { name });
     return withMock(
       () => ({ id: `cat_${Date.now()}`, name, order: 99 }),
       async () => {
-        const response = await apiClient.post<WelloApiResponse<{ category_id: string; message: string; status: string }>>('/menu/products/category/create', { name });
+        const response = await apiClient.post<WelloApiResponse<{ category_id: string; message: string; status: string }>>('/menu/products/categories', { name });
         // Extract category_id from response.data
         const categoryId = response.data?.category_id || `cat_${Date.now()}`;
         return {
@@ -679,11 +728,11 @@ export const menuService = {
   },
 
   async createComponentCategory(name: string): Promise<{ id: string; name: string; order: number }> {
-    logAPI('POST', '/menu/components/category/create', { name });
+    logAPI('POST', '/menu/components/categories', { name });
     return withMock(
       () => ({ id: `cat_${Date.now()}`, name, order: 99 }),
       async () => {
-        const response = await apiClient.post<WelloApiResponse<{ category_id: string; message: string; status: string }>>('/menu/components/category/create', { name });
+        const response = await apiClient.post<WelloApiResponse<{ category_id: string; message: string; status: string }>>('/menu/components/categories', { name });
         // Extract category_id from response.data
         const categoryId = response.data?.category_id || `cat_${Date.now()}`;
         return {
@@ -696,20 +745,32 @@ export const menuService = {
   },
 
   async updateCategory(categoryId: string, name: string): Promise<void> {
-    logAPI('PATCH', `/menu/categories/${categoryId}`, { name });
+    logAPI('PATCH', `/menu/products/categories/${categoryId}`, { name });
     return withMock(
       () => undefined,
-      () => apiClient.patch<void>(`/menu/categories/${categoryId}`, { name })
+      () => apiClient.patch<void>(`/menu/products/categories/${categoryId}`, { name })
     );
   },
 
-  async createProduct(data: Partial<Product>): Promise<Product> {
-    logAPI('POST', '/menu/product/create', data);
+  async createProduct(data: Partial<Product> | ProductCreatePayload): Promise<Product> {
+    // Map ProductCreatePayload fields to Product fields if needed
+    const payload = {
+      ...data,
+      // Handle both old tva_rate_* and new tva_*_id field names
+      ...(('tva_in_id' in data || 'tva_take_away_id' in data || 'tva_delivery_id' in data) ? {
+        tva_in_id: data.tva_in_id || data.tva_rate_in,
+        tva_take_away_id: data.tva_take_away_id || data.tva_rate_take_away,
+        tva_delivery_id: data.tva_delivery_id || data.tva_rate_delivery,
+      } : {})
+    };
+    
+    logAPI('POST', '/menu/products', payload);
     return withMock(
       () => ({ 
         product_id: `p_${Date.now()}`, 
         category_id: data.category_id || '',
         name: data.name || '',
+        description: data.description || '',
         is_product_group: data.is_product_group || false,
         order: 999,
         ...data,
@@ -718,34 +779,80 @@ export const menuService = {
           deliveroo: { enabled: false }
         }
       } as Product),
-      () => apiClient.post<Product>('/menu/product/create', data)
+      async () => {
+        const response = await apiClient.post<any>('/menu/products', payload);
+        // API returns { id, data: { product } }, extract the product
+        return response.data?.product || response;
+      }
     );
   },
 
-  async createComponent(data: { name: string; unit_id: number; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string | number }): Promise<Component> {
-    logAPI('POST', '/menu/components/create', data);
+  async createComponent(data: { name: string; unit_id: string; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string }): Promise<Component> {
+    logAPI('POST', '/menu/components', data);
     return withMock(
       () => ({ 
         component_id: `comp_${Date.now()}`, 
         name: data.name,
         unit_id: data.unit_id,
+        unit_of_measure_id: data.unit_id,
+        unit_of_measure: 'Unité',
         price: data.price / 100,
         category_id: data.category_id,
+        category: data.category_id || '',
         purchase_cost: data.purchase_cost,
-        purchase_unit_id: data.purchase_unit_id
-      } as Component),
-      () => apiClient.post<Component>('/menu/components/create', data)
+        purchase_unit_id: data.purchase_unit_id,
+        purchase_cost_qty: 1,
+        status: '1',
+        available: true
+      } as unknown as Component),
+      () => apiClient.post<Component>('/menu/components', data)
     );
   },
 
-  async updateComponent(componentId: string, data: { name?: string; category_id?: string; unit_id?: number; price?: number; purchase_cost?: number; purchase_unit_id?: string | number }): Promise<Component> {
-    logAPI('PUT', `/menu/components/${componentId}`, data);
+  async updateComponent(componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string }): Promise<Component> {
+    logAPI('PATCH', `/menu/components/${componentId}`, data);
     return withMock(
       () => ({ 
         component_id: componentId, 
         ...data
       } as unknown as Component),
-      () => apiClient.put<Component>(`/menu/components/${componentId}`, data)
+      async () => {
+        interface ApiComponentResponse {
+          component_id: string;
+          name: string;
+          category: string;
+          price: number;
+          unit_of_measure: string;
+          unit_of_measure_id: string;
+          purchase_price?: number;
+          purchase_price_qty?: number;
+          purchase_cost?: number;
+          purchase_cost_qty?: number;
+          purchase_unit_of_measure_id: string;
+          purchase_unit_of_measure: string;
+          status: string;
+        }
+
+        const response = await apiClient.patch<WelloApiResponse<{ component: ApiComponentResponse }>>(`/menu/components/${componentId}`, data);
+        const apiComponent = response.data.component;
+
+        return {
+          component_id: apiComponent.component_id,
+          name: apiComponent.name,
+          category: apiComponent.category,
+          price: apiComponent.price,
+          unit_id: parseInt(apiComponent.unit_of_measure_id),
+          unit_of_measure: apiComponent.unit_of_measure,
+          unit_of_measure_id: apiComponent.unit_of_measure_id,
+          purchase_cost: apiComponent.purchase_price || apiComponent.purchase_cost,
+          purchase_cost_qty: apiComponent.purchase_price_qty || apiComponent.purchase_cost_qty,
+          purchase_unit_id: parseInt(apiComponent.purchase_unit_of_measure_id),
+          purchase_unit_of_measure: apiComponent.purchase_unit_of_measure,
+          purchase_unit_of_measure_id: apiComponent.purchase_unit_of_measure_id,
+          status: apiComponent.status,
+          available: apiComponent.status === '1'
+        } as Component;
+      }
     );
   },
 
@@ -810,12 +917,19 @@ export const menuService = {
     );
   },
 
-  async createTag(name: string): Promise<{ id: string; name: string }> {
-    logAPI('POST', '/menu/tags/create', { name });
+  async createTag(name: string, color?: string): Promise<Tag> {
+    const payload = { name, ...(color && { color }) };
+    logAPI('POST', '/menu/tags/create', payload);
     return withMock(
-      () => ({ id: `tag_${Date.now()}`, name }),
+      () => ({
+        id: `tag_${Date.now()}`,
+        name,
+        color,
+        display_order: 0,
+        product_count: 0
+      } as Tag),
       async () => {
-        const response = await apiClient.post<WelloApiResponse<{ id: string; name: string }>>('/menu/tags/create', { name });
+        const response = await apiClient.post<WelloApiResponse<Tag>>('/menu/tags/create', payload);
         return response.data;
       }
     );
@@ -853,12 +967,13 @@ export const menuService = {
     );
   },
 
-  async updateTag(tagId: string, name: string): Promise<{ id: string; name: string }> {
-    logAPI('PATCH', `/menu/tags/${tagId}`, { name });
+  async updateTag(tagId: string, name: string, color?: string, displayOrder?: number): Promise<{ id: string; name: string; color?: string }> {
+    const payload = { name, ...(color && { color }), ...(displayOrder !== undefined && { display_order: displayOrder }) };
+    logAPI('PATCH', `/menu/tags/${tagId}`, payload);
     return withMock(
-      () => ({ id: tagId, name }),
+      () => ({ id: tagId, name, color }),
       async () => {
-        const response = await apiClient.patch<WelloApiResponse<{ id: string; name: string }>>(`/menu/tags/${tagId}`, { name });
+        const response = await apiClient.patch<WelloApiResponse<{ id: string; name: string; color?: string }>>(`/menu/tags/${tagId}`, payload);
         return response.data;
       }
     );
@@ -877,43 +992,57 @@ export const menuService = {
     price?: number;
     price_take_away?: number;
     price_delivery?: number;
-  }>): Promise<void> {
+  }>): Promise<Array<{ product_id: string; price?: number; price_take_away?: number; price_delivery?: number }>> {
     logAPI('PATCH', '/menu/products/bulk', { products });
     return withMock(
-      () => undefined,
-      () => apiClient.patch<void>('/menu/products/bulk', { products })
+      () => products,
+      async () => {
+        await apiClient.patch<WelloApiResponse<{ message: string; status: string }>>('/menu/products/bulk', { products });
+        
+        // API only returns success message, not updated products
+        // Return the original update data so hook can apply it to local state
+        return products;
+      }
     );
   },
 
   async bulkAssignProductsToCategory(productIds: string[], categoryId: string): Promise<void> {
-    logAPI('PATCH', '/menu/categories/bulk-assign', { product_ids: productIds, category_id: categoryId });
+    logAPI('PATCH', `/menu/products/categories/${categoryId}/bulk-assign`, { product_ids: productIds });
     return withMock(
       () => undefined,
-      () => apiClient.patch<void>('/menu/categories/bulk-assign', { product_ids: productIds, category_id: categoryId })
+      () => apiClient.patch<void>(`/menu/products/categories/${categoryId}/bulk-assign`, { product_ids: productIds })
     );
   },
 
   async bulkAssignProductsToMarketCategory(productIds: string[], categoryId: string): Promise<void> {
-    logAPI('PATCH', '/menu/market-categories/bulk-assign', { product_ids: productIds, category_id: categoryId });
+    logAPI('PATCH', `/menu/market-categories/${categoryId}/bulk-assign`, { product_ids: productIds });
     return withMock(
       () => undefined,
-      () => apiClient.patch<void>('/menu/market-categories/bulk-assign', { product_ids: productIds, category_id: categoryId })
+      () => apiClient.patch<void>(`/menu/market-categories/${categoryId}/bulk-assign`, { product_ids: productIds })
+    );
+  },
+
+  async bulkAssignProductsToTag(productIds: string[], tagId: string): Promise<void> {
+    logAPI('PATCH', `/menu/tags/${tagId}/bulk_assign`, { product_ids: productIds });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/tags/${tagId}/bulk_assign`, { product_ids: productIds })
     );
   },
 
   async updateComponentStatus(componentId: string, status: boolean): Promise<void> {
-    logAPI('POST', `/menu/components/${componentId}/status`, { status: status ? '1' : '0' });
+    logAPI('PATCH', `/menu/components/${componentId}/status`, { status: status ? '1' : '0' });
     return withMock(
       () => undefined,
-      () => apiClient.post<void>(`/menu/components/${componentId}/status`, { status: status ? '1' : '0' })
+      () => apiClient.patch<void>(`/menu/components/${componentId}/status`, { status: status ? '1' : '0' })
     );
   },
 
   async updateProductStatus(productId: string, status: boolean): Promise<void> {
-    logAPI('POST', `/menu/products/${productId}/status`, { status: status ? '1' : '0' });
+    logAPI('PATCH', `/menu/products/${productId}/status`, { status: status ? '1' : '0' });
     return withMock(
       () => undefined,
-      () => apiClient.post<void>(`/menu/products/${productId}/status`, { status: status ? '1' : '0' })
+      () => apiClient.patch<void>(`/menu/products/${productId}/status`, { status: status ? '1' : '0' })
     );
   }
 };

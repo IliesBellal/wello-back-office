@@ -24,9 +24,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Plus, Trash2, Search, Edit2, X } from 'lucide-react';
-import { useMenuData } from '@/hooks/useMenuData';
+import { useComponentsData } from '@/hooks/useComponentsData';
 import { menuService } from '@/services/menuService';
 import { IngredientsTable } from '@/components/menu/IngredientsTable';
+import { IngredientDetailSheet } from '@/components/menu/IngredientDetailSheet';
 import { ComponentCreateSheet } from '@/components/menu/ComponentCreateSheet';
 import { ComponentViewEditSheet } from '@/components/menu/ComponentViewEditSheet';
 import { toast } from 'sonner';
@@ -37,10 +38,10 @@ type SortDir = 'asc' | 'desc';
 
 function getComponentValue(component: Component, key: SortKey, categories: Record<string, string>): string | number {
   switch (key) {
-    case 'name': return component.name.toLowerCase();
+    case 'name': return (component.name || '').toLowerCase();
     case 'category': return (categories[component.category_id || ''] || component.category || '').toLowerCase();
     case 'price': return component.price ?? -1;
-    case 'unit': return component.unit_of_measure?.toLowerCase() || '';
+    case 'unit': return (component.unit_of_measure || '').toLowerCase();
   }
 }
 
@@ -53,17 +54,18 @@ export default function Components() {
     createComponent,
     createComponentCategory,
     updateComponent,
-    deleteComponent
-  } = useMenuData();
+    deleteComponent,
+    deleteComponentCategory
+  } = useComponentsData();
   
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
   const [editSheetOpen, setEditSheetOpen] = useState(false);
   const [componentToEdit, setComponentToEdit] = useState<Component | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const [selectedIngredient, setSelectedIngredient] = useState<Component | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [componentToDelete, setComponentToDelete] = useState<Component | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [updatingComponentId, setUpdatingComponentId] = useState<string | null>(null);
-  const [componentStatusMap, setComponentStatusMap] = useState<Record<string, boolean>>({});
 
   // Filtres et tri
   const [search, setSearch] = useState('');
@@ -130,42 +132,6 @@ export default function Components() {
     }
   };
 
-  const handleEditClick = (component: Component) => {
-    setComponentToEdit(component);
-    setEditSheetOpen(true);
-  };
-
-  const handleDeleteClick = (component: Component) => {
-    setComponentToDelete(component);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleStatusChange = async (componentId: string, status: boolean) => {
-    // Immédiatement mettre à jour le statut localement (optimistic update)
-    setComponentStatusMap(prev => ({
-      ...prev,
-      [componentId]: status
-    }));
-    
-    // Désactiver le switch pendant l'appel
-    setUpdatingComponentId(componentId);
-    
-    try {
-      await menuService.updateComponentStatus(componentId, status);
-      toast.success(status ? 'Ingrédient disponible' : 'Ingrédient indisponible');
-    } catch (error) {
-      // En cas d'erreur, revenir à l'état précédent
-      setComponentStatusMap(prev => ({
-        ...prev,
-        [componentId]: !status
-      }));
-      toast.error('Erreur lors de la mise à jour du statut');
-    } finally {
-      // Re-activer le switch
-      setUpdatingComponentId(null);
-    }
-  };
-
   const handleConfirmDelete = async () => {
     if (!componentToDelete) return;
     
@@ -203,9 +169,18 @@ export default function Components() {
 
   const handleDeleteCategory = async () => {
     if (!deletingCategoryId) return;
-    // TODO: Implement delete category when API is available
-    toast.error('Suppression de catégorie non encore implémentée');
-    setCategoryDeleteOpen(false);
+    
+    setIsDeletingCategory(true);
+    try {
+      await deleteComponentCategory(deletingCategoryId);
+      toast.success('Catégorie supprimée avec succès');
+      setDeletingCategoryId(null);
+      setCategoryDeleteOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erreur lors de la suppression de la catégorie');
+    } finally {
+      setIsDeletingCategory(false);
+    }
   };
 
   if (loading) {
@@ -258,7 +233,9 @@ export default function Components() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Toutes les catégories</SelectItem>
-                  {componentCategories.map(cat => (
+                  {componentCategories
+                    .filter(cat => cat.category_id && cat.category_id.trim() !== '')
+                    .map(cat => (
                     <SelectItem key={cat.category_id} value={cat.category_id}>
                       {cat.category_name || cat.category}
                     </SelectItem>
@@ -351,11 +328,10 @@ export default function Components() {
             sortKey={sortKey}
             sortDir={sortDir}
             onSort={handleSort}
-            onEdit={handleEditClick}
-            onDelete={handleDeleteClick}
-            onStatusChange={handleStatusChange}
-            componentStatusMap={componentStatusMap}
-            updatingComponentId={updatingComponentId}
+            onRowClick={(component) => {
+              setSelectedIngredient(component);
+              setDetailSheetOpen(true);
+            }}
           />
         </div>
 
@@ -373,8 +349,14 @@ export default function Components() {
           onOpenChange={setEditSheetOpen}
           component={componentToEdit}
           units={units || []}
-          onUpdate={updateComponent}
-          onDeleteConfirm={deleteComponent}
+          onUpdate={async (componentId, data) => {
+            const convertedData = {
+              ...data,
+              purchase_unit_id: data.purchase_unit_id ? String(data.purchase_unit_id) : undefined
+            };
+            return updateComponent(componentId, convertedData) as Promise<void>;
+          }}
+          onDeleteConfirm={(component) => deleteComponent(component.component_id)}
         />
 
         {/* Delete ingredient dialog */}
@@ -420,6 +402,32 @@ export default function Components() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Ingredient Detail Sheet */}
+        {selectedIngredient && (
+          <IngredientDetailSheet
+            component={selectedIngredient}
+            componentId={selectedIngredient?.component_id}
+            open={detailSheetOpen}
+            onOpenChange={setDetailSheetOpen}
+            units={units || []}
+            onSave={async (componentId, data) => {
+              const convertedData = {
+                ...data,
+                unit_id: data.unit_id ? String(data.unit_id) : undefined,
+                purchase_unit_id: data.purchase_unit_id ? String(data.purchase_unit_id) : undefined
+              };
+              await updateComponent(componentId, convertedData);
+              setDetailSheetOpen(false);
+              setSelectedIngredient(null);
+            }}
+            onDelete={async (componentId) => {
+              await deleteComponent(componentId);
+              setDetailSheetOpen(false);
+              setSelectedIngredient(null);
+            }}
+          />
+        )}
       </PageContainer>
     </DashboardLayout>
   );

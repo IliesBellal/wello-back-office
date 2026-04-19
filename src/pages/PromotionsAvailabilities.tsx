@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +36,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X, Search } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X, Search, UtensilsCrossed } from 'lucide-react';
+import { useState as useStateBase } from 'react';
 import { promotionsService } from '@/services/promotionsService';
 import { menuService } from '@/services/menuService';
 import { Promotion, Availability, DayOfWeek, TimeSlot } from '@/types/promotions';
@@ -71,6 +73,15 @@ const emptyPromotion = (): Omit<Promotion, 'id'> => ({
   active: true,
   time_slots: [],
   product_ids: [],
+  product_prices: {},
+  discounted_quantity: 1,
+  min_order_value: 0,
+  min_order_unit: 'QTY',
+  order_type: '',
+  is_cumulative: false,
+  is_time_limited: false,
+  available: true,
+  discount_unit: 'PERCENTAGE',
 });
 
 const emptyAvailability = (): Omit<Availability, 'id'> => ({
@@ -138,11 +149,15 @@ function PromotionFormDialog({
   const [products, setProducts] = useState<Product[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productSearch, setProductSearch] = useState('');
+  const [priceDisplayValues, setPriceDisplayValues] = useState<Record<string, string>>({});
+  const [minOrderValueDisplay, setMinOrderValueDisplay] = useState<string>('');
 
   useEffect(() => {
     setForm(initial ? { ...initial } : emptyPromotion());
     setActiveTab('general');
     setProductSearch('');
+    setPriceDisplayValues({});
+    setMinOrderValueDisplay(initial?.min_order_unit === 'EUR' ? priceToDisplayValue(initial?.min_order_value ?? 0) : `${initial?.min_order_value ?? 0}`);
   }, [open, initial]);
 
   // Load products when dialog opens
@@ -202,32 +217,51 @@ function PromotionFormDialog({
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Type de remise *</Label>
-          <Select value={form.type} onValueChange={v => set('type', v as Promotion['type'])}>
+          <Select value={form.discount_unit ?? 'PERCENTAGE'} onValueChange={v => {
+            const unit = v as 'PERCENTAGE' | 'CURRENCY' | 'NEWPRICE';
+            setForm(prev => ({
+              ...prev,
+              discount_unit: unit,
+              type: unit === 'PERCENTAGE' ? 'percentage' : 'fixed'
+            }));
+          }}>
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="percentage">Pourcentage (%)</SelectItem>
-              <SelectItem value="fixed">Montant fixe (€)</SelectItem>
+              <SelectItem value="PERCENTAGE">Pourcentage (%)</SelectItem>
+              <SelectItem value="CURRENCY">Montant fixe (€)</SelectItem>
+              <SelectItem value="NEWPRICE">Individuel par article</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="promo-value">
-            Valeur * {form.type === 'percentage' ? '(%)' : '(€)'}
+            Valeur *
+            {form.discount_unit === 'PERCENTAGE' && ' (%)'}
+            {form.discount_unit === 'CURRENCY' && ' (€)'}
+            {form.discount_unit === 'NEWPRICE' && ' (détail par produit)'}
           </Label>
           <Input
             id="promo-value"
             type="number"
             min={0}
-            step={form.type === 'percentage' ? 1 : 0.01}
-            max={form.type === 'percentage' ? 100 : undefined}
-            value={form.type === 'percentage' ? form.value : (form.value / 100).toFixed(2)}
+            step={form.discount_unit === 'PERCENTAGE' ? 1 : 0.01}
+            max={form.discount_unit === 'PERCENTAGE' ? 100 : undefined}
+            value={form.discount_unit === 'PERCENTAGE' ? form.value : form.discount_unit === 'CURRENCY' ? (form.value / 100).toFixed(2) : form.value}
             onChange={e => {
               const raw = parseFloat(e.target.value || '0');
-              set('value', form.type === 'percentage' ? raw : Math.round(raw * 100));
+              if (form.discount_unit === 'PERCENTAGE') {
+                set('value', raw);
+              } else if (form.discount_unit === 'CURRENCY') {
+                set('value', Math.round(raw * 100));
+              } else {
+                set('value', raw);
+              }
             }}
+            placeholder={form.discount_unit === 'NEWPRICE' ? 'Voir l\'onglet Produits' : 'Ex: 20'}
+            disabled={form.discount_unit === 'NEWPRICE'}
           />
         </div>
       </div>
@@ -275,7 +309,106 @@ function PromotionFormDialog({
         </div>
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="promo-qty">Quantité remisée</Label>
+        <Input
+          id="promo-qty"
+          type="number"
+          min={1}
+          value={form.discounted_quantity ?? 1}
+          onChange={e => set('discounted_quantity', parseInt(e.target.value) || 1)}
+          placeholder="Nombre d'articles remisés"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="promo-min-order">Valeur min de commande</Label>
+        <div className="flex gap-2">
+          <Input
+            id="promo-min-order"
+            type="text"
+            inputMode={form.min_order_unit === 'QTY' ? 'numeric' : 'decimal'}
+            value={minOrderValueDisplay}
+            onChange={e => {
+              const displayValue = e.target.value;
+              setMinOrderValueDisplay(displayValue);
+              if (form.min_order_unit === 'QTY') {
+                set('min_order_value', parseInt(displayValue || '0') || 0);
+              } else {
+                const parsed = parsePriceInput(displayValue);
+                set('min_order_value', parsed);
+              }
+            }}
+            placeholder="Ex: 2"
+            className="flex-1"
+          />
+          <Select value={form.min_order_unit ?? 'QTY'} onValueChange={v => {
+            set('min_order_unit', v);
+            // Mettre à jour le display value quand l'unité change
+            if (v === 'EUR') {
+              setMinOrderValueDisplay(priceToDisplayValue(form.min_order_value ?? 0));
+            } else {
+              setMinOrderValueDisplay(`${form.min_order_value ?? 0}`);
+            }
+          }}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="QTY">Qté</SelectItem>
+              <SelectItem value="EUR">€</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {form.min_order_unit === 'EUR' && minOrderValueDisplay && (
+          <div className="text-xs text-muted-foreground">
+            {formatCents(parsePriceInput(minOrderValueDisplay))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <Label>Type de commande</Label>
+        <div className="space-y-2">
+          {[
+            { id: 'order-in', value: 'IN', label: 'Sur place' },
+            { id: 'order-takeaway', value: 'TAKE_AWAY', label: 'À emporter' },
+            { id: 'order-delivery', value: 'DELIVERY', label: 'Livraison' }
+          ].map(option => {
+            const orderTypes = (form.order_type ?? '').split(' ').filter(Boolean);
+            const isChecked = orderTypes.includes(option.value);
+            return (
+              <div key={option.id} className="flex items-center justify-between gap-3">
+                <Label htmlFor={option.id} className="cursor-pointer font-normal">{option.label}</Label>
+                <Switch
+                  id={option.id}
+                  checked={isChecked}
+                  onCheckedChange={checked => {
+                    const types = (form.order_type ?? '').split(' ').filter(Boolean);
+                    const updated = checked
+                      ? [...types, option.value]
+                      : types.filter(t => t !== option.value);
+                    set('order_type', updated.join(' '));
+                  }}
+                />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="flex items-center gap-3 pt-2 border-t border-border">
+        <Switch
+          id="promo-cumulative"
+          checked={form.is_cumulative ?? false}
+          onCheckedChange={v => set('is_cumulative', v)}
+        />
+        <Label htmlFor="promo-cumulative" className="cursor-pointer">
+          Promotion cumulable
+        </Label>
+      </div>
+
+      <div className="flex items-center gap-3">
         <Switch
           id="promo-active"
           checked={form.active}
@@ -289,109 +422,169 @@ function PromotionFormDialog({
   );
 
   // ─── TAB: HORAIRES ────────────────────────────────────────────────────────
-  const renderHorairesTab = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 pb-2 border-b border-border">
-        <Switch
-          id="restrict-hours"
-          checked={(form.time_slots?.length ?? 0) > 0}
-          onCheckedChange={v => {
-            if (!v) {
-              set('time_slots', []);
-            } else {
-              set('time_slots', [{ day: 'monday', start_time: '11:00', end_time: '14:00' }]);
-            }
-          }}
-        />
-        <Label htmlFor="restrict-hours" className="cursor-pointer font-medium">
-          Restreindre l'application aux horaires
-        </Label>
-      </div>
+  const renderHorairesTab = () => {
+    const isTimeRestricted = (form.time_slots?.length ?? 0) > 0;
+    
+    const getSchedulesForDay = (day: DayOfWeek): TimeSlot[] => 
+      (form.time_slots ?? []).filter(slot => slot.day === day);
+    
+    const hasSchedulesForDay = (day: DayOfWeek): boolean => 
+      getSchedulesForDay(day).length > 0;
+    
+    const addScheduleForDay = (day: DayOfWeek) => {
+      const updated = [...(form.time_slots ?? [])];
+      updated.push({ day, start_time: '11:00', end_time: '14:00' });
+      set('time_slots', updated);
+    };
+    
+    const removeSchedule = (day: DayOfWeek, idx: number) => {
+      const schedules = getSchedulesForDay(day);
+      const allSchedules = form.time_slots ?? [];
+      const firstScheduleIndex = allSchedules.findIndex(s => s.day === day);
+      const updated = allSchedules.filter((_, i) => i !== (firstScheduleIndex + idx));
+      set('time_slots', updated);
+    };
+    
+    const updateSchedule = (day: DayOfWeek, idx: number, field: 'start_time' | 'end_time', value: string) => {
+      const schedules = getSchedulesForDay(day);
+      const allSchedules = form.time_slots ?? [];
+      const firstScheduleIndex = allSchedules.findIndex(s => s.day === day);
+      const updated = [...allSchedules];
+      updated[firstScheduleIndex + idx] = { ...updated[firstScheduleIndex + idx], [field]: value };
+      set('time_slots', updated);
+    };
+    
+    const copySchedulesToAllDays = (sourceDay: DayOfWeek) => {
+      const sourceSchedules = getSchedulesForDay(sourceDay);
+      if (sourceSchedules.length === 0) return;
+      
+      const updated = form.time_slots?.filter(s => s.day !== sourceDay) ?? [];
+      ALL_DAYS.forEach(dayObj => {
+        if (dayObj.key !== sourceDay) {
+          sourceSchedules.forEach(schedule => {
+            updated.push({ ...schedule, day: dayObj.key });
+          });
+        }
+      });
+      updated.push(...sourceSchedules);
+      set('time_slots', updated);
+    };
 
-      {(form.time_slots?.length ?? 0) > 0 && (
-        <div className="space-y-3">
-          {form.time_slots?.map((slot, idx) => (
-            <div key={idx} className="flex gap-2 items-end">
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">Jour</Label>
-                <Select
-                  value={slot.day}
-                  onValueChange={day => {
-                    const updated = [...(form.time_slots ?? [])];
-                    updated[idx].day = day as DayOfWeek;
-                    set('time_slots', updated);
-                  }}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ALL_DAYS.map(d => (
-                      <SelectItem key={d.key} value={d.key}>{d.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">Début</Label>
-                <Input
-                  type="time"
-                  value={slot.start_time}
-                  onChange={e => {
-                    const updated = [...(form.time_slots ?? [])];
-                    updated[idx].start_time = e.target.value;
-                    set('time_slots', updated);
-                  }}
-                  className="h-9"
-                />
-              </div>
-
-              <div className="flex-1 space-y-1">
-                <Label className="text-xs">Fin</Label>
-                <Input
-                  type="time"
-                  value={slot.end_time}
-                  onChange={e => {
-                    const updated = [...(form.time_slots ?? [])];
-                    updated[idx].end_time = e.target.value;
-                    set('time_slots', updated);
-                  }}
-                  className="h-9"
-                />
-              </div>
-
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-destructive hover:text-destructive"
-                onClick={() => {
-                  const updated = form.time_slots?.filter((_, i) => i !== idx) ?? [];
-                  set('time_slots', updated);
-                }}
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          ))}
-
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full"
-            onClick={() => {
-              const updated = [...(form.time_slots ?? [])];
-              updated.push({ day: 'monday', start_time: '11:00', end_time: '14:00' });
-              set('time_slots', updated);
+    return (
+      <div className="space-y-4">
+        {/* Switch général - Restreindre aux horaires */}
+        <div className="flex items-center gap-3 pb-3 border-b border-border">
+          <Switch
+            id="restrict-hours"
+            checked={isTimeRestricted}
+            onCheckedChange={v => {
+              if (!v) {
+                set('time_slots', []);
+              } else {
+                set('time_slots', [{ day: 'monday', start_time: '11:00', end_time: '14:00' }]);
+              }
             }}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Ajouter un créneau
-          </Button>
+          />
+          <Label htmlFor="restrict-hours" className="cursor-pointer font-medium">
+            Restreindre l'application aux horaires
+          </Label>
         </div>
-      )}
-    </div>
-  );
+
+        {/* Sections par jour */}
+        {isTimeRestricted && (
+          <div className="space-y-3">
+            {ALL_DAYS.map(dayObj => {
+              const schedules = getSchedulesForDay(dayObj.key);
+              const isEnabled = schedules.length > 0;
+              
+              return (
+            <div key={dayObj.key} className="border border-border rounded-lg p-4">
+              {/* Header avec jour et switch */}
+              <div className="flex items-center justify-between mb-3 pb-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id={`day-${dayObj.key}`}
+                    checked={isEnabled}
+                    onCheckedChange={v => {
+                      if (v) {
+                        addScheduleForDay(dayObj.key);
+                      } else {
+                        const updated = form.time_slots?.filter(s => s.day !== dayObj.key) ?? [];
+                        set('time_slots', updated);
+                      }
+                    }}
+                  />
+                  <Label htmlFor={`day-${dayObj.key}`} className="cursor-pointer font-medium">
+                    {dayObj.label}
+                  </Label>
+                </div>
+                
+                {/* Copier à tous */}
+                {isEnabled && (
+                  <button
+                    onClick={() => copySchedulesToAllDays(dayObj.key)}
+                    className="text-xs text-primary hover:underline cursor-pointer font-medium"
+                  >
+                    Copier à tous
+                  </button>
+                )}
+              </div>
+
+              {/* Schedules pour ce jour */}
+              {isEnabled && (
+                <div className="space-y-2">
+                  {schedules.map((schedule, idx) => (
+                    <div key={`${dayObj.key}-${idx}`} className="flex gap-2 items-end">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs">Début</Label>
+                        <Input
+                          type="time"
+                          value={schedule.start_time}
+                          onChange={e => updateSchedule(dayObj.key, idx, 'start_time', e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs">Fin</Label>
+                        <Input
+                          type="time"
+                          value={schedule.end_time}
+                          onChange={e => updateSchedule(dayObj.key, idx, 'end_time', e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeSchedule(dayObj.key, idx)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => addScheduleForDay(dayObj.key)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter un créneau
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ─── TAB: PRODUITS ────────────────────────────────────────────────────────
   const filteredProducts = products.filter(p =>
@@ -413,33 +606,69 @@ function PromotionFormDialog({
               {products.length === 0 ? 'Aucun produit disponible' : 'Aucun résultat pour votre recherche'}
             </p>
           ) : (
-            filteredProducts.map(product => (
-              <div
-                key={product.product_id}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarImage src={product.image_url} alt={product.name} />
-                  <AvatarFallback
-                    style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
+            filteredProducts.map(product => {
+              const isSelected = (form.product_ids ?? []).includes(product.product_id);
+              const priceInCents = form.product_prices?.[product.product_id] ?? 0;
+              
+              return (
+                <div
+                  key={product.product_id}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors border-b border-border last:border-b-0"
+                >
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarImage src={product.image_url} alt={product.name} />
+                    <AvatarFallback
+                      style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
+                    />
+                  </Avatar>
+                  <span className="text-sm font-medium flex-1 truncate">{product.name}</span>
+                  
+                  {/* Prix pour NEWPRICE */}
+                  {isSelected && form.discount_unit === 'NEWPRICE' && (
+                    <div className="w-24">
+                      <Input
+                        id={`price-${product.product_id}`}
+                        type="text"
+                        inputMode="decimal"
+                        value={priceDisplayValues[product.product_id] ?? priceToDisplayValue(priceInCents)}
+                        onChange={(e) => {
+                          setPriceDisplayValues(prev => ({ ...prev, [product.product_id]: e.target.value }));
+                          set('product_prices', { ...(form.product_prices ?? {}), [product.product_id]: parsePriceInput(e.target.value) });
+                        }}
+                        onBlur={(e) => {
+                          const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
+                          setPriceDisplayValues(prev => ({ ...prev, [product.product_id]: formatted }));
+                        }}
+                        placeholder="0,00"
+                        className="h-8 text-xs font-mono"
+                      />
+                    </div>
+                  )}
+                  
+                  <Switch
+                    checked={isSelected}
+                    onCheckedChange={checked => {
+                      const updated = [...(form.product_ids ?? [])];
+                      if (checked && !updated.includes(product.product_id)) {
+                        updated.push(product.product_id);
+                        // Initialiser le prix si pas défini
+                        if (!form.product_prices?.[product.product_id]) {
+                          set('product_prices', { ...(form.product_prices ?? {}), [product.product_id]: 0 });
+                        }
+                      } else if (!checked) {
+                        const idx = updated.indexOf(product.product_id);
+                        if (idx > -1) updated.splice(idx, 1);
+                        // Supprimer le prix
+                        const prices = { ...(form.product_prices ?? {}) };
+                        delete prices[product.product_id];
+                        set('product_prices', prices);
+                      }
+                      set('product_ids', updated);
+                    }}
                   />
-                </Avatar>
-                <span className="text-sm font-medium flex-1 truncate">{product.name}</span>
-                <Switch
-                  checked={(form.product_ids ?? []).includes(product.product_id)}
-                  onCheckedChange={checked => {
-                    const updated = [...(form.product_ids ?? [])];
-                    if (checked && !updated.includes(product.product_id)) {
-                      updated.push(product.product_id);
-                    } else if (!checked) {
-                      const idx = updated.indexOf(product.product_id);
-                      if (idx > -1) updated.splice(idx, 1);
-                    }
-                    set('product_ids', updated);
-                  }}
-                />
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
         </div>
       )}
@@ -629,19 +858,42 @@ function PromotionsTab() {
                 <div className="flex flex-wrap gap-2">
                   {/* Discount value */}
                   <div className="flex items-center gap-1.5 text-sm bg-primary/10 text-primary px-2.5 py-1 rounded-full font-medium">
-                    {promo.type === 'percentage'
+                    {promo.discount_unit === 'PERCENTAGE'
                       ? <><Percent className="w-3.5 h-3.5" />{promo.value}% de remise</>
-                      : <><Euro className="w-3.5 h-3.5" />{formatCents(promo.value)} de remise</>
+                      : promo.discount_unit === 'CURRENCY'
+                      ? <><Euro className="w-3.5 h-3.5" />{formatCents(promo.value)} de remise</>
+                      : <>Individuel par article</>
                     }
                   </div>
 
-                  {/* Code */}
-                  {promo.code && (
-                    <div className="flex items-center gap-1.5 text-sm bg-muted px-2.5 py-1 rounded-full font-mono">
-                      {promo.code}
+                  {/* Discounted quantity */}
+                  {promo.discounted_quantity && (
+                    <div className="flex items-center gap-1.5 text-sm bg-blue/10 text-blue-700 px-2.5 py-1 rounded-full font-medium">
+                      Qté: {promo.discounted_quantity}
+                    </div>
+                  )}
+
+                  {/* Cumulative badge */}
+                  {promo.is_cumulative && (
+                    <div className="text-xs bg-green/10 text-green-700 px-2.5 py-1 rounded-full font-medium">
+                      Cumulable
+                    </div>
+                  )}
+
+                  {/* Order type */}
+                  {promo.order_type && (
+                    <div className="text-xs bg-muted px-2.5 py-1 rounded-full font-medium">
+                      {promo.order_type}
                     </div>
                   )}
                 </div>
+
+                {/* Min order value */}
+                {promo.min_order_value && (
+                  <div className="text-xs text-muted-foreground">
+                    Commande min: {promo.min_order_unit === 'QTY' ? `${promo.min_order_value} articles` : `${formatCents(promo.min_order_value)}`}
+                  </div>
+                )}
 
                 {/* Dates */}
                 {(promo.start_date || promo.end_date) && (
@@ -649,6 +901,22 @@ function PromotionsTab() {
                     <CalendarDays className="w-3.5 h-3.5" />
                     {promo.start_date && <span>Du {new Date(promo.start_date).toLocaleDateString('fr-FR')}</span>}
                     {promo.end_date && <span>au {new Date(promo.end_date).toLocaleDateString('fr-FR')}</span>}
+                  </div>
+                )}
+
+                {/* Time slots info */}
+                {promo.time_slots && promo.time_slots.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    <Clock className="w-3.5 h-3.5 inline mr-1" />
+                    {promo.time_slots.length} créneau{promo.time_slots.length !== 1 ? 'x' : ''} horaires
+                  </div>
+                )}
+
+                {/* Products info */}
+                {promo.product_ids && promo.product_ids.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    <UtensilsCrossed className="w-3.5 h-3.5 inline mr-1" />
+                    {promo.product_ids.length} produit{promo.product_ids.length !== 1 ? 's' : ''} associé{promo.product_ids.length !== 1 ? 's' : ''}
                   </div>
                 )}
 

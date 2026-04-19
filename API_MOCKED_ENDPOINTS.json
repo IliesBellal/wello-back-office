@@ -956,7 +956,7 @@
         {
           "function_name": "updateTagOrder",
           "method": "PATCH",
-          "endpoint": "/menu/tags/order",
+          "endpoint": "/menu/tags/display-order",
           "description": "Update tag display order",
           "request": {
             "type": "object",
@@ -1201,14 +1201,16 @@
           "request": {
             "type": "object",
             "schema": {
-              "name": "string"
+              "name": "string",
+              "color": "string (optional)"
             }
           },
           "response": {
             "type": "object",
             "schema": {
               "id": "string",
-              "name": "string"
+              "name": "string",
+              "color": "string (optional)"
             }
           },
           "headers": {
@@ -1227,7 +1229,17 @@
           "request": null,
           "response": {
             "type": "Tag[]",
-            "schema": "[Tag array]"
+            "schema": "[Tag array with product_count]",
+            "example": [
+              {
+                "id": "tag-id",
+                "merchant_id": "merchant-id",
+                "name": "Tag Name",
+                "color": "#ffffff",
+                "display_order": 0,
+                "product_count": 5
+              }
+            ]
           },
           "headers": {
             "Authorization": "Bearer token"
@@ -1300,14 +1312,16 @@
           "request": {
             "type": "object",
             "schema": {
-              "name": "string"
+              "name": "string",
+              "color": "string (optional)"
             }
           },
           "response": {
             "type": "object",
             "schema": {
               "id": "string",
-              "name": "string"
+              "name": "string",
+              "color": "string (optional)"
             }
           },
           "headers": {
@@ -1328,6 +1342,26 @@
             "schema": {
               "product_ids": "string[]",
               "tag_ids": "string[]"
+            }
+          },
+          "response": null,
+          "headers": {
+            "Authorization": "Bearer token",
+            "Content-Type": "application/json"
+          },
+          "query_params": [],
+          "auth_required": true,
+          "mock_enabled": true
+        },
+        {
+          "function_name": "bulkAssignProductsToTag",
+          "method": "PATCH",
+          "endpoint": "/menu/tags/{tag_id}/bulk_assign",
+          "description": "Assign multiple products to a tag",
+          "request": {
+            "type": "object",
+            "schema": {
+              "product_ids": "string[]"
             }
           },
           "response": null,
@@ -2397,24 +2431,55 @@
         {
           "function_name": "getPromotions",
           "method": "GET",
-          "endpoint": "/menu/promotions",
-          "description": "Get all promotions",
+          "endpoint": "/menu/discounts/all",
+          "description": "Get all discounts with products and schedules",
           "request": null,
           "response": {
-            "type": "Promotion[]",
-            "schema": [
-              {
-                "id": "string",
-                "name": "string",
-                "description": "string (optional)",
-                "type": "percentage|fixed",
-                "value": "number",
-                "code": "string (optional)",
-                "start_date": "string (YYYY-MM-DD)",
-                "end_date": "string (YYYY-MM-DD, optional)",
-                "active": "boolean"
-              }
-            ]
+            "type": "WelloApiResponse<Promotion[]>",
+            "schema": {
+              "id": "discounts.list_all",
+              "data": [
+                {
+                  "discount_id": "string",
+                  "merchant_id": "string",
+                  "discount_name": "string",
+                  "discount_desc": "string",
+                  "preferred_order": "number",
+                  "order_type": "string",
+                  "discount_value": "number | null",
+                  "discount_unit": "NEWPRICE | PERCENTAGE",
+                  "valid_from": "string (ISO 8601)",
+                  "valid_to": "string (ISO 8601)",
+                  "min_order_value": "number",
+                  "min_order_unit": "string",
+                  "discounted_quantity": "number",
+                  "is_cumulative": "boolean",
+                  "is_time_limited": "boolean",
+                  "available": "boolean",
+                  "enabled": "boolean",
+                  "creation_date": "string (ISO 8601)",
+                  "products": [
+                    {
+                      "id": "number",
+                      "discount_id": "number",
+                      "product_id": "string",
+                      "new_price": "number (optional)",
+                      "enabled": "boolean"
+                    }
+                  ],
+                  "schedules": [
+                    {
+                      "schedule_id": "number",
+                      "discount_id": "number",
+                      "day_of_week": "number",
+                      "available_from": "string (HH:mm)",
+                      "available_to": "string (HH:mm)",
+                      "enabled": "boolean"
+                    }
+                  ]
+                }
+              ]
+            }
           },
           "headers": {
             "Authorization": "Bearer token"

@@ -3,7 +3,7 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useMenuData } from '@/hooks/useMenuData';
+import { useCategoryData } from '@/hooks/useCategoryData';
 import { Category } from '@/types/menu';
 import { Plus, Pencil, Trash2, GripVertical, LinkIcon } from 'lucide-react';
 import {
@@ -114,7 +114,7 @@ const SortableCategoryRow = ({
 };
 
 export default function CategoriesTable() {
-  const { menuData, loading, createProductCategory, updateCategory, deleteCategory } = useMenuData();
+  const { menuData, loading, createProductCategory, updateCategory, deleteCategory, refreshCategoryData } = useCategoryData();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -247,6 +247,10 @@ export default function CategoriesTable() {
     setIsAssigning(true);
     try {
       await menuService.bulkAssignProductsToCategory(productIds, selectedCategoryForBulk.category_id);
+      
+      // Refresh category data to get updated product assignments
+      await refreshCategoryData();
+      
       toast({
         title: 'Succès',
         description: `${productIds.length} produit(s) assigné(s) à la catégorie`,
@@ -266,8 +270,12 @@ export default function CategoriesTable() {
 
   const debouncedSaveOrder = async (categoriesToSave: Category[]) => {
     try {
-      const categoryOrder = categoriesToSave.map((c) => c.category_id);
-      await menuService.updateCategoryOrder(categoryOrder);
+      // Use the same saveDisplayOrder as OrganizeModal but with empty product lists
+      const displayOrder = categoriesToSave.map(category => ({
+        category_id: category.category_id,
+        products: []
+      }));
+      await menuService.saveDisplayOrder(displayOrder);
     } catch (error) {
       console.error('Error saving category order:', error);
       toast({

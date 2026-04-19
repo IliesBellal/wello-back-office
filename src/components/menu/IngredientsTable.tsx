@@ -8,9 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowUpDown, ArrowUp, ArrowDown, Trash2, Edit2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
+import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 type SortKey = 'name' | 'category' | 'price' | 'unit';
 type SortDir = 'asc' | 'desc';
@@ -22,11 +20,7 @@ interface IngredientsTableProps {
   sortKey?: SortKey;
   sortDir?: SortDir;
   onSort?: (key: SortKey) => void;
-  onEdit?: (component: Component) => void;
-  onDelete?: (component: Component) => void;
-  onStatusChange?: (componentId: string, status: boolean) => void;
-  componentStatusMap?: Record<string, boolean>;
-  updatingComponentId?: string | null;
+  onRowClick?: (component: Component) => void;
 }
 
 const SortIcon = ({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) => {
@@ -53,11 +47,7 @@ export const IngredientsTable = ({
   sortKey = 'name',
   sortDir = 'asc',
   onSort,
-  onEdit,
-  onDelete,
-  onStatusChange,
-  componentStatusMap = {},
-  updatingComponentId = null,
+  onRowClick,
 }: IngredientsTableProps) => {
   if (ingredients.length === 0) {
     return (
@@ -100,8 +90,6 @@ export const IngredientsTable = ({
               </span>
             </TableHead>
             <TableHead>Prix d'achat / Unité</TableHead>
-            <TableHead>Disponible</TableHead>
-            {(onEdit || onDelete) && <TableHead className="w-20">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -114,7 +102,8 @@ export const IngredientsTable = ({
             return (
               <TableRow
                 key={ingredient.component_id}
-                className="hover:bg-muted/20 transition-colors"
+                className="hover:bg-muted/20 transition-colors cursor-pointer"
+                onClick={() => onRowClick?.(ingredient)}
               >
                 <TableCell className="font-medium">{ingredient.name}</TableCell>
                 <TableCell>
@@ -126,41 +115,8 @@ export const IngredientsTable = ({
                 </TableCell>
                 <TableCell>{formatPrice(ingredient.price)}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {ingredient.cost ? formatPrice(ingredient.cost) : '—'}
+                  {ingredient.purchase_cost ? formatPrice(ingredient.purchase_cost) : '—'}
                 </TableCell>
-                <TableCell>
-                  <Switch
-                    checked={componentStatusMap[ingredient.component_id] !== undefined ? componentStatusMap[ingredient.component_id] : (ingredient.available ?? ingredient.status === '1' ?? true)}
-                    onCheckedChange={(checked) => onStatusChange?.(ingredient.component_id, checked)}
-                    disabled={updatingComponentId === ingredient.component_id}
-                  />
-                </TableCell>
-                {(onEdit || onDelete) && (
-                  <TableCell className="flex gap-1">
-                    {onEdit && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                        onClick={() => onEdit(ingredient)}
-                        title="Éditer"
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                    {onDelete && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => onDelete(ingredient)}
-                        title="Supprimer"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                )}
               </TableRow>
             );
           })}

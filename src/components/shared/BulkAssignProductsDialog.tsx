@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+// Load products on demand for bulk assignment dialog
+import { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,12 +14,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Product } from '@/types/menu';
 import { Search, Loader2 } from 'lucide-react';
+import { menuService } from '@/services/menuService';
 
 interface BulkAssignProductsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   categoryName: string;
-  products: Product[];
+  products?: Product[]; // Optional - will be loaded if not provided
   loading?: boolean;
   onConfirm: (selectedProductIds: string[]) => Promise<void>;
 }
@@ -27,13 +29,31 @@ export function BulkAssignProductsDialog({
   open,
   onOpenChange,
   categoryName,
-  products,
+  products: initialProducts,
   loading = false,
   onConfirm,
 }: BulkAssignProductsDialogProps) {
+  const [products, setProducts] = useState<Product[]>(initialProducts || []);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isAssigning, setIsAssigning] = useState(false);
+
+  // Load products when dialog opens and no initial products provided
+  useEffect(() => {
+    if (open && !initialProducts && products.length === 0) {
+      setLoadingProducts(true);
+      menuService.getProducts()
+        .then(setProducts)
+        .catch((error) => {
+          console.error('Error loading products:', error);
+          setProducts([]);
+        })
+        .finally(() => setLoadingProducts(false));
+    } else if (initialProducts) {
+      setProducts(initialProducts);
+    }
+  }, [open, initialProducts, products.length]);
 
   // Filter products by search term
   const filteredProducts = useMemo(() => {
@@ -112,7 +132,11 @@ export function BulkAssignProductsDialog({
 
           {/* Products List */}
           <ScrollArea className="h-64 border rounded-md">
-            {filteredProducts.length === 0 ? (
+            {loadingProducts ? (
+              <div className="flex items-center justify-center h-full">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : filteredProducts.length === 0 ? (
               <div className="flex items-center justify-center h-full text-muted-foreground">
                 Aucun produit trouvé
               </div>

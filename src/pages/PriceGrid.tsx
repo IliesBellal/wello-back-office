@@ -8,12 +8,12 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, Tag, TrendingUp, TrendingDown, ShoppingCart, BadgePercent, Edit2, Save, X, Loader2 } from 'lucide-react';
-import { useMenuData } from '@/hooks/useMenuData';
+import { usePriceGridData } from '@/hooks/usePriceGridData';
 import { Product, Category } from '@/types/menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { PriceTPEInput } from '@/components/ui/PriceTPEInput';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
+import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -27,8 +27,8 @@ type SortDir = 'asc' | 'desc';
 
 function getProductValue(product: Product & { categoryName: string }, key: SortKey): string | number {
   switch (key) {
-    case 'name': return product.name.toLowerCase();
-    case 'category': return product.categoryName.toLowerCase();
+    case 'name': return (product.name || '').toLowerCase();
+    case 'category': return (product.categoryName || '').toLowerCase();
     case 'price': return product.price ?? -1;
     case 'price_take_away': return product.price_take_away ?? -1;
     case 'price_delivery': return product.price_delivery ?? -1;
@@ -65,7 +65,7 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'deliveroo', label: 'Deliveroo' },
 ];
 
-function ProductPriceTable({ products, categories }: { products: EnrichedProduct[]; categories: Category[] }) {
+function ProductPriceTable({ products, categories, bulkUpdatePrices }: { products: EnrichedProduct[]; categories: Category[]; bulkUpdatePrices: (products: Array<{ product_id: string; price?: number; price_take_away?: number; price_delivery?: number; }>) => Promise<void> }) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
@@ -73,6 +73,7 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editedPrices, setEditedPrices] = useState<Record<string, Record<string, number>>>({});
+  const [priceDisplayValues, setPriceDisplayValues] = useState<Record<string, Record<string, string>>>({});
   const { toast } = useToast();
 
   const handleSort = (key: SortKey) => {
@@ -95,10 +96,29 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
     }));
   }, []);
 
+  // Mise à jour de la valeur d'affichage d'un prix (pour éviter la perte de focus)
+  const updatePriceDisplay = useCallback((productId: string, priceField: string, displayValue: string) => {
+    setPriceDisplayValues(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        [priceField]: displayValue,
+      },
+    }));
+  }, []);
+
+  // Récupère la valeur d'affichage d'un prix
+  const getDisplayPriceValue = (productId: string, field: string, originalPrice: number | undefined) => {
+    const displayValue = priceDisplayValues[productId]?.[field];
+    if (displayValue !== undefined) return displayValue;
+    return priceToDisplayValue(originalPrice);
+  };
+
   // Annule l'édition
   const cancelEdit = useCallback(() => {
     setIsEditing(false);
     setEditedPrices({});
+    setPriceDisplayValues({});
   }, []);
 
   // Valide et enregistre tous les prix modifiés
@@ -138,7 +158,7 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
         productsToUpdate.push(product);
       });
 
-      await menuService.bulkUpdatePrices(productsToUpdate);
+      await bulkUpdatePrices(productsToUpdate);
       
       toast({
         title: 'Succès',
@@ -147,6 +167,7 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
       
       setIsEditing(false);
       setEditedPrices({});
+      setPriceDisplayValues({});
     } catch (error) {
       console.error('Error saving prices:', error);
       toast({
@@ -182,12 +203,6 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
       return sortDir === 'asc' ? na - nb : nb - na;
     });
   }, [products, search, categoryFilter, sortKey, sortDir]);
-
-  // Récupère le prix affiché (edited ou original)
-  const getDisplayPrice = (productId: string, field: string, originalPrice: number | undefined) => {
-    const edited = editedPrices[productId]?.[field];
-    return edited !== undefined ? edited : (originalPrice ?? 0);
-  };
 
   return (
     <div className="space-y-4">
@@ -328,10 +343,20 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
                 {/* Prix sur place */}
                 <TableCell className="font-mono text-sm">
                   {isEditing ? (
-                    <PriceTPEInput
-                      value={getDisplayPrice(product.product_id, 'price', product.price)}
-                      onChange={(cents) => updatePrice(product.product_id, 'price', cents)}
-                      autoConfirmOnBlur={false}
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={getDisplayPriceValue(product.product_id, 'price', product.price)}
+                      onChange={(e) => {
+                        updatePriceDisplay(product.product_id, 'price', e.target.value);
+                        updatePrice(product.product_id, 'price', parsePriceInput(e.target.value));
+                      }}
+                      onBlur={(e) => {
+                        const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
+                        updatePriceDisplay(product.product_id, 'price', formatted);
+                      }}
+                      placeholder="0,00"
+                      className="h-8 text-xs font-mono"
                     />
                   ) : (
                     formatPrice(product.price)
@@ -340,10 +365,20 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
                 {/* À emporter */}
                 <TableCell className="font-mono text-sm">
                   {isEditing ? (
-                    <PriceTPEInput
-                      value={getDisplayPrice(product.product_id, 'price_take_away', product.price_take_away)}
-                      onChange={(cents) => updatePrice(product.product_id, 'price_take_away', cents)}
-                      autoConfirmOnBlur={false}
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={getDisplayPriceValue(product.product_id, 'price_take_away', product.price_take_away)}
+                      onChange={(e) => {
+                        updatePriceDisplay(product.product_id, 'price_take_away', e.target.value);
+                        updatePrice(product.product_id, 'price_take_away', parsePriceInput(e.target.value));
+                      }}
+                      onBlur={(e) => {
+                        const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
+                        updatePriceDisplay(product.product_id, 'price_take_away', formatted);
+                      }}
+                      placeholder="0,00"
+                      className="h-8 text-xs font-mono"
                     />
                   ) : (
                     formatPrice(product.price_take_away)
@@ -352,10 +387,20 @@ function ProductPriceTable({ products, categories }: { products: EnrichedProduct
                 {/* Livraison */}
                 <TableCell className="font-mono text-sm">
                   {isEditing ? (
-                    <PriceTPEInput
-                      value={getDisplayPrice(product.product_id, 'price_delivery', product.price_delivery)}
-                      onChange={(cents) => updatePrice(product.product_id, 'price_delivery', cents)}
-                      autoConfirmOnBlur={false}
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={getDisplayPriceValue(product.product_id, 'price_delivery', product.price_delivery)}
+                      onChange={(e) => {
+                        updatePriceDisplay(product.product_id, 'price_delivery', e.target.value);
+                        updatePrice(product.product_id, 'price_delivery', parsePriceInput(e.target.value));
+                      }}
+                      onBlur={(e) => {
+                        const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
+                        updatePriceDisplay(product.product_id, 'price_delivery', formatted);
+                      }}
+                      placeholder="0,00"
+                      className="h-8 text-xs font-mono"
                     />
                   ) : (
                     formatPrice(product.price_delivery)
@@ -739,7 +784,7 @@ function TableSkeleton({ colCount = 7 }: { colCount?: number }) {
 // ─── page ────────────────────────────────────────────────────────────────────
 
 export default function PriceGrid() {
-  const { menuData, loading } = useMenuData();
+  const { menuData, loading, bulkUpdatePrices } = usePriceGridData();
   const [activeTab, setActiveTab] = useState('products');
 
   const categories: Category[] = useMemo(
@@ -803,7 +848,7 @@ export default function PriceGrid() {
               return loading ? (
                 <TableSkeleton />
               ) : (
-                <ProductPriceTable products={enrichedProducts} categories={categories} />
+                <ProductPriceTable products={enrichedProducts} categories={categories} bulkUpdatePrices={bulkUpdatePrices} />
               );
             }
             if (tabId === 'profitability') {

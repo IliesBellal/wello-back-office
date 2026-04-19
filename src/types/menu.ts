@@ -57,6 +57,8 @@ export interface Component {
   purchase_cost?: number;  // Purchase price (prix d'achat) in cents
   purchase_unit_id?: string | number;  // Purchase unit of measure ID
   purchase_unit_of_measure?: string;  // Purchase unit label
+  purchase_unit_of_measure_id?: string;  // Purchase unit of measure ID from API (string)
+  purchase_cost_qty?: number;  // Quantity for purchase cost calculation (default: 1)
   status?: string;
   available?: boolean;
 }
@@ -160,8 +162,9 @@ export interface Tag {
   id: string;
   merchant_id?: string;
   name: string;
-  order?: number;
-  color?: string;  // From new API format
+  display_order?: number;
+  color?: string;
+  product_count?: number;
 }
 
 export interface Product {
@@ -243,19 +246,21 @@ export interface Category {
 export interface ComponentCreatePayload {
   name: string;
   category_id: string;
-  unit_id: number;
+  unit_id: string;
   price: number; // in cents
   purchase_cost?: number; // in cents
-  purchase_unit_id?: string | number;
+  purchase_unit_id?: string;
+  purchase_cost_qty?: number;  // Quantity for purchase cost calculation
 }
 
 export interface ComponentUpdatePayload {
   name?: string;
   category_id?: string;
-  unit_id?: number;
+  unit_id?: string;
   price?: number; // in cents
   purchase_cost?: number; // in cents
-  purchase_unit_id?: string | number;
+  purchase_unit_id?: string;
+  purchase_cost_qty?: number;  // Quantity for purchase cost calculation
 }
 
 export interface ProductCreatePayload {
@@ -265,9 +270,9 @@ export interface ProductCreatePayload {
   price_take_away: number; // in cents
   price_delivery: number; // in cents
   category_id: string;
-  tva_rate_in: number;
-  tva_rate_take_away: number;
-  tva_rate_delivery: number;
+  tva_in_id: string;
+  tva_take_away_id: string;
+  tva_delivery_id: string;
   available_in: boolean;
   available_take_away: boolean;
   available_delivery: boolean;

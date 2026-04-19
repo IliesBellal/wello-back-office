@@ -1,7 +1,7 @@
 export { PageContainer } from './PageContainer';
 export { TabSystem } from './TabSystem';
 export { AdvancedDatePicker } from './AdvancedDatePicker';
-export { BulkAssignProductsDialog } from './BulkAssignProductsDialog';
+export { BulkAssignProductsDialog } from './BulkAssignProductsDialog'; // Products now loaded on-demand
 export { CardSkeleton } from './CardSkeleton';
 export { CategorySelector } from './CategorySelector';
 export { ConfirmDialog } from './ConfirmDialog';

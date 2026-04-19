@@ -25,7 +25,7 @@ type SortDir = 'asc' | 'desc';
 
 function getProductValue(product: Product, key: SortKey, categories: Record<string, string>): string | number {
   switch (key) {
-    case 'name': return product.name.toLowerCase();
+    case 'name': return (product.name || '').toLowerCase();
     case 'category': return (categories[product.category_id || ''] || product.category || '').toLowerCase();
     case 'tags': return (product.tags?.length ?? 0);
     case 'status': {

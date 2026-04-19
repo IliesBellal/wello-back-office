@@ -32,10 +32,11 @@ import { Category, UnitOfMeasure, ComponentCategory, ComponentCreatePayload } fr
 const componentFormSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
   category_id: z.string().min(1, "La catégorie est requise"),
-  unit_id: z.coerce.number().min(1, "L'unité est requise"),
+  unit_id: z.string().min(1, "L'unité est requise"),
   price: z.coerce.number().min(0, "Le prix doit être positif ou nul"),
   purchase_cost: z.coerce.number().min(0, "Le prix d'achat doit être positif ou nul").optional(),
-  purchase_unit_id: z.coerce.number().optional(),
+  purchase_unit_id: z.string().optional(),
+  purchase_cost_qty: z.coerce.number().min(1, "La quantité doit être au minimum 1").optional(),
 });
 
 type ComponentFormValues = z.infer<typeof componentFormSchema>;
@@ -68,6 +69,7 @@ export function ComponentCreateSheet({
       price: 0,
       purchase_cost: undefined,
       purchase_unit_id: undefined,
+      purchase_cost_qty: undefined,
     },
   });
 
@@ -77,10 +79,11 @@ export function ComponentCreateSheet({
       await onCreateComponent({
         name: data.name,
         category_id: data.category_id,
-        unit_id: data.unit_id,
+        unit_id: data.unit_id.toString(),
         price: Math.round(data.price * 100), // Convert to cents
         purchase_cost: data.purchase_cost ? Math.round(data.purchase_cost * 100) : undefined,
         purchase_unit_id: data.purchase_unit_id && data.purchase_unit_id !== 'none' ? data.purchase_unit_id : undefined,
+        purchase_cost_qty: data.purchase_cost_qty || undefined,
       });
       form.reset();
       onOpenChange(false);
@@ -95,9 +98,9 @@ export function ComponentCreateSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="overflow-y-auto sm:max-w-[540px]">
         <SheetHeader>
-          <SheetTitle>Ajouter un composant</SheetTitle>
+          <SheetTitle>Ajouter un ingrédient</SheetTitle>
           <SheetDescription>
-            Créer un nouveau composant/ingrédient
+            Créer un nouvel ingrédient
           </SheetDescription>
         </SheetHeader>
 
@@ -108,7 +111,7 @@ export function ComponentCreateSheet({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Nom du composant</FormLabel>
+                  <FormLabel>Nom de l'ingrédient</FormLabel>
                   <FormControl>
                     <Input placeholder="Farine, Tomate, Mozzarella..." {...field} />
                   </FormControl>
@@ -205,6 +208,27 @@ export function ComponentCreateSheet({
 
               <FormField
                 control={form.control}
+                name="purchase_cost_qty"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantité pour le coût d'achat</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        step="1"
+                        min="1"
+                        placeholder="1"
+                        {...field}
+                        value={field.value || ''}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="purchase_unit_id"
                 render={({ field }) => (
                   <FormItem>
@@ -244,7 +268,7 @@ export function ComponentCreateSheet({
                 className="flex-1 bg-gradient-primary"
                 disabled={isSubmitting}
               >
-                {isSubmitting ? "Création..." : "Créer le composant"}
+                {isSubmitting ? "Création..." : "Créer l'ingrédient"}
               </Button>
             </div>
           </form>

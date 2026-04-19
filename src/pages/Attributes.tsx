@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { PageContainer } from '@/components/shared';
+import { PageContainer, ConfirmDialog } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,7 +30,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Plus, Trash2, Edit, ChevronLeft, Settings2, GripVertical } from 'lucide-react';
-import { useMenuData } from '@/hooks/useMenuData';
+import { useAttributesData } from '@/hooks/useAttributesData';
 import { Attribute, AttributeOption } from '@/types/menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -81,9 +81,10 @@ interface ListViewProps {
   components: any[];
   onNew: () => void;
   onEdit: (attr: Attribute) => void;
+  onDelete: (attr: Attribute) => void;
 }
 
-function ListView({ attributes, components, onNew, onEdit }: ListViewProps) {
+function ListView({ attributes, components, onNew, onEdit, onDelete }: ListViewProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -123,14 +124,24 @@ function ListView({ attributes, components, onNew, onEdit }: ListViewProps) {
                     </span>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onEdit(attr)}
-                >
-                  <Edit className="w-3.5 h-3.5 mr-1.5" />
-                  Modifier
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onEdit(attr)}
+                  >
+                    <Edit className="w-3.5 h-3.5 mr-1.5" />
+                    Modifier
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onDelete(attr)}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="pt-0">
                 <div className="rounded-lg border border-border overflow-hidden">
@@ -142,7 +153,7 @@ function ListView({ attributes, components, onNew, onEdit }: ListViewProps) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {attr.options.map((opt) => {
+                      {(attr.options || []).map((opt) => {
                         const price = getOptionPrice(opt);
                         const cost = getOptionCost(opt, components);
                         return (
@@ -310,10 +321,10 @@ interface FormViewProps {
 }
 
 function FormView({ initial, onSave, onCancel }: FormViewProps) {
-  const { components, units } = useMenuData();
+  const { components, units } = useAttributesData();
   const [formData, setFormData] = useState<Partial<Attribute>>(
     initial
-      ? { ...initial, options: initial.options.map(o => ({ ...o })) }
+      ? { ...initial, options: (initial.options || []).map(o => ({ ...o })) }
       : emptyForm()
   );
 
@@ -322,7 +333,7 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
       ...prev,
       options: [
         ...(prev.options || []),
-        { id: `opt_${Date.now()}`, title: '', price: 0, extra_price: 0 },
+        { id: '', title: '', price: 0, extra_price: 0 },
       ],
     }));
   };
@@ -395,7 +406,7 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
     const newOptions = Array.from(selectedComponents).map(componentId => {
       const component = components.find(c => c.component_id === componentId);
       return {
-        id: `opt_${Date.now()}_${componentId}`,
+        id: '',
         title: component?.name || '',
         price: 0,
         extra_price: 0,
@@ -646,8 +657,26 @@ function PageSkeleton() {
 type ViewMode = 'list' | 'new' | { editing: Attribute };
 
 export default function AttributesPage() {
-  const { attributes, components, loading, createAttribute, updateAttributeData } = useMenuData();
+  const { attributes, components, loading, createAttribute, updateAttributeData, deleteAttribute } = useAttributesData();
   const [view, setView] = useState<ViewMode>('list');
+  const [deletingAttribute, setDeletingAttribute] = useState<Attribute | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const handleDeleteAttribute = async () => {
+    if (!deletingAttribute) return;
+    try {
+      await deleteAttribute(deletingAttribute.id);
+      setShowDeleteDialog(false);
+      setDeletingAttribute(null);
+    } catch (error) {
+      console.error('Error deleting attribute:', error);
+    }
+  };
+
+  const handleDelete = (attr: Attribute) => {
+    setDeletingAttribute(attr);
+    setShowDeleteDialog(true);
+  };
 
   const handleSave = async (data: Partial<Attribute>) => {
     if (view === 'new') {
@@ -673,12 +702,25 @@ export default function AttributesPage() {
         {loading ? (
           <PageSkeleton />
         ) : view === 'list' ? (
-          <ListView
-            attributes={attributes}
-            components={components}
-            onNew={() => setView('new')}
-            onEdit={(attr) => setView({ editing: attr })}
-          />
+          <>
+            <ListView
+              attributes={attributes}
+              components={components}
+              onNew={() => setView('new')}
+              onEdit={(attr) => setView({ editing: attr })}
+              onDelete={handleDelete}
+            />
+            <ConfirmDialog
+              open={showDeleteDialog}
+              onOpenChange={setShowDeleteDialog}
+              title="Supprimer le groupe d'options"
+              description={deletingAttribute ? `Êtes-vous absolument certain de vouloir supprimer le groupe "${deletingAttribute.title}" ? Cette action est définitive et irrévocable.` : ''}
+              onConfirm={handleDeleteAttribute}
+              confirmText="Supprimer"
+              cancelText="Annuler"
+              isDangerous={true}
+            />
+          </>
         ) : (
           <FormView
             initial={typeof view === 'object' ? view.editing : undefined}
