@@ -55,6 +55,7 @@ export interface Component {
   quantity?: number;  // Quantity in the product composition
   cost?: number;  // Cost of the component in the product
   purchase_cost?: number;  // Purchase price (prix d'achat) in cents
+  purchase_price_per_unit?: number;  // Purchase price per unit (prix d'achat unitaire) in cents
   purchase_unit_id?: string | number;  // Purchase unit of measure ID
   purchase_unit_of_measure?: string;  // Purchase unit label
   purchase_unit_of_measure_id?: string;  // Purchase unit of measure ID from API (string)

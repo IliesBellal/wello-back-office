@@ -115,7 +115,9 @@ export const IngredientsTable = ({
                 </TableCell>
                 <TableCell>{formatPrice(ingredient.price)}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {ingredient.purchase_cost ? formatPrice(ingredient.purchase_cost) : '—'}
+                  {ingredient.purchase_price_per_unit && ingredient.unit_of_measure
+                    ? `${formatPrice(ingredient.purchase_price_per_unit)} / ${ingredient.unit_of_measure}`
+                    : '—'}
                 </TableCell>
               </TableRow>
             );
