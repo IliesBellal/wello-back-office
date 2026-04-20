@@ -10,7 +10,7 @@
  *
  * TODO (future) :
  *  • Remplacer `mockStockRuptures` par les données venant de l'API dashboard
- *    (champ `alerts.low_stock_items` de GET /pos/stats/dashboard/summary)
+ *    (champ `alerts.low_stock_items` de GET /stats/dashboard/summary)
  *  • Remplacer `email_verified` et `phone_verified` par les champs correspondants
  *    de l'objet `authData` retourné par l'API auth (ex. authData.email_verified,
  *    authData.phone_verified — à ajouter dans AuthData type quand disponibles)
@@ -49,7 +49,7 @@ interface Notification {
  * Renvoie la liste des noms de produits en rupture ou stock critique.
  */
 const getMockStockRuptures = (): string[] => {
-  // Simulé — plus tard : apiClient.get('/pos/stats/dashboard/summary').alerts.low_stock_items
+  // Simulé — plus tard : apiClient.get('/stats/dashboard/summary').alerts.low_stock_items
   return ['Mozzarella', 'Entrecôte 300g', 'Tiramisu'];
 };
 
