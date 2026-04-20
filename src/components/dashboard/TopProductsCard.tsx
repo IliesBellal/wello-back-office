@@ -47,13 +47,13 @@ export const TopProductsCard = ({ products }: TopProductsCardProps) => {
     <Card className="shadow-card">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-semibold">Top produits du jour</CardTitle>
-        <p className="text-xs text-muted-foreground">Classement par quantité vendue</p>
+        <p className="text-xs text-muted-foreground">Classement par chiffre d'affaires</p>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="space-y-2">
           {products.map((product) => (
             <div
-              key={product.id}
+              key={product.rank}
               className={cn(
                 'flex items-center gap-3 p-3 rounded-xl transition-colors',
                 product.out_of_stock
@@ -87,15 +87,11 @@ export const TopProductsCard = ({ products }: TopProductsCardProps) => {
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">{product.category}</p>
               </div>
 
               {/* Stats */}
-              <div className="text-right shrink-0 space-y-0.5">
+              <div className="text-right shrink-0">
                 <p className="text-sm font-semibold text-foreground tabular-nums">
-                  {product.quantity_sold} vendus
-                </p>
-                <p className="text-xs text-muted-foreground tabular-nums">
                   {formatCurrency(product.revenue)}
                 </p>
               </div>

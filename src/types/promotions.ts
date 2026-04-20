@@ -86,6 +86,17 @@ export interface Promotion {
   schedules?: DiscountScheduleResponse[];
 }
 
+/**
+ * Day of week string type
+ * Used throughout the application with numeric mapping:
+ *   0 = sunday (dimanche)
+ *   1 = monday (lundi)
+ *   2 = tuesday (mardi)
+ *   3 = wednesday (mercredi)
+ *   4 = thursday (jeudi)
+ *   5 = friday (vendredi)
+ *   6 = saturday (samedi)
+ */
 export type DayOfWeek =
   | 'monday'
   | 'tuesday'
@@ -98,9 +109,8 @@ export type DayOfWeek =
 export interface Availability {
   id: string;
   name: string;
-  days: DayOfWeek[];
-  start_time: string; // HH:mm
-  end_time: string;   // HH:mm
+  unavailable_message?: string; // Unavailability message for customers (max 30 chars)
+  time_slots?: TimeSlot[]; // Multiple time slots per day like promotions
   active: boolean;
   product_ids?: string[]; // Product IDs eligible for this availability
 }

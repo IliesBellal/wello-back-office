@@ -52,7 +52,7 @@ const Index = () => {
 
           {/* ── Revenue Evolution Chart ── */}
           <div className="mt-8">
-            <RevenueEvolutionChart />
+            <RevenueEvolutionChart data={data?.hourly || []} />
           </div>
         </PageContainer>
       </div>

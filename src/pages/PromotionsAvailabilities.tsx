@@ -86,9 +86,8 @@ const emptyPromotion = (): Omit<Promotion, 'id'> => ({
 
 const emptyAvailability = (): Omit<Availability, 'id'> => ({
   name: '',
-  days: [],
-  start_time: '11:00',
-  end_time: '14:00',
+  unavailable_message: '',
+  time_slots: [{ day: 'monday', start_time: '11:00', end_time: '14:00' }],
   active: true,
   product_ids: [],
 });
@@ -153,10 +152,18 @@ function PromotionFormDialog({
   const [minOrderValueDisplay, setMinOrderValueDisplay] = useState<string>('');
 
   useEffect(() => {
-    setForm(initial ? { ...initial } : emptyPromotion());
+    const newForm = initial ? { ...initial } : emptyPromotion();
+    setForm(newForm);
     setActiveTab('general');
     setProductSearch('');
-    setPriceDisplayValues({});
+    // Initialize price display values from product_prices
+    const initialPrices: Record<string, string> = {};
+    if (newForm.product_prices) {
+      Object.entries(newForm.product_prices).forEach(([productId, priceInCents]) => {
+        initialPrices[productId] = priceToDisplayValue(priceInCents);
+      });
+    }
+    setPriceDisplayValues(initialPrices);
     setMinOrderValueDisplay(initial?.min_order_unit === 'EUR' ? priceToDisplayValue(initial?.min_order_value ?? 0) : `${initial?.min_order_value ?? 0}`);
   }, [open, initial]);
 
@@ -965,7 +972,7 @@ function AvailabilityFormDialog({
   onSave: (data: Omit<Availability, 'id'>) => Promise<void>;
 }) {
   const [form, setForm] = useState<Omit<Availability, 'id'>>(
-    initial ? { ...initial, days: [...initial.days] } : emptyAvailability()
+    initial ? { ...initial } : emptyAvailability()
   );
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
@@ -974,7 +981,7 @@ function AvailabilityFormDialog({
   const [productSearch, setProductSearch] = useState('');
 
   useEffect(() => {
-    setForm(initial ? { ...initial, days: [...initial.days] } : emptyAvailability());
+    setForm(initial ? { ...initial } : emptyAvailability());
     setActiveTab('general');
     setProductSearch('');
   }, [open, initial]);
@@ -993,20 +1000,9 @@ function AvailabilityFormDialog({
   const set = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
-  const toggleDay = (day: DayOfWeek) => {
-    setForm(prev => ({
-      ...prev,
-      days: prev.days.includes(day)
-        ? prev.days.filter(d => d !== day)
-        : [...prev.days, day],
-    }));
-  };
-
   const isValid =
     form.name.trim().length > 0 &&
-    form.days.length > 0 &&
-    form.start_time.length > 0 &&
-    form.end_time.length > 0;
+    (form.time_slots?.length ?? 0) > 0;
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -1032,44 +1028,19 @@ function AvailabilityFormDialog({
       </div>
 
       <div className="space-y-2">
-        <Label>Jours *</Label>
-        <div className="flex flex-wrap gap-2">
-          {ALL_DAYS.map(day => (
-            <button
-              key={day.key}
-              type="button"
-              onClick={() => toggleDay(day.key)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                form.days.includes(day.key)
-                  ? 'bg-primary text-white border-primary'
-                  : 'border-border text-muted-foreground hover:bg-muted/50'
-              }`}
-            >
-              {day.short}
-            </button>
-          ))}
+        <div className="flex items-center justify-between">
+          <Label htmlFor="avail-msg">Message d'indisponibilité (max 30)</Label>
+          <span className="text-xs text-neutral-500">
+            {(form.unavailable_message || '').length}/30
+          </span>
         </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="avail-start">Heure de début *</Label>
-          <Input
-            id="avail-start"
-            type="time"
-            value={form.start_time}
-            onChange={e => set('start_time', e.target.value)}
-          />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="avail-end">Heure de fin *</Label>
-          <Input
-            id="avail-end"
-            type="time"
-            value={form.end_time}
-            onChange={e => set('end_time', e.target.value)}
-          />
-        </div>
+        <Input
+          id="avail-msg"
+          value={form.unavailable_message || ''}
+          onChange={e => set('unavailable_message', e.target.value.slice(0, 30))}
+          placeholder="Ex: Fermé hors heures midi"
+          maxLength={30}
+        />
       </div>
 
       <div className="flex items-center gap-3 pt-2 border-t border-border">
@@ -1084,6 +1055,149 @@ function AvailabilityFormDialog({
       </div>
     </div>
   );
+
+  // ─── TAB: HORAIRES ────────────────────────────────────────────────────────
+  const renderHorairesTab = () => {
+    const isTimeRestricted = (form.time_slots?.length ?? 0) > 0;
+    
+    const getSchedulesForDay = (day: DayOfWeek): TimeSlot[] => 
+      (form.time_slots ?? []).filter(slot => slot.day === day);
+    
+    const hasSchedulesForDay = (day: DayOfWeek): boolean => 
+      getSchedulesForDay(day).length > 0;
+    
+    const addScheduleForDay = (day: DayOfWeek) => {
+      const updated = [...(form.time_slots ?? [])];
+      updated.push({ day, start_time: '11:00', end_time: '14:00' });
+      set('time_slots', updated);
+    };
+    
+    const removeSchedule = (day: DayOfWeek, idx: number) => {
+      const schedules = getSchedulesForDay(day);
+      const allSchedules = form.time_slots ?? [];
+      const firstScheduleIndex = allSchedules.findIndex(s => s.day === day);
+      const updated = allSchedules.filter((_, i) => i !== (firstScheduleIndex + idx));
+      set('time_slots', updated);
+    };
+    
+    const updateSchedule = (day: DayOfWeek, idx: number, field: 'start_time' | 'end_time', value: string) => {
+      const schedules = getSchedulesForDay(day);
+      const allSchedules = form.time_slots ?? [];
+      const firstScheduleIndex = allSchedules.findIndex(s => s.day === day);
+      const updated = [...allSchedules];
+      updated[firstScheduleIndex + idx] = { ...updated[firstScheduleIndex + idx], [field]: value };
+      set('time_slots', updated);
+    };
+    
+    const copySchedulesToAllDays = (sourceDay: DayOfWeek) => {
+      const sourceSchedules = getSchedulesForDay(sourceDay);
+      if (sourceSchedules.length === 0) return;
+      
+      const updated = form.time_slots?.filter(s => s.day !== sourceDay) ?? [];
+      ALL_DAYS.forEach(dayObj => {
+        if (dayObj.key !== sourceDay) {
+          sourceSchedules.forEach(schedule => {
+            updated.push({ ...schedule, day: dayObj.key });
+          });
+        }
+      });
+      updated.push(...sourceSchedules);
+      set('time_slots', updated);
+    };
+
+    return (
+      <div className="space-y-4">
+        {/* Sections par jour */}
+        {ALL_DAYS.map(dayObj => {
+          const schedules = getSchedulesForDay(dayObj.key);
+          const isEnabled = schedules.length > 0;
+          
+          return (
+            <div key={dayObj.key} className="border border-border rounded-lg p-4">
+              {/* Header avec jour et switch */}
+              <div className="flex items-center justify-between mb-3 pb-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Switch
+                    id={`day-${dayObj.key}`}
+                    checked={isEnabled}
+                    onCheckedChange={v => {
+                      if (v) {
+                        addScheduleForDay(dayObj.key);
+                      } else {
+                        const updated = form.time_slots?.filter(s => s.day !== dayObj.key) ?? [];
+                        set('time_slots', updated);
+                      }
+                    }}
+                  />
+                  <Label htmlFor={`day-${dayObj.key}`} className="cursor-pointer font-medium">
+                    {dayObj.label}
+                  </Label>
+                </div>
+                
+                {/* Copier à tous */}
+                {isEnabled && (
+                  <button
+                    onClick={() => copySchedulesToAllDays(dayObj.key)}
+                    className="text-xs text-primary hover:underline cursor-pointer font-medium"
+                  >
+                    Copier à tous
+                  </button>
+                )}
+              </div>
+
+              {/* Schedules pour ce jour */}
+              {isEnabled && (
+                <div className="space-y-2">
+                  {schedules.map((schedule, idx) => (
+                    <div key={`${dayObj.key}-${idx}`} className="flex gap-2 items-end">
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs">Début</Label>
+                        <Input
+                          type="time"
+                          value={schedule.start_time}
+                          onChange={e => updateSchedule(dayObj.key, idx, 'start_time', e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+
+                      <div className="flex-1 space-y-1">
+                        <Label className="text-xs">Fin</Label>
+                        <Input
+                          type="time"
+                          value={schedule.end_time}
+                          onChange={e => updateSchedule(dayObj.key, idx, 'end_time', e.target.value)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeSchedule(dayObj.key, idx)}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() => addScheduleForDay(dayObj.key)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Ajouter un créneau
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   // ─── TAB: PRODUITS ────────────────────────────────────────────────────────
   const filteredProducts = products.filter(p =>
@@ -1148,13 +1262,19 @@ function AvailabilityFormDialog({
 
         {/* Tabs Container */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          {/* Tabs Navigation - Always Visible */}
+        {/* Tabs Navigation - Always Visible */}
           <TabsList className="w-full justify-start px-6 py-0 h-auto rounded-none border-b bg-transparent gap-6 flex-shrink-0">
             <TabsTrigger 
               value="general" 
               className="rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-primary pb-3 pt-3"
             >
               Général
+            </TabsTrigger>
+            <TabsTrigger 
+              value="horaires" 
+              className="rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-primary pb-3 pt-3"
+            >
+              Horaires
             </TabsTrigger>
             <TabsTrigger 
               value="produits" 
@@ -1172,6 +1292,16 @@ function AvailabilityFormDialog({
               className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden"
             >
               {renderGeneralTab()}
+            </TabsContent>
+
+            {/* Horaires Tab - Internal scroll */}
+            <TabsContent 
+              value="horaires" 
+              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden flex flex-col"
+            >
+              <div className="overflow-y-auto flex-1 pr-2">
+                {renderHorairesTab()}
+              </div>
             </TabsContent>
 
             {/* Produits Tab - Fixed search + scrollable list */}
@@ -1302,27 +1432,43 @@ function AvailabilitiesTab() {
               </CardHeader>
 
               <CardContent className="space-y-3 pt-0">
-                {/* Time range */}
-                <div className="flex items-center gap-2 text-sm font-medium">
-                  <Clock className="w-4 h-4 text-muted-foreground" />
-                  <span>{avail.start_time} – {avail.end_time}</span>
-                </div>
+                {/* Time slots info */}
+                {avail.time_slots && avail.time_slots.length > 0 && (
+                  <>
+                    {/* Get unique days for display */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {Array.from(new Set(avail.time_slots.map(s => s.day)))
+                        .sort()
+                        .map(day => (
+                          <span
+                            key={day}
+                            className="text-xs px-2 py-0.5 rounded-md font-medium bg-primary/15 text-primary"
+                          >
+                            {dayLabel(day)}
+                          </span>
+                        ))}
+                    </div>
 
-                {/* Days */}
-                <div className="flex flex-wrap gap-1.5">
-                  {ALL_DAYS.map(day => (
-                    <span
-                      key={day.key}
-                      className={`text-xs px-2 py-0.5 rounded-md font-medium ${
-                        avail.days.includes(day.key)
-                          ? 'bg-primary/15 text-primary'
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {dayLabel(day.key)}
-                    </span>
-                  ))}
-                </div>
+                    {/* Time ranges */}
+                    <div className="space-y-1 text-sm">
+                      {Array.from(new Set(avail.time_slots.map(s => `${s.start_time}-${s.end_time}`)))
+                        .map((timeRange) => (
+                          <div key={timeRange} className="flex items-center gap-2 font-medium text-muted-foreground">
+                            <Clock className="w-4 h-4" />
+                            <span>{timeRange}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </>
+                )}
+
+                {/* Products info */}
+                {avail.product_ids && avail.product_ids.length > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    <UtensilsCrossed className="w-3.5 h-3.5 inline mr-1" />
+                    {avail.product_ids.length} produit{avail.product_ids.length !== 1 ? 's' : ''} associé{avail.product_ids.length !== 1 ? 's' : ''}
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between pt-1 border-t border-border">
                   <span className="text-xs text-muted-foreground">

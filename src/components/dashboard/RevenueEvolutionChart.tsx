@@ -24,6 +24,10 @@ interface ChartDataPoint extends HourlyChannelData {
   deliveroo: number;
 }
 
+interface RevenueEvolutionChartProps {
+  data: HourlyChannelData[];
+}
+
 const channelLabels: Record<string, string> = {
   sur_place: 'Sur place',
   emporter: 'À emporter',
@@ -69,9 +73,8 @@ const CustomTooltip = ({
   return null;
 };
 
-export const RevenueEvolutionChart = () => {
-  const [data, setData] = useState<ChartDataPoint[] | null>(null);
-  const [loading, setLoading] = useState(true);
+export const RevenueEvolutionChart = ({ data: hourlyData }: RevenueEvolutionChartProps) => {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedChannels, setSelectedChannels] = useState<ChannelType[]>([
     'all',
@@ -80,46 +83,6 @@ export const RevenueEvolutionChart = () => {
     'uber_eats',
     'deliveroo',
   ]);
-
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Mock data
-        const mockData: ChartDataPoint[] = [
-          { hour: '10:00', sur_place: 0, emporter: 120, livraison: 80, uber_eats: 60, deliveroo: 40, total: 300 },
-          { hour: '11:00', sur_place: 180, emporter: 210, livraison: 130, uber_eats: 90, deliveroo: 50, total: 660 },
-          { hour: '12:00', sur_place: 980, emporter: 560, livraison: 310, uber_eats: 280, deliveroo: 180, total: 2310 },
-          { hour: '13:00', sur_place: 1420, emporter: 720, livraison: 390, uber_eats: 340, deliveroo: 210, total: 3080 },
-          { hour: '14:00', sur_place: 640, emporter: 380, livraison: 210, uber_eats: 190, deliveroo: 120, total: 1540 },
-          { hour: '15:00', sur_place: 120, emporter: 150, livraison: 90, uber_eats: 80, deliveroo: 40, total: 480 },
-          { hour: '16:00', sur_place: 80, emporter: 110, livraison: 60, uber_eats: 50, deliveroo: 30, total: 330 },
-          { hour: '17:00', sur_place: 60, emporter: 90, livraison: 40, uber_eats: 40, deliveroo: 20, total: 250 },
-          { hour: '18:00', sur_place: 280, emporter: 200, livraison: 120, uber_eats: 110, deliveroo: 70, total: 780 },
-          { hour: '19:00', sur_place: 820, emporter: 410, livraison: 280, uber_eats: 240, deliveroo: 140, total: 1890 },
-          { hour: '20:00', sur_place: 1180, emporter: 530, livraison: 350, uber_eats: 310, deliveroo: 170, total: 2540 },
-          { hour: '21:00', sur_place: 850, emporter: 320, livraison: 210, uber_eats: 180, deliveroo: 110, total: 1670 },
-        ];
-
-        setData(mockData);
-      } catch (err) {
-        setError('Impossible de charger les données');
-        console.error('Error loading revenue evolution:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-  }, []);
-
-  const visibleChannels = useMemo(() => {
-    if (selectedChannels.length === 0 || !selectedChannels.includes('all')) {
-      return selectedChannels.filter(c => c !== 'all') as Exclude<ChannelType, 'all'>[];
-    }
-    return ['sur_place', 'emporter', 'uber_eats', 'deliveroo'] as const;
-  }, [selectedChannels]);
 
   if (error) {
     return (
@@ -136,6 +99,13 @@ export const RevenueEvolutionChart = () => {
     );
   }
 
+  const visibleChannels = useMemo(() => {
+    if (selectedChannels.length === 0 || !selectedChannels.includes('all')) {
+      return selectedChannels.filter(c => c !== 'all') as Exclude<ChannelType, 'all'>[];
+    }
+    return ['sur_place', 'emporter', 'uber_eats', 'deliveroo'] as const;
+  }, [selectedChannels]);
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-6">
@@ -148,13 +118,11 @@ export const RevenueEvolutionChart = () => {
         </div>
       </CardHeader>
       <CardContent>
-        {loading ? (
-          <Skeleton className="h-[360px] rounded-lg" />
-        ) : data && data.length > 0 ? (
+        {hourlyData && hourlyData.length > 0 ? (
           <div className="h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={data}
+                data={hourlyData}
                 margin={{ top: 5, right: 30, left: 0, bottom: 0 }}
               >
                 <defs>

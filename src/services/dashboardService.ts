@@ -2,42 +2,30 @@ import { withMock, mockDelay, apiClient } from './apiClient';
 
 // ============= Types =============
 
-/** Comparaison temporelle d'un KPI (valeurs brutes pour chaque période) */
-export interface KPIComparison {
+/** Comparaison jour sur jour (aujourd'hui vs hier) */
+export interface DayComparison {
   today: number;
   yesterday: number;
-  same_day_last_week: number;   // Même jour de la semaine passée (ex: lundi dernier)
-  same_day_last_year: number;   // Même jour l'année passée
 }
 
-/** Données de période (semaine, mois) avec comparaisons */
-export interface PeriodComparison {
-  current: number;              // Semaine actuelle ou mois actuel
-  previous_period: number;      // Semaine ou mois précédent
-  same_period_last_year: number; // Même semaine/mois l'année passée
+/** Données de période (semaine, mois) */
+export interface PeriodData {
+  current: number;         // Semaine/mois actuel
+  previous_period: number; // Semaine/mois précédent
 }
 
 /** KPIs principaux du dashboard */
 export interface DashboardKPIs {
   /** Chiffre d'affaires */
-  revenue: KPIComparison & {
+  revenue: DayComparison & {
     currency: string;
-    target_day: number;         // Objectif CA journalier
-    target_week: number;        // Objectif CA hebdomadaire
-    target_month: number;       // Objectif CA mensuel
-    in_progress_amount: number; // Montant des commandes en cours de préparation
-    week: PeriodComparison;     // Données de la semaine
-    month: PeriodComparison;    // Données du mois
+    week: PeriodData;     // Données de la semaine
+    month: PeriodData;    // Données du mois
   };
-  /** Ticket moyen = CA / nombre de tickets (encaissements) */
-  avg_ticket: KPIComparison & { currency: string };
   /** Panier moyen = CA / nombre de commandes */
-  avg_basket: KPIComparison & { currency: string };
+  avg_basket: DayComparison & { currency: string };
   /** Commandes (toutes sources confondues) */
-  orders: KPIComparison & {
-    in_progress: number;   // Commandes actuellement en préparation
-    cancelled_today: number; // Annulées aujourd'hui
-  };
+  orders: DayComparison;
 }
 
 /** Statistiques par canal de vente */
@@ -46,7 +34,6 @@ export interface ChannelStats {
   label: string;
   orders: number;
   revenue: number;
-  avg_preparation_time_minutes: number;
   trend_vs_yesterday_pct: number; // % d'évolution vs hier (positif = hausse)
 }
 
@@ -59,10 +46,7 @@ export interface DashboardChannels {
 /** Top produit vendu du jour */
 export interface TopProduct {
   rank: number;
-  id: string;
   name: string;
-  category: string;
-  quantity_sold: number;
   revenue: number;
   trend_vs_yesterday: 'up' | 'down' | 'stable';
   trend_percentage: number;
@@ -87,28 +71,14 @@ export interface ActivityEvent {
   message: string;
   value: string | null;
   time: string;
-  user?: string; // opérateur responsable si applicable
+  user?: string;
 }
 
 /** Alertes opérationnelles */
 export interface DashboardAlerts {
   low_stock_count: number;
-  low_stock_items: string[];        // Noms des articles en rupture/critique
   voided_orders: number;
   pending_deliveries: number;
-  cash_register_alerts: number;    // Nb de caisses avec anomalie
-  unpaid_orders: number;           // Commandes non encaissées
-}
-
-/** Métriques de service (opérations salle/cuisine) */
-export interface ServiceMetrics {
-  avg_preparation_time_minutes: number;
-  avg_table_time_minutes: number;  // Temps moyen d'occupation d'une table
-  tables_occupied: number;
-  tables_total: number;
-  covers_today: number;            // Couverts servis aujourd'hui
-  covers_target: number;           // Objectif couverts journalier
-  satisfaction_rate: number | null; // Note moyenne (ex. Google / plateforme) — null si absent
 }
 
 /** Réponse complète du dashboard */
@@ -119,7 +89,6 @@ export interface DashboardSummary {
   hourly: HourlyChannelData[];
   activity: ActivityEvent[];
   alerts: DashboardAlerts;
-  service: ServiceMetrics;
 }
 
 // ============= Mock Data =============
@@ -128,45 +97,24 @@ const mockKPIs: DashboardKPIs = {
   revenue: {
     today: 12_480,
     yesterday: 10_920,
-    same_day_last_week: 11_350,
-    same_day_last_year: 9_870,
     currency: 'EUR',
-    target_day: 15_000,
-    target_week: 98_000,
-    target_month: 420_000,
-    in_progress_amount: 640,
     week: {
       current: 87_500,
       previous_period: 82_200,
-      same_period_last_year: 79_800,
     },
     month: {
       current: 385_200,
       previous_period: 371_600,
-      same_period_last_year: 356_900,
     },
-  },
-  avg_ticket: {
-    today: 28.40,
-    yesterday: 25.10,
-    same_day_last_week: 26.80,
-    same_day_last_year: 23.50,
-    currency: 'EUR',
   },
   avg_basket: {
     today: 19.75,
     yesterday: 17.90,
-    same_day_last_week: 18.60,
-    same_day_last_year: 16.20,
     currency: 'EUR',
   },
   orders: {
     today: 439,
     yesterday: 398,
-    same_day_last_week: 422,
-    same_day_last_year: 371,
-    in_progress: 12,
-    cancelled_today: 4,
   },
 };
 
@@ -179,7 +127,6 @@ const mockChannels: DashboardChannels = {
       label: 'Sur place',
       orders: 198,
       revenue: 5_612,
-      avg_preparation_time_minutes: 14,
       trend_vs_yesterday_pct: 8.2,
     },
     {
@@ -187,7 +134,6 @@ const mockChannels: DashboardChannels = {
       label: 'À emporter',
       orders: 112,
       revenue: 2_890,
-      avg_preparation_time_minutes: 9,
       trend_vs_yesterday_pct: 12.5,
     },
     {
@@ -195,7 +141,6 @@ const mockChannels: DashboardChannels = {
       label: 'Livraison propre',
       orders: 54,
       revenue: 1_620,
-      avg_preparation_time_minutes: 22,
       trend_vs_yesterday_pct: -3.1,
     },
     {
@@ -203,7 +148,6 @@ const mockChannels: DashboardChannels = {
       label: 'Uber Eats',
       orders: 47,
       revenue: 1_410,
-      avg_preparation_time_minutes: 26,
       trend_vs_yesterday_pct: 5.7,
     },
     {
@@ -211,7 +155,6 @@ const mockChannels: DashboardChannels = {
       label: 'Deliveroo',
       orders: 28,
       revenue: 948,
-      avg_preparation_time_minutes: 24,
       trend_vs_yesterday_pct: -8.4,
     },
   ],
@@ -220,10 +163,7 @@ const mockChannels: DashboardChannels = {
 const mockTopProducts: TopProduct[] = [
   {
     rank: 1,
-    id: 'prod_001',
     name: 'Burger Classic',
-    category: 'Burgers',
-    quantity_sold: 87,
     revenue: 1_479,
     trend_vs_yesterday: 'up',
     trend_percentage: 18,
@@ -231,10 +171,7 @@ const mockTopProducts: TopProduct[] = [
   },
   {
     rank: 2,
-    id: 'prod_002',
     name: 'Pizza Margherita',
-    category: 'Pizzas',
-    quantity_sold: 64,
     revenue: 1_152,
     trend_vs_yesterday: 'stable',
     trend_percentage: 2,
@@ -242,10 +179,7 @@ const mockTopProducts: TopProduct[] = [
   },
   {
     rank: 3,
-    id: 'prod_003',
     name: 'Salade César',
-    category: 'Salades',
-    quantity_sold: 52,
     revenue: 780,
     trend_vs_yesterday: 'up',
     trend_percentage: 31,
@@ -253,10 +187,7 @@ const mockTopProducts: TopProduct[] = [
   },
   {
     rank: 4,
-    id: 'prod_004',
     name: 'Tiramisu Maison',
-    category: 'Desserts',
-    quantity_sold: 48,
     revenue: 528,
     trend_vs_yesterday: 'down',
     trend_percentage: 12,
@@ -264,14 +195,11 @@ const mockTopProducts: TopProduct[] = [
   },
   {
     rank: 5,
-    id: 'prod_005',
     name: 'Entrecôte 300g',
-    category: 'Viandes',
-    quantity_sold: 31,
     revenue: 1_054,
     trend_vs_yesterday: 'up',
     trend_percentage: 7,
-    out_of_stock: true, // en rupture
+    out_of_stock: true,
   },
 ];
 
@@ -303,21 +231,8 @@ const mockActivity: ActivityEvent[] = [
 
 const mockAlerts: DashboardAlerts = {
   low_stock_count: 3,
-  low_stock_items: ['Mozzarella', 'Entrecôte 300g', 'Tiramisu'],
   voided_orders: 2,
   pending_deliveries: 1,
-  cash_register_alerts: 0,
-  unpaid_orders: 1,
-};
-
-const mockService: ServiceMetrics = {
-  avg_preparation_time_minutes: 14,
-  avg_table_time_minutes: 52,
-  tables_occupied: 11,
-  tables_total: 18,
-  covers_today: 198,
-  covers_target: 250,
-  satisfaction_rate: 4.7,
 };
 
 const mockDashboardSummary: DashboardSummary = {
@@ -327,13 +242,12 @@ const mockDashboardSummary: DashboardSummary = {
   hourly: mockHourlyData,
   activity: mockActivity,
   alerts: mockAlerts,
-  service: mockService,
 };
 
 // ============= API Functions =============
 
 /**
- * GET /pos/stats/dashboard/summary
+ * GET /stats/dashboard/summary
  * Retourne l'ensemble des données du dashboard en un seul appel.
  */
 export const getDashboardSummary = (): Promise<DashboardSummary> => {
@@ -342,6 +256,9 @@ export const getDashboardSummary = (): Promise<DashboardSummary> => {
       await mockDelay(450);
       return mockDashboardSummary;
     },
-    () => apiClient.get<DashboardSummary>('/pos/stats/dashboard/summary')
+    async () => {
+      const response = await apiClient.get<{ id: string; data: DashboardSummary }>('/stats/dashboard/summary');
+      return response.data;
+    }
   );
 };

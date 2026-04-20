@@ -1,10 +1,80 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from '@/services/apiClient';
 import { Promotion, Availability, DiscountResponse, DiscountScheduleResponse, DayOfWeek, TimeSlot } from '@/types/promotions';
 
+// ════════════════════════════════════════════════════════════════════════════
+// IMPORTANT: Day of Week Convention (Standard Unix/JavaScript - NOT ISO 8601)
+// ════════════════════════════════════════════════════════════════════════════
+// This service uses the following convention for day_of_week throughout:
+//   0 = Sunday (Dimanche)
+//   1 = Monday (Lundi)
+//   2 = Tuesday (Mardi)
+//   3 = Wednesday (Mercredi)
+//   4 = Thursday (Jeudi)
+//   5 = Friday (Vendredi)
+//   6 = Saturday (Samedi)
+//
+// This is consistent with:
+// - JavaScript native .getDay() method (returns 0-6)
+// - Unix/POSIX standard (Sunday=0)
+// - All API responses and internal data structures
+// - NOT ISO 8601 (which uses 1-7 with Monday=1, Sunday=7)
+// ════════════════════════════════════════════════════════════════════════════
+
+// ─── Types for API Responses ──────────────────────────────────────────────────
+
+interface AvailabilityApiResponse {
+  availability_id: string;
+  name: string;
+  unavailable_message?: string; // Unavailability message for customers (max 30 chars)
+  available: number | boolean;
+  creation_date?: string;
+  update_date?: string;
+  product_ids: string[] | null;
+  schedules: Array<{
+    schedule_id: string;
+    availability_id: string;
+    day_of_week: number; // 0=Sunday, 1=Monday, ..., 6=Saturday
+    start_time: string; // HH:MM:SS format
+    end_time: string;   // HH:MM:SS format
+    creation_date?: string;
+    update_date?: string;
+  }> | null;
+}
+
 // ─── Mapping Functions ────────────────────────────────────────────────────────
 
 /**
- * Convert day of week number (0=Sunday, 1=Monday, ..., 6=Saturday) to DayOfWeek string
+ * Convert HH:MM:SS to HH:MM (truncate seconds)
+ */
+function timeToDisplayFormat(time: string): string {
+  return time.substring(0, 5); // "HH:MM:SS" -> "HH:MM"
+}
+
+/**
+ * Map API AvailabilityApiResponse to internal Availability type
+ */
+function mapAvailabilityResponseToAvailability(availability: AvailabilityApiResponse): Availability {
+  // Transform schedules to time_slots
+  const time_slots: TimeSlot[] = (availability.schedules ?? [])
+    .map(s => ({
+      day: dayOfWeekNumberToString(s.day_of_week),
+      start_time: timeToDisplayFormat(s.start_time),
+      end_time: timeToDisplayFormat(s.end_time),
+    }));
+
+  return {
+    id: availability.availability_id,
+    name: availability.name,
+    unavailable_message: availability.unavailable_message,
+    time_slots: time_slots.length > 0 ? time_slots : undefined,
+    active: availability.available ? true : false,
+    product_ids: availability.product_ids && availability.product_ids.length > 0 ? availability.product_ids : undefined,
+  };
+}
+
+/**
+ * Convert day of week number to DayOfWeek string
+ * Uses standard 0-6 convention: 0=Sunday, 1=Monday, ..., 6=Saturday
  */
 function dayOfWeekNumberToString(dayNum: number): DayOfWeek {
   const days: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -12,7 +82,8 @@ function dayOfWeekNumberToString(dayNum: number): DayOfWeek {
 }
 
 /**
- * Convert DayOfWeek string to day of week number (0=Sunday, 1=Monday, ..., 6=Saturday)
+ * Convert DayOfWeek string to day of week number
+ * Uses standard 0-6 convention: 0=Sunday, 1=Monday, ..., 6=Saturday
  */
 function stringToDayOfWeekNumber(day: DayOfWeek): number {
   const mapping: Record<DayOfWeek, number> = {
@@ -45,6 +116,16 @@ function mapDiscountResponseToPromotion(discount: DiscountResponse): Promotion {
     .filter(p => p.enabled)
     .map(p => p.product_id);
 
+  // Extract product prices for NEWPRICE discounts
+  const product_prices: Record<string, number> = {};
+  (discount.products ?? [])
+    .filter(p => p.enabled)
+    .forEach(p => {
+      if (p.new_price !== null && p.new_price !== undefined) {
+        product_prices[p.product_id] = p.new_price;
+      }
+    });
+
   // Determine discount type from discount_unit
   const type = discount.discount_unit === 'PERCENTAGE' ? 'percentage' : 'fixed';
 
@@ -57,9 +138,10 @@ function mapDiscountResponseToPromotion(discount: DiscountResponse): Promotion {
     value: discount.discount_value ?? 0,
     start_date: discount.valid_from,
     end_date: discount.valid_to,
-    active: discount.enabled,
+    active: discount.available,
     time_slots: time_slots.length > 0 ? time_slots : undefined,
     product_ids: product_ids.length > 0 ? product_ids : undefined,
+    product_prices: Object.keys(product_prices).length > 0 ? product_prices : undefined,
     order_type: discount.order_type,
     min_order_value: discount.min_order_value,
     min_order_unit: discount.min_order_unit,
@@ -106,7 +188,7 @@ function transformPromotionForAPI(promo: Omit<Promotion, 'id'> | Partial<Omit<Pr
   if (promo.discounted_quantity !== undefined) payload.discounted_quantity = promo.discounted_quantity;
   if (promo.is_cumulative !== undefined) payload.is_cumulative = promo.is_cumulative;
   if (promo.is_time_limited !== undefined) payload.is_time_limited = promo.is_time_limited;
-  if (promo.available !== undefined) payload.available = promo.available;
+  if (promo.active !== undefined) payload.available = promo.active;
 
   // Transform time_slots to schedules with day_of_week numbers
   if (promo.time_slots && promo.time_slots.length > 0) {
@@ -128,6 +210,38 @@ function transformPromotionForAPI(promo: Omit<Promotion, 'id'> | Partial<Omit<Pr
         new_price: newPrice ? Math.round(newPrice) : null, // Convert to int64 (cents)
       };
     });
+  }
+
+  return payload;
+}
+
+/**
+ * Transform internal Availability type to API payload format
+ * Maps field names and converts types as needed
+ */
+function transformAvailabilityForAPI(avail: Omit<Availability, 'id'> | Partial<Omit<Availability, 'id'>>) {
+  const payload: Record<string, unknown> = {};
+
+  if (avail.name !== undefined) payload.name = avail.name;
+
+  if (avail.unavailable_message !== undefined) payload.unavailable_message = avail.unavailable_message;
+
+  // Transform time_slots to schedules with day_of_week numbers
+  if (avail.time_slots && avail.time_slots.length > 0) {
+    payload.schedules = avail.time_slots.map(slot => {
+      return {
+        day_of_week: stringToDayOfWeekNumber(slot.day),
+        start_time: slot.start_time,  // HH:mm format
+        end_time: slot.end_time,      // HH:mm format
+      };
+    });
+  }
+
+  if (avail.active !== undefined) payload.available = avail.active;
+
+  // Product IDs
+  if (avail.product_ids !== undefined) {
+    payload.product_ids = avail.product_ids && avail.product_ids.length > 0 ? avail.product_ids : null;
   }
 
   return payload;
@@ -237,25 +351,38 @@ const mockAvailabilities: Availability[] = [
   {
     id: 'avail_1',
     name: 'Service du midi',
-    days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
-    start_time: '11:30',
-    end_time: '14:30',
+    unavailable_message: 'Fermé hors heures midi',
+    time_slots: [
+      { day: 'monday', start_time: '11:30', end_time: '14:30' },
+      { day: 'tuesday', start_time: '11:30', end_time: '14:30' },
+      { day: 'wednesday', start_time: '11:30', end_time: '14:30' },
+      { day: 'thursday', start_time: '11:30', end_time: '14:30' },
+      { day: 'friday', start_time: '11:30', end_time: '14:30' },
+    ],
     active: true,
   },
   {
     id: 'avail_2',
     name: 'Service du soir',
-    days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
-    start_time: '18:30',
-    end_time: '22:30',
+    unavailable_message: 'Fermé hors heures soir',
+    time_slots: [
+      { day: 'monday', start_time: '18:30', end_time: '22:30' },
+      { day: 'tuesday', start_time: '18:30', end_time: '22:30' },
+      { day: 'wednesday', start_time: '18:30', end_time: '22:30' },
+      { day: 'thursday', start_time: '18:30', end_time: '22:30' },
+      { day: 'friday', start_time: '18:30', end_time: '22:30' },
+      { day: 'saturday', start_time: '18:30', end_time: '22:30' },
+    ],
     active: true,
   },
   {
     id: 'avail_3',
     name: 'Brunch du week-end',
-    days: ['saturday', 'sunday'],
-    start_time: '10:00',
-    end_time: '14:00',
+    unavailable_message: 'W-end uniquement',
+    time_slots: [
+      { day: 'saturday', start_time: '10:00', end_time: '14:00' },
+      { day: 'sunday', start_time: '10:00', end_time: '14:00' },
+    ],
     active: false,
   },
 ];
@@ -271,7 +398,7 @@ export const promotionsService = {
       () => [...mockPromotions],
       async () => {
         const response = await apiClient.get<WelloApiResponse<DiscountResponse[]>>('/menu/discounts/all');
-        return response.data.map(mapDiscountResponseToPromotion);
+        return (response.data ?? []).map(mapDiscountResponseToPromotion);
       }
     );
   },
@@ -281,7 +408,10 @@ export const promotionsService = {
     logAPI('POST', '/menu/discounts', payload);
     return withMock(
       () => ({ ...data, id: `promo_${Date.now()}` }),
-      () => apiClient.post<Promotion>('/menu/discounts', payload)
+      async () => {
+        const response = await apiClient.post<WelloApiResponse<DiscountResponse>>('/menu/discounts', payload);
+        return mapDiscountResponseToPromotion(response.data);
+      }
     );
   },
 
@@ -293,7 +423,10 @@ export const promotionsService = {
         const found = mockPromotions.find(p => p.id === id);
         return { ...found!, ...data };
       },
-      () => apiClient.patch<Promotion>(`/menu/discounts/${id}`, payload)
+      async () => {
+        const response = await apiClient.patch<WelloApiResponse<DiscountResponse>>(`/menu/discounts/${id}`, payload);
+        return mapDiscountResponseToPromotion(response.data);
+      }
     );
   },
 
@@ -311,26 +444,38 @@ export const promotionsService = {
     logAPI('GET', '/menu/availabilities');
     return withMock(
       () => [...mockAvailabilities],
-      () => apiClient.get<Availability[]>('/menu/availabilities')
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<{ availabilities: AvailabilityApiResponse[] }>>('/menu/availabilities');
+        const availabilities = response.data?.availabilities ?? [];
+        return availabilities.map(mapAvailabilityResponseToAvailability);
+      }
     );
   },
 
   async createAvailability(data: Omit<Availability, 'id'>): Promise<Availability> {
-    logAPI('POST', '/menu/availabilities', data);
+    const payload = transformAvailabilityForAPI(data);
+    logAPI('POST', '/menu/availabilities', payload);
     return withMock(
       () => ({ ...data, id: `avail_${Date.now()}` }),
-      () => apiClient.post<Availability>('/menu/availabilities', data)
+      async () => {
+        const response = await apiClient.post<WelloApiResponse<AvailabilityApiResponse>>('/menu/availabilities', payload);
+        return mapAvailabilityResponseToAvailability(response.data);
+      }
     );
   },
 
   async updateAvailability(id: string, data: Partial<Omit<Availability, 'id'>>): Promise<Availability> {
-    logAPI('PATCH', `/menu/availabilities/${id}`, data);
+    const payload = transformAvailabilityForAPI(data);
+    logAPI('PATCH', `/menu/availabilities/${id}`, payload);
     return withMock(
       () => {
         const found = mockAvailabilities.find(a => a.id === id);
         return { ...found!, ...data };
       },
-      () => apiClient.patch<Availability>(`/menu/availabilities/${id}`, data)
+      async () => {
+        const response = await apiClient.patch<WelloApiResponse<AvailabilityApiResponse>>(`/menu/availabilities/${id}`, payload);
+        return mapAvailabilityResponseToAvailability(response.data);
+      }
     );
   },
 
