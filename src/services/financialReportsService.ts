@@ -38,10 +38,16 @@ export interface PaymentReportResponse {
   calendar: PaymentDayData[];
 }
 
+export interface ExportResponse {
+  status: string;
+  filename: string;
+  download_url: string;
+}
+
 // ============= Mock Data =============
 const mockVATData = (): VATReportResponse => {
   return {
-    status: "1",
+    status: "success",
     calendar: [
       {
         date: "2023-11-01",
@@ -79,7 +85,7 @@ const mockVATData = (): VATReportResponse => {
 
 const mockPaymentData = (): PaymentReportResponse => {
   return {
-    status: "1",
+    status: "success",
     calendar: [
       {
         date: "2023-11-01",
@@ -110,91 +116,73 @@ const mockPaymentData = (): PaymentReportResponse => {
 // ============= API Functions =============
 export const financialReportsService = {
   async getVATReport(dateFrom: string, dateTo: string): Promise<VATReportResponse> {
-    logAPI('POST', '/establishment/report/tva', { date_from: dateFrom, date_to: dateTo });
+    logAPI('POST', '/pos/reports/tva', { date_from: dateFrom, date_to: dateTo });
     
     return withMock(
       () => mockVATData(),
-      () => apiClient.post<VATReportResponse>('/establishment/report/tva', { date_from: dateFrom, date_to: dateTo })
+      async () => {
+        const response = await apiClient.post<{ id: string; data: VATReportResponse }>('/pos/reports/tva', { date_from: dateFrom, date_to: dateTo });
+        return response.data;
+      }
     );
   },
 
   async getPaymentReport(dateFrom: string, dateTo: string): Promise<PaymentReportResponse> {
-    logAPI('POST', '/establishment/report/payments', { date_from: dateFrom, date_to: dateTo });
+    logAPI('POST', '/pos/reports/payments', { date_from: dateFrom, date_to: dateTo });
     
     return withMock(
       () => mockPaymentData(),
-      () => apiClient.post<PaymentReportResponse>('/establishment/report/payments', { date_from: dateFrom, date_to: dateTo })
-    );
-  },
-
-  async exportGlobal(dateFrom: string, dateTo: string): Promise<void> {
-    logAPI('POST', '/establishment/accounting/export', { date_from: dateFrom, date_to: dateTo });
-    
-    return withMock(
-      () => {
-        console.log('Mock: Exporting global accounting data', { dateFrom, dateTo });
-      },
       async () => {
-        const response = await fetch(`${API_BASE_URL}/establishment/accounting/export`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-        });
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `export-comptable-${dateFrom}-${dateTo}.xlsx`;
-        a.click();
+        const response = await apiClient.post<{ id: string; data: PaymentReportResponse }>('/pos/reports/payments', { date_from: dateFrom, date_to: dateTo });
+        return response.data;
       }
     );
   },
 
-  async exportVAT(dateFrom: string, dateTo: string): Promise<void> {
-    logAPI('POST', '/establishment/report/tva/export', { date_from: dateFrom, date_to: dateTo });
+  async exportGlobal(dateFrom: string, dateTo: string): Promise<ExportResponse> {
+    logAPI('POST', '/pos/accounting/export', { date_from: dateFrom, date_to: dateTo });
     
     return withMock(
-      () => {
-        console.log('Mock: Exporting VAT data', { dateFrom, dateTo });
-      },
+      () => ({
+        status: '1',
+        filename: `WR_rapport_comptable_${new Date().getFullYear()}_${String(new Date().getMonth() + 1).padStart(2, '0')}.pdf`,
+        download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_comptable.pdf'
+      }),
       async () => {
-        const response = await fetch(`${API_BASE_URL}/establishment/report/tva/export`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-        });
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `export-tva-${dateFrom}-${dateTo}.xlsx`;
-        a.click();
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/accounting/export', { date_from: dateFrom, date_to: dateTo });
+        return response.data;
       }
     );
   },
 
-  async exportPayments(dateFrom: string, dateTo: string): Promise<void> {
-    logAPI('POST', '/establishment/report/payments/export', { date_from: dateFrom, date_to: dateTo });
+  async exportVAT(dateFrom: string, dateTo: string): Promise<ExportResponse> {
+    logAPI('POST', '/pos/reports/tva/export', { date_from: dateFrom, date_to: dateTo });
     
     return withMock(
-      () => {
-        console.log('Mock: Exporting payment data', { dateFrom, dateTo });
-      },
+      () => ({
+        status: '1',
+        filename: `WR_rapport_tva_${new Date().getFullYear()}_${String(new Date().getMonth() + 1).padStart(2, '0')}.pdf`,
+        download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_tva.pdf'
+      }),
       async () => {
-        const response = await fetch(`${API_BASE_URL}/establishment/report/payments/export`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date_from: dateFrom, date_to: dateTo })
-        });
-        
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `export-paiements-${dateFrom}-${dateTo}.xlsx`;
-        a.click();
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/reports/tva/export', { date_from: dateFrom, date_to: dateTo });
+        return response.data;
+      }
+    );
+  },
+
+  async exportPayments(dateFrom: string, dateTo: string): Promise<ExportResponse> {
+    logAPI('POST', '/pos/reports/payments/export', { date_from: dateFrom, date_to: dateTo });
+    
+    return withMock(
+      () => ({
+        status: '1',
+        filename: `WR_rapport_paiements_${new Date().getFullYear()}_${String(new Date().getMonth() + 1).padStart(2, '0')}.pdf`,
+        download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_paiements.pdf'
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/reports/payments/export', { date_from: dateFrom, date_to: dateTo });
+        return response.data;
       }
     );
   }

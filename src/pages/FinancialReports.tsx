@@ -52,34 +52,49 @@ const FinancialReports = () => {
   const isLoading = vatLoading || paymentLoading;
 
   // Calculate totals from VAT data
-  const totals = vatData?.calendar.reduce(
+  const totals = (vatData?.calendar || []).reduce(
     (acc, day) => ({
       ttc: acc.ttc + (day.TTC_sum || 0),
       ht: acc.ht + (day.HT_sum || 0),
       tva: acc.tva + (day.TVA_sum || 0)
     }),
     { ttc: 0, ht: 0, tva: 0 }
-  ) || { ttc: 0, ht: 0, tva: 0 };
+  );
 
-  const handleExportGlobal = () => {
-    financialReportsService.exportGlobal(
-      format(dateRange.from, 'yyyy-MM-dd'),
-      format(dateRange.to, 'yyyy-MM-dd')
-    );
+  const handleExportGlobal = async () => {
+    try {
+      const result = await financialReportsService.exportGlobal(
+        format(dateRange.from, 'yyyy-MM-dd'),
+        format(dateRange.to, 'yyyy-MM-dd')
+      );
+      window.open(result.download_url, '_blank');
+    } catch (err) {
+      console.error('Erreur export comptable:', err);
+    }
   };
 
-  const handleExportVAT = () => {
-    financialReportsService.exportVAT(
-      format(dateRange.from, 'yyyy-MM-dd'),
-      format(dateRange.to, 'yyyy-MM-dd')
-    );
+  const handleExportVAT = async () => {
+    try {
+      const result = await financialReportsService.exportVAT(
+        format(dateRange.from, 'yyyy-MM-dd'),
+        format(dateRange.to, 'yyyy-MM-dd')
+      );
+      window.open(result.download_url, '_blank');
+    } catch (err) {
+      console.error('Erreur export TVA:', err);
+    }
   };
 
-  const handleExportPayments = () => {
-    financialReportsService.exportPayments(
-      format(dateRange.from, 'yyyy-MM-dd'),
-      format(dateRange.to, 'yyyy-MM-dd')
-    );
+  const handleExportPayments = async () => {
+    try {
+      const result = await financialReportsService.exportPayments(
+        format(dateRange.from, 'yyyy-MM-dd'),
+        format(dateRange.to, 'yyyy-MM-dd')
+      );
+      window.open(result.download_url, '_blank');
+    } catch (err) {
+      console.error('Erreur export paiements:', err);
+    }
   };
 
   return (
