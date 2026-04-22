@@ -1,4 +1,5 @@
 import { apiClient, withMock, logAPI } from "@/services/apiClient";
+import { toUTCDateString } from '@/utils/apiDate';
 
 // ============= Types =============
 export interface CashRegister { id: string; cash_desk_name: string; start_date: string; closed: boolean; enclosed: boolean; cash_fund: number; }
@@ -19,7 +20,11 @@ const mockSummary: CashRegisterSummary = { cash_fund: 15000, items: [{ mop_code:
 const mockTvaDetails: TvaDetails[] = [{ delivery_type_label: "Sur Place", items: [{ tva_rate: 10, tva_title: "TVA 10%", ttc_sum: 18500, ht_sum: 16818, tva_sum: 1682 }, { tva_rate: 20, tva_title: "TVA 20%", ttc_sum: 8200, ht_sum: 6833, tva_sum: 1367 }] }, { delivery_type_label: "Emporter", items: [{ tva_rate: 5.5, tva_title: "TVA 5.5%", ttc_sum: 5500, ht_sum: 5213, tva_sum: 287 }, { tva_rate: 10, tva_title: "TVA 10%", ttc_sum: 4700, ht_sum: 4273, tva_sum: 427 }] }];
 
 // ============= API Functions =============
-export const getCashRegisterHistory = (date: string) => { logAPI('GET', `/cash_register/history/${date}`); return withMock(() => [...mockRegisters], () => apiClient.get<CashRegister[]>(`/cash_register/history/${date}`)); };
+export const getCashRegisterHistory = (date: Date | string) => {
+  const utcDate = toUTCDateString(date);
+  logAPI('GET', `/cash_register/history/${utcDate}`);
+  return withMock(() => [...mockRegisters], () => apiClient.get<CashRegister[]>(`/cash_register/history/${utcDate}`));
+};
 export const closeCashRegister = (id: string) => { logAPI('PATCH', `/cash_register/${id}/close`); return withMock(() => ({ status: "ok" as string, error: undefined as string | undefined }), () => apiClient.patch<{ status: string; error?: string }>(`/cash_register/${id}/close`)); };
 export const getCashRegisterSummary = (id: string) => { logAPI('GET', `/cash_register/${id}/summary`); return withMock(() => ({ ...mockSummary, enclosed: mockRegisters.find(r => r.id === id)?.enclosed || false }), () => apiClient.get<CashRegisterSummary>(`/cash_register/${id}/summary`)); };
 export const getCashRegisterTvaDetails = (id: string) => { logAPI('GET', `/cash_register/${id}/tva_details`); return withMock(() => [...mockTvaDetails], () => apiClient.get<TvaDetails[]>(`/cash_register/${id}/tva_details`)); };

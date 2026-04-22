@@ -86,9 +86,20 @@ export interface DashboardSummary {
   kpis: DashboardKPIs;
   channels: DashboardChannels;
   top_products: TopProduct[];
+  /** CA horaire (centimes) par canal. Source prioritaire pour les graphiques de CA. */
   hourly: HourlyChannelData[];
+  /** Optionnel: séries horaires de commandes (volumes), si l'API les expose. */
+  hourly_orders?: HourlyChannelData[];
   activity: ActivityEvent[];
   alerts: DashboardAlerts;
+}
+
+interface DashboardSummaryApiResponse {
+  id: string;
+  data: DashboardSummary & {
+    hourly_revenue?: HourlyChannelData[];
+    hourly_orders?: HourlyChannelData[];
+  };
 }
 
 // ============= Mock Data =============
@@ -257,8 +268,17 @@ export const getDashboardSummary = (): Promise<DashboardSummary> => {
       return mockDashboardSummary;
     },
     async () => {
-      const response = await apiClient.get<{ id: string; data: DashboardSummary }>('/stats/dashboard/summary');
-      return response.data;
+      const response = await apiClient.get<DashboardSummaryApiResponse>('/stats/dashboard/summary');
+      const payload = response.data;
+
+      const normalizedHourly = payload.hourly_revenue ?? [];
+      const normalizedHourlyOrders = payload.hourly_orders ?? payload.hourly;
+
+      return {
+        ...payload,
+        hourly: normalizedHourly,
+        hourly_orders: normalizedHourlyOrders,
+      };
     }
   );
 };

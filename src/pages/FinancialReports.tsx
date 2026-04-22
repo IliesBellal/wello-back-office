@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Download, Calendar as CalendarIcon } from 'lucide-react';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { DollarSign, TrendingUp, Receipt } from 'lucide-react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { startOfMonth, endOfMonth } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { financialReportsService } from '@/services/financialReportsService';
@@ -36,16 +36,16 @@ const FinancialReports = () => {
   const { data: vatData, isLoading: vatLoading } = useQuery({
     queryKey: ['vat-report', dateRange],
     queryFn: () => financialReportsService.getVATReport(
-      format(dateRange.from, 'yyyy-MM-dd'),
-      format(dateRange.to, 'yyyy-MM-dd')
+      dateRange.from,
+      dateRange.to
     )
   });
 
   const { data: paymentData, isLoading: paymentLoading } = useQuery({
     queryKey: ['payment-report', dateRange],
     queryFn: () => financialReportsService.getPaymentReport(
-      format(dateRange.from, 'yyyy-MM-dd'),
-      format(dateRange.to, 'yyyy-MM-dd')
+      dateRange.from,
+      dateRange.to
     )
   });
 
@@ -64,8 +64,8 @@ const FinancialReports = () => {
   const handleExportGlobal = async () => {
     try {
       const result = await financialReportsService.exportGlobal(
-        format(dateRange.from, 'yyyy-MM-dd'),
-        format(dateRange.to, 'yyyy-MM-dd')
+        dateRange.from,
+        dateRange.to
       );
       window.open(result.download_url, '_blank');
     } catch (err) {
@@ -76,8 +76,8 @@ const FinancialReports = () => {
   const handleExportVAT = async () => {
     try {
       const result = await financialReportsService.exportVAT(
-        format(dateRange.from, 'yyyy-MM-dd'),
-        format(dateRange.to, 'yyyy-MM-dd')
+        dateRange.from,
+        dateRange.to
       );
       window.open(result.download_url, '_blank');
     } catch (err) {
@@ -88,8 +88,8 @@ const FinancialReports = () => {
   const handleExportPayments = async () => {
     try {
       const result = await financialReportsService.exportPayments(
-        format(dateRange.from, 'yyyy-MM-dd'),
-        format(dateRange.to, 'yyyy-MM-dd')
+        dateRange.from,
+        dateRange.to
       );
       window.open(result.download_url, '_blank');
     } catch (err) {

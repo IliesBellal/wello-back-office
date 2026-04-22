@@ -43,8 +43,7 @@ const CashRegisters = () => {
   const loadRegisters = async () => {
     setLoading(true);
     try {
-      const dateStr = format(date, "yyyy-MM-dd");
-      const data = await getCashRegisterHistory(dateStr);
+      const data = await getCashRegisterHistory(date);
       setRegisters(data);
     } catch (error) {
       toast.error("Erreur lors du chargement des registres");

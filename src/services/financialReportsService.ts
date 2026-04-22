@@ -1,4 +1,5 @@
 import { apiClient, withMock, logAPI, API_BASE_URL } from "@/services/apiClient";
+import { toUTCDateString } from '@/utils/apiDate';
 
 // ============= Types =============
 export interface VATData {
@@ -115,32 +116,41 @@ const mockPaymentData = (): PaymentReportResponse => {
 
 // ============= API Functions =============
 export const financialReportsService = {
-  async getVATReport(dateFrom: string, dateTo: string): Promise<VATReportResponse> {
-    logAPI('POST', '/pos/reports/tva', { date_from: dateFrom, date_to: dateTo });
+  async getVATReport(dateFrom: Date | string, dateTo: Date | string): Promise<VATReportResponse> {
+    const dateFromUTC = toUTCDateString(dateFrom);
+    const dateToUTC = toUTCDateString(dateTo);
+
+    logAPI('POST', '/pos/reports/tva', { date_from: dateFromUTC, date_to: dateToUTC });
     
     return withMock(
       () => mockVATData(),
       async () => {
-        const response = await apiClient.post<{ id: string; data: VATReportResponse }>('/pos/reports/tva', { date_from: dateFrom, date_to: dateTo });
+        const response = await apiClient.post<{ id: string; data: VATReportResponse }>('/pos/reports/tva', { date_from: dateFromUTC, date_to: dateToUTC });
         return response.data;
       }
     );
   },
 
-  async getPaymentReport(dateFrom: string, dateTo: string): Promise<PaymentReportResponse> {
-    logAPI('POST', '/pos/reports/payments', { date_from: dateFrom, date_to: dateTo });
+  async getPaymentReport(dateFrom: Date | string, dateTo: Date | string): Promise<PaymentReportResponse> {
+    const dateFromUTC = toUTCDateString(dateFrom);
+    const dateToUTC = toUTCDateString(dateTo);
+
+    logAPI('POST', '/pos/reports/payments', { date_from: dateFromUTC, date_to: dateToUTC });
     
     return withMock(
       () => mockPaymentData(),
       async () => {
-        const response = await apiClient.post<{ id: string; data: PaymentReportResponse }>('/pos/reports/payments', { date_from: dateFrom, date_to: dateTo });
+        const response = await apiClient.post<{ id: string; data: PaymentReportResponse }>('/pos/reports/payments', { date_from: dateFromUTC, date_to: dateToUTC });
         return response.data;
       }
     );
   },
 
-  async exportGlobal(dateFrom: string, dateTo: string): Promise<ExportResponse> {
-    logAPI('POST', '/pos/accounting/export', { date_from: dateFrom, date_to: dateTo });
+  async exportGlobal(dateFrom: Date | string, dateTo: Date | string): Promise<ExportResponse> {
+    const dateFromUTC = toUTCDateString(dateFrom);
+    const dateToUTC = toUTCDateString(dateTo);
+
+    logAPI('POST', '/pos/accounting/export', { date_from: dateFromUTC, date_to: dateToUTC });
     
     return withMock(
       () => ({
@@ -149,14 +159,17 @@ export const financialReportsService = {
         download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_comptable.pdf'
       }),
       async () => {
-        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/accounting/export', { date_from: dateFrom, date_to: dateTo });
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/accounting/export', { date_from: dateFromUTC, date_to: dateToUTC });
         return response.data;
       }
     );
   },
 
-  async exportVAT(dateFrom: string, dateTo: string): Promise<ExportResponse> {
-    logAPI('POST', '/pos/reports/tva/export', { date_from: dateFrom, date_to: dateTo });
+  async exportVAT(dateFrom: Date | string, dateTo: Date | string): Promise<ExportResponse> {
+    const dateFromUTC = toUTCDateString(dateFrom);
+    const dateToUTC = toUTCDateString(dateTo);
+
+    logAPI('POST', '/pos/reports/tva/export', { date_from: dateFromUTC, date_to: dateToUTC });
     
     return withMock(
       () => ({
@@ -165,14 +178,17 @@ export const financialReportsService = {
         download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_tva.pdf'
       }),
       async () => {
-        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/reports/tva/export', { date_from: dateFrom, date_to: dateTo });
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/reports/tva/export', { date_from: dateFromUTC, date_to: dateToUTC });
         return response.data;
       }
     );
   },
 
-  async exportPayments(dateFrom: string, dateTo: string): Promise<ExportResponse> {
-    logAPI('POST', '/pos/reports/payments/export', { date_from: dateFrom, date_to: dateTo });
+  async exportPayments(dateFrom: Date | string, dateTo: Date | string): Promise<ExportResponse> {
+    const dateFromUTC = toUTCDateString(dateFrom);
+    const dateToUTC = toUTCDateString(dateTo);
+
+    logAPI('POST', '/pos/reports/payments/export', { date_from: dateFromUTC, date_to: dateToUTC });
     
     return withMock(
       () => ({
@@ -181,7 +197,7 @@ export const financialReportsService = {
         download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_paiements.pdf'
       }),
       async () => {
-        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/reports/payments/export', { date_from: dateFrom, date_to: dateTo });
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/reports/payments/export', { date_from: dateFromUTC, date_to: dateToUTC });
         return response.data;
       }
     );

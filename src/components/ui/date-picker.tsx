@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { toUTCDateString } from '@/utils/apiDate';
 
 interface DatePickerProps {
   value?: string; // ISO date string (YYYY-MM-DD)
@@ -27,11 +28,7 @@ export function DatePicker({
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      // Format date as YYYY-MM-DD without timezone conversion
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const isoString = `${year}-${month}-${day}`;
+      const isoString = toUTCDateString(date);
       onDateChange(isoString);
       setOpen(false);
     }

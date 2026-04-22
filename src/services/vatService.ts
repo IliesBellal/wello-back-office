@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { toUTCDateString } from '@/utils/apiDate';
 
 export interface VATRate {
   [rate: string]: {
@@ -116,22 +117,25 @@ const USE_VAT_MOCK =
   new URLSearchParams(window.location.search).get('vat_mock') === 'true';
 
 export const calculateVAT = async (
-  startDate: string,
-  endDate: string,
+  startDate: Date | string,
+  endDate: Date | string,
   channels: string[]
 ): Promise<VATCalculationResponse> => {
+  const startDateUTC = toUTCDateString(startDate);
+  const endDateUTC = toUTCDateString(endDate);
+
   // Simulate network delay
   await new Promise((resolve) => setTimeout(resolve, 300));
 
   if (USE_VAT_MOCK) {
-    return generateMockVATData(startDate, endDate, channels);
+    return generateMockVATData(startDateUTC, endDateUTC, channels);
   }
 
   const response = await apiClient.post<VATCalculationResponse>(
     '/accounting/vat/calculate',
     {
-      start_date: startDate,
-      end_date: endDate,
+      start_date: startDateUTC,
+      end_date: endDateUTC,
       channels,
     }
   );
@@ -140,10 +144,12 @@ export const calculateVAT = async (
 };
 
 export const exportVATCSV = async (
-  startDate: string,
-  endDate: string,
+  startDate: Date | string,
+  endDate: Date | string,
   channels: string[]
 ): Promise<Blob> => {
+  const startDateUTC = toUTCDateString(startDate);
+  const endDateUTC = toUTCDateString(endDate);
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com";
   const authData = localStorage.getItem("authData");
   const authToken = authData ? JSON.parse(authData).token : null;
@@ -158,8 +164,8 @@ export const exportVATCSV = async (
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
       body: JSON.stringify({
-        start_date: startDate,
-        end_date: endDate,
+        start_date: startDateUTC,
+        end_date: endDateUTC,
         channels,
       }),
     }

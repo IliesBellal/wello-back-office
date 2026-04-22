@@ -1,4 +1,5 @@
 import { apiClient, USE_MOCK_DATA, withMock, logAPI } from "@/services/apiClient";
+import { toUTCDateString } from '@/utils/apiDate';
 
 export interface StockUnit {
   unit_name: string;
@@ -85,29 +86,35 @@ export const updateStockMovement = async (payload: StockMovementPayload): Promis
   );
 };
 
-export const getStockMovements = async (from: string, to: string): Promise<StockMovement[]> => {
-  logAPI("GET", `/stocks/movements?from=${from}&to=${to}`);
+export const getStockMovements = async (from: Date | string, to: Date | string): Promise<StockMovement[]> => {
+  const fromUTC = toUTCDateString(from);
+  const toUTC = toUTCDateString(to);
+
+  logAPI("GET", `/stocks/movements?from=${fromUTC}&to=${toUTC}`);
   
   return withMock(
     () => {
       // Filtrer les mouvements par période
       return mockStockMovements.filter(m => {
         const movementDate = m.created_at.split('T')[0];
-        return movementDate >= from && movementDate <= to;
+        return movementDate >= fromUTC && movementDate <= toUTC;
       }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
-    () => apiClient.get<StockMovement[]>(`/stocks/movements?from=${from}&to=${to}`)
+    () => apiClient.get<StockMovement[]>(`/stocks/movements?from=${fromUTC}&to=${toUTC}`)
   );
 };
 
-export const getMovementsSummary = async (from: string, to: string) => {
-  logAPI("GET", `/stocks/movements/summary?from=${from}&to=${to}`);
+export const getMovementsSummary = async (from: Date | string, to: Date | string) => {
+  const fromUTC = toUTCDateString(from);
+  const toUTC = toUTCDateString(to);
+
+  logAPI("GET", `/stocks/movements/summary?from=${fromUTC}&to=${toUTC}`);
   
   return withMock(
     () => {
       const movements = mockStockMovements.filter(m => {
         const movementDate = m.created_at.split('T')[0];
-        return movementDate >= from && movementDate <= to;
+        return movementDate >= fromUTC && movementDate <= toUTC;
       });
 
       // Résumer les ingrédients consommés
@@ -135,6 +142,6 @@ export const getMovementsSummary = async (from: string, to: string) => {
         total_consumed: data.total
       }));
     },
-    () => apiClient.get(`/stocks/movements/summary?from=${from}&to=${to}`)
+    () => apiClient.get(`/stocks/movements/summary?from=${fromUTC}&to=${toUTC}`)
   );
 };

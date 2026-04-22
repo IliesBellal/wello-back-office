@@ -16,7 +16,7 @@ import {
   vatChannels,
   type VATCalculationResponse,
 } from '@/services/vatService';
-import { format } from 'date-fns';
+import { toUTCDateString } from '@/utils/apiDate';
 import { Download, AlertCircle, DollarSign, Percent } from 'lucide-react';
 
 const VAT = () => {
@@ -54,10 +54,7 @@ const VAT = () => {
     const loadData = async () => {
       setLoading(true);
       try {
-        const startDate = format(dateRange.from, 'yyyy-MM-dd');
-        const endDate = format(dateRange.to, 'yyyy-MM-dd');
-
-        const data = await calculateVAT(startDate, endDate, parsedChannels);
+        const data = await calculateVAT(dateRange.from, dateRange.to, parsedChannels);
         setVatData(data);
       } catch (error) {
         console.error('Error loading VAT data:', error);
@@ -87,11 +84,11 @@ const VAT = () => {
 
     setExporting(true);
     try {
-      const startDate = format(dateRange.from, 'yyyy-MM-dd');
-      const endDate = format(dateRange.to, 'yyyy-MM-dd');
-
-      const blob = await exportVATCSV(startDate, endDate, parsedChannels);
-      const filename = generateVATExportFilename(startDate, endDate);
+      const blob = await exportVATCSV(dateRange.from, dateRange.to, parsedChannels);
+      const filename = generateVATExportFilename(
+        toUTCDateString(dateRange.from),
+        toUTCDateString(dateRange.to)
+      );
 
       downloadCSV(blob, filename);
 

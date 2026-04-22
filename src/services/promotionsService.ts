@@ -1,5 +1,6 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from '@/services/apiClient';
 import { Promotion, Availability, DiscountResponse, DiscountScheduleResponse, DayOfWeek, TimeSlot } from '@/types/promotions';
+import { toUTCDateString } from '@/utils/apiDate';
 
 // ════════════════════════════════════════════════════════════════════════════
 // IMPORTANT: Day of Week Convention (Standard Unix/JavaScript - NOT ISO 8601)
@@ -171,8 +172,12 @@ function transformPromotionForAPI(promo: Omit<Promotion, 'id'> | Partial<Omit<Pr
   if (promo.order_type !== undefined) payload.order_type = promo.order_type || null;
   if (promo.value !== undefined) payload.discount_value = promo.value;
   if (promo.discount_unit !== undefined) payload.discount_unit = promo.discount_unit;
-  if (promo.start_date !== undefined) payload.valid_from = promo.start_date;
-  if (promo.end_date !== undefined) payload.valid_to = promo.end_date || null;
+  if (promo.start_date !== undefined) {
+    payload.valid_from = promo.start_date ? toUTCDateString(promo.start_date) : null;
+  }
+  if (promo.end_date !== undefined) {
+    payload.valid_to = promo.end_date ? toUTCDateString(promo.end_date) : null;
+  }
   if (promo.min_order_value !== undefined) payload.min_order_value = promo.min_order_value || null;
   if (promo.min_order_unit !== undefined) payload.min_order_unit = promo.min_order_unit || null;
   

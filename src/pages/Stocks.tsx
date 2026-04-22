@@ -52,11 +52,9 @@ const Stocks = () => {
   const fetchMovements = async () => {
     setMovementsLoading(true);
     try {
-      const fromStr = format(movementDateRange.from, 'yyyy-MM-dd');
-      const toStr = format(movementDateRange.to, 'yyyy-MM-dd');
       const [mvts, summary] = await Promise.all([
-        getStockMovements(fromStr, toStr),
-        getMovementsSummary(fromStr, toStr)
+        getStockMovements(movementDateRange.from, movementDateRange.to),
+        getMovementsSummary(movementDateRange.from, movementDateRange.to)
       ]);
       setMovements(mvts);
       setMovementsSummary(summary);

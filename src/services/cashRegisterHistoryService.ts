@@ -1,4 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from '@/services/apiClient';
+import { toUTCDateString } from '@/utils/apiDate';
 
 // ============= TYPES =============
 export interface CashRegisterHistoryRecord {
@@ -79,21 +80,24 @@ const mockRegisters = generateMockRegisters();
 
 // ============= SERVICE FUNCTIONS =============
 export const getCashRegisterHistory = async (
-  startDate: string,
-  endDate: string,
+  startDate: Date | string,
+  endDate: Date | string,
   type: 'all' | 'Z' | 'X' = 'all'
 ): Promise<CashRegisterListResponse> => {
+  const startDateUTC = toUTCDateString(startDate);
+  const endDateUTC = toUTCDateString(endDate);
+
   logAPI(
     'GET',
     '/accounting/registers',
-    { start_date: startDate, end_date: endDate, type }
+    { start_date: startDateUTC, end_date: endDateUTC, type }
   );
 
   return withMock(
     () => {
       const filtered = mockRegisters.filter((reg) => {
         const regDate = reg.created_at.split('T')[0];
-        const inRange = regDate >= startDate && regDate <= endDate;
+        const inRange = regDate >= startDateUTC && regDate <= endDateUTC;
         const typeMatch = type === 'all' || reg.type === type;
         return inRange && typeMatch;
       });
@@ -116,8 +120,8 @@ export const getCashRegisterHistory = async (
           '/accounting/registers',
           {
             params: {
-              start_date: startDate,
-              end_date: endDate,
+              start_date: startDateUTC,
+              end_date: endDateUTC,
               type,
             },
           }
@@ -127,20 +131,23 @@ export const getCashRegisterHistory = async (
 };
 
 export const getCashRegisterStats = async (
-  startDate: string,
-  endDate: string
+  startDate: Date | string,
+  endDate: Date | string
 ): Promise<CashRegisterStats> => {
+  const startDateUTC = toUTCDateString(startDate);
+  const endDateUTC = toUTCDateString(endDate);
+
   logAPI(
     'GET',
     '/accounting/registers/stats',
-    { start_date: startDate, end_date: endDate }
+    { start_date: startDateUTC, end_date: endDateUTC }
   );
 
   return withMock(
     () => {
       const filtered = mockRegisters.filter((reg) => {
         const regDate = reg.created_at.split('T')[0];
-        return regDate >= startDate && regDate <= endDate;
+        return regDate >= startDateUTC && regDate <= endDateUTC;
       });
 
       return {
@@ -156,8 +163,8 @@ export const getCashRegisterStats = async (
           '/accounting/registers/stats',
           {
             params: {
-              start_date: startDate,
-              end_date: endDate,
+              start_date: startDateUTC,
+              end_date: endDateUTC,
             },
           }
         )
@@ -201,14 +208,17 @@ export const exportRegisterPDF = async (registerId: string): Promise<void> => {
 };
 
 export const exportPeriodRegisters = async (
-  startDate: string,
-  endDate: string,
+  startDate: Date | string,
+  endDate: Date | string,
   type: 'all' | 'Z' | 'X' = 'all',
   format: 'zip' | 'single' = 'zip'
 ): Promise<void> => {
+  const startDateUTC = toUTCDateString(startDate);
+  const endDateUTC = toUTCDateString(endDate);
+
   logAPI('POST', '/accounting/registers/export-period', {
-    start_date: startDate,
-    end_date: endDate,
+    start_date: startDateUTC,
+    end_date: endDateUTC,
     type,
     format,
   });
@@ -217,8 +227,8 @@ export const exportPeriodRegisters = async (
     () => {
       // Mock: trigger download with dummy ZIP
       const link = document.createElement('a');
-      link.href = `/mock-registers-${startDate}-${endDate}.zip`;
-      link.download = `registers_${startDate}_to_${endDate}.zip`;
+      link.href = `/mock-registers-${startDateUTC}-${endDateUTC}.zip`;
+      link.download = `registers_${startDateUTC}_to_${endDateUTC}.zip`;
       link.click();
     },
     async () => {
@@ -231,8 +241,8 @@ export const exportPeriodRegisters = async (
             Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
           },
           body: JSON.stringify({
-            start_date: startDate,
-            end_date: endDate,
+            start_date: startDateUTC,
+            end_date: endDateUTC,
             type,
             format,
           }),
@@ -245,7 +255,7 @@ export const exportPeriodRegisters = async (
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `registers_${startDate}_to_${endDate}.${format === 'zip' ? 'zip' : 'pdf'}`;
+      link.download = `registers_${startDateUTC}_to_${endDateUTC}.${format === 'zip' ? 'zip' : 'pdf'}`;
       link.click();
       window.URL.revokeObjectURL(url);
     }

@@ -58,10 +58,7 @@ const CashRegisterHistory = () => {
   const loadRegisters = async () => {
     setLoading(true);
     try {
-      const startDate = format(dateRange.from, 'yyyy-MM-dd');
-      const endDate = format(dateRange.to, 'yyyy-MM-dd');
-
-      const result = await getCashRegisterHistory(startDate, endDate, 'all');
+      const result = await getCashRegisterHistory(dateRange.from, dateRange.to, 'all');
       setRegisters(result.registers);
       setStats(result.stats);
     } catch (error) {
