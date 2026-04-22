@@ -137,6 +137,12 @@ const Login = () => {
   const { setAuthData } = useAuth();
   const { toast } = useToast();
 
+  // Email validation function
+  const isValidEmail = (emailValue: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(emailValue);
+  };
+
   const handleMFASuccess = async () => {
     if (pendingAuthData?.token) {
       try {
@@ -330,17 +336,17 @@ const Login = () => {
               />
             </motion.div>
 
-            {/* Password field - hidden by default, shown after email */}
+            {/* Password field - hidden by default, shown after valid email */}
             <motion.div
               variants={itemVariants}
               initial={{ opacity: 0, height: 0 }}
               animate={{
-                opacity: email ? 1 : 0,
-                height: email ? 'auto' : 0,
+                opacity: isValidEmail(email) ? 1 : 0,
+                height: isValidEmail(email) ? 'auto' : 0,
               }}
               transition={{ duration: 0.25 }}
             >
-              {email && (
+              {isValidEmail(email) && (
                 <InputWithIcon
                   icon={Lock}
                   type="password"
@@ -360,7 +366,7 @@ const Login = () => {
             <motion.div variants={itemVariants}>
               <motion.button
                 type="submit"
-                disabled={isLoading || !email || !password}
+                disabled={isLoading || !isValidEmail(email) || !password}
                 className="w-full h-12 md:h-13 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold
                   rounded-lg shadow-md hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed
                   transition-all duration-300 relative overflow-hidden group hover:from-blue-700 hover:to-blue-700"
