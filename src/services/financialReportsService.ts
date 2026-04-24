@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, API_BASE_URL } from "@/services/apiClient";
-import { toUTCDateString } from '@/utils/apiDate';
+import { toUTCDateString, toUTCDateTimeString } from '@/utils/apiDate';
 
 // ============= Types =============
 export interface VATData {
@@ -117,8 +117,8 @@ const mockPaymentData = (): PaymentReportResponse => {
 // ============= API Functions =============
 export const financialReportsService = {
   async getVATReport(dateFrom: Date | string, dateTo: Date | string): Promise<VATReportResponse> {
-    const dateFromUTC = toUTCDateString(dateFrom);
-    const dateToUTC = toUTCDateString(dateTo);
+    const dateFromUTC = toUTCDateTimeString(dateFrom);
+    const dateToUTC = toUTCDateTimeString(dateTo);
 
     logAPI('POST', '/pos/reports/tva', { date_from: dateFromUTC, date_to: dateToUTC });
     
@@ -132,8 +132,8 @@ export const financialReportsService = {
   },
 
   async getPaymentReport(dateFrom: Date | string, dateTo: Date | string): Promise<PaymentReportResponse> {
-    const dateFromUTC = toUTCDateString(dateFrom);
-    const dateToUTC = toUTCDateString(dateTo);
+    const dateFromUTC = toUTCDateTimeString(dateFrom);
+    const dateToUTC = toUTCDateTimeString(dateTo);
 
     logAPI('POST', '/pos/reports/payments', { date_from: dateFromUTC, date_to: dateToUTC });
     

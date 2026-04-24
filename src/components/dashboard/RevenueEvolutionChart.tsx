@@ -12,6 +12,7 @@ import {
 } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import type { HourlyChannelData } from '@/services/dashboardService';
 
 type ChannelType = 'sur_place' | 'emporter' | 'livraison' | 'uber_eats' | 'deliveroo';
@@ -102,6 +103,7 @@ const CustomTooltip = ({
 };
 
 export const RevenueEvolutionChart = ({ data: hourlyData }: RevenueEvolutionChartProps) => {
+  const isMobile = useIsMobile();
   const [mode, setMode] = useState<DisplayMode>('global');
   const [selectedChannels, setSelectedChannels] = useState<ChannelType[]>([
     'sur_place',
@@ -150,6 +152,27 @@ export const RevenueEvolutionChart = ({ data: hourlyData }: RevenueEvolutionChar
       return selectedAndAvailable;
     }, [mode, selectedChannels, availableChannels]);
 
+  const displayData = useMemo<ChartDataPoint[]>(() => {
+    const isPointZero = (point: ChartDataPoint) => {
+      if (mode === 'global') {
+        return (point.global_total ?? 0) <= 0;
+      }
+
+      return visibleChannels.every((channel) => (point[channel] ?? 0) <= 0);
+    };
+
+    const firstNonZeroIndex = chartData.findIndex((point) => !isPointZero(point));
+
+    if (firstNonZeroIndex === -1) {
+      return [];
+    }
+
+    // Keep up to 2 zero-value points right before the first non-zero point
+    // so users can still see the start of activity.
+    const startIndex = Math.max(0, firstNonZeroIndex - 2);
+    return chartData.slice(startIndex);
+  }, [chartData, mode, visibleChannels]);
+
   const toggleChannel = (channel: ChannelType) => {
     setSelectedChannels((prev) => {
         const selectable = prev.filter((item) => availableChannels.includes(item));
@@ -168,16 +191,17 @@ export const RevenueEvolutionChart = ({ data: hourlyData }: RevenueEvolutionChar
   return (
     <Card className="shadow-sm">
       <CardHeader className="pb-6">
-        <div className="flex items-start justify-between gap-6">
-          <div className="space-y-1">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-6">
+          <div className="w-full space-y-1">
             <CardTitle className="text-lg">Évolution du chiffre d'affaires</CardTitle>
             <p className="text-sm text-muted-foreground">CA par heure sur la journée</p>
           </div>
-          <div className="inline-flex rounded-md border border-border p-1 bg-muted/40">
+          <div className="w-full md:w-auto">
+            <div className="inline-flex w-full rounded-md border border-border p-1 bg-muted/40 md:w-auto">
             <Button
               size="sm"
               variant={mode === 'global' ? 'default' : 'ghost'}
-              className="h-8"
+              className="h-8 flex-1 md:flex-none"
               onClick={() => setMode('global')}
             >
               Global
@@ -185,11 +209,12 @@ export const RevenueEvolutionChart = ({ data: hourlyData }: RevenueEvolutionChar
             <Button
               size="sm"
               variant={mode === 'channels' ? 'default' : 'ghost'}
-              className="h-8"
+              className="h-8 flex-1 md:flex-none"
               onClick={() => setMode('channels')}
             >
               Par canaux
             </Button>
+            </div>
           </div>
         </div>
 
@@ -221,12 +246,12 @@ export const RevenueEvolutionChart = ({ data: hourlyData }: RevenueEvolutionChar
         )}
       </CardHeader>
       <CardContent>
-        {hourlyData && hourlyData.length > 0 ? (
+        {displayData.length > 0 ? (
           <div className="h-[420px]">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart
-                data={chartData}
-                margin={{ top: 5, right: 30, left: 0, bottom: 0 }}
+                data={displayData}
+                margin={{ top: 5, right: isMobile ? 8 : 30, left: 0, bottom: 0 }}
               >
                 <CartesianGrid
                   strokeDasharray="3 3"

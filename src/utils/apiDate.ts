@@ -23,6 +23,16 @@ export const toUTCDateString = (value: Date | string): string => {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 };
 
+export const toUTCDateTimeString = (value: Date | string): string => {
+  const date = parseDateInput(value);
+
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid date value: ${String(value)}`);
+  }
+
+  return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())} ${pad2(date.getUTCHours())}:${pad2(date.getUTCMinutes())}:${pad2(date.getUTCSeconds())}`;
+};
+
 export const toUTCDateRange = (from: Date | string, to: Date | string) => ({
   from: toUTCDateString(from),
   to: toUTCDateString(to),

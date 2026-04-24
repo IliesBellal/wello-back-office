@@ -42,25 +42,34 @@ export const DashboardHero = ({ data, loading }: DashboardHeroProps) => {
         day: {
           value: revenue.today,
           currency: revenue.currency,
-          comparison: calculateTrend(revenue.today, revenue.yesterday),
+          referenceValue: revenue.yesterday,
+          referenceLabel: 'Hier',
         },
         week: {
           value: revenue.week.current,
           currency: revenue.currency,
-          comparison: calculateTrend(revenue.week.current, revenue.week.previous_period),
+          referenceValue: revenue.week.previous_period,
+          referenceLabel: 'Semaine derniere',
         },
         month: {
           value: revenue.month.current,
           currency: revenue.currency,
-          comparison: calculateTrend(revenue.month.current, revenue.month.previous_period),
+          referenceValue: revenue.month.previous_period,
+          referenceLabel: 'Mois dernier',
         },
       },
       commandesJour: {
         label: 'Commandes du jour',
         value: orders.today,
         icon: ShoppingCart,
-        comparison: calculateTrend(orders.today, orders.yesterday),
-        context: `vs hier : ${orders.yesterday} commandes`,
+        completion: {
+          current: orders.today,
+          reference: orders.yesterday,
+          referenceLabel: 'Hier',
+          referenceValueText: `${orders.yesterday} commandes`,
+          tooltipLabel: 'Commandes de reference',
+          tooltipValueText: `${orders.yesterday} commandes`,
+        },
       },
       panierMoyen: {
         label: 'Panier moyen',
@@ -120,8 +129,7 @@ export const DashboardHero = ({ data, loading }: DashboardHeroProps) => {
         label={metrics.commandesJour.label}
         value={metrics.commandesJour.value}
         icon={metrics.commandesJour.icon}
-        comparison={metrics.commandesJour.comparison}
-        context={metrics.commandesJour.context}
+        completion={metrics.commandesJour.completion}
       />
 
       {/* Panier moyen - 1 colonne */}
