@@ -222,20 +222,34 @@ export const SimpleProductSheet = ({
     };
   };
 
-  // Helper to get TVA rate value by ID
-  const getTvaRateValue = (tvaId: number | string | undefined): number | null => {
-    if (!tvaId) return null;
-    
-    const tvaIdNum = typeof tvaId === 'string' ? parseInt(tvaId) : tvaId;
-    
+  // TVA can now be provided directly as a float rate (5.5, 10, 20),
+  // while keeping backward compatibility with legacy rate IDs.
+  const getTvaRateValue = (tvaValueOrId: number | string | undefined): number | null => {
+    if (tvaValueOrId === null || tvaValueOrId === undefined || tvaValueOrId === '') {
+      return null;
+    }
+
+    const normalized = typeof tvaValueOrId === 'string'
+      ? Number.parseFloat(tvaValueOrId)
+      : tvaValueOrId;
+
+    if (!Number.isFinite(normalized)) {
+      return null;
+    }
+
     for (const group of tvaRates) {
-      const rate = group.rates.find(r => r.id === tvaIdNum);
-      if (rate) {
-        return rate.value;
+      const byId = group.rates.find((rate) => rate.id === normalized);
+      if (byId) {
+        return byId.value;
+      }
+
+      const byValue = group.rates.find((rate) => rate.value === normalized);
+      if (byValue) {
+        return byValue.value;
       }
     }
-    
-    return null;
+
+    return normalized;
   };
 
   useEffect(() => {
@@ -447,6 +461,14 @@ export const SimpleProductSheet = ({
   };
 
   if (!product && !loading) return null;
+
+  const onSiteTva = getTvaRateValue(product?.tva_rate_in ?? product?.tva_ids?.on_site);
+  const takeawayTva = getTvaRateValue(product?.tva_rate_take_away ?? product?.tva_ids?.takeaway);
+  const deliveryTva = getTvaRateValue(product?.tva_rate_delivery ?? product?.tva_ids?.delivery);
+
+  const onSiteTvaLabel = onSiteTva !== null ? `${onSiteTva}%` : '—';
+  const takeawayTvaLabel = takeawayTva !== null ? `${takeawayTva}%` : '—';
+  const deliveryTvaLabel = deliveryTva !== null ? `${deliveryTva}%` : '—';
 
   // Mobile version with full-screen Dialog
   if (isMobile) {
@@ -744,7 +766,7 @@ export const SimpleProductSheet = ({
                         {!isEditMode ? (
                           <>
                             <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{((product.price || 0) / 100).toFixed(2)} €</span></p>
-                            <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{getTvaRateValue(product.tva_ids?.on_site) ? `${getTvaRateValue(product.tva_ids?.on_site)}%` : '—'}</span></p>
+                            <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{onSiteTvaLabel}</span></p>
                             <p className="text-muted-foreground">Disponible: <Badge variant={product.available_in ? "default" : "secondary"} className="ml-1 text-xs">{product.available_in ? '✓' : '✗'}</Badge></p>
                           </>
                         ) : (
@@ -786,7 +808,7 @@ export const SimpleProductSheet = ({
                         {!isEditMode ? (
                           <>
                             <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{((product.price_take_away || 0) / 100).toFixed(2)} €</span></p>
-                            <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{getTvaRateValue(product.tva_ids?.takeaway) ? `${getTvaRateValue(product.tva_ids?.takeaway)}%` : '—'}</span></p>
+                            <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{takeawayTvaLabel}</span></p>
                             <p className="text-muted-foreground">Disponible: <Badge variant={product.available_take_away ? "default" : "secondary"} className="ml-1 text-xs">{product.available_take_away ? '✓' : '✗'}</Badge></p>
                           </>
                         ) : (
@@ -828,7 +850,7 @@ export const SimpleProductSheet = ({
                         {!isEditMode ? (
                           <>
                             <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{((product.price_delivery || 0) / 100).toFixed(2)} €</span></p>
-                            <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{getTvaRateValue(product.tva_ids?.delivery) ? `${getTvaRateValue(product.tva_ids?.delivery)}%` : '—'}</span></p>
+                            <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{deliveryTvaLabel}</span></p>
                             <p className="text-muted-foreground">Disponible: <Badge variant={product.available_delivery ? "default" : "secondary"} className="ml-1 text-xs">{product.available_delivery ? '✓' : '✗'}</Badge></p>
                           </>
                         ) : (
@@ -1450,7 +1472,7 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">TVA</p>
-                            <p className="text-sm text-foreground">{getTvaRateValue(product.tva_ids?.on_site) ? `${getTvaRateValue(product.tva_ids?.on_site)}%` : '—'}</p>
+                            <p className="text-sm text-foreground">{onSiteTvaLabel}</p>
                           </div>
                           <div className="pt-2 border-t">
                             <p className="text-xs text-muted-foreground mb-1">Disponible</p>
@@ -1481,7 +1503,7 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <Label className="text-xs">Taux TVA</Label>
-                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{getTvaRateValue(product.tva_ids?.on_site) ? `${getTvaRateValue(product.tva_ids?.on_site)}%` : '—'}</p>
+                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{onSiteTvaLabel}</p>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t">
                             <Label className="text-xs">Disponible</Label>
@@ -1515,7 +1537,7 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">TVA</p>
-                            <p className="text-sm text-foreground">{getTvaRateValue(product.tva_ids?.takeaway) ? `${getTvaRateValue(product.tva_ids?.takeaway)}%` : '—'}</p>
+                            <p className="text-sm text-foreground">{takeawayTvaLabel}</p>
                           </div>
                           <div className="pt-2 border-t">
                             <p className="text-xs text-muted-foreground mb-1">Disponible</p>
@@ -1546,7 +1568,7 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <Label className="text-xs">Taux TVA</Label>
-                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{getTvaRateValue(product.tva_ids?.takeaway) ? `${getTvaRateValue(product.tva_ids?.takeaway)}%` : '—'}</p>
+                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{takeawayTvaLabel}</p>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t">
                             <Label className="text-xs">Disponible</Label>
@@ -1580,7 +1602,7 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">TVA</p>
-                            <p className="text-sm text-foreground">{getTvaRateValue(product.tva_ids?.delivery) ? `${getTvaRateValue(product.tva_ids?.delivery)}%` : '—'}</p>
+                            <p className="text-sm text-foreground">{deliveryTvaLabel}</p>
                           </div>
                           <div className="pt-2 border-t">
                             <p className="text-xs text-muted-foreground mb-1">Disponible</p>
@@ -1611,7 +1633,7 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <Label className="text-xs">Taux TVA</Label>
-                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{getTvaRateValue(product.tva_ids?.delivery) ? `${getTvaRateValue(product.tva_ids?.delivery)}%` : '—'}</p>
+                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{deliveryTvaLabel}</p>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t">
                             <Label className="text-xs">Disponible</Label>

@@ -78,6 +78,7 @@ const PAYMENT_LABELS: Record<string, string> = {
   card: 'Carte',
   cash: 'Espèces',
   applepay: 'Apple Pay',
+  stripe: 'En ligne',
   uberpay: 'Uber Pay',
   cancelled: 'Annulée',
   cb: 'Carte',
@@ -223,8 +224,11 @@ const RefundModal = ({ isOpen, onClose, onRefund, maxAmount }: RefundModalProps)
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-      <Card className="bg-card border border-border w-full max-w-md">
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <Card className="bg-card border border-border w-full max-w-md" onClick={(e) => e.stopPropagation()}>
         <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-card border-b border-border">
           <CardTitle className="text-lg font-bold">Rembourser</CardTitle>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
@@ -314,8 +318,14 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
 
   return (
     <>
-      <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-        <Card className="bg-card border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div
+        className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+        onClick={onClose}
+      >
+        <Card
+          className="bg-card border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-card border-b border-border">
             <div>
               <CardTitle className="text-lg font-bold">Détails Commande {orderDetail ? `#${orderDetail.order_num}` : ''}</CardTitle>
@@ -489,12 +499,13 @@ export const DashboardOrderHistory = () => {
     channel,
     status,
     search,
+    orderId,
     handlePageChange,
+    setOrderId,
+    clearOrderId,
     applyFilters,
   } = useOrderHistorySearchParams();
 
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [draftStartDate, setDraftStartDate] = useState<Date>(startDate);
   const [draftEndDate, setDraftEndDate] = useState<Date>(endDate);
   const [draftChannel, setDraftChannel] = useState<string>(channel);
@@ -599,8 +610,7 @@ export const DashboardOrderHistory = () => {
   };
 
   const handleDetailOpen = (orderId: string) => {
-    setSelectedOrderId(orderId);
-    setIsDetailOpen(true);
+    setOrderId(orderId);
   };
 
   return (
@@ -822,9 +832,9 @@ export const DashboardOrderHistory = () => {
 
       {/* Detail Modal */}
       <OrderDetailModal 
-        isOpen={isDetailOpen}
-        onClose={() => setIsDetailOpen(false)}
-        orderId={selectedOrderId || ''}
+        isOpen={Boolean(orderId)}
+        onClose={clearOrderId}
+        orderId={orderId || ''}
       />
     </DashboardLayout>
   );

@@ -74,6 +74,7 @@ interface OrderHistoryUrlState {
   channel: string;
   status: string;
   search: string;
+  orderId: string | null;
 }
 
 interface OrderHistoryFiltersInput {
@@ -92,6 +93,8 @@ interface UseOrderHistorySearchParamsResult extends OrderHistoryUrlState {
   setChannel: (channel: string) => void;
   setStatus: (status: string) => void;
   setSearch: (search: string) => void;
+  setOrderId: (orderId: string) => void;
+  clearOrderId: () => void;
   applyFilters: (filters: OrderHistoryFiltersInput) => void;
 }
 
@@ -114,6 +117,7 @@ export const useOrderHistorySearchParams = (): UseOrderHistorySearchParamsResult
     channel: searchParams.get('channel') || 'all',
     status: searchParams.get('status') || 'all',
     search: searchParams.get('search') || '',
+    orderId: searchParams.get('orderId'),
   };
 
   const updateParams = (updates: Record<string, string | number | null>) => {
@@ -165,6 +169,14 @@ export const useOrderHistorySearchParams = (): UseOrderHistorySearchParamsResult
     updateParams({ search: search.trim() ? search : null, page: DEFAULT_PAGE });
   };
 
+  const setOrderId = (orderId: string) => {
+    updateParams({ orderId: orderId.trim() || null });
+  };
+
+  const clearOrderId = () => {
+    updateParams({ orderId: null });
+  };
+
   const applyFilters = (filters: OrderHistoryFiltersInput) => {
     updateParams({
       startDate: serializeDate(filters.startDate),
@@ -185,6 +197,8 @@ export const useOrderHistorySearchParams = (): UseOrderHistorySearchParamsResult
     setChannel,
     setStatus,
     setSearch,
+    setOrderId,
+    clearOrderId,
     applyFilters,
   };
 };
