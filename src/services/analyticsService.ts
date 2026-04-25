@@ -1,4 +1,5 @@
-import { apiClient } from './apiClient';
+import { apiClient, withMock, WelloApiResponse } from './apiClient';
+import type { Order } from './ordersService';
 
 export interface DateRange {
   from: Date;
@@ -300,24 +301,204 @@ interface RestaurantsAnalyticsResponse {
 }
 
 // Order History
-interface OrderHistoryItem {
+export interface OrderHistoryItem {
   id: string;
   number: string;
   date: string;
   time: string;
   customer_name: string;
   channel: string;
-  status: 'completed' | 'cancelled' | 'refunded';
+  status: 'completed' | 'cancelled' | 'pending' | 'processing' | 'refunded';
   total: number;
   payment_method: string;
 }
 
-interface OrderHistoryResponse {
+export interface OrderHistoryResponse {
   orders: OrderHistoryItem[];
   total_count: number;
   page: number;
   per_page: number;
+  total_pages?: number;
 }
+
+type OrderHistoryApiResponse = WelloApiResponse<{
+  orders: Order[];
+  metadata?: {
+    total_items?: number;
+    total_pages?: number;
+    current_page?: number;
+    limit?: number;
+  };
+}>;
+
+const formatOrderHistoryDate = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return date.toLocaleDateString('fr-FR');
+};
+
+const formatOrderHistoryTime = (value: string): string => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleTimeString('fr-FR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const toUtcBoundaryISOString = (value: string | Date, endOfDay = false): string => {
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = value.getMonth();
+    const day = value.getDate();
+
+    return new Date(
+      Date.UTC(year, month, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0)
+    ).toISOString();
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (match) {
+    const year = Number.parseInt(match[1], 10);
+    const month = Number.parseInt(match[2], 10);
+    const day = Number.parseInt(match[3], 10);
+
+    return new Date(
+      Date.UTC(year, month - 1, day, endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0, endOfDay ? 999 : 0)
+    ).toISOString();
+  }
+
+  const parsed = new Date(value);
+  return parsed.toISOString();
+};
+
+const getOrderHistoryTimestamp = (order: Order): string => {
+  if (order.callHour) {
+    return order.callHour;
+  }
+
+  if (order.creation_date) {
+    return new Date(order.creation_date * 1000).toISOString();
+  }
+
+  return new Date().toISOString();
+};
+
+const mapOrderHistoryChannel = (order: Order): OrderHistoryItem['channel'] => {
+  const orderType = order.order_type?.toLowerCase() || '';
+  const fulfillmentType = order.fulfillment_type?.toLowerCase() || '';
+  const brand = order.brand?.toLowerCase() || '';
+
+  if (brand.includes('uber') || fulfillmentType.includes('uber')) {
+    return 'ubereats';
+  }
+
+  if (brand.includes('deliveroo') || fulfillmentType.includes('deliveroo')) {
+    return 'deliveroo';
+  }
+
+  if (
+    orderType.includes('delivery') ||
+    fulfillmentType.includes('delivery') ||
+    order.isDelivery === 1
+  ) {
+    return 'delivery';
+  }
+
+  if (orderType.includes('take')) {
+    return 'takeaway';
+  }
+
+  if (orderType.includes('click')) {
+    return 'clickcollect';
+  }
+
+  return 'restaurant';
+};
+
+const mapOrderHistoryStatus = (order: Order): OrderHistoryItem['status'] => {
+  const state = order.state?.toLowerCase() || '';
+  const brandStatus = order.brand_status?.toLowerCase() || '';
+
+  if (state.includes('cancel') || brandStatus.includes('cancel')) {
+    return 'cancelled';
+  }
+
+  if (state.includes('refund') || brandStatus.includes('refund')) {
+    return 'refunded';
+  }
+
+  if (
+    state.includes('open') ||
+    state.includes('pending') ||
+    brandStatus.includes('pending') ||
+    brandStatus.includes('preparing')
+  ) {
+    return 'pending';
+  }
+
+  return 'completed';
+};
+
+const mapOrderHistoryPaymentMethod = (order: Order): string => {
+  const paymentMethod = order.payments[0]?.mop?.toLowerCase() || '';
+
+  if (paymentMethod === 'cb') {
+    return 'card';
+  }
+
+  if (paymentMethod === 'cash' || paymentMethod === 'espèces') {
+    return 'cash';
+  }
+
+  if (paymentMethod.includes('apple')) {
+    return 'applepay';
+  }
+
+  return paymentMethod || 'card';
+};
+
+const mapChannelFilterForApi = (channel?: string): string | undefined => {
+  if (!channel) {
+    return undefined;
+  }
+
+  if (channel === 'restaurant') {
+    return 'in';
+  }
+
+  if (channel === 'takeaway') {
+    return 'take_away';
+  }
+
+  if (channel === 'ubereats') {
+    return 'uber_eats';
+  }
+
+  return channel;
+};
+
+const mapOrderToHistoryItem = (order: Order): OrderHistoryItem => {
+  const timestamp = getOrderHistoryTimestamp(order);
+
+  return {
+    id: order.order_id,
+    number: order.order_num.startsWith('#') ? order.order_num : `#${order.order_num}`,
+    date: formatOrderHistoryDate(timestamp),
+    time: formatOrderHistoryTime(timestamp),
+    customer_name: order.customer?.customer_name || '—',
+    channel: mapOrderHistoryChannel(order),
+    status: mapOrderHistoryStatus(order),
+    total: order.TTC / 100,
+    payment_method: mapOrderHistoryPaymentMethod(order),
+  };
+};
 
 /**
  * Analytics Service - Données pour la page Analyses du Tableau de bord
@@ -1097,17 +1278,17 @@ class AnalyticsService {
   /**
    * Récupère l'historique des commandes
    */
-  getOrderHistory(
+  async getOrderHistory(
     startDate: string | Date,
     endDate: string | Date,
     channel?: string,
     status?: string,
     search?: string,
-    page: number = 1
-  ): OrderHistoryResponse {
-    // Convert Date to string if needed
-    const start = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
-    const end = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
+    page: number = 1,
+    limit: number = 50
+  ): Promise<OrderHistoryResponse> {
+    const start = toUtcBoundaryISOString(startDate);
+    const end = toUtcBoundaryISOString(endDate, true);
     const mockOrders: OrderHistoryItem[] = [
       {
         id: '1',
@@ -1166,12 +1347,47 @@ class AnalyticsService {
       },
     ];
 
-    return {
-      orders: mockOrders,
-      total_count: 150,
+    const payload = {
+      date_from: start,
+      date_to: end,
+      channel: mapChannelFilterForApi(channel),
+      status,
+      search,
       page,
-      per_page: 50,
+      limit,
     };
+
+    return withMock(
+      () => ({
+        orders: mockOrders,
+        total_count: 150,
+        page,
+        per_page: limit,
+        total_pages: Math.ceil(150 / limit),
+      }),
+      async () => {
+        const response = await apiClient.post<OrderHistoryApiResponse>('/orders/history', payload);
+        const orders = (response.data.orders || []).map(mapOrderToHistoryItem);
+        const metadata = response.data.metadata;
+        const perPage = metadata?.limit ?? limit;
+        const totalCount = metadata?.total_items ?? orders.length;
+        const totalPages = metadata?.total_pages ?? (perPage > 0 ? Math.ceil(totalCount / perPage) : 1);
+        const currentPage = metadata?.current_page ?? page;
+
+        return {
+          orders,
+          total_count: totalCount,
+          page: currentPage,
+          per_page: perPage,
+          total_pages: totalPages,
+        };
+      },
+      {
+        method: 'POST',
+        endpoint: '/orders/history',
+        payload,
+      }
+    );
   }
 
   /**

@@ -30,8 +30,8 @@ export interface OrderProduct {
   production_status: string;
   production_status_done_quantity: number;
   name: string;
-  image_url: string;
-  components: OrderComponent[];
+  image_url?: string;
+  components?: OrderComponent[];
   description: string;
   price: number;
   price_take_away: number;
@@ -44,9 +44,9 @@ export interface OrderProduct {
   available_delivery: boolean;
   category: string;
   category_id: string;
-  is_product_group: boolean;
-  status: number;
-  sub_products: unknown;
+  is_product_group?: boolean;
+  status: number | string;
+  sub_products?: unknown;
   configuration: OrderProductConfiguration;
   quantity: number;
   paid_quantity: number;
@@ -54,23 +54,33 @@ export interface OrderProduct {
   ready_for_distribution_quantity: number;
   isPaid: number;
   isDistributed: number;
-  discount_id: string | null;
-  discount_name: string | null;
-  discounted_price: unknown;
-  production_color: string;
-  extra: unknown[];
-  without: unknown[];
-  customers: unknown[];
-  comment: OrderComment;
+  discount_id?: string | null;
+  discount_name?: string | null;
+  discounted_price?: unknown;
+  production_color?: string;
+  extra?: unknown[];
+  without?: unknown[];
+  customers?: unknown[];
+  comment?: OrderComment;
+  display_order?: number | null;
+  tags?: unknown;
+  allergens?: unknown;
+  integrations?: {
+    uber_eats?: { enabled?: boolean };
+    deliveroo?: { enabled?: boolean };
+  };
 }
 
 export interface OrderPayment {
   order_id: string;
-  payment_id: number;
+  payment_id: number | string;
   mop: string;
   amount: number;
-  payment_date: string;
-  enabled: number;
+  payment_date: string | number;
+  merchant_id?: string;
+  user_id?: string;
+  enabled: number | boolean;
+  operation_type?: string;
 }
 
 export interface OrderCustomer {
@@ -107,8 +117,10 @@ export interface OrderCustomer {
 
 export interface Order {
   order_id: string;
+  merchant_id?: string;
   order_num: string;
-  delivery_session_id: string;
+  delivery_session_id: string | null;
+  delivery_priority?: string | null;
   brand: string;
   brand_order_id: string | null;
   brand_order_num: string | null;
@@ -140,6 +152,17 @@ export interface Order {
   creation_date: number;
   fulfillment_type: string;
   last_update: number;
+  delivery_session?: unknown;
+  cash_register?: {
+    cash_register_id: string;
+    start_date: string | null;
+    end_date: string | null;
+    closed: boolean;
+    cash_desk?: {
+      cash_desk_id: string;
+      cash_desk_name: string;
+    };
+  };
 }
 
 export type PendingOrdersResponse = WelloApiResponse<{ orders: Order[] }>;
@@ -394,7 +417,7 @@ export const ordersService = {
           order.customer?.customer_name.toLowerCase().includes(searchTerm)
         );
       },
-      () => apiClient.get<GetOrderResponse>('/orders/search', { params: { term } }).then(res => res.data.orders || [])
+      () => apiClient.get<GetOrderResponse>(`/orders/search?term=${encodeURIComponent(term)}`).then(res => res.data.orders || [])
     );
   }
 };
