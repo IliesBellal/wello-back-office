@@ -115,27 +115,21 @@ const formatTimestamp = (value: string | number | null | undefined): string => {
 };
 
 const getOrderChannelLabel = (order: Order): string => {
-  const brand = order.brand?.toLowerCase() || '';
-  const fulfillmentType = order.fulfillment_type?.toLowerCase() || '';
-  const orderType = order.order_type?.toLowerCase() || '';
+  const brand = order.brand;
+  const fulfillmentType = order.fulfillment_type;
+  const orderType = order.order_type;
 
-  if (brand.includes('uber') || fulfillmentType.includes('uber')) {
-    return CHANNEL_LABELS.ubereats;
+  if (brand === 'UBER_EATS' || fulfillmentType === 'UBER_EATS') return CHANNEL_LABELS.ubereats;
+  if (brand === 'DELIVEROO' || fulfillmentType === 'DELIVEROO') return CHANNEL_LABELS.deliveroo;
+
+  if (brand === 'WELLO_RESTO') {
+    if (orderType === 'TAKE_AWAY') return CHANNEL_LABELS.takeaway;
+    if (orderType === 'DELIVERY') return CHANNEL_LABELS.delivery;
+    if (orderType === 'IN') return CHANNEL_LABELS.restaurant;
+    return '';
   }
 
-  if (brand.includes('deliveroo') || fulfillmentType.includes('deliveroo')) {
-    return CHANNEL_LABELS.deliveroo;
-  }
-
-  if (orderType.includes('take')) {
-    return CHANNEL_LABELS.takeaway;
-  }
-
-  if (orderType.includes('click')) {
-    return CHANNEL_LABELS.clickcollect;
-  }
-
-  return CHANNEL_LABELS.restaurant;
+  return '';
 };
 
 const getOrderStatusConfig = (order: Order) => {
@@ -201,9 +195,10 @@ interface RefundModalProps {
   onClose: () => void;
   onRefund: (amount: number, reason: string) => Promise<void>;
   maxAmount: number;
+  zIndex?: number;
 }
 
-const RefundModal = ({ isOpen, onClose, onRefund, maxAmount }: RefundModalProps) => {
+const RefundModal = ({ isOpen, onClose, onRefund, maxAmount, zIndex = 70 }: RefundModalProps) => {
   const [amount, setAmount] = useState<string>(maxAmount.toString());
   const [reason, setReason] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -226,6 +221,7 @@ const RefundModal = ({ isOpen, onClose, onRefund, maxAmount }: RefundModalProps)
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+      style={{ zIndex }}
       onClick={onClose}
     >
       <Card className="bg-card border border-border w-full max-w-md" onClick={(e) => e.stopPropagation()}>
@@ -290,9 +286,11 @@ interface OrderDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   orderId: string;
+  // Allows callers to place this modal above other open layers (ex: side sheets).
+  zIndex?: number;
 }
 
-const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) => {
+export const OrderDetailModal = ({ isOpen, onClose, orderId, zIndex = 50 }: OrderDetailModalProps) => {
   const [isRefundModalOpen, setIsRefundModalOpen] = useState(false);
 
   const { data: orderDetail, isLoading, error } = useQuery<Order>({
@@ -320,10 +318,11 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
     <>
       <div
         className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+        style={{ zIndex }}
         onClick={onClose}
       >
         <Card
-          className="bg-card border border-border w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="bg-card w-screen h-dvh max-h-dvh overflow-y-auto rounded-none border-0 sm:w-full sm:h-auto sm:max-w-2xl sm:max-h-[90vh] sm:rounded-lg sm:border sm:border-border"
           onClick={(e) => e.stopPropagation()}
         >
           <CardHeader className="flex flex-row items-center justify-between sticky top-0 bg-card border-b border-border">
@@ -485,6 +484,7 @@ const OrderDetailModal = ({ isOpen, onClose, orderId }: OrderDetailModalProps) =
       onClose={() => setIsRefundModalOpen(false)}
       onRefund={handleRefund}
       maxAmount={orderDetail ? orderDetail.TTC / 100 : 0}
+      zIndex={zIndex + 10}
     />
     </>
   );

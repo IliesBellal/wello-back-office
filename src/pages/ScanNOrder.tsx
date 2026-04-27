@@ -22,7 +22,9 @@ import {
   uploadBanner,
   OnlineOrdersConfig,
 } from '@/services/onlineOrdersService';
-import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp } from 'lucide-react';
+import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp, Wallet } from 'lucide-react';
+import { InfoTooltip } from '@/components/ui/InfoTooltip';
+import { integrationsService } from '@/services/integrationsService';
 import { useToast } from '@/hooks/use-toast';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -104,16 +106,17 @@ export default function ScanNOrder() {
   const [bannerPreview, setBannerPreview] = useState<string>('');
   const [activeTab, setActiveTab] = useState('appearance');
   const accessUrl = 'https://app.scanorder.com';
-  
-  // Mock KPI data
-  const kpis = {
-    revenue: 2450000, // €24,500
-    orders: 156,
-    avg_basket: 1571, // €15.71
-  };
+  const [stripeBalance, setStripeBalance] = useState<{ available: number; pending: number } | null>(null);
+  const [kpis, setKpis] = useState<{ revenue: number; orders: number; avg_basket: number } | null>(null);
 
   useEffect(() => {
     fetchConfig();
+    integrationsService.getStripeBalance()
+      .then(setStripeBalance)
+      .catch(() => {/* balance stays null */});
+    integrationsService.getScanNOrderStatus()
+      .then(status => setKpis(status.kpis))
+      .catch(() => {/* kpis stay null */});
   }, []);
 
   const fetchConfig = async () => {
@@ -669,23 +672,65 @@ export default function ScanNOrder() {
         <StripeStatusCard />
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-8">
-          {/* Revenue */}
-          <Card>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 mb-8">
+          {/* Revenue — en surbrillance */}
+          <Card className="bg-gradient-primary border-transparent">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-sm font-medium text-white/90">
                 Chiffre d'affaires
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">
-                {new Intl.NumberFormat('fr-FR', {
+              <div className="text-2xl font-bold text-white">
+                {kpis !== null ? new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
                   currency: 'EUR',
-                  minimumFractionDigits: 0,
-                }).format(kpis.revenue / 100)}
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                }).format(kpis.revenue / 100) : '—'}
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Par ScanNOrder</p>
+              <p className="text-xs text-white/80 mt-1">Par ScanNOrder</p>
+            </CardContent>
+          </Card>
+
+          {/* Stripe Balance */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+                  Solde actuel
+                  <InfoTooltip
+                    title="À propos du solde et des paiements"
+                    description={
+                      `Le solde actuel correspond à l'argent déjà prélevé, prêt pour le prochain versement vers votre compte bancaire.\n\n` +
+                      `La section "En attente" indique les fonds qui seront bientôt disponibles (paiements en cours de validation).\n\n` +
+                      `Tous les versements sont effectués automatiquement le 7 de chaque mois.`
+                    }
+                  />
+                </CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">
+                {stripeBalance !== null
+                  ? new Intl.NumberFormat('fr-FR', {
+                      style: 'currency',
+                      currency: 'EUR',
+                      minimumFractionDigits: 0,
+                    }).format(stripeBalance.available / 100)
+                  : '—'}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                En attente&nbsp;:
+                {stripeBalance !== null
+                  ? ` ${new Intl.NumberFormat('fr-FR', {
+                      style: 'currency',
+                      currency: 'EUR',
+                      minimumFractionDigits: 0,
+                    }).format(stripeBalance.pending / 100)}`
+                  : ' —'}
+              </p>
             </CardContent>
           </Card>
 
@@ -697,7 +742,7 @@ export default function ScanNOrder() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{kpis.orders}</div>
+              <div className="text-2xl font-bold">{kpis !== null ? kpis.orders : '—'}</div>
               <p className="text-xs text-muted-foreground mt-1">Commandes totales</p>
             </CardContent>
           </Card>
@@ -711,11 +756,11 @@ export default function ScanNOrder() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {new Intl.NumberFormat('fr-FR', {
+                {kpis !== null ? new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
                   currency: 'EUR',
                   minimumFractionDigits: 0,
-                }).format(kpis.avg_basket / 100)}
+                }).format(kpis.avg_basket / 100) : '—'}
               </div>
               <p className="text-xs text-muted-foreground mt-1">Montant moyen</p>
             </CardContent>

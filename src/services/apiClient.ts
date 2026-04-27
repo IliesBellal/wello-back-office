@@ -217,6 +217,7 @@ const handleNetworkError = () => {
 
 // ============= Main API Client =============
 async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
+
   const { method = "GET", body, headers = {}, skipAuth = false } = options;
   const url = `${API_BASE_URL}${endpoint}`;
 
@@ -226,8 +227,10 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
 
   try {
     const authToken = getAuthToken();
+    // Only set Content-Type if not FormData
+    const isFormData = typeof window !== 'undefined' && body instanceof FormData;
     const requestHeaders: Record<string, string> = {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       "X-App-Source": "backoffice",
       ...headers,
     };
@@ -236,11 +239,16 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
       requestHeaders["Authorization"] = `Bearer ${authToken}`;
     }
 
-    const response = await fetch(url, {
+    const fetchOptions: RequestInit = {
       method,
       headers: requestHeaders,
-      body: body ? JSON.stringify(body) : undefined,
-    });
+      body: undefined,
+    };
+    if (body) {
+      fetchOptions.body = isFormData ? body : JSON.stringify(body);
+    }
+
+    const response = await fetch(url, fetchOptions);
 
     if (!response.ok) {
       let errorMessage: string | undefined;

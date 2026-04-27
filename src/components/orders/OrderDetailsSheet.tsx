@@ -392,6 +392,7 @@ export const OrderDetailsSheet = () => {
                 </Button>
               </ResponsiveSheetFooter>
             )}
+          </>
         ) : null}
       </ResponsiveSheetContent>
     </ResponsiveSheet>

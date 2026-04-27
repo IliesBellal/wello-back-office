@@ -52,6 +52,7 @@ export interface Component {
   unit_id?: number;
   unit_of_measure?: string;  // e.g. "Grammes", "Millilitres"
   unit_of_measure_id?: string;  // e.g. "2" (numeric ID from API)
+  unit_of_measure_short_name?: string;  // e.g. "g", "mL"
   quantity?: number;  // Quantity in the product composition
   cost?: number;  // Cost of the component in the product
   purchase_cost?: number;  // Purchase price (prix d'achat) in cents

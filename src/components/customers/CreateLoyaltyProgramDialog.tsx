@@ -29,7 +29,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { createLoyaltyProgram, getProducts, CreateLoyaltyProgramPayload } from "@/services/customersService";
+import { createLoyaltyProgram, getProducts, type LoyaltyProgramMutationPayload } from "@/services/customersService";
 
 const formSchema = z.object({
   name: z.string().min(1, "Le nom est requis"),
@@ -97,16 +97,25 @@ const CreateLoyaltyProgramDialog = ({ open, onOpenChange, onSuccess }: CreateLoy
   const onSubmit = async (values: FormValues) => {
     setLoading(true);
     try {
-      const payload: CreateLoyaltyProgramPayload = {
+      const payload: LoyaltyProgramMutationPayload = {
         name: values.name,
         description: values.description || "",
-        type: values.type,
-        target_value: values.type === "total_spent" ? values.target_value * 100 : values.target_value,
-        target_order_types: values.target_order_types,
-        target_products: values.target_products,
-        reward_type: values.reward_type,
-        reward_value: values.reward_type === "fixed_discount" ? values.reward_value * 100 : values.reward_value,
-        reward_products: values.reward_products,
+        available: true,
+        target: {
+          type: values.type,
+          value: values.type === "total_spent" ? Math.round(values.target_value * 100) : values.target_value,
+          order_types: values.target_order_types.join(" "),
+          product_ids: values.type === "product_count" ? (values.target_products || []) : [],
+        },
+        reward: {
+          type: values.reward_type,
+          value: values.reward_type === "fixed_discount" ? Math.round(values.reward_value * 100) : values.reward_value,
+          order_types: values.target_order_types.join(" "),
+          min_order_value: 0,
+          max_rewards_per_order: 1,
+          ...(values.reward_type === "percent_discount" ? { max_discount_value: 0 } : {}),
+          product_ids: values.reward_type === "free_product" ? (values.reward_products || []) : [],
+        },
       };
 
       await createLoyaltyProgram(payload);

@@ -597,6 +597,7 @@ export const menuService = {
           price: number;
           unit_of_measure: string;
           unit_of_measure_id: string;
+          unit_of_measure_short_name?: string;
           purchase_price?: number;
           purchase_price_qty?: number;
           purchase_cost?: number;
@@ -618,8 +619,14 @@ export const menuService = {
                   unit_id: parseInt(comp.unit_of_measure_id),
                   unit_of_measure: comp.unit_of_measure,
                   unit_of_measure_id: comp.unit_of_measure_id,
+                  unit_of_measure_short_name: comp.unit_of_measure_short_name ?? comp.unit_of_measure,
                   purchase_cost: comp.purchase_price || comp.purchase_cost,
                   purchase_cost_qty: comp.purchase_price_qty || comp.purchase_cost_qty,
+                  purchase_price_per_unit: (() => {
+                    const cost = comp.purchase_price || comp.purchase_cost;
+                    const qty = comp.purchase_price_qty || comp.purchase_cost_qty;
+                    return cost && qty ? Math.round(cost / qty) : undefined;
+                  })(),
                   status: comp.status,
                   available: comp.status === '1'
                 });

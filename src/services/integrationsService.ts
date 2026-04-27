@@ -8,13 +8,23 @@ export interface IntegrationKPIs {
 }
 
 export interface IntegrationStatus {
-  platform: 'uber_eats' | 'deliveroo';
+  platform: 'uber_eats' | 'deliveroo' | 'scannorder';
   active: boolean;
   commission_rate: number;
   auto_accept_orders: boolean;
   kpis: IntegrationKPIs;
-  last_sync: string;
+  last_sync: string | null;
   synced_items: number;
+  logo_url?: string | null;
+  banner_url?: string | null;
+  primary_color?: string | null;
+  header_title?: string | null;
+  header_text?: string | null;
+  takeaway_enabled?: boolean;
+  takeaway_auto_accept?: boolean;
+  delivery_enabled?: boolean;
+  delivery_auto_accept?: boolean;
+  delivery_distance_limit?: number;
 }
 
 export type GetIntegrationResponse = WelloApiResponse<{ integration: IntegrationStatus }>;
@@ -48,6 +58,19 @@ const mockIntegrations: Record<string, IntegrationStatus> = {
     last_sync: '2024-04-08T10:15:00Z',
     synced_items: 76,
   },
+  scanorder: {
+    platform: 'scannorder',
+    active: true,
+    commission_rate: 0,
+    auto_accept_orders: true,
+    kpis: {
+      revenue: 2100000,
+      orders: 158,
+      avg_basket: 1329,
+    },
+    last_sync: '2024-04-08T09:45:00Z',
+    synced_items: 94,
+  },
 };
 
 // ============= API Functions =============
@@ -67,6 +90,15 @@ export const integrationsService = {
     return withMock(
       () => mockIntegrations.deliveroo,
       () => apiClient.get<GetIntegrationResponse>('/integrations/deliveroo').then(res => res.data.integration)
+    );
+  },
+
+  getScanNOrderStatus: async (): Promise<IntegrationStatus> => {
+    logAPI('GET', '/integrations/scannorder');
+
+    return withMock(
+      () => mockIntegrations.scanorder,
+      () => apiClient.get<GetIntegrationResponse>('/integrations/scannorder').then(res => res.data.integration)
     );
   },
 
@@ -192,6 +224,21 @@ export const integrationsService = {
     return withMock(
       () => ({ url: 'https://connect.stripe.com/setup/bank-account/mock/' }),
       () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/stripe/bank-account-link', {}).then(res => res.data.data)
+    );
+  },
+
+  getStripeBalance: async (): Promise<{ available: number; pending: number }> => {
+    logAPI('GET', '/integrations/stripe/balance');
+
+    return withMock(
+      () => ({ available: 150000, pending: 45000 }),
+      () =>
+        apiClient
+          .get<WelloApiResponse<{ available: Array<{ amount: number; currency: string }>; pending: Array<{ amount: number; currency: string }> }>>('/integrations/stripe/balance')
+          .then((res) => ({
+            available: res.data.data.available.reduce((sum, e) => sum + e.amount, 0),
+            pending: res.data.data.pending.reduce((sum, e) => sum + e.amount, 0),
+          }))
     );
   },
 };

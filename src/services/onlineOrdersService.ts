@@ -36,7 +36,8 @@ const mockOnlineOrdersConfig: OnlineOrdersConfig = {
 export const getOnlineOrdersConfig = async (): Promise<OnlineOrdersConfig> => {
   try {
     const response = await apiClient.get('/integrations/scannorder');
-    return response.data;
+    // API returns { id, data: { integration: { ... } } }
+    return response.data.integration;
   } catch (error) {
     console.error('Failed to fetch online orders config:', error);
     // Return mock data as fallback
@@ -48,8 +49,14 @@ export const updateOnlineOrdersConfig = async (
   config: OnlineOrdersConfig
 ): Promise<OnlineOrdersConfig> => {
   try {
-    const response = await apiClient.patch('/integrations/scannorder', config);
-    return response.data;
+    // Remove forbidden fields from payload
+    const {
+      auto_accept_orders, commission_rate, logo_url, banner_url, // eslint-disable-line @typescript-eslint/no-unused-vars
+      ...allowedConfig
+    } = config;
+    const response = await apiClient.patch('/integrations/scannorder', allowedConfig);
+    // API returns { id, data: { integration: { ... } } }
+    return response.data.integration;
   } catch (error) {
     console.error('Failed to update online orders config:', error);
     // Return the config that was attempted to be saved as fallback
@@ -60,13 +67,9 @@ export const updateOnlineOrdersConfig = async (
 export const uploadLogo = async (file: File): Promise<string> => {
   try {
     const formData = new FormData();
-    formData.append('logo', file);
-    const response = await apiClient.post('/integrations/scannorder/logo', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data.logo_url;
+    formData.append('photo', file);
+    const response = await apiClient.put('/integrations/scannorder/logo', formData);
+    return response.data.photo_url;
   } catch (error) {
     console.error('Failed to upload logo:', error);
     throw error;
@@ -76,13 +79,9 @@ export const uploadLogo = async (file: File): Promise<string> => {
 export const uploadBanner = async (file: File): Promise<string> => {
   try {
     const formData = new FormData();
-    formData.append('banner', file);
-    const response = await apiClient.post('/integrations/scannorder/banner', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data.banner_url;
+    formData.append('photo', file);
+    const response = await apiClient.put('/integrations/scannorder/banner', formData);
+    return response.data.photo_url;
   } catch (error) {
     console.error('Failed to upload banner:', error);
     throw error;

@@ -4,15 +4,17 @@ import { PageContainer } from "@/components/shared";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Package, Calendar } from "lucide-react";
-import { getStocksList, StockComponent, getStockMovements, getMovementsSummary, StockMovement } from "@/services/stocksService";
+import { AlertTriangle, Calendar, Minus, Package, Plus } from "lucide-react";
+import { getStocksList, StockComponent, getStockMovements, StockMovement, StockMovementType } from "@/services/stocksService";
 import { StockMovementDialog } from "@/components/stocks/StockMovementDialog";
 import { AdvancedDatePicker } from "@/components/shared/AdvancedDatePicker";
 import { Tile } from "@/components/shared/Tile";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -32,8 +34,13 @@ const Stocks = () => {
     return { from, to };
   });
   const [movements, setMovements] = useState<StockMovement[]>([]);
-  const [movementsSummary, setMovementsSummary] = useState<any[]>([]);
   const [movementsLoading, setMovementsLoading] = useState(false);
+  const [selectedMovementTypes, setSelectedMovementTypes] = useState<StockMovementType[]>([
+    "add",
+    "remove",
+    "loss",
+    "consumption",
+  ]);
 
   // Fetch stocks
   const fetchStocks = async () => {
@@ -52,12 +59,8 @@ const Stocks = () => {
   const fetchMovements = async () => {
     setMovementsLoading(true);
     try {
-      const [mvts, summary] = await Promise.all([
-        getStockMovements(movementDateRange.from, movementDateRange.to),
-        getMovementsSummary(movementDateRange.from, movementDateRange.to)
-      ]);
+      const mvts = await getStockMovements(movementDateRange.from, movementDateRange.to);
       setMovements(mvts);
-      setMovementsSummary(summary);
     } catch (error) {
       console.error("Error fetching movements:", error);
     } finally {
@@ -84,6 +87,70 @@ const Stocks = () => {
       style: "currency",
       currency: "EUR",
     }).format(cents / 100);
+  };
+
+  const toggleMovementType = (type: StockMovementType, checked: boolean) => {
+    setSelectedMovementTypes((current) => {
+      if (checked) {
+        return current.includes(type) ? current : [...current, type];
+      }
+
+      return current.filter((entry) => entry !== type);
+    });
+  };
+
+  const filteredMovements = movements.filter((movement) => selectedMovementTypes.includes(movement.type));
+
+  const movementSummary = Array.from(
+    filteredMovements.reduce((summaryMap, movement) => {
+      const stockComponent = stocks.find((component) => component.component_id === movement.component_id);
+      const purchasingPrice = stockComponent?.purchasing_price ?? 0;
+      const existing = summaryMap.get(movement.component_id);
+
+      if (existing) {
+        existing.totalQuantity += movement.quantity;
+        existing.totalValue += movement.quantity * purchasingPrice;
+        return summaryMap;
+      }
+
+      summaryMap.set(movement.component_id, {
+        component_id: movement.component_id,
+        component_name: movement.component_name,
+        unit: {
+          unit_short_name: movement.unit.unit_short_name,
+          unit_name: movement.unit.unit_name,
+          unit_id: movement.unit.unit_id,
+        },
+        totalQuantity: movement.quantity,
+        totalValue: movement.quantity * purchasingPrice,
+      });
+
+      return summaryMap;
+    }, new Map<string, {
+      component_id: string;
+      component_name: string;
+      unit: {
+        unit_short_name: string;
+        unit_name: string;
+        unit_id: string;
+      };
+      totalQuantity: number;
+      totalValue: number;
+    }>()).values()
+  );
+
+  const movementTypeLabels: Record<StockMovementType, string> = {
+    add: "Ajouts",
+    remove: "Retraits",
+    loss: "Pertes",
+    consumption: "Consommations",
+  };
+
+  const movementTypeIcons: Record<StockMovementType, React.ReactNode> = {
+    add: <Plus className="w-5 h-5" />,
+    remove: <Minus className="w-5 h-5" />,
+    loss: <AlertTriangle className="w-5 h-5" />,
+    consumption: <Package className="w-5 h-5" />,
   };
 
   const handleMovementClick = (component: StockComponent) => {
@@ -156,11 +223,11 @@ const Stocks = () => {
                         <div className={`flex items-center gap-2 ${isLowStock ? "text-destructive" : ""}`}>
                           {isLowStock && <AlertTriangle className="h-4 w-4" />}
                           <span className="font-medium">
-                            {component.quantity} {component.unit.unit_name}
+                            {component.quantity} {component.unit.unit_short_name}
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell>{formatPrice(component.purchasing_price)}/{component.unit.unit_name}</TableCell>
+                      <TableCell>{formatPrice(component.purchasing_price)}/{component.unit.unit_short_name}</TableCell>
                       <TableCell className="font-medium">{formatPrice(totalValue)}</TableCell>
                       <TableCell className="text-right">
                         <Button
@@ -189,12 +256,40 @@ const Stocks = () => {
         {/* Date Range Filter */}
         <Card>
           <CardContent className="p-4">
-            <div className="flex items-center gap-4">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              <AdvancedDatePicker
-                value={movementDateRange}
-                onChange={setMovementDateRange}
-              />
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-center gap-4">
+                <Calendar className="h-5 w-5 text-muted-foreground" />
+                <AdvancedDatePicker
+                  value={movementDateRange}
+                  onChange={setMovementDateRange}
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-4">
+                {(["add", "remove", "loss", "consumption"] as StockMovementType[]).map((type) => (
+                  <label
+                    key={type}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-2 border rounded-lg cursor-pointer transition-all whitespace-nowrap",
+                      selectedMovementTypes.includes(type)
+                        ? "border-primary bg-primary/5"
+                        : "border-input hover:border-primary/50 hover:bg-accent/50"
+                    )}
+                  >
+                    <Checkbox
+                      checked={selectedMovementTypes.includes(type)}
+                      onCheckedChange={(checked) => toggleMovementType(type, Boolean(checked))}
+                      className="mt-0.5"
+                    />
+                    <div className="flex items-center gap-2">
+                      <div className="text-muted-foreground">
+                        {movementTypeIcons[type]}
+                      </div>
+                      <span className="text-sm font-medium">{movementTypeLabels[type]}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -206,16 +301,22 @@ const Stocks = () => {
               <Skeleton key={i} className="h-28" />
             ))}
           </div>
+        ) : movementSummary.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              Aucun mouvement ne correspond aux filtres selectionnes
+            </CardContent>
+          </Card>
         ) : (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {movementsSummary.map((item) => (
+            {movementSummary.map((item) => (
               <Tile
                 key={item.component_id}
                 title={item.component_name}
-                value={`${item.total_consumed.toFixed(1)} ${item.unit}`}
+                value={`${item.totalQuantity.toFixed(1)} ${item.unit.unit_short_name}`}
                 isHighlighted={false}
               >
-                <p className="text-xs text-muted-foreground mt-2">Consommé</p>
+                <p className="text-xs text-muted-foreground mt-2">Valorisation: {formatPrice(item.totalValue)}</p>
               </Tile>
             ))}
           </div>
@@ -246,20 +347,20 @@ const Stocks = () => {
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   </TableRow>
                 ))
-              ) : movements.length === 0 ? (
+              ) : filteredMovements.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    Aucun mouvement pour cette période
+                    Aucun mouvement pour les filtres selectionnes
                   </TableCell>
                 </TableRow>
               ) : (
-                movements.map((movement) => (
+                filteredMovements.map((movement) => (
                   <TableRow key={movement.id}>
                     <TableCell className="text-sm">
                       {format(new Date(movement.created_at), 'dd MMM HH:mm', { locale: fr })}
                     </TableCell>
                     <TableCell>
-                      {movement.type === 'consommation' ? (
+                      {movement.type === 'consumption' ? (
                         <div>
                           <p className="font-medium">{movement.component_name}</p>
                           <p className="text-xs text-muted-foreground italic">{movement.product_name}</p>
@@ -270,15 +371,15 @@ const Stocks = () => {
                     </TableCell>
                     <TableCell>
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        movement.type === 'ajout' ? 'bg-green-100 text-green-700' :
-                        movement.type === 'consommation' ? 'bg-blue-100 text-blue-700' :
-                        movement.type === 'retrait' ? 'bg-yellow-100 text-yellow-700' :
+                        movement.type === 'add' ? 'bg-green-100 text-green-700' :
+                        movement.type === 'consumption' ? 'bg-blue-100 text-blue-700' :
+                        movement.type === 'remove' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-red-100 text-red-700'
                       }`}>
-                        {movement.type}
+                        {movementTypeLabels[movement.type]}
                       </span>
                     </TableCell>
-                    <TableCell>{movement.quantity} {movement.unit}</TableCell>
+                    <TableCell>{movement.quantity} {movement.unit.unit_short_name}</TableCell>
                     <TableCell className="text-sm">{movement.created_by}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{movement.comment || '-'}</TableCell>
                   </TableRow>

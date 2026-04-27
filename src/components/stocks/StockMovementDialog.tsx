@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { StockComponent, updateStockMovement } from "@/services/stocksService";
+import { StockComponent, updateStockMovement, type StockMovementType } from "@/services/stocksService";
 import { toast } from "sonner";
 import { ArrowDownToLine, ArrowUpFromLine, Trash2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface StockMovementDialogProps {
   component: StockComponent | null;
@@ -29,6 +29,16 @@ export const StockMovementDialog = ({
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const parsedQuantity = Number.parseFloat(quantity);
+  const hasValidQuantity = Number.isFinite(parsedQuantity) && parsedQuantity > 0;
+  const stockAfterSave = hasValidQuantity
+    ? component
+      ? movementType === "entry"
+        ? component.quantity + parsedQuantity
+        : component.quantity - parsedQuantity
+      : 0
+    : component?.quantity ?? 0;
+
   const handleSubmit = async () => {
     if (!component || !quantity) return;
 
@@ -41,12 +51,17 @@ export const StockMovementDialog = ({
     setIsSubmitting(true);
 
     try {
-      const finalQuantity = movementType === "entry" ? numQuantity : -numQuantity;
+      const apiTypeByMovement: Record<MovementType, Exclude<StockMovementType, 'consumption'>> = {
+        entry: "add",
+        exit: "remove",
+        loss: "loss",
+      };
       
       await updateStockMovement({
         component_id: component.component_id,
-        unit: component.unit.unit_name,
-        quantity: finalQuantity,
+        unit_id: component.unit.unit_id ?? component.unit.unit_name,
+        quantity: numQuantity,
+        type: apiTypeByMovement[movementType],
         comment: reason || undefined,
       });
 
@@ -79,29 +94,51 @@ export const StockMovementDialog = ({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <Label>Type de mouvement</Label>
-            <ToggleGroup
-              type="single"
-              value={movementType}
-              onValueChange={(value) => value && setMovementType(value as MovementType)}
-              className="justify-start"
-            >
-              <ToggleGroupItem value="entry" className="gap-2">
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setMovementType("entry")}
+                className={cn(
+                  "flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors",
+                  movementType === "entry"
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
                 <ArrowDownToLine className="h-4 w-4" />
                 Entrée
-              </ToggleGroupItem>
-              <ToggleGroupItem value="exit" className="gap-2">
+              </button>
+              <button
+                type="button"
+                onClick={() => setMovementType("exit")}
+                className={cn(
+                  "flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors",
+                  movementType === "exit"
+                    ? "border-rose-500 bg-rose-50 text-rose-700"
+                    : "border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
                 <ArrowUpFromLine className="h-4 w-4" />
                 Sortie
-              </ToggleGroupItem>
-              <ToggleGroupItem value="loss" className="gap-2">
+              </button>
+              <button
+                type="button"
+                onClick={() => setMovementType("loss")}
+                className={cn(
+                  "flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors",
+                  movementType === "loss"
+                    ? "border-amber-500 bg-amber-50 text-amber-700"
+                    : "border-input bg-background hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
                 <Trash2 className="h-4 w-4" />
                 Perte
-              </ToggleGroupItem>
-            </ToggleGroup>
+              </button>
+            </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quantity">Quantité ({component.unit.unit_name})</Label>
+            <Label htmlFor="quantity">Quantité ({component.unit.unit_short_name})</Label>
             <Input
               id="quantity"
               type="number"
@@ -112,7 +149,10 @@ export const StockMovementDialog = ({
               placeholder="0"
             />
             <p className="text-sm text-muted-foreground">
-              Stock actuel: {component.quantity} {component.unit.unit_name}
+              Stock actuel: {component.quantity} {component.unit.unit_short_name}
+            </p>
+            <p className="text-sm text-foreground font-medium">
+              Stock après enregistrement: {stockAfterSave.toFixed(3).replace(/\.0+$/, "").replace(/(\.[0-9]*[1-9])0+$/, "$1")} {component.unit.unit_short_name}
             </p>
           </div>
 

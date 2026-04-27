@@ -391,35 +391,21 @@ const getOrderHistoryTimestamp = (order: Order): string => {
 };
 
 const mapOrderHistoryChannel = (order: Order): OrderHistoryItem['channel'] => {
-  const orderType = order.order_type?.toLowerCase() || '';
-  const fulfillmentType = order.fulfillment_type?.toLowerCase() || '';
-  const brand = order.brand?.toLowerCase() || '';
+  const brand = order.brand;
+  const orderType = order.order_type;
+  const fulfillmentType = order.fulfillment_type;
 
-  if (brand.includes('uber') || fulfillmentType.includes('uber')) {
-    return 'ubereats';
+  if (brand === 'UBER_EATS' || fulfillmentType === 'UBER_EATS') return 'ubereats';
+  if (brand === 'DELIVEROO' || fulfillmentType === 'DELIVEROO') return 'deliveroo';
+
+  if (brand === 'WELLO_RESTO') {
+    if (orderType === 'TAKE_AWAY') return 'takeaway';
+    if (orderType === 'DELIVERY') return 'delivery';
+    if (orderType === 'IN') return 'restaurant';
+    return '';
   }
 
-  if (brand.includes('deliveroo') || fulfillmentType.includes('deliveroo')) {
-    return 'deliveroo';
-  }
-
-  if (
-    orderType.includes('delivery') ||
-    fulfillmentType.includes('delivery') ||
-    order.isDelivery === 1
-  ) {
-    return 'delivery';
-  }
-
-  if (orderType.includes('take')) {
-    return 'takeaway';
-  }
-
-  if (orderType.includes('click')) {
-    return 'clickcollect';
-  }
-
-  return 'restaurant';
+  return '';
 };
 
 const mapOrderHistoryStatus = (order: Order): OrderHistoryItem['status'] => {

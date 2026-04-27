@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, type UIEvent } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,8 @@ import {
   acquisitionSourceLabels, deliveryTypeLabels
 } from "@/services/customersService";
 
+const ORDERS_PAGE_SIZE = 10;
+
 interface CustomerDetailsSheetProps {
   customer: Customer | null;
   open: boolean;
@@ -32,8 +34,11 @@ interface CustomerDetailsSheetProps {
 
 const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: CustomerDetailsSheetProps) => {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
+  const [ordersPage, setOrdersPage] = useState(1);
+  const [hasMoreOrders, setHasMoreOrders] = useState(true);
   const [loyalty, setLoyalty] = useState<CustomerLoyalty | null>(null);
   const [loadingOrders, setLoadingOrders] = useState(false);
+  const [loadingMoreOrders, setLoadingMoreOrders] = useState(false);
   const [loadingLoyalty, setLoadingLoyalty] = useState(false);
   const [activeTab, setActiveTab] = useState("general");
   const [editingProgram, setEditingProgram] = useState<string | null>(null);
@@ -43,29 +48,57 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
     if (open && customer) {
       setActiveTab("general");
       setOrders([]);
+      setOrdersPage(1);
+      setHasMoreOrders(true);
+      setLoadingMoreOrders(false);
       setLoyalty(null);
     }
   }, [open, customer]);
 
   useEffect(() => {
     if (activeTab === "orders" && customer && orders.length === 0) {
-      loadOrders();
+      loadOrders(1, false);
     }
     if (activeTab === "loyalty" && customer && !loyalty) {
       loadLoyalty();
     }
   }, [activeTab, customer]);
 
-  const loadOrders = async () => {
+  const loadOrders = async (page: number, append: boolean) => {
     if (!customer) return;
-    setLoadingOrders(true);
+
+    if (append) {
+      setLoadingMoreOrders(true);
+    } else {
+      setLoadingOrders(true);
+    }
+
     try {
-      const data = await getCustomerOrders(customer.id);
-      setOrders(data);
+      const result = await getCustomerOrders(customer.id, { page, limit: ORDERS_PAGE_SIZE });
+      setOrders((prev) => (append ? [...prev, ...result.data] : result.data));
+      setOrdersPage(result.metadata.currentPage);
+      setHasMoreOrders(result.hasMore);
     } catch (error) {
       toast.error("Erreur lors du chargement des commandes");
     } finally {
-      setLoadingOrders(false);
+      if (append) {
+        setLoadingMoreOrders(false);
+      } else {
+        setLoadingOrders(false);
+      }
+    }
+  };
+
+  const handleOrdersScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (loadingOrders || loadingMoreOrders || !hasMoreOrders) {
+      return;
+    }
+
+    const target = event.currentTarget;
+    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 80;
+
+    if (nearBottom) {
+      loadOrders(ordersPage + 1, true);
     }
   };
 
@@ -82,17 +115,58 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
     }
   };
 
-  const handleUpdateProgram = async (programId: string, targetValue: number) => {
+  const getLoyaltyStep = (targetValue: number): number => Math.max(1, targetValue);
+
+  const getMinimumAllowedProgress = (currentValue: number, targetValue: number): number => {
+    const step = getLoyaltyStep(targetValue);
+    return Math.floor(currentValue / step) * step;
+  };
+
+  const parseProgramValue = (value: string): number | null => {
+    if (!value.trim()) {
+      return null;
+    }
+
+    const parsed = Number.parseInt(value, 10);
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const getRewardsToAdd = (currentValue: number, targetValue: number, nextValue: number): number => {
+    const step = getLoyaltyStep(targetValue);
+    const currentRewards = Math.floor(currentValue / step);
+    const nextRewards = Math.floor(nextValue / step);
+    return Math.max(0, nextRewards - currentRewards);
+  };
+
+  const getCurrentTierProgress = (currentValue: number, targetValue: number): number => {
+    const step = getLoyaltyStep(targetValue);
+    return currentValue % step;
+  };
+
+  const getCurrentTierPercentage = (currentValue: number, targetValue: number): number => {
+    const step = getLoyaltyStep(targetValue);
+    const tierProgress = getCurrentTierProgress(currentValue, targetValue);
+    return Math.round((tierProgress / step) * 100);
+  };
+
+  const handleUpdateProgram = async (program: LoyaltyProgram) => {
     if (!customer || !newProgramValue) return;
-    const value = parseInt(newProgramValue);
-    if (isNaN(value) || value < 0) {
+
+    const value = parseProgramValue(newProgramValue);
+    if (value === null || value < 0) {
       toast.error("Valeur invalide");
       return;
     }
 
+    const minimumAllowedProgress = getMinimumAllowedProgress(program.current_value, program.target_value);
+    if (value < minimumAllowedProgress) {
+      toast.error(`Impossible de descendre en dessous de ${minimumAllowedProgress}`);
+      return;
+    }
+
     try {
-      await updateLoyaltyProgress(customer.id, programId, value);
-      if (value >= targetValue) {
+      await updateLoyaltyProgress(customer.id, program.id, value);
+      if (value >= program.target_value) {
         toast.success("Récompense débloquée !");
       } else {
         toast.success("Progression mise à jour");
@@ -105,11 +179,14 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
     }
   };
 
-  const handleToggleReward = async (reward: Reward) => {
+  const handleToggleReward = async (reward: Reward, isAvailable: boolean) => {
     if (!customer) return;
+
+    const nextIsUsed = !isAvailable;
+
     try {
-      await updateRewardStatus(customer.id, reward.id, !reward.is_used);
-      toast.success(reward.is_used ? "Récompense marquée comme disponible" : "Récompense marquée comme utilisée");
+      await updateRewardStatus(customer.id, reward.id, nextIsUsed);
+      toast.success(nextIsUsed ? "Récompense marquée comme utilisée" : "Récompense marquée comme disponible");
       loadLoyalty();
     } catch (error) {
       toast.error("Erreur lors de la mise à jour");
@@ -138,38 +215,49 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
   const googleMapsUrl = fullAddress ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}` : null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader className="pb-4">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xl">
-                {initials}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="flex items-center gap-2">
-                <SheetTitle className="text-xl">{displayName}</SheetTitle>
-                {isVIP && (
-                  <Badge variant="default" className="bg-amber-500">
-                    <Crown className="h-3 w-3 mr-1" />
-                    VIP
-                  </Badge>
-                )}
+    // Keep the customer sheet non-modal so a higher modal (order details) can receive pointer events.
+    <Sheet open={open} onOpenChange={onOpenChange} modal={false}>
+      {open && (
+        // Manual overlay restores "click outside to close" behavior while staying compatible with the stacked order modal.
+        <div
+          className="fixed inset-0 z-40 bg-black/80"
+          onClick={() => onOpenChange(false)}
+          aria-hidden="true"
+        />
+      )}
+      <SheetContent className="w-full sm:max-w-xl !p-0 overflow-hidden flex flex-col">
+        <div className="shrink-0 border-b border-border bg-background px-6 pt-6 pb-4">
+          <SheetHeader className="pb-0 pr-8">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-16 w-16">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xl">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="flex items-center gap-2">
+                  <SheetTitle className="text-xl">{displayName}</SheetTitle>
+                  {isVIP && (
+                    <Badge variant="default" className="bg-amber-500">
+                      <Crown className="h-3 w-3 mr-1" />
+                      VIP
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">Membre depuis {memberSince}</p>
               </div>
-              <p className="text-sm text-muted-foreground">Membre depuis {memberSince}</p>
             </div>
-          </div>
-        </SheetHeader>
+          </SheetHeader>
+        </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-4">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col px-6 pb-6">
+          <TabsList className="mt-4 grid w-full grid-cols-3 shrink-0">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="orders">Commandes</TabsTrigger>
             <TabsTrigger value="loyalty">Fidélité</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="general" className="space-y-4 mt-4">
+          <TabsContent value="general" className="mt-4 flex-1 min-h-0 overflow-y-auto space-y-4">
             {/* Contact Info */}
             <Card>
               <CardContent className="p-4 space-y-3 flex flex-col sm:flex-row sm:items-start sm:justify-between">
@@ -245,7 +333,11 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
             </div>
           </TabsContent>
 
-          <TabsContent value="orders" className="space-y-3 mt-4">
+          <TabsContent
+            value="orders"
+            className="mt-4 flex-1 min-h-0 overflow-y-auto space-y-3"
+            onScroll={handleOrdersScroll}
+          >
             {loadingOrders ? (
               <>
                 {[1, 2, 3].map(i => (
@@ -288,9 +380,21 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                 </Card>
               ))
             )}
+
+            {loadingMoreOrders && (
+              <>
+                {[1, 2].map((i) => (
+                  <Skeleton key={`orders-loading-more-${i}`} className="h-20 w-full" />
+                ))}
+              </>
+            )}
+
+            {!loadingOrders && !loadingMoreOrders && !hasMoreOrders && orders.length > 0 && (
+              <p className="py-2 text-center text-xs text-muted-foreground">Toutes les commandes sont chargées</p>
+            )}
           </TabsContent>
 
-          <TabsContent value="loyalty" className="space-y-6 mt-4">
+          <TabsContent value="loyalty" className="mt-4 flex-1 min-h-0 overflow-y-auto space-y-6">
             {loadingLoyalty ? (
               <>
                 <Skeleton className="h-32 w-full" />
@@ -310,7 +414,17 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                     <p className="text-sm text-muted-foreground">Aucun programme actif</p>
                   ) : (
                     <div className="space-y-3">
-                      {loyalty.programs.map(program => (
+                      {loyalty.programs.map((program) => {
+                        const minimumAllowedProgress = getMinimumAllowedProgress(program.current_value, program.target_value);
+                        const isEditingProgram = editingProgram === program.id;
+                        const parsedNewValue = parseProgramValue(newProgramValue);
+                        const rewardsToAdd = isEditingProgram && parsedNewValue !== null
+                          ? getRewardsToAdd(program.current_value, program.target_value, parsedNewValue)
+                          : 0;
+                        const currentTierProgress = getCurrentTierProgress(program.current_value, program.target_value);
+                        const currentTierPercentage = getCurrentTierPercentage(program.current_value, program.target_value);
+
+                        return (
                         <Card key={program.id}>
                           <CardContent className="p-4">
                             <div className="flex items-start justify-between mb-2">
@@ -319,8 +433,13 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                                 <p className="text-sm text-muted-foreground">{program.description}</p>
                               </div>
                               <Popover open={editingProgram === program.id} onOpenChange={(open) => {
-                                setEditingProgram(open ? program.id : null);
-                                if (!open) setNewProgramValue("");
+                                if (open) {
+                                  setEditingProgram(program.id);
+                                  setNewProgramValue(String(program.current_value));
+                                } else {
+                                  setEditingProgram(null);
+                                  setNewProgramValue("");
+                                }
                               }}>
                                 <PopoverTrigger asChild>
                                   <Button variant="ghost" size="sm">
@@ -332,17 +451,25 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                                     <p className="text-sm font-medium">Modifier la progression</p>
                                     <Input
                                       type="number"
-                                      placeholder={`Actuel: ${program.current_value}`}
+                                      min={minimumAllowedProgress}
                                       value={newProgramValue}
                                       onChange={(e) => setNewProgramValue(e.target.value)}
                                     />
                                     <p className="text-xs text-muted-foreground">
-                                      Si la valeur dépasse la cible ({program.target_value}), une récompense sera générée.
+                                      Total actuel: {program.current_value}
                                     </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      Minimum possible: {minimumAllowedProgress}.
+                                    </p>
+                                    {rewardsToAdd > 0 && (
+                                      <p className="text-xs font-medium text-emerald-600">
+                                        {rewardsToAdd} {rewardsToAdd > 1 ? "récompenses seront ajoutées" : "récompense sera ajoutée"}
+                                      </p>
+                                    )}
                                     <Button 
                                       size="sm" 
                                       className="w-full"
-                                      onClick={() => handleUpdateProgram(program.id, program.target_value)}
+                                      onClick={() => handleUpdateProgram(program)}
                                     >
                                       Valider
                                     </Button>
@@ -352,14 +479,16 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                             </div>
                             <div className="space-y-1">
                               <div className="flex justify-between text-sm">
-                                <span>{program.current_value} / {program.target_value}</span>
-                                <span>{Math.round((program.current_value / program.target_value) * 100)}%</span>
+                                <span>{currentTierProgress} / {program.target_value} avant prochaine récompense</span>
+                                <span>{currentTierPercentage}%</span>
                               </div>
-                              <Progress value={(program.current_value / program.target_value) * 100} className="h-2" />
+                              <Progress value={currentTierPercentage} className="h-2" />
+                              <p className="text-xs text-muted-foreground">Total enregistré: {program.current_value}</p>
                             </div>
                           </CardContent>
                         </Card>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -382,7 +511,7 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                                 <p className="font-medium flex items-center gap-2">
                                   {reward.reward_type === "percent_discount" && `${reward.reward_value}% de réduction`}
                                   {reward.reward_type === "fixed_discount" && `${(reward.reward_value / 100).toFixed(2)}€ de réduction`}
-                                  {reward.reward_type === "free_product" && `Produit offert: ${reward.reward_products?.join(", ")}`}
+                                  {reward.reward_type === "free_product" && `Produit offert`}
                                   {reward.is_used && <Check className="h-4 w-4 text-muted-foreground" />}
                                 </p>
                                 <p className="text-sm text-muted-foreground">{reward.program_name}</p>
@@ -395,8 +524,8 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                                   {reward.is_used ? "Utilisée" : "Disponible"}
                                 </span>
                                 <Switch
-                                  checked={reward.is_used}
-                                  onCheckedChange={() => handleToggleReward(reward)}
+                                  checked={!reward.is_used}
+                                  onCheckedChange={(isAvailable) => handleToggleReward(reward, isAvailable)}
                                 />
                               </div>
                             </div>

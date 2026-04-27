@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
-import { CheckCircle, AlertCircle, ArrowRight, Euro, ShoppingCart, TrendingUp, Copy, ExternalLink, Search } from 'lucide-react';
+import { CheckCircle, AlertCircle, ArrowRight, Euro, ShoppingCart, TrendingUp, Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface IntegrationOverviewProps {
@@ -43,7 +43,7 @@ const IntegrationOverview = ({ platform, status, loading, icon, path }: Integrat
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="rounded-lg overflow-hidden">
               {icon}
             </div>
             <div>
@@ -174,7 +174,7 @@ const ScanNOrderOverview = ({ status, loading, icon, accessUrl = 'https://app.sc
       <CardHeader className="pb-4">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
+            <div className="rounded-lg overflow-hidden">
               {icon}
             </div>
             <div>
@@ -290,15 +290,12 @@ export default function IntegrationsOverviewPage() {
     Promise.all([
       integrationsService.getUberEatsStatus(),
       integrationsService.getDeliverooStatus(),
+      integrationsService.getScanNOrderStatus(),
     ])
-      .then(([uber, deliveroo]) => {
+      .then(([uber, deliveroo, scanorder]) => {
         setUberStatus(uber);
         setDeliverooStatus(deliveroo);
-        // Mock ScanNOrder data (copié d'Uber Eats)
-        setScanNOrderStatus({
-          ...uber,
-          platform: 'scanorder' as any,
-        });
+        setScanNOrderStatus(scanorder);
       })
       .finally(() => setLoading(false));
   }, []);
@@ -375,20 +372,20 @@ export default function IntegrationsOverviewPage() {
             platform="Uber Eats"
             status={uberStatus}
             loading={loading}
-            icon={<span className="text-lg">🍽️</span>}
+            icon={<img src="/uber_eats_logo.png" alt="Uber Eats" className="h-10 w-10 object-cover rounded-xl shadow-md" />}
             path="/integrations/uber-eats"
           />
           <IntegrationOverview
             platform="Deliveroo"
             status={deliverooStatus}
             loading={loading}
-            icon={<span className="text-lg">🏪</span>}
+            icon={<img src="/deliveroo_logo.png" alt="Deliveroo" className="h-10 w-10 object-cover rounded-xl shadow-md" />}
             path="/integrations/deliveroo"
           />
           <ScanNOrderOverview
             status={scanNOrderStatus}
             loading={loading}
-            icon={<Search className="h-5 w-5 text-primary" />}
+            icon={<img src="/scannorder_logo.png" alt="ScanNOrder" className="h-10 w-10 object-cover rounded-xl shadow-md" />}
             accessUrl="https://app.scanorder.com"
           />
         </div>

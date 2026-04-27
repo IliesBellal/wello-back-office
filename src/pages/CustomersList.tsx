@@ -1,12 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Customer, getCustomersList, searchCustomers } from '@/services/customersService';
+import {
+  Customer,
+  CustomerListMetadata,
+  CustomerSortDirection,
+  CustomerSortField,
+  getCustomersList,
+  searchCustomers,
+} from '@/services/customersService';
 import { Skeleton } from '@/components/ui/skeleton';
 import CustomerDetailsSheet from '@/components/customers/CustomerDetailsSheet';
+import { OrderDetailModal } from '@/pages/DashboardOrderHistory';
 import {
   Table,
   TableBody,
@@ -15,7 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Users } from 'lucide-react';
+import { Search, ArrowUpDown, ArrowUp, ArrowDown, Users, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -27,11 +36,103 @@ interface SortState {
   direction: SortDirection;
 }
 
+const SORT_FIELD_TO_API: Record<Exclude<SortField, 'created_at' | 'last_order_date'> | 'created_at' | 'last_order_date', CustomerSortField> = {
+  first_name: 'customer_first_name',
+  email: 'customer_email',
+  phone: 'customer_tel',
+  customer_total_orders: 'customer_nb_orders',
+  customer_total_spent: 'customer_total_spent',
+  created_at: 'creation_date',
+  last_order_date: 'last_order_date',
+};
+
+const toApiSort = (sort: SortState): { sortField: CustomerSortField; sortDir: CustomerSortDirection } | undefined => {
+  if (!sort.field || !sort.direction) {
+    return undefined;
+  }
+
+  return {
+    sortField: SORT_FIELD_TO_API[sort.field],
+    sortDir: sort.direction,
+  };
+};
+
+const formatCustomerDate = (value: string | number | null | undefined): string => {
+  if (value === null || value === undefined || value === '') {
+    return '-';
+  }
+
+  const date = typeof value === 'number'
+    ? new Date(value > 9999999999 ? value : value * 1000)
+    : parseISO(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '-';
+  }
+
+  return format(date, 'dd MMM yyyy', { locale: fr });
+};
+
+const renderAcquisitionBadge = (source: string | undefined) => {
+  const normalized = (source || '').toUpperCase();
+
+  if (normalized === 'UBER_EATS') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded bg-black px-2 py-0.5 text-[11px]">
+        <img src="/uber_eats_logo.png" alt="Uber Eats" className="h-3 w-3 object-contain" />
+        <span className="font-medium text-white">Uber Eats</span>
+      </span>
+    );
+  }
+
+  if (normalized === 'DELIVEROO') {
+    return (
+      <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium text-white" style={{ backgroundColor: '#00CCBC' }}>
+        <img src="/deliveroo_logo.png" alt="Deliveroo" className="h-3 w-3 object-contain" />
+        <span>Deliveroo</span>
+      </span>
+    );
+  }
+
+  return null;
+};
+
+const isVipCustomer = (customer: Customer): boolean => customer.customer_total_spent > 50000;
+
+const NEW_CUSTOMER_DAYS_THRESHOLD = 30;
+
+const isNewCustomer = (customer: Customer): boolean => {
+  if (!customer.created_at) {
+    return false;
+  }
+
+  const createdAt = new Date(customer.created_at);
+  if (Number.isNaN(createdAt.getTime())) {
+    return false;
+  }
+
+  const now = new Date();
+  const diffMs = now.getTime() - createdAt.getTime();
+  const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+  return diffDays >= 0 && diffDays <= NEW_CUSTOMER_DAYS_THRESHOLD;
+};
+
 const CustomersList = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const orderId = searchParams.get('orderId');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(50);
+  const [pagination, setPagination] = useState<CustomerListMetadata>({
+    totalItems: 0,
+    totalPages: 1,
+    currentPage: 1,
+    limit: 50,
+  });
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sort, setSort] = useState<SortState>({ field: null, direction: null });
@@ -67,19 +168,30 @@ const CustomersList = () => {
     }
   };
 
-  const loadCustomers = async (searchVal?: string) => {
+  const loadCustomers = async (searchVal?: string, sortOverride?: SortState, pageOverride?: number) => {
     setLoading(true);
     try {
       const term = searchVal !== undefined ? searchVal : searchTerm;
+      const apiSort = toApiSort(sortOverride ?? sort);
+      const targetPage = pageOverride ?? page;
       
       let results: Customer[];
       if (term.trim()) {
-        results = await searchCustomers(term);
+        results = await searchCustomers(term, apiSort);
         setIsSearching(true);
+        setPage(1);
+        setPagination({
+          totalItems: results.length,
+          totalPages: 1,
+          currentPage: 1,
+          limit: results.length || limit,
+        });
       } else {
-        const result = await getCustomersList(1, 1000);
+        const result = await getCustomersList(targetPage, limit, apiSort);
         results = result.data;
         setIsSearching(false);
+        setPage(result.metadata.currentPage);
+        setPagination(result.metadata);
       }
       
       setCustomers(results);
@@ -102,7 +214,7 @@ const CustomersList = () => {
     }
 
     debounceRef.current = setTimeout(() => {
-      loadCustomers(value);
+      loadCustomers(value, undefined, 1);
     }, 500);
   }, []);
 
@@ -126,39 +238,29 @@ const CustomersList = () => {
       }
     }
 
-    setSort({
+    const nextSort: SortState = {
       field: newDirection === null ? null : field,
       direction: newDirection,
-    });
+    };
+
+    setSort(nextSort);
+    loadCustomers(undefined, nextSort, 1);
   };
 
-  const sortedCustomers = useCallback(() => {
-    let sorted = [...customers];
-
-    if (sort.field && sort.direction) {
-      sorted.sort((a, b) => {
-        let aVal: any = getSortValue(a, sort.field!);
-        let bVal: any = getSortValue(b, sort.field!);
-
-        // Handle null/undefined
-        if (aVal == null && bVal == null) return 0;
-        if (aVal == null) return 1;
-        if (bVal == null) return -1;
-
-        // Convert to comparable values
-        if (typeof aVal === 'string') {
-          aVal = aVal.toLowerCase();
-          bVal = (bVal as string).toLowerCase();
-        }
-
-        if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage === page || nextPage < 1 || nextPage > pagination.totalPages) {
+      return;
     }
 
-    return sorted;
-  }, [customers, sort]);
+    loadCustomers(undefined, undefined, nextPage);
+  };
+
+  const totalCustomers = isSearching ? customers.length : pagination.totalItems;
+  const currentPage = isSearching ? 1 : pagination.currentPage;
+  const totalPages = isSearching ? 1 : pagination.totalPages;
+  const currentLimit = isSearching ? (customers.length || limit) : pagination.limit;
+  const displayStart = customers.length === 0 ? 0 : ((currentPage - 1) * currentLimit) + 1;
+  const displayEnd = customers.length === 0 ? 0 : displayStart + customers.length - 1;
 
   const getSortIcon = (field: SortField) => {
     if (sort.field !== field) {
@@ -188,7 +290,7 @@ const CustomersList = () => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <h1 className="text-3xl font-bold text-foreground">Liste des clients</h1>
             <p className="text-sm text-muted-foreground">
-              {customers.length} client{customers.length !== 1 ? 's' : ''}
+              {totalCustomers} client{totalCustomers !== 1 ? 's' : ''}
             </p>
           </div>
         }
@@ -222,54 +324,79 @@ const CustomersList = () => {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="cursor-pointer hover:bg-muted">
+                  <TableRow className="border-b border-border">
+                    <TableHead className="px-2" />
+                    <TableHead className="cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="first_name" label="Nom et prénom" />
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted">
+                    <TableHead className="cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="email" label="Email" />
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted">
+                    <TableHead className="cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="phone" label="Téléphone" />
                     </TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted">
+                    <TableHead className="text-right cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="customer_total_spent" label="Total dépensé" />
                     </TableHead>
-                    <TableHead className="text-right cursor-pointer hover:bg-muted">
+                    <TableHead className="text-right cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="customer_total_orders" label="Nombre de commandes" />
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted">
+                    <TableHead className="cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="created_at" label="Client depuis" />
                     </TableHead>
-                    <TableHead className="cursor-pointer hover:bg-muted">
+                    <TableHead className="cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="last_order_date" label="Dernière commande" />
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedCustomers().map((customer) => (
+                  {customers.map((customer) => (
                     <TableRow 
                       key={customer.id} 
-                      className="cursor-pointer hover:bg-muted"
+                      className="border-b border-border cursor-pointer hover:bg-muted/70 transition-colors"
                       onClick={() => {
                         setSelectedCustomer(customer);
                         setDetailsOpen(true);
                       }}
                     >
-                      <TableCell className="font-medium">{getCustomerFullName(customer)}</TableCell>
-                      <TableCell className="text-sm">{customer.email || '-'}</TableCell>
-                      <TableCell className="text-sm">{customer.phone || '-'}</TableCell>
-                      <TableCell className="text-right text-sm">
-                        {customer.customer_total_spent ? `${customer.customer_total_spent.toFixed(2)}€` : '-'}
+                      <TableCell className="px-2">
+                        <div className="flex items-center gap-1.5">
+                          {isVipCustomer(customer) && (
+                            <span className="inline-flex items-center gap-1 rounded bg-amber-500 px-2 py-0.5 text-[11px] font-medium text-white">
+                              <Crown className="h-3 w-3" />
+                              VIP
+                            </span>
+                          )}
+                          {isNewCustomer(customer) && (
+                            <span className="inline-flex items-center rounded bg-emerald-500 px-2 py-0.5 text-[11px] font-medium text-white">
+                              NEW
+                            </span>
+                          )}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-right text-sm">
+                      <TableCell className="pl-2">
+                        <div className="flex items-center gap-2">
+                          {renderAcquisitionBadge(customer.acquisition_source)}
+                          <div className="font-medium text-foreground">{getCustomerFullName(customer)}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {customer.email || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground font-mono">
+                        {customer.phone || '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold tabular-nums">
+                        {customer.customer_total_spent ? `${(customer.customer_total_spent / 100).toFixed(2)}\u00A0€` : '-'}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-semibold tabular-nums">
                         {customer.customer_total_orders || 0}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {customer.created_at ? format(parseISO(customer.created_at), "dd MMM yyyy", { locale: fr }) : '-'}
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatCustomerDate(customer.created_at)}
                       </TableCell>
-                      <TableCell className="text-sm">
-                        {customer.last_order_date ? format(parseISO(customer.last_order_date), "dd MMM yyyy", { locale: fr }) : '-'}
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatCustomerDate(customer.last_order_date)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -277,6 +404,32 @@ const CustomersList = () => {
               </Table>
             </div>
           )}
+        </div>
+
+        {/* Pagination */}
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Affichage {displayStart} à {displayEnd} sur {totalCustomers}
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1 || loading || isSearching}
+              className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
+              Page {currentPage} sur {totalPages}
+            </span>
+            <button
+              onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage >= totalPages || loading || isSearching}
+              className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
         </div>
         </div>
       </PageContainer>
@@ -286,9 +439,32 @@ const CustomersList = () => {
         <CustomerDetailsSheet
           customer={selectedCustomer}
           open={detailsOpen}
-          onOpenChange={setDetailsOpen}
+          onOpenChange={(nextOpen) => {
+            // Do not close the customer sheet when only the order modal is being closed.
+            if (!nextOpen && orderId) {
+              return;
+            }
+            setDetailsOpen(nextOpen);
+          }}
+          onOrderClick={(orderId) => {
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.set('orderId', orderId);
+            setSearchParams(nextParams);
+          }}
         />
       )}
+
+      <OrderDetailModal
+        isOpen={Boolean(orderId)}
+        onClose={() => {
+          const nextParams = new URLSearchParams(searchParams);
+          nextParams.delete('orderId');
+          setSearchParams(nextParams);
+        }}
+        orderId={orderId || ''}
+        // Render above the customer sheet and its overlay.
+        zIndex={70}
+      />
     </DashboardLayout>
   );
 };
