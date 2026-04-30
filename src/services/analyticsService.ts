@@ -1,5 +1,11 @@
 import { apiClient, withMock, WelloApiResponse } from './apiClient';
 import type { Order } from './ordersService';
+import {
+  mapBrandFilterForApi,
+  mapOrderTypeFilterForApi,
+  resolveOrderHistoryBrand,
+  resolveOrderHistoryType,
+} from '../utils/orderHistory';
 
 export interface DateRange {
   from: Date;
@@ -18,7 +24,7 @@ interface PeriodComparison {
 }
 
 interface TimepointData {
-  [key: string]: any;
+  [key: string]: unknown;
   date: string;
 }
 
@@ -155,7 +161,7 @@ interface TagsMetrics {
 interface TagsAnalyticsResponse {
   metrics: TagsMetrics;
   by_tag: TagAnalysis[];
-  timeline: Array<{ date: string; [key: string]: any }>;
+  timeline: Array<{ date: string; [key: string]: unknown }>;
   comparisons: {
     previous_period: { value: number; change: number };
     year_ago: { value: number; change: number };
@@ -292,7 +298,7 @@ interface RestaurantComparative {
 
 interface RestaurantsAnalyticsResponse {
   by_restaurant: RestaurantComparative[];
-  timeline?: Array<{ date: string; [key: string]: any }>;
+  timeline?: Array<{ date: string; [key: string]: unknown }>;
   breakdown?: Array<{ name: string; value: number }>;
   comparisons: {
     previous_period: { value: number; change: number };
@@ -307,8 +313,9 @@ export interface OrderHistoryItem {
   date: string;
   time: string;
   customer_name: string;
-  channel: string;
-  status: 'completed' | 'cancelled' | 'pending' | 'processing' | 'refunded';
+  brand: string;
+  order_type: string;
+  status: 'canceled' | 'done' | 'pending' | 'denied';
   total: number;
   payment_method: string;
 }
@@ -390,34 +397,23 @@ const getOrderHistoryTimestamp = (order: Order): string => {
   return new Date().toISOString();
 };
 
-const mapOrderHistoryChannel = (order: Order): OrderHistoryItem['channel'] => {
-  const brand = order.brand;
-  const orderType = order.order_type;
-  const fulfillmentType = order.fulfillment_type;
-
-  if (brand === 'UBER_EATS' || fulfillmentType === 'UBER_EATS') return 'ubereats';
-  if (brand === 'DELIVEROO' || fulfillmentType === 'DELIVEROO') return 'deliveroo';
-
-  if (brand === 'WELLO_RESTO') {
-    if (orderType === 'TAKE_AWAY') return 'takeaway';
-    if (orderType === 'DELIVERY') return 'delivery';
-    if (orderType === 'IN') return 'restaurant';
-    return '';
-  }
-
-  return '';
-};
-
 const mapOrderHistoryStatus = (order: Order): OrderHistoryItem['status'] => {
   const state = order.state?.toLowerCase() || '';
   const brandStatus = order.brand_status?.toLowerCase() || '';
+  const merchantApproval = order.merchant_approval?.toLowerCase() || '';
 
-  if (state.includes('cancel') || brandStatus.includes('cancel')) {
-    return 'cancelled';
+  if (
+    state.includes('deny') ||
+    state.includes('reject') ||
+    brandStatus.includes('deny') ||
+    brandStatus.includes('reject') ||
+    merchantApproval.includes('deny')
+  ) {
+    return 'denied';
   }
 
-  if (state.includes('refund') || brandStatus.includes('refund')) {
-    return 'refunded';
+  if (state.includes('cancel') || brandStatus.includes('cancel')) {
+    return 'canceled';
   }
 
   if (
@@ -429,7 +425,7 @@ const mapOrderHistoryStatus = (order: Order): OrderHistoryItem['status'] => {
     return 'pending';
   }
 
-  return 'completed';
+  return 'done';
 };
 
 const mapOrderHistoryPaymentMethod = (order: Order): string => {
@@ -450,26 +446,6 @@ const mapOrderHistoryPaymentMethod = (order: Order): string => {
   return paymentMethod || 'card';
 };
 
-const mapChannelFilterForApi = (channel?: string): string | undefined => {
-  if (!channel) {
-    return undefined;
-  }
-
-  if (channel === 'restaurant') {
-    return 'in';
-  }
-
-  if (channel === 'takeaway') {
-    return 'take_away';
-  }
-
-  if (channel === 'ubereats') {
-    return 'uber_eats';
-  }
-
-  return channel;
-};
-
 const mapOrderToHistoryItem = (order: Order): OrderHistoryItem => {
   const timestamp = getOrderHistoryTimestamp(order);
 
@@ -479,7 +455,8 @@ const mapOrderToHistoryItem = (order: Order): OrderHistoryItem => {
     date: formatOrderHistoryDate(timestamp),
     time: formatOrderHistoryTime(timestamp),
     customer_name: order.customer?.customer_name || '—',
-    channel: mapOrderHistoryChannel(order),
+    brand: resolveOrderHistoryBrand(order.brand, order.fulfillment_type),
+    order_type: resolveOrderHistoryType(order.order_type),
     status: mapOrderHistoryStatus(order),
     total: order.TTC / 100,
     payment_method: mapOrderHistoryPaymentMethod(order),
@@ -1267,8 +1244,9 @@ class AnalyticsService {
   async getOrderHistory(
     startDate: string | Date,
     endDate: string | Date,
-    channel?: string,
-    status?: string,
+    brands?: string[],
+    orderTypes?: string[],
+    statuses?: string[],
     search?: string,
     page: number = 1,
     limit: number = 50
@@ -1282,8 +1260,9 @@ class AnalyticsService {
         date: '08/04/2026',
         time: '14:32',
         customer_name: 'Marie Dubois',
-        channel: 'restaurant',
-        status: 'completed',
+        brand: 'WELLO_RESTO',
+        order_type: 'IN',
+        status: 'done',
         total: 45.50,
         payment_method: 'card',
       },
@@ -1293,8 +1272,9 @@ class AnalyticsService {
         date: '08/04/2026',
         time: '14:15',
         customer_name: 'Jean Martin',
-        channel: 'takeaway',
-        status: 'completed',
+        brand: 'WELLO_RESTO',
+        order_type: 'TAKE_AWAY',
+        status: 'done',
         total: 32.80,
         payment_method: 'cash',
       },
@@ -1304,8 +1284,9 @@ class AnalyticsService {
         date: '08/04/2026',
         time: '13:45',
         customer_name: 'Client anonyme',
-        channel: 'ubereats',
-        status: 'completed',
+        brand: 'UBER_EATS',
+        order_type: 'DELIVERY',
+        status: 'pending',
         total: 28.90,
         payment_method: 'uberpay',
       },
@@ -1315,8 +1296,9 @@ class AnalyticsService {
         date: '08/04/2026',
         time: '13:20',
         customer_name: 'Sophie Bernard',
-        channel: 'restaurant',
-        status: 'cancelled',
+        brand: 'WELLO_RESTO',
+        order_type: 'IN',
+        status: 'canceled',
         total: 0,
         payment_method: 'cancelled',
       },
@@ -1326,8 +1308,9 @@ class AnalyticsService {
         date: '08/04/2026',
         time: '12:55',
         customer_name: 'Pierre Durand',
-        channel: 'deliveroo',
-        status: 'completed',
+        brand: 'DELIVEROO',
+        order_type: 'DELIVERY',
+        status: 'denied',
         total: 38.50,
         payment_method: 'applepay',
       },
@@ -1336,21 +1319,40 @@ class AnalyticsService {
     const payload = {
       date_from: start,
       date_to: end,
-      channel: mapChannelFilterForApi(channel),
-      status,
+      channel: brands && brands.length > 0 ? brands.map((brand) => mapBrandFilterForApi(brand)).filter(Boolean) : undefined,
+      order_type: orderTypes && orderTypes.length > 0 ? orderTypes.map((orderType) => mapOrderTypeFilterForApi(orderType)).filter(Boolean) : undefined,
+      status: statuses && statuses.length > 0 ? statuses : undefined,
       search,
       page,
       limit,
     };
 
     return withMock(
-      () => ({
-        orders: mockOrders,
-        total_count: 150,
-        page,
-        per_page: limit,
-        total_pages: Math.ceil(150 / limit),
-      }),
+      () => {
+        const normalizedSearch = search?.trim().toLowerCase() || '';
+        const filteredMockOrders = mockOrders.filter((order) => {
+          const matchesBrand = !brands || brands.length === 0 || brands.includes(order.brand);
+          const matchesOrderType = !orderTypes || orderTypes.length === 0 || orderTypes.includes(order.order_type);
+          const matchesStatus = !statuses || statuses.length === 0 || statuses.includes(order.status);
+          const matchesSearch = !normalizedSearch
+            || order.number.toLowerCase().includes(normalizedSearch)
+            || order.customer_name.toLowerCase().includes(normalizedSearch);
+
+          return matchesBrand && matchesOrderType && matchesStatus && matchesSearch;
+        });
+
+        const totalCount = filteredMockOrders.length;
+        const startIndex = (page - 1) * limit;
+        const paginatedOrders = filteredMockOrders.slice(startIndex, startIndex + limit);
+
+        return {
+          orders: paginatedOrders,
+          total_count: totalCount,
+          page,
+          per_page: limit,
+          total_pages: Math.max(1, Math.ceil(Math.max(totalCount, 1) / limit)),
+        };
+      },
       async () => {
         const response = await apiClient.post<OrderHistoryApiResponse>('/orders/history', payload);
         const orders = (response.data.orders || []).map(mapOrderToHistoryItem);

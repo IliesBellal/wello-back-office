@@ -66,13 +66,32 @@ const serializeDate = (date: Date): string => {
   return `${date.getFullYear()}-${formatLocalDatePart(date.getMonth() + 1)}-${formatLocalDatePart(date.getDate())}`;
 };
 
+const parseListParam = (value: string | null, fallback: string[] = []): string[] => {
+  if (!value) {
+    return fallback;
+  }
+
+  const items = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return items.length > 0 ? Array.from(new Set(items)) : fallback;
+};
+
+const serializeListParam = (values: string[]): string | null => {
+  const items = Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+  return items.length > 0 ? items.join(',') : null;
+};
+
 interface OrderHistoryUrlState {
   page: number;
   limit: number;
   startDate: Date;
   endDate: Date;
-  channel: string;
-  status: string;
+  brands: string[];
+  orderTypes: string[];
+  statuses: string[];
   search: string;
   orderId: string | null;
 }
@@ -80,8 +99,9 @@ interface OrderHistoryUrlState {
 interface OrderHistoryFiltersInput {
   startDate: Date;
   endDate: Date;
-  channel: string;
-  status: string;
+  brands: string[];
+  orderTypes: string[];
+  statuses: string[];
   search: string;
 }
 
@@ -90,8 +110,9 @@ interface UseOrderHistorySearchParamsResult extends OrderHistoryUrlState {
   handlePageChange: (nextPage: number) => void;
   setLimit: (nextLimit: number) => void;
   setDateRange: (from: Date, to: Date) => void;
-  setChannel: (channel: string) => void;
-  setStatus: (status: string) => void;
+  setBrands: (brands: string[]) => void;
+  setOrderTypes: (orderTypes: string[]) => void;
+  setStatuses: (statuses: string[]) => void;
   setSearch: (search: string) => void;
   setOrderId: (orderId: string) => void;
   clearOrderId: () => void;
@@ -114,8 +135,9 @@ export const useOrderHistorySearchParams = (): UseOrderHistorySearchParamsResult
     limit: parsePositiveInt(searchParams.get('limit'), DEFAULT_LIMIT),
     startDate: parseDateParam(searchParams.get('startDate'), defaults.startDate),
     endDate: parseDateParam(searchParams.get('endDate'), defaults.endDate),
-    channel: searchParams.get('channel') || 'all',
-    status: searchParams.get('status') || 'all',
+    brands: parseListParam(searchParams.get('brand'), parseListParam(searchParams.get('channel'))),
+    orderTypes: parseListParam(searchParams.get('type'), parseListParam(searchParams.get('orderType'))),
+    statuses: parseListParam(searchParams.get('status')),
     search: searchParams.get('search') || '',
     orderId: searchParams.get('orderId'),
   };
@@ -157,12 +179,24 @@ export const useOrderHistorySearchParams = (): UseOrderHistorySearchParamsResult
     });
   };
 
-  const setChannel = (channel: string) => {
-    updateParams({ channel: channel === 'all' ? null : channel, page: DEFAULT_PAGE });
+  const setBrands = (brands: string[]) => {
+    updateParams({
+      brand: serializeListParam(brands),
+      channel: null,
+      page: DEFAULT_PAGE,
+    });
   };
 
-  const setStatus = (status: string) => {
-    updateParams({ status: status === 'all' ? null : status, page: DEFAULT_PAGE });
+  const setOrderTypes = (orderTypes: string[]) => {
+    updateParams({
+      type: serializeListParam(orderTypes),
+      orderType: null,
+      page: DEFAULT_PAGE,
+    });
+  };
+
+  const setStatuses = (statuses: string[]) => {
+    updateParams({ status: serializeListParam(statuses), page: DEFAULT_PAGE });
   };
 
   const setSearch = (search: string) => {
@@ -181,8 +215,11 @@ export const useOrderHistorySearchParams = (): UseOrderHistorySearchParamsResult
     updateParams({
       startDate: serializeDate(filters.startDate),
       endDate: serializeDate(filters.endDate),
-      channel: filters.channel === 'all' ? null : filters.channel,
-      status: filters.status === 'all' ? null : filters.status,
+      brand: serializeListParam(filters.brands),
+      channel: null,
+      type: serializeListParam(filters.orderTypes),
+      orderType: null,
+      status: serializeListParam(filters.statuses),
       search: filters.search.trim() ? filters.search : null,
       page: DEFAULT_PAGE,
     });
@@ -194,8 +231,9 @@ export const useOrderHistorySearchParams = (): UseOrderHistorySearchParamsResult
     handlePageChange,
     setLimit,
     setDateRange,
-    setChannel,
-    setStatus,
+    setBrands,
+    setOrderTypes,
+    setStatuses,
     setSearch,
     setOrderId,
     clearOrderId,

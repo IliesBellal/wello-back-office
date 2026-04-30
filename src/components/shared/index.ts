@@ -8,6 +8,7 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { DateRangePicker } from './DateRangePicker';
 export { ExpandableDataTable } from './ExpandableDataTable';
 export { MultiFilter } from './MultiFilter';
+export { MultiSelectDropdown } from './MultiSelectDropdown';
 export { NotificationBell } from './NotificationBell';
 export { ProtectedRoute } from './ProtectedRoute';
 export { Tile } from './Tile';

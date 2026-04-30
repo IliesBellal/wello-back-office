@@ -10,6 +10,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
+import { MultiSelectDropdown } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,27 +21,23 @@ import { ExportButton } from '@/components/analytics';
 import { analyticsService, type OrderHistoryResponse } from '@/services/analyticsService';
 import { useOrderHistorySearchParams } from '@/hooks/useOrderHistorySearchParams';
 import { ordersService, type Order } from '@/services/ordersService';
-import { Search, ChevronLeft, ChevronRight, CheckCircle2, Clock3, LoaderCircle, XCircle, RotateCcw } from 'lucide-react';
+import {
+  ORDER_HISTORY_BRAND_LABELS,
+  ORDER_HISTORY_TYPE_LABELS,
+  resolveOrderHistoryBrand,
+  resolveOrderHistoryType,
+} from '@/utils/orderHistory';
+import { Search, ChevronLeft, ChevronRight, CheckCircle2, Clock3, XCircle, ShieldX } from 'lucide-react';
 
 const ORDER_STATUS_COLORS: Record<string, { bg: string; text: string; label: string; icon: React.ComponentType<{ className?: string }> }> = {
-  completed: { bg: 'bg-green-100', text: 'text-green-700', label: 'Complétée', icon: CheckCircle2 },
+  done: { bg: 'bg-green-100', text: 'text-green-700', label: 'Terminée', icon: CheckCircle2 },
   pending: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'En attente', icon: Clock3 },
-  processing: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'En cours', icon: LoaderCircle },
-  cancelled: { bg: 'bg-red-100', text: 'text-red-700', label: 'Annulée', icon: XCircle },
-  refunded: { bg: 'bg-slate-100', text: 'text-slate-700', label: 'Remboursée', icon: RotateCcw },
+  canceled: { bg: 'bg-red-100', text: 'text-red-700', label: 'Annulée', icon: XCircle },
+  denied: { bg: 'bg-slate-100', text: 'text-slate-700', label: 'Refusée', icon: ShieldX },
 };
 
-const CHANNEL_LABELS: Record<string, string> = {
-  restaurant: 'Sur place',
-  takeaway: 'Emporter',
-  delivery: 'Livraison',
-  ubereats: 'Uber Eats',
-  deliveroo: 'Deliveroo',
-  clickcollect: 'Click & Collect',
-};
-
-const renderChannelBadge = (channel: string) => {
-  if (channel === 'ubereats') {
+const renderBrandBadge = (brand: string) => {
+  if (brand === 'UBER_EATS') {
     return (
       <span
         className="inline-flex items-center gap-1 rounded bg-black px-2 py-1 text-xs"
@@ -52,7 +49,7 @@ const renderChannelBadge = (channel: string) => {
     );
   }
 
-  if (channel === 'deliveroo') {
+  if (brand === 'DELIVEROO') {
     return (
       <span
         className="inline-flex items-center rounded px-2 py-1 text-xs font-semibold text-white"
@@ -67,11 +64,35 @@ const renderChannelBadge = (channel: string) => {
     );
   }
 
+  if (brand === 'WELLO_RESTO') {
+    return (
+      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+        Wello Resto
+      </span>
+    );
+  }
+
   return (
-    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-      {CHANNEL_LABELS[channel] || channel}
+    <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">
+      {ORDER_HISTORY_BRAND_LABELS.UNKNOWN}
     </span>
   );
+};
+
+const renderOrderTypeBadge = (orderType: string) => {
+  if (orderType === 'DELIVERY') {
+    return <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs">{ORDER_HISTORY_TYPE_LABELS.DELIVERY}</span>;
+  }
+
+  if (orderType === 'TAKE_AWAY') {
+    return <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs">{ORDER_HISTORY_TYPE_LABELS.TAKE_AWAY}</span>;
+  }
+
+  if (orderType === 'IN') {
+    return <span className="px-2 py-1 bg-sky-100 text-sky-700 rounded text-xs">{ORDER_HISTORY_TYPE_LABELS.IN}</span>;
+  }
+
+  return <span className="px-2 py-1 bg-slate-100 text-slate-700 rounded text-xs">{ORDER_HISTORY_TYPE_LABELS.UNKNOWN}</span>;
 };
 
 const PAYMENT_LABELS: Record<string, string> = {
@@ -83,6 +104,25 @@ const PAYMENT_LABELS: Record<string, string> = {
   cancelled: 'Annulée',
   cb: 'Carte',
 };
+
+const BRAND_FILTER_OPTIONS = [
+  { id: 'UBER_EATS', label: 'Uber Eats' },
+  { id: 'DELIVEROO', label: 'Deliveroo' },
+  { id: 'WELLO_RESTO', label: 'Wello Resto' },
+];
+
+const ORDER_TYPE_FILTER_OPTIONS = [
+  { id: 'DELIVERY', label: 'Livraison' },
+  { id: 'TAKE_AWAY', label: 'Emporter' },
+  { id: 'IN', label: 'Sur place' },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { id: 'done', label: 'Terminée' },
+  { id: 'pending', label: 'En attente' },
+  { id: 'canceled', label: 'Annulée' },
+  { id: 'denied', label: 'Refusée' },
+];
 
 const formatCurrency = (value: number): string => {
   return value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -114,41 +154,40 @@ const formatTimestamp = (value: string | number | null | undefined): string => {
   });
 };
 
-const getOrderChannelLabel = (order: Order): string => {
-  const brand = order.brand;
-  const fulfillmentType = order.fulfillment_type;
-  const orderType = order.order_type;
+const getOrderBrandLabel = (order: Order): string => {
+  const brand = resolveOrderHistoryBrand(order.brand, order.fulfillment_type);
+  return ORDER_HISTORY_BRAND_LABELS[brand];
+};
 
-  if (brand === 'UBER_EATS' || fulfillmentType === 'UBER_EATS') return CHANNEL_LABELS.ubereats;
-  if (brand === 'DELIVEROO' || fulfillmentType === 'DELIVEROO') return CHANNEL_LABELS.deliveroo;
-
-  if (brand === 'WELLO_RESTO') {
-    if (orderType === 'TAKE_AWAY') return CHANNEL_LABELS.takeaway;
-    if (orderType === 'DELIVERY') return CHANNEL_LABELS.delivery;
-    if (orderType === 'IN') return CHANNEL_LABELS.restaurant;
-    return '';
-  }
-
-  return '';
+const getOrderTypeLabel = (order: Order): string => {
+  const orderType = resolveOrderHistoryType(order.order_type);
+  return ORDER_HISTORY_TYPE_LABELS[orderType];
 };
 
 const getOrderStatusConfig = (order: Order) => {
   const state = order.state?.toLowerCase() || '';
   const brandStatus = order.brand_status?.toLowerCase() || '';
+  const merchantApproval = order.merchant_approval?.toLowerCase() || '';
 
-  if (state.includes('cancel') || brandStatus.includes('cancel')) {
-    return ORDER_STATUS_COLORS.cancelled;
+  if (
+    state.includes('deny') ||
+    state.includes('reject') ||
+    brandStatus.includes('deny') ||
+    brandStatus.includes('reject') ||
+    merchantApproval.includes('deny')
+  ) {
+    return ORDER_STATUS_COLORS.denied;
   }
 
-  if (state.includes('refund') || brandStatus.includes('refund')) {
-    return ORDER_STATUS_COLORS.refunded;
+  if (state.includes('cancel') || brandStatus.includes('cancel')) {
+    return ORDER_STATUS_COLORS.canceled;
   }
 
   if (state.includes('open') || state.includes('pending') || brandStatus.includes('pending')) {
     return ORDER_STATUS_COLORS.pending;
   }
 
-  return ORDER_STATUS_COLORS.completed;
+  return ORDER_STATUS_COLORS.done;
 };
 
 const getPaymentMethodLabel = (method: string): string => {
@@ -311,7 +350,7 @@ export const OrderDetailModal = ({ isOpen, onClose, orderId, zIndex = 50 }: Orde
     }
   };
 
-  const detailStatusConfig = orderDetail ? getOrderStatusConfig(orderDetail) : null;
+  const detailStatusConfig = orderDetail ? getOrderStatusConfig(orderDetail) : ORDER_STATUS_COLORS.pending;
   const DetailStatusIcon = detailStatusConfig?.icon;
 
   return (
@@ -363,7 +402,11 @@ export const OrderDetailModal = ({ isOpen, onClose, orderId, zIndex = 50 }: Orde
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Canal</p>
-                <p className="font-medium">{getOrderChannelLabel(orderDetail)}</p>
+                <p className="font-medium">{getOrderBrandLabel(orderDetail)}</p>
+              </div>
+              <div>
+                <p className="text-muted-foreground text-xs">Type</p>
+                <p className="font-medium">{getOrderTypeLabel(orderDetail)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Statut</p>
@@ -496,8 +539,9 @@ export const DashboardOrderHistory = () => {
     limit,
     startDate,
     endDate,
-    channel,
-    status,
+    brands,
+    orderTypes,
+    statuses,
     search,
     orderId,
     handlePageChange,
@@ -508,27 +552,33 @@ export const DashboardOrderHistory = () => {
 
   const [draftStartDate, setDraftStartDate] = useState<Date>(startDate);
   const [draftEndDate, setDraftEndDate] = useState<Date>(endDate);
-  const [draftChannel, setDraftChannel] = useState<string>(channel);
-  const [draftStatus, setDraftStatus] = useState<string>(status);
+  const [draftBrands, setDraftBrands] = useState<string[]>(brands);
+  const [draftOrderTypes, setDraftOrderTypes] = useState<string[]>(orderTypes);
+  const [draftStatuses, setDraftStatuses] = useState<string[]>(statuses);
   const [draftSearch, setDraftSearch] = useState<string>(search);
 
   const startDateKey = toLocalDateParam(startDate);
   const endDateKey = toLocalDateParam(endDate);
+  const brandsKey = brands.join(',');
+  const orderTypesKey = orderTypes.join(',');
+  const statusesKey = statuses.join(',');
 
   useEffect(() => {
     setDraftStartDate(fromLocalDateParam(startDateKey));
     setDraftEndDate(fromLocalDateParam(endDateKey));
-    setDraftChannel(channel);
-    setDraftStatus(status);
+    setDraftBrands(brandsKey ? brandsKey.split(',') : []);
+    setDraftOrderTypes(orderTypesKey ? orderTypesKey.split(',') : []);
+    setDraftStatuses(statusesKey ? statusesKey.split(',') : []);
     setDraftSearch(search);
-  }, [startDateKey, endDateKey, channel, status, search]);
+  }, [startDateKey, endDateKey, brandsKey, orderTypesKey, statusesKey, search]);
 
   const handleApplyFilters = () => {
     applyFilters({
       startDate: draftStartDate,
       endDate: draftEndDate,
-      channel: draftChannel,
-      status: draftStatus,
+      brands: draftBrands,
+      orderTypes: draftOrderTypes,
+      statuses: draftStatuses,
       search: draftSearch,
     });
   };
@@ -541,12 +591,13 @@ export const DashboardOrderHistory = () => {
         limit,
         startDate: toLocalDateParam(startDate),
         endDate: toLocalDateParam(endDate),
-        channel,
-        status,
+        brands,
+        orderTypes,
+        statuses,
         search,
       },
     ],
-    [channel, endDate, limit, page, search, startDate, status]
+    [brands, endDate, limit, orderTypes, page, search, startDate, statuses]
   );
 
   const {
@@ -560,8 +611,9 @@ export const DashboardOrderHistory = () => {
       analyticsService.getOrderHistory(
         startDate,
         endDate,
-        channel !== 'all' ? channel : undefined,
-        status !== 'all' ? status : undefined,
+        brands.length > 0 ? brands : undefined,
+        orderTypes.length > 0 ? orderTypes : undefined,
+        statuses.length > 0 ? statuses : undefined,
         search || undefined,
         page,
         limit
@@ -590,13 +642,14 @@ export const DashboardOrderHistory = () => {
   const loadError = error instanceof Error ? error.message : null;
 
   const handleExportOrders = async (): Promise<Blob> => {
-    const header = ['commande', 'date', 'heure', 'client', 'canal', 'statut', 'montant', 'paiement'];
+    const header = ['commande', 'date', 'heure', 'client', 'canal', 'type', 'statut', 'montant', 'paiement'];
     const rows = filteredOrders.map((order) => [
       order.number,
       order.date,
       order.time,
       order.customer_name,
-      CHANNEL_LABELS[order.channel] || order.channel,
+      ORDER_HISTORY_BRAND_LABELS[order.brand as keyof typeof ORDER_HISTORY_BRAND_LABELS] || ORDER_HISTORY_BRAND_LABELS.UNKNOWN,
+      ORDER_HISTORY_TYPE_LABELS[order.order_type as keyof typeof ORDER_HISTORY_TYPE_LABELS] || ORDER_HISTORY_TYPE_LABELS.UNKNOWN,
       ORDER_STATUS_COLORS[order.status]?.label || order.status,
       order.total.toFixed(2),
       PAYMENT_LABELS[order.payment_method] || order.payment_method,
@@ -630,7 +683,7 @@ export const DashboardOrderHistory = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-4 items-end">
-              <div className="lg:col-span-4">
+              <div className="lg:col-span-3">
                 <label className="text-xs font-medium text-muted-foreground mb-2 block">Période</label>
                 <AdvancedDatePicker 
                   value={{ from: draftStartDate, to: draftEndDate }}
@@ -640,37 +693,34 @@ export const DashboardOrderHistory = () => {
                   }}
                 />
               </div>
-              <div className="lg:col-span-2 lg:max-w-[180px]">
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">Canal</label>
-                <Select value={draftChannel} onValueChange={(v) => setDraftChannel(v)}>
-                  <SelectTrigger className="bg-background border border-input">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les canaux</SelectItem>
-                    <SelectItem value="ubereats">Uber Eats</SelectItem>
-                    <SelectItem value="deliveroo">Deliveroo</SelectItem>
-                    <SelectItem value="restaurant">Sur place</SelectItem>
-                    <SelectItem value="takeaway">Emporter</SelectItem>
-                    <SelectItem value="delivery">Livraison</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="lg:col-span-2 lg:max-w-[220px]">
+                <MultiSelectDropdown
+                  label="Canal"
+                  options={BRAND_FILTER_OPTIONS}
+                  selectedIds={draftBrands}
+                  onChange={setDraftBrands}
+                  placeholder="Tous les canaux"
+                />
               </div>
-              <div className="lg:col-span-2 lg:max-w-[180px]">
-                <label className="text-xs font-medium text-muted-foreground mb-2 block">Statut</label>
-                <Select value={draftStatus} onValueChange={(v) => setDraftStatus(v)}>
-                  <SelectTrigger className="bg-background border border-input">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Tous les statuts</SelectItem>
-                    <SelectItem value="completed">Complétée</SelectItem>
-                    <SelectItem value="pending">En attente</SelectItem>
-                    <SelectItem value="cancelled">Annulée</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="lg:col-span-2 lg:max-w-[220px]">
+                <MultiSelectDropdown
+                  label="Type"
+                  options={ORDER_TYPE_FILTER_OPTIONS}
+                  selectedIds={draftOrderTypes}
+                  onChange={setDraftOrderTypes}
+                  placeholder="Tous les types"
+                />
               </div>
-              <div className="lg:col-span-3">
+              <div className="lg:col-span-2 lg:max-w-[220px]">
+                <MultiSelectDropdown
+                  label="Statut"
+                  options={STATUS_FILTER_OPTIONS}
+                  selectedIds={draftStatuses}
+                  onChange={setDraftStatuses}
+                  placeholder="Tous les statuts"
+                />
+              </div>
+              <div className="lg:col-span-2">
                 <label className="text-xs font-medium text-muted-foreground mb-2 block">Recherche</label>
                 <div className="relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -744,6 +794,7 @@ export const DashboardOrderHistory = () => {
                     <TableHead className="font-semibold">Date/Heure</TableHead>
                     <TableHead className="font-semibold">Client</TableHead>
                     <TableHead className="font-semibold">Canal</TableHead>
+                    <TableHead className="font-semibold">Type</TableHead>
                     <TableHead className="font-semibold">Statut</TableHead>
                     <TableHead className="text-right font-semibold">Montant</TableHead>
                   </TableRow>
@@ -751,21 +802,21 @@ export const DashboardOrderHistory = () => {
                 <TableBody>
                   {isLoading && (
                     <TableRow className="border-b border-border">
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                         Chargement de l'historique des commandes...
                       </TableCell>
                     </TableRow>
                   )}
                   {!isLoading && loadError && (
                     <TableRow className="border-b border-border">
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-red-600">
+                      <TableCell colSpan={7} className="py-8 text-center text-sm text-red-600">
                         {loadError}
                       </TableCell>
                     </TableRow>
                   )}
                   {!isLoading && !loadError && filteredOrders.length === 0 && (
                     <TableRow className="border-b border-border">
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                         Aucune commande trouvée pour cette période.
                       </TableCell>
                     </TableRow>
@@ -783,7 +834,10 @@ export const DashboardOrderHistory = () => {
                       <TableCell className="text-sm text-muted-foreground">{order.date} {order.time}</TableCell>
                       <TableCell>{order.customer_name?.trim() || '-'}</TableCell>
                       <TableCell className="text-sm">
-                        {renderChannelBadge(order.channel)}
+                        {renderBrandBadge(order.brand)}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {renderOrderTypeBadge(order.order_type)}
                       </TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${statusConfig.bg} ${statusConfig.text}`}>
