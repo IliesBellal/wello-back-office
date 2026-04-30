@@ -12,6 +12,7 @@ export interface IntegrationStatus {
   active: boolean;
   commission_rate: number;
   auto_accept_orders: boolean;
+  preparation_time_minutes?: number;
   kpis: IntegrationKPIs;
   last_sync: string | null;
   synced_items: number;
@@ -29,6 +30,7 @@ export interface IntegrationStatus {
 
 export type GetIntegrationResponse = WelloApiResponse<{ integration: IntegrationStatus }>;
 export type PatchIntegrationResponse = WelloApiResponse<{ integration: IntegrationStatus }>;
+export type IntegrationPlatform = 'uber_eats' | 'deliveroo' | 'scannorder';
 
 // ============= Mock Data =============
 const mockIntegrations: Record<string, IntegrationStatus> = {
@@ -37,6 +39,7 @@ const mockIntegrations: Record<string, IntegrationStatus> = {
     active: true,
     commission_rate: 15,
     auto_accept_orders: true,
+    preparation_time_minutes: 20,
     kpis: {
       revenue: 4850000,
       orders: 324,
@@ -50,6 +53,7 @@ const mockIntegrations: Record<string, IntegrationStatus> = {
     active: true,
     commission_rate: 18,
     auto_accept_orders: true,
+    preparation_time_minutes: 25,
     kpis: {
       revenue: 5320000,
       orders: 287,
@@ -105,6 +109,7 @@ export const integrationsService = {
   updateUberEats: async (data: {
     commission_rate: number;
     auto_accept_orders: boolean;
+    preparation_time_minutes?: number;
   }): Promise<IntegrationStatus> => {
     logAPI('PATCH', '/integrations/uber-eats', data);
     
@@ -117,6 +122,7 @@ export const integrationsService = {
   updateDeliveroo: async (data: {
     commission_rate: number;
     auto_accept_orders: boolean;
+    preparation_time_minutes?: number;
   }): Promise<IntegrationStatus> => {
     logAPI('PATCH', '/integrations/deliveroo', data);
     
@@ -159,6 +165,27 @@ export const integrationsService = {
     return withMock(
       () => ({ synced_items: mockIntegrations.deliveroo.synced_items }),
       () => apiClient.patch<WelloApiResponse<{ synced_items: number }>>('/menu/deliveroo/sync', {}).then(res => res.data)
+    );
+  },
+
+  closeEstablishmentTemporary: async (data: {
+    duration_minutes: number;
+    affected_integrations: IntegrationPlatform[];
+  }): Promise<{ closed_until: string; affected_integrations: IntegrationPlatform[] }> => {
+    logAPI('POST', '/integrations/establishment/close-temporary', data);
+
+    return withMock(
+      () => ({
+        closed_until: new Date(Date.now() + data.duration_minutes * 60 * 1000).toISOString(),
+        affected_integrations: data.affected_integrations,
+      }),
+      () =>
+        apiClient
+          .post<WelloApiResponse<{ closed_until: string; affected_integrations: IntegrationPlatform[] }>>(
+            '/integrations/establishment/close-temporary',
+            data
+          )
+          .then(res => res.data.data)
     );
   },
 

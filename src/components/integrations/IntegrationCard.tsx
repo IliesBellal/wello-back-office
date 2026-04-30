@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { IntegrationStatus } from '@/services/integrationsService';
 import { Loader2, AlertCircle, RefreshCw, Power } from 'lucide-react';
 
@@ -22,10 +23,11 @@ interface IntegrationCardProps {
   name: string;
   status: IntegrationStatus | null;
   loading: boolean;
-  onUpdate: (data: { commission_rate: number; auto_accept_orders: boolean }) => Promise<void>;
+  onUpdate: (data: { commission_rate: number; auto_accept_orders: boolean; preparation_time_minutes?: number }) => Promise<void>;
   onDisable: () => Promise<void>;
   onSync: () => Promise<void>;
   tutorial: React.ReactNode;
+  enablePreparationTime?: boolean;
 }
 
 export const IntegrationCard = ({
@@ -36,10 +38,12 @@ export const IntegrationCard = ({
   onDisable,
   onSync,
   tutorial,
+  enablePreparationTime = false,
 }: IntegrationCardProps) => {
   const [editMode, setEditMode] = useState(false);
   const [commissionRate, setCommissionRate] = useState(status?.commission_rate || 0);
   const [autoAccept, setAutoAccept] = useState(status?.auto_accept_orders || false);
+  const [preparationTimeMinutes, setPreparationTimeMinutes] = useState(status?.preparation_time_minutes || 20);
   const [saving, setSaving] = useState(false);
   const [disabling, setDisabling] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -50,6 +54,7 @@ export const IntegrationCard = ({
     if (status) {
       setCommissionRate(status.commission_rate);
       setAutoAccept(status.auto_accept_orders);
+      setPreparationTimeMinutes(status.preparation_time_minutes || 20);
     }
   }, [status]);
 
@@ -59,6 +64,7 @@ export const IntegrationCard = ({
       await onUpdate({
         commission_rate: commissionRate,
         auto_accept_orders: autoAccept,
+        ...(enablePreparationTime ? { preparation_time_minutes: preparationTimeMinutes } : {}),
       });
       setEditMode(false);
     } finally {
@@ -279,6 +285,27 @@ export const IntegrationCard = ({
                 />
               </div>
 
+              {enablePreparationTime && (
+                <div className="space-y-2">
+                  <Label htmlFor="preparation-time">Temps de preparation</Label>
+                  <Select
+                    value={String(preparationTimeMinutes)}
+                    onValueChange={(value) => setPreparationTimeMinutes(parseInt(value, 10))}
+                  >
+                    <SelectTrigger id="preparation-time" className="max-w-xs">
+                      <SelectValue placeholder="Choisir un temps" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60].map((minutes) => (
+                        <SelectItem key={minutes} value={String(minutes)}>
+                          {minutes} min
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               {/* Edit Buttons */}
               <div className="flex gap-2 pt-4">
                 <Button
@@ -320,6 +347,15 @@ export const IntegrationCard = ({
                   {autoAccept ? 'ON' : 'OFF'}
                 </Badge>
               </div>
+
+              {enablePreparationTime && (
+                <div className="flex items-center justify-between py-3 px-3 rounded-lg border">
+                  <div>
+                    <p className="font-medium">Temps de preparation</p>
+                    <p className="text-xs text-muted-foreground">{preparationTimeMinutes} min</p>
+                  </div>
+                </div>
+              )}
 
               {/* Edit Button */}
               <Button

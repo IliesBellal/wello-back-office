@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { CheckCircle, AlertCircle, ArrowRight, Euro, ShoppingCart, TrendingUp, Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
 
 interface IntegrationOverviewProps {
   platform: string;
@@ -310,7 +311,10 @@ export default function IntegrationsOverviewPage() {
     <DashboardLayout>
       <PageContainer
         header={
-          <h1 className="text-3xl font-bold text-foreground">Canaux et Plateformes</h1>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-3xl font-bold text-foreground">Canaux et Plateformes</h1>
+            <EstablishmentClosureModal />
+          </div>
         }
         description="Gérez vos intégrations avec les plateformes de livraison et consultez vos KPIs"
         className="space-y-6"

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { IntegrationCard } from '@/components/integrations/IntegrationCard';
+import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { AlertCircle } from 'lucide-react';
 
@@ -84,7 +85,7 @@ export default function DeliverooPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const handleUpdate = async (data: { commission_rate: number; auto_accept_orders: boolean }) => {
+  const handleUpdate = async (data: { commission_rate: number; auto_accept_orders: boolean; preparation_time_minutes?: number }) => {
     const updated = await integrationsService.updateDeliveroo(data);
     setStatus(updated);
   };
@@ -105,7 +106,10 @@ export default function DeliverooPage() {
     <DashboardLayout>
       <PageContainer
         header={
-          <h1 className="text-3xl font-bold text-foreground">Deliveroo</h1>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <h1 className="text-3xl font-bold text-foreground">Deliveroo</h1>
+            <EstablishmentClosureModal />
+          </div>
         }
         description="Gérez votre intégration Deliveroo, commandes et synchronisation du menu"
       >
@@ -117,6 +121,7 @@ export default function DeliverooPage() {
           onDisable={handleDisable}
           onSync={handleSync}
           tutorial={<DeliverrooTutorial />}
+          enablePreparationTime={true}
         />
       </PageContainer>
     </DashboardLayout>

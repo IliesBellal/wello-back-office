@@ -26,6 +26,7 @@ import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, Tre
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { integrationsService } from '@/services/integrationsService';
 import { useToast } from '@/hooks/use-toast';
+import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
 
 // ════════════════════════════════════════════════════════════════════════════
 // ImageUploadField Component
@@ -607,7 +608,10 @@ export default function ScanNOrder() {
       <PageContainer
         header={
           <div className="space-y-4">
-            <h1 className="text-3xl font-bold">ScanNOrder</h1>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <h1 className="text-3xl font-bold">ScanNOrder</h1>
+              <EstablishmentClosureModal />
+            </div>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground mb-2">URL d'accès:</p>
