@@ -26,6 +26,7 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: Add
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const onSelectRef = useRef(onSelect);
   const [inputValue, setInputValue] = useState(value);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Keep callback ref fresh without re-binding the autocomplete listener
   useEffect(() => {
@@ -38,39 +39,48 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: Add
   }, [value]);
 
   useEffect(() => {
-    loadGooglePlacesLibrary().then(() => {
-      if (!inputRef.current || autocompleteRef.current) return;
+    const initAutocomplete = async () => {
+      try {
+        setLoadError(null);
+        await loadGooglePlacesLibrary();
+        if (!inputRef.current || autocompleteRef.current) return;
 
-      autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-        types: ['address'],
-        fields: ['address_components', 'formatted_address', 'geometry'],
-      });
+        autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
+          types: ['address'],
+          fields: ['address_components', 'formatted_address', 'geometry'],
+        });
 
-      autocompleteRef.current.addListener('place_changed', () => {
-        const place = autocompleteRef.current!.getPlace();
-        if (!place.address_components) return;
+        autocompleteRef.current.addListener('place_changed', () => {
+          const place = autocompleteRef.current!.getPlace();
+          if (!place.address_components) return;
 
-        const get = (type: string, short = false) => {
-          const comp = place.address_components!.find(c => c.types.includes(type));
-          return short ? (comp?.short_name ?? '') : (comp?.long_name ?? '');
-        };
+          const get = (type: string, short = false) => {
+            const comp = place.address_components!.find(c => c.types.includes(type));
+            return short ? (comp?.short_name ?? '') : (comp?.long_name ?? '');
+          };
 
-        const street = [get('street_number'), get('route')].filter(Boolean).join(' ');
+          const street = [get('street_number'), get('route')].filter(Boolean).join(' ');
 
-        const parsed: ParsedAddress = {
-          address: place.formatted_address ?? '',
-          street,
-          city: get('locality') || get('postal_town') || get('administrative_area_level_2'),
-          postal_code: get('postal_code'),
-          country: get('country', true), // ISO 3166-1 alpha-2
-          lat: place.geometry?.location?.lat() ?? null,
-          lng: place.geometry?.location?.lng() ?? null,
-        };
+          const parsed: ParsedAddress = {
+            address: place.formatted_address ?? '',
+            street,
+            city: get('locality') || get('postal_town') || get('administrative_area_level_2'),
+            postal_code: get('postal_code'),
+            country: get('country', true), // ISO 3166-1 alpha-2
+            lat: place.geometry?.location?.lat() ?? null,
+            lng: place.geometry?.location?.lng() ?? null,
+          };
 
-        setInputValue(parsed.address);
-        onSelectRef.current(parsed);
-      });
-    });
+          setInputValue(parsed.address);
+          onSelectRef.current(parsed);
+        });
+      } catch (error) {
+        setLoadError('Impossible de charger Google Places. Verifiez la cle API et les restrictions de domaine.');
+        console.error('Google Places initialization failed', error);
+      }
+    };
+
+    initAutocomplete();
   }, []);
 
   return (
@@ -88,6 +98,7 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: Add
           autoComplete="off"
         />
       </div>
+      {loadError && <p className="text-xs text-destructive">{loadError}</p>}
     </div>
   );
 };
