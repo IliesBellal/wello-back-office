@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { IntegrationCard } from '@/components/integrations/IntegrationCard';
-import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { AlertCircle, Check, Monitor, ListChecks, Settings } from 'lucide-react';
 
@@ -94,10 +93,7 @@ export default function UberEatsPage() {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <h1 className="text-3xl font-bold text-foreground">Uber Eats</h1>
-            <EstablishmentClosureModal />
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">Uber Eats</h1>
         }
         description="Gérez votre intégration Uber Eats, commandes et synchronisation du menu"
       >

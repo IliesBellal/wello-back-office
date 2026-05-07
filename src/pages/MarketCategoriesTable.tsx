@@ -353,9 +353,7 @@ export default function MarketCategoriesTable() {
                   <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                     <SortableContext items={categories.map((c) => c.category_id)} strategy={verticalListSortingStrategy}>
                       {categories.map((category) => {
-                        const productCount = (menuData.products || []).filter(
-                          p => p.category_id === category.category_id
-                        ).length;
+                        const productCount = category.product_count ?? 0;
                         
                         return editingId === category.category_id ? (
                           <TableRow key={category.category_id}>
@@ -473,7 +471,8 @@ export default function MarketCategoriesTable() {
             open={bulkAssignOpen}
             onOpenChange={setBulkAssignOpen}
             categoryName={selectedCategoryForBulk.category_name || selectedCategoryForBulk.category}
-            products={menuData.products || []}
+            products={menuData.products && menuData.products.length > 0 ? menuData.products : undefined}
+            initialSelectedIds={selectedCategoryForBulk.product_ids}
             loading={isAssigning}
             onConfirm={handleBulkAssignConfirm}
           />

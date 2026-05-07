@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
-import { TabSystem, PageContainer } from '@/components/shared';
+import { TabSystem, PageContainer, ConfirmDialog } from '@/components/shared';
 import { StripeStatusCard } from '@/components/integrations/StripeStatusCard';
 import { BankAccountsTab } from '@/components/integrations/BankAccountsTab';
 import {
@@ -22,9 +22,9 @@ import {
   uploadBanner,
   OnlineOrdersConfig,
 } from '@/services/onlineOrdersService';
-import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp, Wallet } from 'lucide-react';
+import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp, Wallet, Loader2 } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
-import { integrationsService } from '@/services/integrationsService';
+import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { useToast } from '@/hooks/use-toast';
 import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
 
@@ -109,6 +109,9 @@ export default function ScanNOrder() {
   const accessUrl = 'https://app.scanorder.com';
   const [stripeBalance, setStripeBalance] = useState<{ available: number; pending: number } | null>(null);
   const [kpis, setKpis] = useState<{ revenue: number; orders: number; avg_basket: number } | null>(null);
+  const [scanStatus, setScanStatus] = useState<IntegrationStatus | null>(null);
+  const [showDisableDialog, setShowDisableDialog] = useState(false);
+  const [disabling, setDisabling] = useState(false);
 
   useEffect(() => {
     fetchConfig();
@@ -116,9 +119,20 @@ export default function ScanNOrder() {
       .then(setStripeBalance)
       .catch(() => {/* balance stays null */});
     integrationsService.getScanNOrderStatus()
-      .then(status => setKpis(status.kpis))
+      .then(status => {
+        setScanStatus(status);
+        setKpis(status.kpis);
+      })
       .catch(() => {/* kpis stay null */});
   }, []);
+
+  const closureDate = (() => {
+    const closedUntil = scanStatus?.closed_until;
+    if (!closedUntil) return null;
+    const parsed = new Date(closedUntil);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.getTime() > Date.now() ? parsed : null;
+  })();
 
   const fetchConfig = async () => {
     setLoading(true);
@@ -206,8 +220,13 @@ export default function ScanNOrder() {
   };
 
   const handleDisable = async () => {
-    // TODO: Implement disable functionality
-    console.log('ScanNOrder integration disabled');
+    setDisabling(true);
+    try {
+      // TODO: Implement disable functionality
+      console.log('ScanNOrder integration disabled');
+    } finally {
+      setDisabling(false);
+    }
   };
 
   const renderAppearanceTab = () => (
@@ -610,7 +629,6 @@ export default function ScanNOrder() {
           <div className="space-y-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <h1 className="text-3xl font-bold">ScanNOrder</h1>
-              <EstablishmentClosureModal />
             </div>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:gap-6">
               <div className="flex-1 min-w-0">
@@ -649,28 +667,68 @@ export default function ScanNOrder() {
           </div>
         }
       >
-        {/* Status Card */}
-        <Card className="mb-8">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                <CardTitle className="text-foreground">
-                  Intégration active
-                </CardTitle>
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                  <CardTitle className="text-foreground">
+                    Intégration active
+                  </CardTitle>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowDisableDialog(true)}
+                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+                  title="Désactiver ScanNOrder"
+                  aria-label="Désactiver ScanNOrder"
+                  disabled={disabling}
+                >
+                  {disabling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+                </Button>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDisable}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-              >
-                <Power className="h-4 w-4 mr-2" />
-                Désactiver
-              </Button>
-            </div>
-          </CardHeader>
-        </Card>
+            </CardHeader>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Etat des commandes
+                </CardTitle>
+                <EstablishmentClosureModal triggerMode="icon" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {closureDate ? (
+                <>
+                  <div className="text-xl font-semibold text-amber-600">
+                    Ferme jusqu a {closureDate.toLocaleString('fr-FR', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </div>
+                </>
+              ) : (
+                  <div className="text-xl font-semibold text-green-600">Accepte les commandes</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+          <ConfirmDialog
+            open={showDisableDialog}
+            onOpenChange={setShowDisableDialog}
+            title="Désactiver l'intégration ScanNOrder"
+            description="Êtes-vous sûr de vouloir désactiver ScanNOrder ? Les commandes ne seront plus reçues de cette plateforme."
+            onConfirm={handleDisable}
+            isLoading={disabling}
+            isDangerous={true}
+          />
 
         {/* ═══ Stripe Status Card ═══ */}
         <StripeStatusCard />

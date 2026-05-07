@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -11,11 +11,12 @@ import { UserProfile } from "@/types/settings";
 import { userProfileFields } from "@/config/settingsConfig";
 
 export const ProfileTab = () => {
-  const { profile, isLoading, isSaving, updateProfile } = useUserProfile();
+  const { profile, isLoading, isSaving, updateProfile, refreshProfile, uploadAvatar } = useUserProfile();
   const [formData, setFormData] = useState<UserProfile | null>(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [otpDialogOpen, setOtpDialogOpen] = useState(false);
   const [otpMode, setOtpMode] = useState<'email' | 'tel' | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (profile) {
@@ -34,21 +35,14 @@ export const ProfileTab = () => {
     }
   };
 
-  const handleVerifyClick = (type: 'email' | 'phone') => {
+  const handleVerifyClick = (type: 'email' | 'tel') => {
     setOtpMode(type);
     setOtpDialogOpen(true);
   };
 
-  const handleOtpSuccess = () => {
-    if (formData && otpMode) {
-      const updatedProfile = {
-        ...formData,
-        ...(otpMode === 'email' && { email_verified: true }),
-        ...(otpMode === 'tel' && { phone_verified: true }),
-      };
-      setFormData(updatedProfile);
-      updateProfile(updatedProfile);
-    }
+  const handleOtpSuccess = async () => {
+    // OTP validation updates verification flags server-side; only refresh local profile.
+    await refreshProfile();
     setOtpDialogOpen(false);
     setOtpMode(null);
   };
@@ -56,6 +50,20 @@ export const ProfileTab = () => {
   const handleOtpCancel = () => {
     setOtpDialogOpen(false);
     setOtpMode(null);
+  };
+
+  const handleAvatarButtonClick = () => {
+    avatarInputRef.current?.click();
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    await uploadAvatar(file);
+    event.target.value = "";
   };
 
   if (isLoading || !formData) {
@@ -83,7 +91,14 @@ export const ProfileTab = () => {
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
             <div>
-              <Button variant="outline" size="sm">
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/gif"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+              <Button variant="outline" size="sm" onClick={handleAvatarButtonClick} disabled={isSaving}>
                 Changer l'avatar
               </Button>
               <p className="text-xs text-muted-foreground mt-1">

@@ -21,6 +21,7 @@ interface BulkAssignProductsDialogProps {
   onOpenChange: (open: boolean) => void;
   categoryName: string;
   products?: Product[]; // Optional - will be loaded if not provided
+  initialSelectedIds?: string[]; // Pre-selected product IDs
   loading?: boolean;
   onConfirm: (selectedProductIds: string[]) => Promise<void>;
 }
@@ -30,6 +31,7 @@ export function BulkAssignProductsDialog({
   onOpenChange,
   categoryName,
   products: initialProducts,
+  initialSelectedIds,
   loading = false,
   onConfirm,
 }: BulkAssignProductsDialogProps) {
@@ -54,6 +56,15 @@ export function BulkAssignProductsDialog({
       setProducts(initialProducts);
     }
   }, [open, initialProducts, products.length]);
+
+  // Pre-select products when dialog opens
+  useEffect(() => {
+    if (open && initialSelectedIds && initialSelectedIds.length > 0) {
+      setSelectedIds(new Set(initialSelectedIds));
+    } else if (open) {
+      setSelectedIds(new Set());
+    }
+  }, [open, initialSelectedIds]);
 
   // Filter products by search term
   const filteredProducts = useMemo(() => {

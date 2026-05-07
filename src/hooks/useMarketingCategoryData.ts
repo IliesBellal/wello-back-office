@@ -16,7 +16,10 @@ export const useMarketingCategoryData = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const categoriesData = await menuService.getMarketingCategories();
+      const [categoriesData, productsData] = await Promise.all([
+        menuService.getMarketingCategories(),
+        menuService.getProducts(),
+      ]);
 
       // Marketing categories are already in the correct structure with field mapping done in the service
       const productsTypes = categoriesData.map((cat: Category) => ({
@@ -29,13 +32,16 @@ export const useMarketingCategoryData = () => {
         categ_order: cat.categ_order || cat.order || 0,
         bg_color: cat.bg_color,
         available: cat.available ?? true,
-        products: cat.products || [] // Marketing categories don't have nested products
+        products: cat.products || [], // Marketing categories don't have nested products
+        product_count: cat.product_count ?? 0,
+        product_ids: cat.product_ids || []
       }));
 
       // Marketing categories don't contain products, so we don't flatten them
       setMenuData({
         products_types: productsTypes,
-        products: [] // No products in marketing categories
+        // Use regular products list for bulk-assign dialog in market categories page
+        products: productsData || []
       });
     } catch (error) {
       console.error('Erreur lors du chargement des catégories vitrines:', error);

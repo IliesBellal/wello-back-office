@@ -243,6 +243,8 @@ export interface Category {
   availability?: boolean;  // Availability status for the category
   available?: boolean;     // From new API format
   products: Product[];
+  product_count?: number;  // Number of products in the category (from marketing-categories API)
+  product_ids?: string[]; // List of product IDs in the category (from marketing-categories API)
 }
 
 export interface ComponentCreatePayload {

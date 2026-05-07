@@ -16,6 +16,8 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
+import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
 import type { IntegrationStatus } from '@/services/integrationsService';
 import { Loader2, AlertCircle, RefreshCw, Power } from 'lucide-react';
 
@@ -49,6 +51,13 @@ export const IntegrationCard = ({
   const [syncing, setSyncing] = useState(false);
   const [showDisableDialog, setShowDisableDialog] = useState(false);
   const [showSyncDialog, setShowSyncDialog] = useState(false);
+
+  const getFutureClosureDate = (closedUntil?: string | null): Date | null => {
+    if (!closedUntil) return null;
+    const parsed = new Date(closedUntil);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed.getTime() > Date.now() ? parsed : null;
+  };
 
   useEffect(() => {
     if (status) {
@@ -136,39 +145,70 @@ export const IntegrationCard = ({
     );
   }
 
+  const closureDate = getFutureClosureDate(status.closed_until);
+
   return (
     <div className="space-y-6">
-      {/* Status Card */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-3 w-3 rounded-full bg-green-500"></div>
-              <div>
-                <CardTitle className="text-foreground">
-                  Intégration active
-                </CardTitle>
-                {status.last_sync && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Dernière synchronisation: {new Date(status.last_sync).toLocaleString('fr-FR')}
-                  </p>
-                )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+        {/* Status Card */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                <div>
+                  <CardTitle className="text-foreground">
+                    Intégration active
+                  </CardTitle>
+                  {status.last_sync && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Dernière synchronisation: {new Date(status.last_sync).toLocaleString('fr-FR')}
+                    </p>
+                  )}
+                </div>
               </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowDisableDialog(true)}
+                disabled={disabling}
+                title={`Désactiver ${name}`}
+                aria-label={`Désactiver ${name}`}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
+              >
+                {disabling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowDisableDialog(true)}
-              disabled={disabling}
-              className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-            >
-              {disabling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              <Power className="h-4 w-4 mr-2" />
-              Désactiver
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+          </CardHeader>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Etat des commandes
+              </CardTitle>
+              <EstablishmentClosureModal triggerMode="icon" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            {closureDate ? (
+              <>
+                <div className="text-xl font-semibold text-amber-600">
+                  Ferme jusqu a {closureDate.toLocaleString('fr-FR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </div>
+              </>
+            ) : (
+              <div className="text-xl font-semibold text-green-600">Accepte les commandes</div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
@@ -370,28 +410,15 @@ export const IntegrationCard = ({
         </CardContent>
       </Card>
 
-      {/* Disable Dialog */}
-      <AlertDialog open={showDisableDialog} onOpenChange={setShowDisableDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Désactiver l'intégration {name}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir désactiver {name}? Les commandes ne seront plus reçues de cette plateforme.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-3">
-            <AlertDialogCancel>Non, continuer</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDisable}
-              disabled={disabling}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {disabling && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Oui, désactiver
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDisableDialog}
+        onOpenChange={setShowDisableDialog}
+        title={`Désactiver l'intégration ${name}`}
+        description={`Êtes-vous sûr de vouloir désactiver ${name} ? Les commandes ne seront plus reçues de cette plateforme.`}
+        onConfirm={handleDisable}
+        isLoading={disabling}
+        isDangerous={true}
+      />
 
       {/* Sync Dialog */}
       <AlertDialog open={showSyncDialog} onOpenChange={setShowSyncDialog}>

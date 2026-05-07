@@ -1,5 +1,12 @@
-import { apiClient, withMock, logAPI } from "@/services/apiClient";
+import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
 import { UserProfile, EstablishmentSettings } from "@/types/settings";
+
+const unwrapWelloData = <T>(response: WelloApiResponse<T> | T): T => {
+  if (response && typeof response === "object" && "data" in response) {
+    return (response as WelloApiResponse<T>).data;
+  }
+  return response as T;
+};
 
 // ============= Mock Data =============
 const mockUserProfile: UserProfile = {
@@ -32,7 +39,10 @@ const mockEstablishmentSettings: EstablishmentSettings = {
     concurrent_capacity: 50,
     service_required: "table",
     disable_low_stock: true,
-    register_required: true
+    register_required: true,
+    active_on_site: true,
+    active_takeaway: true,
+    active_delivery: true
   },
   scan_order: {
     active_delivery: true,
@@ -49,34 +59,52 @@ const mockEstablishmentSettings: EstablishmentSettings = {
 // ============= API Functions =============
 export const settingsService = {
   async getUserProfile(): Promise<UserProfile> {
-    logAPI('GET', '/api/user/profile');
+    logAPI('GET', '/users/profile');
     return withMock(
       () => ({ ...mockUserProfile }),
-      () => apiClient.get<UserProfile>('/api/user/profile')
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<UserProfile> | UserProfile>('/users/profile');
+        return unwrapWelloData(response);
+      }
     );
   },
 
   async updateUserProfile(data: Partial<UserProfile>): Promise<UserProfile> {
-    logAPI('PATCH', '/api/user/profile', data);
+    logAPI('PATCH', '/users/profile', data);
     return withMock(
       () => ({ ...mockUserProfile, ...data }),
-      () => apiClient.patch<UserProfile>('/api/user/profile', data)
+      () => apiClient.patch<UserProfile>('/users/profile', data)
+    );
+  },
+
+  async uploadUserProfileAvatar(file: File): Promise<void> {
+    logAPI('POST', '/users/profile/avatar', { avatar: file.name });
+    return withMock(
+      async () => undefined,
+      async () => {
+        const formData = new FormData();
+        formData.append('avatar', file);
+        await apiClient.post('/users/profile/avatar', formData);
+      }
     );
   },
 
   async getEstablishmentSettings(): Promise<EstablishmentSettings> {
-    logAPI('GET', '/api/establishment/settings');
+    logAPI('GET', '/pos/settings');
     return withMock(
       () => ({ ...mockEstablishmentSettings }),
-      () => apiClient.get<EstablishmentSettings>('/api/establishment/settings')
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<EstablishmentSettings> | EstablishmentSettings>('/pos/settings');
+        return unwrapWelloData(response);
+      }
     );
   },
 
   async updateEstablishmentSettings(data: Partial<EstablishmentSettings>): Promise<EstablishmentSettings> {
-    logAPI('PATCH', '/api/establishment/settings', data);
+    logAPI('PATCH', '/pos/settings', data);
     return withMock(
       () => ({ ...mockEstablishmentSettings, ...data }),
-      () => apiClient.patch<EstablishmentSettings>('/api/establishment/settings', data)
+      () => apiClient.patch<EstablishmentSettings>('/pos/settings', data)
     );
   }
 };

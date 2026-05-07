@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Clock3 } from 'lucide-react';
+import { AlertTriangle, Clock3, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -30,7 +30,13 @@ const AVAILABLE_INTEGRATIONS: Array<{ id: IntegrationPlatform; label: string }> 
 
 const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120];
 
-export const EstablishmentClosureModal = () => {
+interface EstablishmentClosureModalProps {
+  triggerMode?: 'button' | 'icon';
+}
+
+export const EstablishmentClosureModal = ({
+  triggerMode = 'button',
+}: EstablishmentClosureModalProps) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState('30');
@@ -103,37 +109,48 @@ export const EstablishmentClosureModal = () => {
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button
-          variant="destructive"
-          size="sm"
-          className="gap-2"
-        >
-          <AlertTriangle className="h-4 w-4" />
-          Fermer temporairement
-        </Button>
+        {triggerMode === 'icon' ? (
+          <Button
+            variant="outline"
+            size="icon"
+            title="Fermer temporairement"
+            aria-label="Fermer temporairement"
+          >
+            <Pause className="h-4 w-4" />
+          </Button>
+        ) : (
+          <Button
+            variant="destructive"
+            size="sm"
+            className="gap-2"
+          >
+            <AlertTriangle className="h-4 w-4" />
+            Fermer temporairement
+          </Button>
+        )}
       </DialogTrigger>
 
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Fermeture temporaire de l etablissement</DialogTitle>
+          <DialogTitle>Fermeture temporaire de l'établissement</DialogTitle>
           <DialogDescription>
-            Fermez rapidement votre etablissement sur les integrations souhaitees.
+            Fermez rapidement votre établissement sur les intégrations souhaitées.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5">
           <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Action immediate: les canaux selectionnes seront indisponibles pendant la duree choisie.
+            Action immédiate: les canaux sélectionnés seront indisponibles pendant la durée choisie.
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="closure-duration" className="flex items-center gap-2">
               <Clock3 className="h-4 w-4" />
-              Duree de fermeture
+              Durée de fermeture
             </Label>
             <Select value={durationMinutes} onValueChange={setDurationMinutes}>
               <SelectTrigger id="closure-duration" className="max-w-xs">
-                <SelectValue placeholder="Choisir une duree" />
+                <SelectValue placeholder="Choisir une durée" />
               </SelectTrigger>
               <SelectContent>
                 {DURATION_OPTIONS.map(minutes => (
@@ -146,7 +163,7 @@ export const EstablishmentClosureModal = () => {
           </div>
 
           <div className="space-y-3">
-            <Label>Integrations impactees</Label>
+            <Label>Intégrations impactées</Label>
             <p className="text-xs text-muted-foreground">{selectedLabel}</p>
             <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-3">
               {AVAILABLE_INTEGRATIONS.map(integration => {

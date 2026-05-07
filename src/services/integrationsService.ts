@@ -10,6 +10,7 @@ export interface IntegrationKPIs {
 export interface IntegrationStatus {
   platform: 'uber_eats' | 'deliveroo' | 'scannorder';
   active: boolean;
+  closed_until?: string | null;
   commission_rate: number;
   auto_accept_orders: boolean;
   preparation_time_minutes?: number;
@@ -171,18 +172,19 @@ export const integrationsService = {
   closeEstablishmentTemporary: async (data: {
     duration_minutes: number;
     affected_integrations: IntegrationPlatform[];
-  }): Promise<{ closed_until: string; affected_integrations: IntegrationPlatform[] }> => {
-    logAPI('POST', '/integrations/establishment/close-temporary', data);
+  }): Promise<{ status: string; closed_until: string; affected_integrations: IntegrationPlatform[] }> => {
+    logAPI('PATCH', '/integrations/global/close-temporary', data);
 
     return withMock(
       () => ({
+        status: 'success',
         closed_until: new Date(Date.now() + data.duration_minutes * 60 * 1000).toISOString(),
         affected_integrations: data.affected_integrations,
       }),
       () =>
         apiClient
-          .post<WelloApiResponse<{ closed_until: string; affected_integrations: IntegrationPlatform[] }>>(
-            '/integrations/establishment/close-temporary',
+          .patch<WelloApiResponse<{ status: string; closed_until: string; affected_integrations: IntegrationPlatform[] }>>(
+            '/integrations/global/close-temporary',
             data
           )
           .then(res => res.data.data)

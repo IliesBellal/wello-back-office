@@ -106,21 +106,23 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await apiClient.post<SendVerificationResponse>('/auth/send-verification', {
+      const response = await apiClient.post<WelloApiResponse<SendVerificationResponse> | SendVerificationResponse>('/auth/send-verification', {
         mode,
       }, { headers });
 
-      if (response.status === 'success') {
+      const responseData = 'data' in response ? response.data : response;
+
+      if (responseData.status === 'success') {
         setCooldown(60);
         setCode(''); // Clear existing code
         toast({
           title: 'Code renvoyé',
-          description: response.message || 'Un nouveau code a été envoyé.',
+          description: responseData.message || 'Un nouveau code a été envoyé.',
         });
       } else {
         toast({
           title: 'Échec de l\'envoi',
-          description: response.message || 'Impossible de renvoyer le code.',
+          description: responseData.message || 'Impossible de renvoyer le code.',
           variant: 'destructive',
         });
       }

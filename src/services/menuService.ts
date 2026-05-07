@@ -417,7 +417,9 @@ export const menuService = {
           order: cat.display_order ?? 0,
           categ_order: cat.display_order ?? 0,
           available: cat.available ?? true,
-          products: [] // Marketing categories don't have nested products
+          products: [], // Marketing categories don't have nested products
+          product_count: cat.product_count ?? 0,
+          product_ids: cat.product_ids || []
         }));
       }
     );

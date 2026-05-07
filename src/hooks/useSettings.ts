@@ -12,9 +12,11 @@ export const useUserProfile = () => {
     loadProfile();
   }, []);
 
-  const loadProfile = async () => {
+  const loadProfile = async (withLoading = true) => {
     try {
-      setIsLoading(true);
+      if (withLoading) {
+        setIsLoading(true);
+      }
       const data = await settingsService.getUserProfile();
       setProfile(data);
     } catch (error) {
@@ -24,8 +26,14 @@ export const useUserProfile = () => {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      if (withLoading) {
+        setIsLoading(false);
+      }
     }
+  };
+
+  const refreshProfile = async () => {
+    await loadProfile(false);
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
@@ -48,7 +56,27 @@ export const useUserProfile = () => {
     }
   };
 
-  return { profile, isLoading, isSaving, updateProfile };
+  const uploadAvatar = async (file: File) => {
+    try {
+      setIsSaving(true);
+      await settingsService.uploadUserProfileAvatar(file);
+      await refreshProfile();
+      toast({
+        title: "Photo mise à jour",
+        description: "Votre photo de profil a été enregistrée"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour la photo de profil",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return { profile, isLoading, isSaving, updateProfile, refreshProfile, uploadAvatar };
 };
 
 export const useEstablishmentSettings = () => {

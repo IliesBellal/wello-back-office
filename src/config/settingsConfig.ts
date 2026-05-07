@@ -15,8 +15,8 @@ export const establishmentInfoFields: FieldConfig[] = [
   { key: 'address', label: 'Adresse', type: 'text', group: 'info', placeholder: 'Adresse complète' },
   { key: 'currency', label: 'Devise', type: 'select', group: 'info', options: [
     { value: 'EUR', label: '€ Euro' },
-    { value: 'USD', label: '$ Dollar' },
-    { value: 'GBP', label: '£ Livre' },
+    //{ value: 'USD', label: '$ Dollar' },
+    //{ value: 'GBP', label: '£ Livre' },
   ]},
 ];
 
