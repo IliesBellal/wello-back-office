@@ -1,3 +1,5 @@
+/// <reference types="@types/google.maps" />
+
 import { useEffect, useRef, useState } from 'react';
 import { loadGooglePlacesLibrary } from '@/lib/googlePlacesLoader';
 import { Input } from '@/components/ui/input';
