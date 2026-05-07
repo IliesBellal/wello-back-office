@@ -37,9 +37,11 @@ export const useUserProfile = () => {
   };
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { avatar: _avatar, ...profileUpdates } = updates;
     try {
       setIsSaving(true);
-      const updated = await settingsService.updateUserProfile(updates);
+      const updated = await settingsService.updateUserProfile(profileUpdates);
       setProfile(updated);
       toast({
         title: "Profil mis à jour",
@@ -79,7 +81,7 @@ export const useUserProfile = () => {
   const updateMfaType = async (mfaType: MfaType) => {
     try {
       setIsSaving(true);
-      const updated = await settingsService.updateMfaType(mfaType);
+      const updated = await settingsService.updateUserProfile({ mfa_type: mfaType });
       setProfile(updated);
       toast({
         title: mfaType === 'email_sms' ? 'MFA activé' : 'MFA désactivé',

@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
-import { UserProfile, EstablishmentSettings, MfaType } from "@/types/settings";
+import { UserProfile, EstablishmentSettings } from "@/types/settings";
 
 const unwrapWelloData = <T>(response: WelloApiResponse<T> | T): T => {
   if (response && typeof response === "object" && "data" in response) {
@@ -77,17 +77,6 @@ export const settingsService = {
       () => ({ ...mockUserProfile, ...data }),
       async () => {
         const response = await apiClient.patch<WelloApiResponse<UserProfile> | UserProfile>('/users/profile', data);
-        return unwrapWelloData(response);
-      }
-    );
-  },
-
-  async updateMfaType(mfaType: MfaType): Promise<UserProfile> {
-    logAPI('PATCH', '/users/profile', { mfa_type: mfaType });
-    return withMock(
-      () => ({ ...mockUserProfile, mfa_type: mfaType }),
-      async () => {
-        const response = await apiClient.patch<WelloApiResponse<UserProfile> | UserProfile>('/users/profile', { mfa_type: mfaType });
         return unwrapWelloData(response);
       }
     );
