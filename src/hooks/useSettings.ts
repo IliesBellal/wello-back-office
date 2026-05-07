@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { settingsService } from '@/services/settingsService';
-import { UserProfile, EstablishmentSettings } from '@/types/settings';
+import { UserProfile, EstablishmentSettings, MfaType } from '@/types/settings';
 import { toast } from '@/hooks/use-toast';
 
 export const useUserProfile = () => {
@@ -76,7 +76,29 @@ export const useUserProfile = () => {
     }
   };
 
-  return { profile, isLoading, isSaving, updateProfile, refreshProfile, uploadAvatar };
+  const updateMfaType = async (mfaType: MfaType) => {
+    try {
+      setIsSaving(true);
+      const updated = await settingsService.updateMfaType(mfaType);
+      setProfile(updated);
+      toast({
+        title: mfaType === 'email_sms' ? 'MFA activé' : 'MFA désactivé',
+        description: mfaType === 'email_sms'
+          ? 'La double authentification par email/SMS est maintenant active.'
+          : 'La double authentification a été désactivée.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de modifier le paramètre MFA.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return { profile, isLoading, isSaving, updateProfile, refreshProfile, uploadAvatar, updateMfaType };
 };
 
 export const useEstablishmentSettings = () => {

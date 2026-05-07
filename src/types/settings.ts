@@ -1,3 +1,5 @@
+export type MfaType = '' | 'email_sms';
+
 export interface UserProfile {
   firstname: string;
   lastname: string;
@@ -7,6 +9,7 @@ export interface UserProfile {
   avatar: string;
   email_verified?: boolean;
   phone_verified?: boolean;
+  mfa_type?: MfaType;
 }
 
 export interface EstablishmentInfo {

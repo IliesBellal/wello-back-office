@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { User, Shield, Mail, Phone, Check } from "lucide-react";
+import { User, Shield, Mail, Phone, Check, ShieldCheck, ShieldOff } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useUserProfile } from "@/hooks/useSettings";
 import { SettingsSection } from "./SettingsSection";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
@@ -14,7 +15,7 @@ import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
 
 export const ProfileTab = () => {
-  const { profile, isLoading, isSaving, updateProfile, refreshProfile, uploadAvatar } = useUserProfile();
+  const { profile, isLoading, isSaving, updateProfile, refreshProfile, uploadAvatar, updateMfaType } = useUserProfile();
   const { settings: establishmentSettings } = useEstablishmentSettings();
   const [formData, setFormData] = useState<UserProfile | null>(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
@@ -206,6 +207,46 @@ export const ProfileTab = () => {
                 </Button>
               )}
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* MFA Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5" />
+            Double authentification (MFA)
+          </CardTitle>
+          <CardDescription>
+            Sécurisez votre compte avec une vérification en deux étapes à chaque connexion.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-muted/30">
+            <div className="flex items-center gap-3 min-w-0">
+              {formData.mfa_type === 'email_sms' ? (
+                <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
+              ) : (
+                <ShieldOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              )}
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  {formData.mfa_type === 'email_sms' ? 'MFA activé' : 'MFA désactivé'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formData.mfa_type === 'email_sms'
+                    ? 'Un code de vérification vous sera demandé à chaque connexion.'
+                    : 'Aucune vérification supplémentaire requise à la connexion.'}
+                </p>
+              </div>
+            </div>
+            <Switch
+              checked={formData.mfa_type === 'email_sms'}
+              disabled={isSaving}
+              onCheckedChange={(checked) => updateMfaType(checked ? 'email_sms' : '')}
+              className="flex-shrink-0"
+            />
           </div>
         </CardContent>
       </Card>
