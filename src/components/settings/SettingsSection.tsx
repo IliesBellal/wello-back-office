@@ -99,12 +99,16 @@ export const SettingsSection = ({ fields, values, onChange, defaultPhoneCountry 
                 type={field.type}
                 value={values[field.key] ?? ''}
                 onChange={(e) => {
+                  if (field.readOnly) return;
                   const value = field.type === 'number' ? Number(e.target.value) : e.target.value;
                   onChange(field.key, value);
                 }}
                 placeholder={field.placeholder}
                 min={field.min}
                 max={field.max}
+                readOnly={field.readOnly}
+                disabled={field.readOnly}
+                className={field.readOnly ? 'opacity-60 cursor-not-allowed bg-muted' : ''}
               />
             </div>
           )}

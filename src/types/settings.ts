@@ -82,5 +82,6 @@ export interface FieldConfig {
   placeholder?: string;
   min?: number;
   max?: number;
+  readOnly?: boolean;
   options?: { value: string; label: string }[];
 }

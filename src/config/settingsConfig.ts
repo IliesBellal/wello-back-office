@@ -11,7 +11,7 @@ export const userProfileFields: FieldConfig[] = [
 export const establishmentInfoFields: FieldConfig[] = [
   { key: 'name', label: 'Nom de l\'établissement', type: 'text', group: 'info', placeholder: 'Nom du restaurant' },
   { key: 'phone', label: 'Téléphone', type: 'tel', group: 'info', placeholder: '01 02 03 04 05' },
-  { key: 'siret', label: 'SIRET', type: 'text', group: 'info', placeholder: '123 456 789 00012' },
+  { key: 'siret', label: 'SIRET', type: 'text', group: 'info', placeholder: '123 456 789 00012', readOnly: true },
 
   { key: 'currency', label: 'Devise', type: 'select', group: 'info', options: [
     { value: 'EUR', label: '€ Euro' },

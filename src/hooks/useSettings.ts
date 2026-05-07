@@ -129,9 +129,14 @@ export const useEstablishmentSettings = () => {
   };
 
   const updateSettings = async (updates: Partial<EstablishmentSettings>) => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { siret: _siret, ...infoWithoutSiret } = updates.info ?? {};
+    const sanitized: Partial<EstablishmentSettings> = updates.info
+      ? { ...updates, info: infoWithoutSiret as typeof updates.info }
+      : updates;
     try {
       setIsSaving(true);
-      const updated = await settingsService.updateEstablishmentSettings(updates);
+      const updated = await settingsService.updateEstablishmentSettings(sanitized);
       setSettings(updated);
       toast({
         title: "Paramètres mis à jour",
