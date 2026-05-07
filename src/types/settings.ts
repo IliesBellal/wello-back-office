@@ -6,6 +6,12 @@ export interface UserProfile {
   email: string;
   phone: string;
   address?: string;
+  street?: string;
+  city?: string;
+  postal_code?: string;
+  country?: string;
+  lat?: number | null;
+  lng?: number | null;
   avatar: string;
   email_verified?: boolean;
   phone_verified?: boolean;
@@ -18,6 +24,12 @@ export interface EstablishmentInfo {
   country_code?: string;
   siret: string;
   address: string;
+  street?: string;
+  city?: string;
+  postal_code?: string;
+  country?: string;
+  lat?: number | null;
+  lng?: number | null;
   currency: string;
   primary_color: string;
   text_color: string;

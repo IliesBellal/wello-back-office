@@ -16,6 +16,7 @@ import {
 } from "@/config/settingsConfig";
 import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
+import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressAutocomplete";
 
 export const EstablishmentTab = () => {
   const { settings, isLoading, isSaving, updateSettings } = useEstablishmentSettings();
@@ -36,6 +37,23 @@ export const EstablishmentTab = () => {
         ...formData[group],
         [key]: value
       }
+    });
+  };
+
+  const handleAddressSelect = (parsed: ParsedAddress) => {
+    if (!formData) return;
+    setFormData({
+      ...formData,
+      info: {
+        ...formData.info,
+        address: parsed.address,
+        street: parsed.street,
+        city: parsed.city,
+        postal_code: parsed.postal_code,
+        country: parsed.country,
+        lat: parsed.lat,
+        lng: parsed.lng,
+      },
     });
   };
 
@@ -110,13 +128,21 @@ export const EstablishmentTab = () => {
               <CardDescription>Informations générales</CardDescription>
             </CardHeader>
             <CardContent>
-              <SettingsSection
-                fields={establishmentInfoFields}
-                values={formData.info}
-                onChange={(key, value) => handleFieldChange('info', key, value)}
-                defaultPhoneCountry={formData.info.country_code}
-                useGrid={true}
-              />
+              <div className="space-y-4">
+                <SettingsSection
+                  fields={establishmentInfoFields}
+                  values={formData.info}
+                  onChange={(key, value) => handleFieldChange('info', key, value)}
+                  defaultPhoneCountry={formData.info.country_code}
+                  useGrid={true}
+                />
+                <AddressAutocomplete
+                  label="Adresse"
+                  value={formData.info.address ?? ''}
+                  onSelect={handleAddressSelect}
+                  placeholder="Rechercher l'adresse de l'établissement..."
+                />
+              </div>
             </CardContent>
           </Card>
 

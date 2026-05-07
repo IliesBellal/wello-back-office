@@ -5,14 +5,14 @@ export const userProfileFields: FieldConfig[] = [
   { key: 'lastname', label: 'Nom', type: 'text', group: 'profile', placeholder: 'Votre nom' },
   { key: 'email', label: 'Email', type: 'email', group: 'profile', placeholder: 'votre@email.fr' },
   { key: 'phone', label: 'Téléphone', type: 'tel', group: 'profile', placeholder: '+33 6 12 34 56 78' },
-  { key: 'address', label: 'Adresse postale', type: 'text', group: 'profile', placeholder: '123 rue de la Paix, 75000 Paris' },
+
 ];
 
 export const establishmentInfoFields: FieldConfig[] = [
   { key: 'name', label: 'Nom de l\'établissement', type: 'text', group: 'info', placeholder: 'Nom du restaurant' },
   { key: 'phone', label: 'Téléphone', type: 'tel', group: 'info', placeholder: '01 02 03 04 05' },
   { key: 'siret', label: 'SIRET', type: 'text', group: 'info', placeholder: '123 456 789 00012' },
-  { key: 'address', label: 'Adresse', type: 'text', group: 'info', placeholder: 'Adresse complète' },
+
   { key: 'currency', label: 'Devise', type: 'select', group: 'info', options: [
     { value: 'EUR', label: '€ Euro' },
     //{ value: 'USD', label: '$ Dollar' },

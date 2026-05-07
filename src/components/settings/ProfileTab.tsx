@@ -8,6 +8,7 @@ import { useUserProfile } from "@/hooks/useSettings";
 import { SettingsSection } from "./SettingsSection";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { OTPVerification } from "@/components/auth/OTPVerification";
+import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressAutocomplete";
 import { UserProfile } from "@/types/settings";
 import { userProfileFields } from "@/config/settingsConfig";
 import { useEstablishmentSettings } from "@/hooks/useSettings";
@@ -74,6 +75,20 @@ export const ProfileTab = () => {
     setOtpMode(null);
   };
 
+  const handleAddressSelect = (parsed: ParsedAddress) => {
+    if (!formData) return;
+    setFormData({
+      ...formData,
+      address: parsed.address,
+      street: parsed.street,
+      city: parsed.city,
+      postal_code: parsed.postal_code,
+      country: parsed.country,
+      lat: parsed.lat,
+      lng: parsed.lng,
+    });
+  };
+
   const handleAvatarButtonClick = () => {
     avatarInputRef.current?.click();
   };
@@ -95,7 +110,8 @@ export const ProfileTab = () => {
   const initials = `${formData.firstname[0]}${formData.lastname[0]}`.toUpperCase();
 
   return (
-    <div className="space-y-6 max-w-2xl">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      {/* Colonne gauche — Informations personnelles */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -136,141 +152,151 @@ export const ProfileTab = () => {
             defaultPhoneCountry={establishmentSettings?.info.country_code}
           />
 
+          <AddressAutocomplete
+            label="Adresse postale"
+            value={formData.address ?? ''}
+            onSelect={handleAddressSelect}
+            placeholder="123 rue de la Paix, 75000 Paris"
+          />
+
           <Button onClick={handleSave} disabled={isSaving} className="w-full bg-gradient-primary">
             {isSaving ? "Enregistrement..." : "Enregistrer"}
           </Button>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="w-5 h-5" />
-            Vérification de contact
-          </CardTitle>
-          <CardDescription>
-            Vérifiez votre email et numéro de téléphone
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Email Verification */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-card">
-            <div className="flex items-center gap-3 min-w-0">
-              <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{formData.email}</p>
-                <p className="text-xs text-muted-foreground">Email</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {formData.email_verified ? (
-                <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                  <Check className="w-4 h-4" />
-                  Vérifié
+      {/* Colonne droite */}
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Vérification de contact
+            </CardTitle>
+            <CardDescription>
+              Vérifiez votre email et numéro de téléphone
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Email Verification */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-card">
+              <div className="flex items-center gap-3 min-w-0">
+                <Mail className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{formData.email}</p>
+                  <p className="text-xs text-muted-foreground">Email</p>
                 </div>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleVerifyClick('email')}
-                  className="text-xs"
-                >
-                  Vérifier
-                </Button>
-              )}
-            </div>
-          </div>
-
-          {/* Phone Verification */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-card">
-            <div className="flex items-center gap-3 min-w-0">
-              <Phone className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{formData.phone}</p>
-                <p className="text-xs text-muted-foreground">Téléphone</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {formData.email_verified ? (
+                  <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                    <Check className="w-4 h-4" />
+                    Vérifié
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleVerifyClick('email')}
+                    className="text-xs"
+                  >
+                    Vérifier
+                  </Button>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {formData.phone_verified ? (
-                <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
-                  <Check className="w-4 h-4" />
-                  Vérifié
+
+            {/* Phone Verification */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-card">
+              <div className="flex items-center gap-3 min-w-0">
+                <Phone className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{formData.phone}</p>
+                  <p className="text-xs text-muted-foreground">Téléphone</p>
                 </div>
-              ) : (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleVerifyClick('tel')}
-                  className="text-xs"
-                >
-                  Vérifier
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* MFA Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5" />
-            Double authentification (MFA)
-          </CardTitle>
-          <CardDescription>
-            Sécurisez votre compte avec une vérification en deux étapes à chaque connexion.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-muted/30">
-            <div className="flex items-center gap-3 min-w-0">
-              {formData.mfa_type === 'email_sms' ? (
-                <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
-              ) : (
-                <ShieldOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              )}
-              <div className="min-w-0">
-                <p className="text-sm font-medium">
-                  {formData.mfa_type === 'email_sms' ? 'MFA activé' : 'MFA désactivé'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {formData.mfa_type === 'email_sms'
-                    ? 'Un code de vérification vous sera demandé à chaque connexion.'
-                    : 'Aucune vérification supplémentaire requise à la connexion.'}
-                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {formData.phone_verified ? (
+                  <div className="flex items-center gap-1 text-xs text-green-600 font-medium">
+                    <Check className="w-4 h-4" />
+                    Vérifié
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => handleVerifyClick('tel')}
+                    className="text-xs"
+                  >
+                    Vérifier
+                  </Button>
+                )}
               </div>
             </div>
-            <Switch
-              checked={formData.mfa_type === 'email_sms'}
-              disabled={isSaving}
-              onCheckedChange={(checked) => updateMfaType(checked ? 'email_sms' : '')}
-              className="flex-shrink-0"
-            />
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5" />
-            Sécurité
-          </CardTitle>
-          <CardDescription>
-            Gérez vos paramètres de sécurité
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="outline"
-            onClick={() => setIsPasswordDialogOpen(true)}
-            className="w-full"
-          >
-            Modifier le mot de passe
-          </Button>
-        </CardContent>
-      </Card>
+        {/* MFA Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              Double authentification (MFA)
+            </CardTitle>
+            <CardDescription>
+              Sécurisez votre compte avec une vérification en deux étapes à chaque connexion.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 p-4 rounded-lg border border-border bg-muted/30">
+              <div className="flex items-center gap-3 min-w-0">
+                {formData.mfa_type === 'email_sms' ? (
+                  <ShieldCheck className="w-5 h-5 text-green-600 flex-shrink-0" />
+                ) : (
+                  <ShieldOff className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">
+                    {formData.mfa_type === 'email_sms' ? 'MFA activé' : 'MFA désactivé'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.mfa_type === 'email_sms'
+                      ? 'Un code de vérification vous sera demandé à chaque connexion.'
+                      : 'Aucune vérification supplémentaire requise à la connexion.'}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={formData.mfa_type === 'email_sms'}
+                disabled={isSaving}
+                onCheckedChange={(checked) => updateMfaType(checked ? 'email_sms' : '')}
+                className="flex-shrink-0"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="w-5 h-5" />
+              Sécurité
+            </CardTitle>
+            <CardDescription>
+              Gérez vos paramètres de sécurité
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => setIsPasswordDialogOpen(true)}
+              className="w-full"
+            >
+              Modifier le mot de passe
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
 
       <ChangePasswordDialog
         open={isPasswordDialogOpen}
