@@ -3,7 +3,7 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useMenuData } from '@/hooks/useMenuData';
+import { useMarketingCategoryData } from '@/hooks/useMarketingCategoryData';
 import { Category } from '@/types/menu';
 import { Plus, Pencil, Trash2, GripVertical, LinkIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -114,7 +114,7 @@ const SortableCategoryRow = ({
 };
 
 export default function MarketCategoriesTable() {
-  const { menuData, loading, createProductCategory, updateCategory, deleteCategory } = useMenuData();
+  const { menuData, loading, createMarketingCategory, updateMarketingCategory, deleteMarketingCategory } = useMarketingCategoryData();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -146,7 +146,7 @@ export default function MarketCategoriesTable() {
     if (!newCategoryName.trim()) return;
 
     try {
-      await createProductCategory(newCategoryName);
+      await createMarketingCategory(newCategoryName);
       setNewCategoryName('');
       setCreateDialogOpen(false);
       toast({
@@ -174,7 +174,7 @@ export default function MarketCategoriesTable() {
     if (!editingName.trim()) return;
 
     try {
-      await updateCategory(categoryId, editingName);
+      await updateMarketingCategory(categoryId, editingName);
       
       // Update order if changed
       const updatedCategory = categories.find(c => c.category_id === categoryId);
@@ -219,7 +219,7 @@ export default function MarketCategoriesTable() {
 
     setIsDeleting(true);
     try {
-      await deleteCategory(categoryToDelete);
+      await deleteMarketingCategory(categoryToDelete);
       toast({
         title: 'Succès',
         description: 'Catégorie supprimée avec succès',
@@ -268,7 +268,7 @@ export default function MarketCategoriesTable() {
   const debouncedSaveOrder = async (categoriesToSave: Category[]) => {
     try {
       const categoryOrder = categoriesToSave.map((c) => c.category_id);
-      await menuService.updateCategoryOrder(categoryOrder);
+      await menuService.updateMarketingCategoryDisplayOrder(categoryOrder);
     } catch (error) {
       console.error('Error saving category order:', error);
       toast({

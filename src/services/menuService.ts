@@ -400,6 +400,29 @@ export const menuService = {
     );
   },
 
+  async getMarketingCategories(): Promise<Category[]> {
+    logAPI('GET', '/menu/marketing-categories');
+    return withMock(
+      () => [...mockCategories],
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<{ categories: any[] }>>('/menu/marketing-categories');
+        const categories = response.data?.categories || [];
+        // Map marketing category fields to standard Category structure
+        return categories.map((cat: any) => ({
+          category_id: cat.category_id,
+          category: cat.name,
+          category_name: cat.name,
+          id: cat.category_id,
+          name: cat.name,
+          order: cat.display_order ?? 0,
+          categ_order: cat.display_order ?? 0,
+          available: cat.available ?? true,
+          products: [] // Marketing categories don't have nested products
+        }));
+      }
+    );
+  },
+
   async getProducts(): Promise<Product[]> {
     // ✅ CONSOLIDATED: Now calls getMenuData() internally
     // Returns a flattened array of Product[] for backward compatibility
@@ -700,6 +723,15 @@ export const menuService = {
     );
   },
 
+  async updateMarketingCategoryDisplayOrder(categoryIds: string[]): Promise<void> {
+    const payload = { category_ids: categoryIds };
+    logAPI('PATCH', '/menu/marketing-categories/display-order', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/marketing-categories/display-order', payload)
+    );
+  },
+
   async updateTagOrder(tagIds: string[]): Promise<void> {
     const payload = { tags: tagIds.map(id => ({ id })) };
     logAPI('PATCH', '/menu/tags/display-order', payload);
@@ -734,6 +766,22 @@ export const menuService = {
     );
   },
 
+  async createMarketingCategory(name: string): Promise<{ id: string; name: string; order: number }> {
+    logAPI('POST', '/menu/marketing-categories', { name });
+    return withMock(
+      () => ({ id: `cat_${Date.now()}`, name, order: 99 }),
+      async () => {
+        const response = await apiClient.post<WelloApiResponse<{ category_id: string; message: string; status: string }>>('/menu/marketing-categories', { name });
+        const categoryId = response.data?.category_id || `cat_${Date.now()}`;
+        return {
+          id: categoryId,
+          name,
+          order: 99
+        };
+      }
+    );
+  },
+
   async createComponentCategory(name: string): Promise<{ id: string; name: string; order: number }> {
     logAPI('POST', '/menu/components/categories', { name });
     return withMock(
@@ -756,6 +804,14 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.patch<void>(`/menu/products/categories/${categoryId}`, { name })
+    );
+  },
+
+  async updateMarketingCategory(categoryId: string, name: string): Promise<void> {
+    logAPI('PATCH', `/menu/marketing-categories/${categoryId}`, { name });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/marketing-categories/${categoryId}`, { name })
     );
   },
 
@@ -1022,10 +1078,18 @@ export const menuService = {
   },
 
   async bulkAssignProductsToMarketCategory(productIds: string[], categoryId: string): Promise<void> {
-    logAPI('PATCH', `/menu/market-categories/${categoryId}/bulk-assign`, { product_ids: productIds });
+    logAPI('PATCH', `/menu/marketing-categories/${categoryId}/bulk-assign`, { product_ids: productIds });
     return withMock(
       () => undefined,
-      () => apiClient.patch<void>(`/menu/market-categories/${categoryId}/bulk-assign`, { product_ids: productIds })
+      () => apiClient.patch<void>(`/menu/marketing-categories/${categoryId}/bulk-assign`, { product_ids: productIds })
+    );
+  },
+
+  async deleteMarketingCategory(categoryId: string): Promise<void> {
+    logAPI('DELETE', `/menu/marketing-categories/${categoryId}`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/marketing-categories/${categoryId}`)
     );
   },
 
