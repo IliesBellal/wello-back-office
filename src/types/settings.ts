@@ -12,6 +12,7 @@ export interface UserProfile {
 export interface EstablishmentInfo {
   name: string;
   phone: string;
+  country_code?: string;
   siret: string;
   address: string;
   currency: string;

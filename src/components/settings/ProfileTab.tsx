@@ -9,9 +9,13 @@ import { ChangePasswordDialog } from "./ChangePasswordDialog";
 import { OTPVerification } from "@/components/auth/OTPVerification";
 import { UserProfile } from "@/types/settings";
 import { userProfileFields } from "@/config/settingsConfig";
+import { useEstablishmentSettings } from "@/hooks/useSettings";
+import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
+import { toast } from "@/hooks/use-toast";
 
 export const ProfileTab = () => {
   const { profile, isLoading, isSaving, updateProfile, refreshProfile, uploadAvatar } = useUserProfile();
+  const { settings: establishmentSettings } = useEstablishmentSettings();
   const [formData, setFormData] = useState<UserProfile | null>(null);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
   const [otpDialogOpen, setOtpDialogOpen] = useState(false);
@@ -31,7 +35,24 @@ export const ProfileTab = () => {
 
   const handleSave = () => {
     if (formData) {
-      updateProfile(formData);
+      const trimmedPhone = formData.phone?.trim();
+      if (trimmedPhone && !isValidPhoneNumber(trimmedPhone)) {
+        toast({
+          title: "Numéro invalide",
+          description: "Le numéro de téléphone est incomplet pour le pays sélectionné.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const normalizedPhone = trimmedPhone
+        ? parsePhoneNumber(trimmedPhone)?.number || trimmedPhone
+        : trimmedPhone;
+
+      updateProfile({
+        ...formData,
+        phone: normalizedPhone
+      });
     }
   };
 
@@ -111,6 +132,7 @@ export const ProfileTab = () => {
             fields={userProfileFields}
             values={formData}
             onChange={handleFieldChange}
+            defaultPhoneCountry={establishmentSettings?.info.country_code}
           />
 
           <Button onClick={handleSave} disabled={isSaving} className="w-full bg-gradient-primary">

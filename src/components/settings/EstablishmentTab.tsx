@@ -14,6 +14,8 @@ import {
   establishmentTimingsFields,
   establishmentOrderingFields
 } from "@/config/settingsConfig";
+import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
+import { toast } from "@/hooks/use-toast";
 
 export const EstablishmentTab = () => {
   const { settings, isLoading, isSaving, updateSettings } = useEstablishmentSettings();
@@ -39,7 +41,27 @@ export const EstablishmentTab = () => {
 
   const handleSave = () => {
     if (formData) {
-      updateSettings(formData);
+      const trimmedPhone = formData.info.phone?.trim();
+      if (trimmedPhone && !isValidPhoneNumber(trimmedPhone)) {
+        toast({
+          title: "Numéro invalide",
+          description: "Le numéro de téléphone est incomplet pour le pays sélectionné.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const normalizedPhone = trimmedPhone
+        ? parsePhoneNumber(trimmedPhone)?.number || trimmedPhone
+        : trimmedPhone;
+
+      updateSettings({
+        ...formData,
+        info: {
+          ...formData.info,
+          phone: normalizedPhone
+        }
+      });
     }
   };
 
@@ -92,6 +114,7 @@ export const EstablishmentTab = () => {
                 fields={establishmentInfoFields}
                 values={formData.info}
                 onChange={(key, value) => handleFieldChange('info', key, value)}
+                defaultPhoneCountry={formData.info.country_code}
                 useGrid={true}
               />
             </CardContent>

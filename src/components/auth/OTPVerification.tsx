@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -36,7 +36,7 @@ const MODE_CONFIG = {
   },
   email: {
     icon: Mail,
-    title: 'Vérifiez votre adresse email',
+    title: 'Vérifiez vos emails',
     description: 'Un code à 6 chiffres a été envoyé à votre adresse email. Veuillez le saisir ci-dessous.',
   },
   tel: {
@@ -54,6 +54,7 @@ export function OTPVerification({
   token,
 }: OTPVerificationProps) {
   const [isMobile, setIsMobile] = useState(false);
+  const hasAutoSentForCurrentOpenRef = useRef(false);
   
   const {
     code,
@@ -66,6 +67,7 @@ export function OTPVerification({
     maskedPhone,
     handleComplete,
     resendCode,
+    sendInitialCode,
     sendSMSFallback,
   } = useOTPVerification({ mode, onSuccess, token });
 
@@ -89,6 +91,21 @@ export function OTPVerification({
       setCode('');
     }
   }, [isOpen, setCode]);
+
+  // Auto-send verification code on open for profile verification flows.
+  useEffect(() => {
+    if (!isOpen) {
+      hasAutoSentForCurrentOpenRef.current = false;
+      return;
+    }
+
+    if (mode === 'email' || mode === 'tel') {
+      if (!hasAutoSentForCurrentOpenRef.current) {
+        hasAutoSentForCurrentOpenRef.current = true;
+        void sendInitialCode();
+      }
+    }
+  }, [isOpen, mode, sendInitialCode, hasAutoSentForCurrentOpenRef]);
 
   const handleOpenChange = (open: boolean) => {
     if (!open && !isVerifying) {

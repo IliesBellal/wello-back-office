@@ -97,9 +97,9 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
     [mode, onSuccess, token]
   );
 
-  // Resend verification code
-  const resendCode = useCallback(async () => {
-    if (cooldown > 0) return;
+  // Send verification code (initial send and resend)
+  const requestVerificationCode = useCallback(async (options?: { ignoreCooldown?: boolean; isInitialSend?: boolean }) => {
+    if (cooldown > 0 && !options?.ignoreCooldown) return;
 
     setIsResending(true);
     setError(null);
@@ -116,7 +116,7 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
         setCooldown(60);
         setCode(''); // Clear existing code
         toast({
-          title: 'Code renvoyé',
+          title: options?.isInitialSend ? 'Code envoyé' : 'Code renvoyé',
           description: responseData.message || 'Un nouveau code a été envoyé.',
         });
       } else {
@@ -137,6 +137,14 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
       setIsResending(false);
     }
   }, [mode, cooldown, token]);
+
+  const resendCode = useCallback(async () => {
+    await requestVerificationCode();
+  }, [requestVerificationCode]);
+
+  const sendInitialCode = useCallback(async () => {
+    await requestVerificationCode({ ignoreCooldown: true, isInitialSend: true });
+  }, [requestVerificationCode]);
 
   // Fallback to SMS (MFA only)
   const sendSMSFallback = useCallback(async () => {
@@ -191,6 +199,7 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
     maskedPhone,
     handleComplete,
     resendCode,
+    sendInitialCode,
     sendSMSFallback,
   };
 }

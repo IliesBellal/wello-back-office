@@ -21,6 +21,7 @@ const mockEstablishmentSettings: EstablishmentSettings = {
   info: {
     name: "Brasserie du midi",
     phone: "0102030405",
+    country_code: "FR",
     siret: "12345678900012",
     address: "12 Rue de la Paix, Paris",
     currency: "EUR",
@@ -73,7 +74,10 @@ export const settingsService = {
     logAPI('PATCH', '/users/profile', data);
     return withMock(
       () => ({ ...mockUserProfile, ...data }),
-      () => apiClient.patch<UserProfile>('/users/profile', data)
+      async () => {
+        const response = await apiClient.patch<WelloApiResponse<UserProfile> | UserProfile>('/users/profile', data);
+        return unwrapWelloData(response);
+      }
     );
   },
 
@@ -104,7 +108,10 @@ export const settingsService = {
     logAPI('PATCH', '/pos/settings', data);
     return withMock(
       () => ({ ...mockEstablishmentSettings, ...data }),
-      () => apiClient.patch<EstablishmentSettings>('/pos/settings', data)
+      async () => {
+        const response = await apiClient.patch<WelloApiResponse<EstablishmentSettings> | EstablishmentSettings>('/pos/settings', data);
+        return unwrapWelloData(response);
+      }
     );
   }
 };
