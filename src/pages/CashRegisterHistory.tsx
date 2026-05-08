@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,8 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
   Clock,
   FileText,
   Receipt,
@@ -26,8 +28,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type SortField = 'created_at' | 'register_number' | 'total_revenue' | 'transaction_count';
-type SortDirection = 'asc' | 'desc';
+const PAGE_LIMIT = 31;
 
 const CashRegisterHistory = () => {
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
@@ -38,12 +39,19 @@ const CashRegisterHistory = () => {
   });
 
   const [registers, setRegisters] = useState<CashRegisterHistoryRecord[]>([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     z_count: 0,
     x_count: 0,
     total_revenue: 0,
     total_transactions: 0,
+  });
+  const [metadata, setMetadata] = useState({
+    total_items: 0,
+    total_pages: 1,
+    current_page: 1,
+    limit: PAGE_LIMIT,
   });
   const [selectedRegisterX, setSelectedRegisterX] = useState<CashRegisterHistoryRecord | null>(null);
   const [closureDialogOpen, setClosureDialogOpen] = useState(false);
@@ -52,15 +60,16 @@ const CashRegisterHistory = () => {
 
   // Load registers when date range changes
   useEffect(() => {
-    loadRegisters();
+    setPage(1);
   }, [dateRange]);
 
-  const loadRegisters = async () => {
+  const loadRegisters = useCallback(async (targetPage: number) => {
     setLoading(true);
     try {
-      const result = await getCashRegisterHistory(dateRange.from, dateRange.to, 'all');
+      const result = await getCashRegisterHistory(dateRange.from, dateRange.to, 'all', targetPage, PAGE_LIMIT);
       setRegisters(result.registers);
       setStats(result.stats);
+      setMetadata(result.metadata);
     } catch (error) {
       toast({
         title: 'Erreur',
@@ -70,25 +79,22 @@ const CashRegisterHistory = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [dateRange, toast]);
 
-  const sortedRegisters = useMemo(() => {
-    const sorted = [...registers];
-    sorted.sort((a, b) => {
-      const aVal: any = a['created_at'];
-      const bVal: any = b['created_at'];
-
-      if (aVal < bVal) return -1;
-      if (aVal > bVal) return 1;
-      return 0;
-    });
-
-    return sorted;
-  }, [registers]);
+  useEffect(() => {
+    loadRegisters(page);
+  }, [loadRegisters, page]);
 
   const formatCurrency = (cents: number) => {
     return `${(cents / 100).toFixed(2)}€`;
   };
+
+  const totalItems = metadata.total_items;
+  const currentPage = metadata.current_page || page;
+  const currentLimit = metadata.limit || PAGE_LIMIT;
+  const totalPages = Math.max(1, metadata.total_pages || 1);
+  const displayStart = registers.length === 0 ? 0 : ((currentPage - 1) * currentLimit) + 1;
+  const displayEnd = registers.length === 0 ? 0 : displayStart + registers.length - 1;
 
   return (
     <DashboardLayout>
@@ -159,10 +165,21 @@ const CashRegisterHistory = () => {
               <ExpandableDataTable<CashRegisterHistoryRecord>
                 columns={[
                   {
-                    key: 'created_at',
-                    label: 'Date & Heure',
+                    key: 'start_date',
+                    label: 'Plage',
                     sortable: true,
-                    render: (val) => format(new Date(val), 'dd/MM/yyyy HH:mm', { locale: fr }),
+                    render: (val: string, row: CashRegisterHistoryRecord) => {
+                      const start = format(new Date(val), 'dd/MM/yyyy HH:mm', { locale: fr });
+                      const end = row.end_date
+                        ? format(new Date(row.end_date), 'dd/MM/yyyy HH:mm', { locale: fr })
+                        : 'En cours';
+                      return (
+                        <div className="text-sm">
+                          <p>{start}</p>
+                          <p className="text-xs text-muted-foreground">→ {end}</p>
+                        </div>
+                      );
+                    },
                   },
                   {
                     key: 'type',
@@ -211,7 +228,7 @@ const CashRegisterHistory = () => {
                     key: 'id',
                     label: 'Actions',
                     render: (val: string, row: CashRegisterHistoryRecord) => 
-                      row.type === 'X' ? (
+                      row.closed && !row.enclosed ? (
                         <Button
                           size="sm"
                           variant="outline"
@@ -229,64 +246,105 @@ const CashRegisterHistory = () => {
                       )
                   },
                 ]}
-                data={sortedRegisters}
+                data={registers}
                 expandableRowKey="id"
-                initialSortBy="created_at"
+                initialSortBy="start_date"
                 initialSortDir="desc"
                 emptyMessage="Aucun registre pour cette période"
                 emptyIcon={<FileText className="h-12 w-12 text-muted-foreground" />}
                 renderExpandedRow={(register) => (
                   <div className="space-y-4">
+                    <div>
+                      <h4 className="text-sm font-semibold mb-2">Informations caisse</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm bg-white p-2 rounded border border-border">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">ID registre :</span>
+                          <span className="font-medium">{register.id}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Caisse :</span>
+                          <span className="font-medium">{register.cash_desk?.cash_desk_name || '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Hash prefix :</span>
+                          <span className="font-mono text-xs text-primary">{register.hash_prefix ? register.hash_prefix + '...' : '-'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Statut :</span>
+                          <span className="font-medium">{register.closed ? 'Fermé (Z)' : 'Ouvert (X)'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Fond de caisse initial :</span>
+                          <span className="font-medium">{formatCurrency(register.cash_fund)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Fond de caisse final :</span>
+                          <span className="font-medium">{formatCurrency(register.final_cash_fund)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Clôturé par :</span>
+                          <span className="font-medium">{register.closed_by_name || '-'}</span>
+                        </div>
+                        <div className="flex justify-between md:col-span-2">
+                          <span className="text-muted-foreground">Commentaire de clôture :</span>
+                          <span className="font-medium text-right">{register.closure_comment || '-'}</span>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Payment Methods */}
                     <div>
                       <h4 className="text-sm font-semibold mb-2">Moyens de paiement</h4>
                       <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm">
-                        {Object.entries(register.payment_methods).map(([method, amount]) => (
+                        {(register.payment_methods || []).map((method) => (
                           <div
-                            key={method}
+                            key={method.mop}
                             className="flex justify-between bg-white p-2 rounded border border-border"
                           >
-                            <span className="text-muted-foreground capitalize">
-                              {method === 'card'
-                                ? 'Carte Bancaire'
-                                : method === 'cash'
-                                  ? 'Espèces'
-                                  : method === 'ticket_restaurant'
-                                    ? 'Tickets Restaurant'
-                                    : method}
-                            </span>
+                            <span className="text-muted-foreground">{method.label}</span>
                             <span className="font-semibold">
-                              {formatCurrency(amount as number)}
+                              {formatCurrency(method.amount)}
                             </span>
                           </div>
                         ))}
+                        {(register.payment_methods || []).length === 0 && (
+                          <p className="text-xs text-muted-foreground">Aucune repartition de paiement disponible.</p>
+                        )}
                       </div>
                     </div>
-
-                    {/* NF525 Info */}
-                    {(register as any).nf525_certified && (
-                      <div>
-                        <h4 className="text-sm font-semibold mb-2">
-                          Informations NF525
-                        </h4>
-                        <div className="space-y-1 text-sm bg-white p-2 rounded border border-border">
-                          {(register as any).nf525_hash && (
-                            <div className="flex justify-between">
-                              <span className="text-muted-foreground">Hash :</span>
-                              <code className="font-mono text-xs text-primary">
-                                {((register as any).nf525_hash as string).substring(0, 16)}...
-                              </code>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
               />
             </CardContent>
           )}
         </Card>
+
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Affichage {displayStart} à {displayEnd} sur {totalItems}
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1 || loading}
+              className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+              aria-label="Page précédente"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
+              Page {currentPage} sur {totalPages}
+            </span>
+            <button
+              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage >= totalPages || loading}
+              className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+              aria-label="Page suivante"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
         </div>
       </PageContainer>
 
@@ -294,7 +352,7 @@ const CashRegisterHistory = () => {
         register={selectedRegisterX}
         open={closureDialogOpen}
         onOpenChange={setClosureDialogOpen}
-        onSuccess={loadRegisters}
+        onSuccess={() => loadRegisters(page)}
       />
     </DashboardLayout>
   );

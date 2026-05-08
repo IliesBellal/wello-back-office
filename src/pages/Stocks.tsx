@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle, Calendar, Minus, Package, Plus } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Calendar, ChevronDown, ChevronUp, Minus, Package, Plus } from "lucide-react";
 import { getStocksList, StockComponent, getStockMovements, StockMovement, StockMovementType } from "@/services/stocksService";
 import { StockMovementDialog } from "@/components/stocks/StockMovementDialog";
 import { AdvancedDatePicker } from "@/components/shared/AdvancedDatePicker";
@@ -19,6 +19,10 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 const Stocks = () => {
+  type SortDirection = "asc" | "desc";
+  type CurrentStockSortKey = "name" | "quantity" | "purchasing_price" | "totalValue";
+  type MovementSortKey = "created_at" | "component_name" | "type" | "quantity" | "created_by" | "comment";
+
   const [activeTab, setActiveTab] = useState<string>("actuel");
   const [stocks, setStocks] = useState<StockComponent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,6 +45,14 @@ const Stocks = () => {
     "loss",
     "consumption",
   ]);
+  const [currentStockSort, setCurrentStockSort] = useState<{ key: CurrentStockSortKey; direction: SortDirection }>({
+    key: "name",
+    direction: "asc",
+  });
+  const [movementSort, setMovementSort] = useState<{ key: MovementSortKey; direction: SortDirection }>({
+    key: "created_at",
+    direction: "desc",
+  });
 
   // Fetch stocks
   const fetchStocks = async () => {
@@ -100,6 +112,95 @@ const Stocks = () => {
   };
 
   const filteredMovements = movements.filter((movement) => selectedMovementTypes.includes(movement.type));
+
+  const toggleCurrentStockSort = (key: CurrentStockSortKey) => {
+    setCurrentStockSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const toggleMovementSort = (key: MovementSortKey) => {
+    setMovementSort((current) => ({
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc",
+    }));
+  };
+
+  const sortedFilteredStocks = [...filteredStocks].sort((a, b) => {
+    let aValue: string | number;
+    let bValue: string | number;
+
+    switch (currentStockSort.key) {
+      case "name":
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+        break;
+      case "quantity":
+        aValue = a.quantity;
+        bValue = b.quantity;
+        break;
+      case "purchasing_price":
+        aValue = a.purchasing_price;
+        bValue = b.purchasing_price;
+        break;
+      case "totalValue":
+        aValue = a.quantity * a.purchasing_price;
+        bValue = b.quantity * b.purchasing_price;
+        break;
+      default:
+        aValue = a.name.toLowerCase();
+        bValue = b.name.toLowerCase();
+    }
+
+    if (aValue < bValue) return currentStockSort.direction === "asc" ? -1 : 1;
+    if (aValue > bValue) return currentStockSort.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const sortedFilteredMovements = [...filteredMovements].sort((a, b) => {
+    let aValue: string | number;
+    let bValue: string | number;
+
+    switch (movementSort.key) {
+      case "created_at":
+        aValue = new Date(a.created_at).getTime();
+        bValue = new Date(b.created_at).getTime();
+        break;
+      case "component_name":
+        aValue = a.component_name.toLowerCase();
+        bValue = b.component_name.toLowerCase();
+        break;
+      case "type":
+        aValue = movementTypeLabels[a.type].toLowerCase();
+        bValue = movementTypeLabels[b.type].toLowerCase();
+        break;
+      case "quantity":
+        aValue = a.quantity;
+        bValue = b.quantity;
+        break;
+      case "created_by":
+        aValue = a.created_by.toLowerCase();
+        bValue = b.created_by.toLowerCase();
+        break;
+      case "comment":
+        aValue = (a.comment || "").toLowerCase();
+        bValue = (b.comment || "").toLowerCase();
+        break;
+      default:
+        aValue = new Date(a.created_at).getTime();
+        bValue = new Date(b.created_at).getTime();
+    }
+
+    if (aValue < bValue) return movementSort.direction === "asc" ? -1 : 1;
+    if (aValue > bValue) return movementSort.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const renderSortIcon = (isActive: boolean, direction: SortDirection) => {
+    if (!isActive) return <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />;
+    return direction === "asc" ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />;
+  };
 
   const movementSummary = Array.from(
     filteredMovements.reduce((summaryMap, movement) => {
@@ -185,10 +286,46 @@ const Stocks = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead>En stock</TableHead>
-                <TableHead>Coût Moyen</TableHead>
-                <TableHead>Valeur</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleCurrentStockSort("name")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Item
+                    {renderSortIcon(currentStockSort.key === "name", currentStockSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleCurrentStockSort("quantity")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    En stock
+                    {renderSortIcon(currentStockSort.key === "quantity", currentStockSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleCurrentStockSort("purchasing_price")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Coût Moyen
+                    {renderSortIcon(currentStockSort.key === "purchasing_price", currentStockSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleCurrentStockSort("totalValue")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Valeur
+                    {renderSortIcon(currentStockSort.key === "totalValue", currentStockSort.direction)}
+                  </button>
+                </TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -203,7 +340,7 @@ const Stocks = () => {
                     <TableCell><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                   </TableRow>
                 ))
-              ) : filteredStocks.length === 0 ? (
+              ) : sortedFilteredStocks.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                     {showLowStockOnly
@@ -212,7 +349,7 @@ const Stocks = () => {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredStocks.map((component) => {
+                sortedFilteredStocks.map((component) => {
                   const isLowStock = component.quantity < component.alert_threshold;
                   const totalValue = component.quantity * component.purchasing_price;
 
@@ -327,12 +464,66 @@ const Stocks = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Ingrédient</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Quantité</TableHead>
-                <TableHead>Responsable</TableHead>
-                <TableHead>Commentaire</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleMovementSort("created_at")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Date
+                    {renderSortIcon(movementSort.key === "created_at", movementSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleMovementSort("component_name")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Ingrédient
+                    {renderSortIcon(movementSort.key === "component_name", movementSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleMovementSort("type")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Type
+                    {renderSortIcon(movementSort.key === "type", movementSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleMovementSort("quantity")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Quantité
+                    {renderSortIcon(movementSort.key === "quantity", movementSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleMovementSort("created_by")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Responsable
+                    {renderSortIcon(movementSort.key === "created_by", movementSort.direction)}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleMovementSort("comment")}
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    Commentaire
+                    {renderSortIcon(movementSort.key === "comment", movementSort.direction)}
+                  </button>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -347,14 +538,14 @@ const Stocks = () => {
                     <TableCell><Skeleton className="h-5 w-32" /></TableCell>
                   </TableRow>
                 ))
-              ) : filteredMovements.length === 0 ? (
+              ) : sortedFilteredMovements.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                     Aucun mouvement pour les filtres selectionnes
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredMovements.map((movement) => (
+                sortedFilteredMovements.map((movement) => (
                   <TableRow key={movement.id}>
                     <TableCell className="text-sm">
                       {format(new Date(movement.created_at), 'dd MMM HH:mm', { locale: fr })}

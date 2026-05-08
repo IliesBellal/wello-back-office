@@ -17,6 +17,7 @@
  */
 
 import { Bell, MailWarning, Phone, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -26,21 +27,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { notificationsService, UserNotification } from '@/services/notificationsService';
 import type { AuthData } from '@/types/auth';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type NotifType = 'STOCK_RUPTURE' | 'EMAIL_UNVERIFIED' | 'PHONE_UNVERIFIED';
-
-interface Notification {
-  id: string;
-  type: NotifType;
-  title: string;
-  description: string;
-  actionLabel?: string;
-  onAction?: () => void;
-  severity: 'warning' | 'info' | 'danger';
-}
+type Notification = UserNotification & { onAction?: () => void };
 
 // ─── Mock / Derivation helpers ─────────────────────────────────────────────────
 
@@ -48,29 +40,6 @@ interface Notification {
  * TODO: Remplacer par `alerts.low_stock_items` provenant de l'API.
  * Renvoie la liste des noms de produits en rupture ou stock critique.
  */
-const getMockStockRuptures = (): string[] => {
-  // Simulé — plus tard : apiClient.get('/stats/dashboard/summary').alerts.low_stock_items
-  return ['Mozzarella', 'Entrecôte 300g', 'Tiramisu'];
-};
-
-/**
- * TODO: Remplacer par authData.email_verified (à ajouter dans AuthData) une
- * fois que le backend expose ce champ.
- */
-const isEmailVerified = (_authData: AuthData): boolean => {
-  // Simulé : toujours non vérifié pour la démo
-  return false;
-};
-
-/**
- * TODO: Remplacer par authData.phone_verified (à ajouter dans AuthData) une
- * fois que le backend expose ce champ.
- */
-const isPhoneVerified = (_authData: AuthData): boolean => {
-  // Simulé : toujours non vérifié pour la démo
-  return false;
-};
-
 // ─── Helpers UI ───────────────────────────────────────────────────────────────
 
 const SEVERITY_STYLES: Record<Notification['severity'], { icon: string; badge: string; bg: string }> = {
@@ -79,7 +48,7 @@ const SEVERITY_STYLES: Record<Notification['severity'], { icon: string; badge: s
   info:    { icon: 'text-blue-600',   badge: 'bg-blue-100 text-blue-700',  bg: 'bg-blue-50/50 border-blue-100' },
 };
 
-const NOTIF_ICONS: Record<NotifType, typeof Bell> = {
+const NOTIF_ICONS: Record<UserNotification['type'], typeof Bell> = {
   STOCK_RUPTURE:    AlertTriangle,
   EMAIL_UNVERIFIED: MailWarning,
   PHONE_UNVERIFIED: Phone,
@@ -92,48 +61,35 @@ interface NotificationBellProps {
 }
 
 export const NotificationBell = ({ authData }: NotificationBellProps) => {
-  // ── Construire la liste des notifications ──────────────────────────────────
-  const notifications: Notification[] = [];
+  const [notificationsData, setNotificationsData] = useState<UserNotification[]>([]);
 
-  // 1. Ruptures de stock
-  const stockRuptures = getMockStockRuptures();
-  if (stockRuptures.length > 0) {
-    notifications.push({
-      id: 'stock_rupture',
-      type: 'STOCK_RUPTURE',
-      title: `${stockRuptures.length} rupture${stockRuptures.length > 1 ? 's' : ''} de stock`,
-      description: stockRuptures.join(', '),
-      actionLabel: 'Voir les stocks',
-      onAction: () => { window.location.href = '/stocks'; },
-      severity: 'danger',
-    });
-  }
+  const fetchNotifications = async () => {
+    try {
+      const data = await notificationsService.getUserNotifications();
+      setNotificationsData(data);
+    } catch (error) {
+      console.error('Failed to load notifications', error);
+    }
+  };
 
-  // 2. Email non vérifié
-  if (!isEmailVerified(authData)) {
-    notifications.push({
-      id: 'email_unverified',
-      type: 'EMAIL_UNVERIFIED',
-      title: 'Email non vérifié',
-      description: `Vérifiez votre adresse ${authData.user_mail} pour sécuriser votre compte.`,
-      actionLabel: 'Vérifier',
-      onAction: () => { window.location.href = '/settings?tab=account'; },
-      severity: 'warning',
-    });
-  }
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
 
-  // 3. Téléphone non vérifié
-  if (!isPhoneVerified(authData)) {
-    notifications.push({
-      id: 'phone_unverified',
-      type: 'PHONE_UNVERIFIED',
-      title: 'Numéro de téléphone non vérifié',
-      description: 'Ajoutez et vérifiez votre numéro pour activer les alertes SMS.',
-      actionLabel: 'Ajouter',
-      onAction: () => { window.location.href = '/settings?tab=account'; },
-      severity: 'info',
-    });
-  }
+  const notifications: Notification[] = useMemo(
+    () => notificationsData.map((notif) => {
+      const defaultAction =
+        notif.type === 'STOCK_RUPTURE'
+          ? () => { window.location.href = '/stocks'; }
+          : () => { window.location.href = '/settings?tab=account'; };
+
+      return {
+        ...notif,
+        onAction: notif.actionLabel ? defaultAction : undefined,
+      };
+    }),
+    [notificationsData]
+  );
 
   const count = notifications.length;
 
@@ -144,6 +100,7 @@ export const NotificationBell = ({ authData }: NotificationBellProps) => {
           variant="outline"
           size="icon"
           className="h-10 w-10 rounded-xl relative"
+          onClick={fetchNotifications}
           aria-label={`Notifications${count > 0 ? ` (${count})` : ''}`}
         >
           <Bell className="w-4 h-4" />
