@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { LogOut, Building2 } from 'lucide-react';
-import { NavigationContent } from '@/components/navigation/NavigationContent';
+import { NavMenuContent } from '@/components/navigation/NavMenuContent';
+import { NavHeader } from '@/components/navigation/NavHeader';
+import { NavLogoutButton } from '@/components/navigation/NavLogoutButton';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,33 +32,20 @@ export const MobileSidebar = ({ onClose }: MobileSidebarProps) => {
 
   return (
     <div className="flex flex-col h-full bg-sidebar">
-      <SheetHeader className="p-4 border-b border-sidebar-border">
-        <SheetTitle className="text-left">
-          <span className="text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Wello Resto
-          </span>
-        </SheetTitle>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mt-2">
-          <Building2 className="w-4 h-4" />
-          <span className="truncate">{authData.merchantName}</span>
-        </div>
-      </SheetHeader>
+      <NavHeader
+        title="Wello Resto"
+        subtitle={authData.merchantName || 'Wello Resto'}
+        className="h-auto min-h-20 py-4"
+      />
 
-      <NavigationContent
+      <NavMenuContent
         variant="mobile"
-        onItemClick={onClose}
+        onClose={onClose}
         containerClassName="flex-1 overflow-y-auto p-3 space-y-1"
       />
 
-      <div className="p-3 border-t border-sidebar-border">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-destructive hover:text-destructive hover:bg-destructive/10 min-h-[44px]"
-          onClick={() => setShowLogoutDialog(true)}
-        >
-          <LogOut className="w-5 h-5" />
-          <span>Déconnexion</span>
-        </Button>
+      <div className="p-3 border-t border-sidebar-border bg-gradient-to-t from-sidebar/50 to-sidebar">
+        <NavLogoutButton onClick={() => setShowLogoutDialog(true)} />
       </div>
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>

@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSidebar } from '@/hooks/useSidebar';
-import { NavigationContent } from './NavigationContent';
+import { NavMenuContent } from './NavMenuContent';
+import { NavHeader } from './NavHeader';
+import { NavLogoutButton } from './NavLogoutButton';
 import { Button } from '@/components/ui/button';
 import {
   AlertDialog,
@@ -14,7 +16,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 /**
  * Desktop Sidebar Component
@@ -63,54 +65,36 @@ export const Sidebar: React.FC = () => {
       aria-label="Navigation principale"
     >
       {/* ═══ HEADER ═══ */}
-      <div
-        className={cn(
-          'flex items-center justify-between h-20 px-4 border-b border-sidebar-border',
-          'shrink-0 bg-gradient-to-r from-sidebar/50 to-sidebar',
-          'transition-all duration-300'
+      <NavHeader
+        title="Wello Resto"
+        isCollapsed={!isExpanded}
+        onTitleClick={() => navigate('/')}
+        className="transition-all duration-300"
+        action={(
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleExpanded}
+            className={cn(
+              'h-8 w-8 shrink-0',
+              'hover:bg-sidebar-accent/50 transition-all duration-200',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
+            )}
+            title={isExpanded ? 'Réduire le menu' : 'Agrandir le menu'}
+            aria-label={isExpanded ? 'Réduire le menu' : 'Agrandir le menu'}
+            aria-expanded={isExpanded}
+          >
+            {isExpanded ? (
+              <ChevronLeft className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </Button>
         )}
-      >
-        {/* Logo */}
-        {isExpanded && (
-          <div className="animate-in fade-in duration-300">
-            <button
-              onClick={() => navigate('/')}
-              className={cn(
-                'text-lg font-bold bg-gradient-to-r from-blue-600 to-blue-500',
-                'bg-clip-text text-transparent hover:opacity-80 transition-opacity',
-                'truncate'
-              )}
-              title="Aller au tableau de bord"
-            >
-              Wello Resto
-            </button>
-          </div>
-        )}
-
-        {/* Toggle Button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleExpanded}
-          className={cn(
-            'h-8 w-8 shrink-0',
-            'hover:bg-sidebar-accent/50 transition-all duration-200',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring'
-          )}
-          title={isExpanded ? 'Réduire le menu' : 'Agrandir le menu'}
-          aria-label={isExpanded ? 'Réduire le menu' : 'Agrandir le menu'}
-          aria-expanded={isExpanded}
-        >
-          {isExpanded ? (
-            <ChevronLeft className="w-4 h-4" />
-          ) : (
-            <ChevronRight className="w-4 h-4" />
-          )}
-        </Button>
-      </div>
+      />
 
       {/* ═══ NAVIGATION ═══ */}
-      <NavigationContent
+      <NavMenuContent
         variant="desktop"
         isCollapsed={!isExpanded}
         collapsibleState={collapsibleState}
@@ -131,24 +115,11 @@ export const Sidebar: React.FC = () => {
           'transition-all duration-300'
         )}
       >
-        <Button
-          variant="ghost"
-          className={cn(
-            'w-full text-sm font-medium transition-all duration-200',
-            'text-sidebar-foreground hover:bg-destructive/20 hover:text-destructive',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
-            'group relative',
-            isExpanded ? 'justify-start gap-3 px-3 py-2.5' : 'justify-center w-11 h-11 p-0'
-          )}
+        <NavLogoutButton
+          isCollapsed={!isExpanded}
           onClick={() => setShowLogoutDialog(true)}
-          title={isExpanded ? 'Déconnexion' : 'Déconnexion'}
-          aria-label="Se déconnecter"
-        >
-          <LogOut className="w-5 h-5 shrink-0" />
-          {isExpanded && (
-            <span className="truncate animate-in fade-in duration-300">Déconnexion</span>
-          )}
-        </Button>
+          className={!isExpanded ? undefined : 'animate-in fade-in duration-300'}
+        />
       </div>
 
       {/* ═══ LOGOUT CONFIRMATION DIALOG ═══ */}

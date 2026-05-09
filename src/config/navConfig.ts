@@ -32,7 +32,6 @@ import {
   AlertTriangle,
   Home,
   ShoppingBag,
-  Menu as MenuIcon,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -108,7 +107,7 @@ export const NAV_ITEMS: NavItem[] = [
   {
     id: 'menu',
     title: 'Menu',
-    icon: MenuIcon,
+    icon: UtensilsCrossed,
     children: [
       {
         id: 'products',
