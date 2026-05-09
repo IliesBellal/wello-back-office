@@ -5,6 +5,16 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
 import { RegisterXClosureDialog } from '@/components/cash/RegisterXClosureDialog';
@@ -12,8 +22,10 @@ import { Tile } from '@/components/shared/Tile';
 import { useToast } from '@/hooks/use-toast';
 import {
   CashRegisterHistoryRecord,
+  getCashRegisterById,
   getCashRegisterHistory,
 } from '@/services/cashRegisterHistoryService';
+import { closeCashRegister } from '@/services/cashRegisterService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -55,6 +67,9 @@ const CashRegisterHistory = () => {
   });
   const [selectedRegisterX, setSelectedRegisterX] = useState<CashRegisterHistoryRecord | null>(null);
   const [closureDialogOpen, setClosureDialogOpen] = useState(false);
+  const [selectedRegisterToClose, setSelectedRegisterToClose] = useState<CashRegisterHistoryRecord | null>(null);
+  const [closeConfirmDialogOpen, setCloseConfirmDialogOpen] = useState(false);
+  const [closingRegisterId, setClosingRegisterId] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -87,6 +102,39 @@ const CashRegisterHistory = () => {
 
   const formatCurrency = (cents: number) => {
     return `${(cents / 100).toFixed(2)}€`;
+  };
+
+  const handleCloseRegister = async () => {
+    if (!selectedRegisterToClose) return;
+
+    const registerId = selectedRegisterToClose.id;
+    setClosingRegisterId(registerId);
+    try {
+      await closeCashRegister(registerId);
+      const updatedRegister = await getCashRegisterById(registerId);
+
+      setRegisters((prev) =>
+        prev.map((register) =>
+          register.id === registerId ? updatedRegister : register
+        )
+      );
+
+      toast({
+        title: 'Succès',
+        description: 'Registre fermé avec succès',
+      });
+
+      setCloseConfirmDialogOpen(false);
+      setSelectedRegisterToClose(null);
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de fermer le registre',
+        variant: 'destructive',
+      });
+    } finally {
+      setClosingRegisterId(null);
+    }
   };
 
   const totalItems = metadata.total_items;
@@ -227,23 +275,41 @@ const CashRegisterHistory = () => {
                   {
                     key: 'id',
                     label: 'Actions',
-                    render: (val: string, row: CashRegisterHistoryRecord) => 
-                      row.closed && !row.enclosed ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setSelectedRegisterX(row);
-                            setClosureDialogOpen(true);
-                          }}
-                          className="gap-2"
-                        >
-                          <Lock className="h-4 w-4" />
-                          Clôturer
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">-</span>
-                      )
+                    render: (val: string, row: CashRegisterHistoryRecord) => {
+                      if (row.closed && !row.enclosed) {
+                        return (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRegisterX(row);
+                              setClosureDialogOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            <Lock className="h-4 w-4" />
+                            Clôturer
+                          </Button>
+                        );
+                      } else if (!row.closed && !row.enclosed) {
+                        return (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedRegisterToClose(row);
+                              setCloseConfirmDialogOpen(true);
+                            }}
+                            className="gap-2"
+                          >
+                            Fermer
+                          </Button>
+                        );
+                      }
+                      return <span className="text-xs text-muted-foreground">-</span>;
+                    }
                   },
                 ]}
                 data={registers}
@@ -354,6 +420,26 @@ const CashRegisterHistory = () => {
         onOpenChange={setClosureDialogOpen}
         onSuccess={() => loadRegisters(page)}
       />
+
+      <AlertDialog open={closeConfirmDialogOpen} onOpenChange={setCloseConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la fermeture</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir fermer le registre {selectedRegisterToClose?.register_number} ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Non</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleCloseRegister}
+              disabled={closingRegisterId === selectedRegisterToClose?.id}
+            >
+              {closingRegisterId === selectedRegisterToClose?.id ? 'Fermeture...' : 'Oui'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };

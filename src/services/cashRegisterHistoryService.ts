@@ -166,6 +166,69 @@ const mapApiRegisterToHistoryRecord = (register: CashRegisterApiRecord): CashReg
   payment_methods: register.payment_methods,
 });
 
+export const getCashRegisterById = async (
+  registerId: string
+): Promise<CashRegisterHistoryRecord> => {
+  logAPI('GET', `/cash_register/${registerId}`);
+
+  return withMock(
+    () => {
+      const register = mockRegisters.find((r) => r.id === registerId);
+      if (!register) {
+        throw new Error('Register not found');
+      }
+      return { ...register };
+    },
+    async () => {
+      const response = await apiClient.get<{
+        id: string;
+        data: {
+          cash_register: {
+            cash_register_id: string;
+            start_date: string;
+            end_date: string;
+            cash_fund: number;
+            final_cash_fund: number;
+            closed: boolean;
+            enclosed: boolean;
+            total_revenu: number;
+            transaction_count: number;
+            payment_methods: CashRegisterPaymentMethod[];
+            hash_prefix: string;
+            cash_desk: {
+              cash_desk_id: string;
+              cash_desk_name: string;
+            };
+          };
+          status: string;
+        };
+      }>(`/cash_register/${registerId}`);
+
+      const payload = response.data.cash_register;
+
+      return {
+        id: payload.cash_register_id,
+        register_number: payload.cash_register_id,
+        type: payload.closed ? 'Z' : 'X',
+        created_at: payload.start_date,
+        start_date: payload.start_date,
+        end_date: payload.end_date || null,
+        cash_fund: payload.cash_fund,
+        final_cash_fund: payload.final_cash_fund,
+        closure_comment: undefined,
+        closed_by_name: undefined,
+        closed: payload.closed,
+        enclosed: payload.enclosed,
+        hash_prefix: payload.hash_prefix,
+        cash_desk: payload.cash_desk,
+        total_revenue: payload.total_revenu,
+        transaction_count: payload.transaction_count,
+        payment_methods: payload.payment_methods,
+      };
+    }
+  );
+};
+
 // ============= SERVICE FUNCTIONS =============
 export const getCashRegisterHistory = async (
   startDate: Date | string,
