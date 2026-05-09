@@ -17,7 +17,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
-import { RegisterXClosureDialog } from '@/components/cash/RegisterXClosureDialog';
+import { ClosureModal } from '@/components/cash/ClosureModal';
 import { Tile } from '@/components/shared/Tile';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -65,7 +65,7 @@ const CashRegisterHistory = () => {
     current_page: 1,
     limit: PAGE_LIMIT,
   });
-  const [selectedRegisterX, setSelectedRegisterX] = useState<CashRegisterHistoryRecord | null>(null);
+  const [selectedRegisterForEnclose, setSelectedRegisterForEnclose] = useState<CashRegisterHistoryRecord | null>(null);
   const [closureDialogOpen, setClosureDialogOpen] = useState(false);
   const [selectedRegisterToClose, setSelectedRegisterToClose] = useState<CashRegisterHistoryRecord | null>(null);
   const [closeConfirmDialogOpen, setCloseConfirmDialogOpen] = useState(false);
@@ -134,6 +134,22 @@ const CashRegisterHistory = () => {
       });
     } finally {
       setClosingRegisterId(null);
+    }
+  };
+
+  const handleEncloseSuccess = async () => {
+    if (!selectedRegisterForEnclose) return;
+
+    try {
+      const refreshed = await getCashRegisterById(selectedRegisterForEnclose.id);
+      setRegisters((prev) =>
+        prev.map((register) =>
+          register.id === selectedRegisterForEnclose.id ? refreshed : register
+        )
+      );
+    } catch {
+      // If targeted refresh fails, fallback to list refresh to keep UI consistent.
+      loadRegisters(page);
     }
   };
 
@@ -283,7 +299,7 @@ const CashRegisterHistory = () => {
                             variant="outline"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setSelectedRegisterX(row);
+                              setSelectedRegisterForEnclose(row);
                               setClosureDialogOpen(true);
                             }}
                             className="gap-2"
@@ -414,11 +430,11 @@ const CashRegisterHistory = () => {
         </div>
       </PageContainer>
 
-      <RegisterXClosureDialog
-        register={selectedRegisterX}
+      <ClosureModal
+        register={selectedRegisterForEnclose}
         open={closureDialogOpen}
         onOpenChange={setClosureDialogOpen}
-        onSuccess={() => loadRegisters(page)}
+        onSuccess={handleEncloseSuccess}
       />
 
       <AlertDialog open={closeConfirmDialogOpen} onOpenChange={setCloseConfirmDialogOpen}>

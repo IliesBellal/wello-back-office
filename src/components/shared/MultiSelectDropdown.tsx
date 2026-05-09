@@ -42,7 +42,7 @@ const getTriggerLabel = (
 
 export const MultiSelectDropdown = ({
   options,
-  selectedIds,
+  selectedIds = [],
   onChange,
   label,
   placeholder = 'Tout sélectionner',

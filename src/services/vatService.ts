@@ -31,6 +31,12 @@ export interface VATCalculationResponse {
   vat_by_rate: VATRate;
   monthly_breakdown: MonthlyBreakdown[];
   by_channel: ChannelVAT;
+  by_order_type?: ChannelVAT;
+}
+
+interface ApiEnvelope<T> {
+  id: string;
+  data: T;
 }
 
 export const vatChannels = [
@@ -41,112 +47,50 @@ export const vatChannels = [
   { id: 'deliveroo', label: 'Ventes Deliveroo' },
 ];
 
-// Mock data for testing (while API is being built)
-const generateMockVATData = (
-  _startDate: string,
-  _endDate: string,
-  channels: string[]
-): VATCalculationResponse => {
-  const baseAmounts: Record<string, number> = {
-    restaurant: 1250000,
-    takeaway: 150000,
-    scannorder: 50000,
-    ubereats: 40000,
-    deliveroo: 35000,
-  };
-
-  const selectedAmount = channels.reduce((sum, ch) => sum + (baseAmounts[ch] || 0), 0);
-
-  return {
-    total_vat: Math.round(selectedAmount * 0.122), // 12.2% average
-    vat_by_rate: {
-      '10.0': {
-        amount: Math.round(selectedAmount * 0.7 * 0.1),
-        base_ht: Math.round(selectedAmount * 0.7),
-      },
-      '5.5': {
-        amount: Math.round(selectedAmount * 0.3 * 0.055),
-        base_ht: Math.round(selectedAmount * 0.3),
-      },
-    },
-    monthly_breakdown: [
-      {
-        month: '2025-12',
-        revenue_ht: Math.round(selectedAmount / 3),
-        vat_10: Math.round((selectedAmount / 3) * 0.7 * 0.1),
-        vat_5_5: Math.round((selectedAmount / 3) * 0.3 * 0.055),
-        vat_total: Math.round((selectedAmount / 3) * 0.122),
-        revenue_ttc: Math.round((selectedAmount / 3) * 1.122),
-      },
-      {
-        month: '2026-01',
-        revenue_ht: Math.round(selectedAmount / 3),
-        vat_10: Math.round((selectedAmount / 3) * 0.7 * 0.1),
-        vat_5_5: Math.round((selectedAmount / 3) * 0.3 * 0.055),
-        vat_total: Math.round((selectedAmount / 3) * 0.122),
-        revenue_ttc: Math.round((selectedAmount / 3) * 1.122),
-      },
-      {
-        month: '2026-02',
-        revenue_ht: Math.round(selectedAmount / 3),
-        vat_10: Math.round((selectedAmount / 3) * 0.7 * 0.1),
-        vat_5_5: Math.round((selectedAmount / 3) * 0.3 * 0.055),
-        vat_total: Math.round((selectedAmount / 3) * 0.122),
-        revenue_ttc: Math.round((selectedAmount / 3) * 1.122),
-      },
-    ],
-    by_channel: Object.fromEntries(
-      channels.map((ch) => {
-        const amount = baseAmounts[ch] || 0;
-        const percentage = Math.round((amount / selectedAmount) * 100);
-        return [
-          ch,
-          {
-            vat: Math.round(amount * 0.122),
-            percentage,
-          },
-        ];
-      })
-    ),
-  };
-};
-
-// Enable mock mode with environment variable or query param
-const USE_VAT_MOCK = 
-  import.meta.env.VITE_USE_VAT_MOCK != 'true' ||
-  new URLSearchParams(window.location.search).get('vat_mock') === 'true';
+export const vatOrderTypes = [
+  { id: 'in', label: 'Sur place' },
+  { id: 'take_away', label: 'Emporter' },
+  { id: 'delivery', label: 'Livraison' },
+];
 
 export const calculateVAT = async (
   startDate: Date | string,
   endDate: Date | string,
-  channels: string[]
+  channels: string[],
+  orderTypes?: string[]
 ): Promise<VATCalculationResponse> => {
   const startDateUTC = toUTCDateString(startDate);
   const endDateUTC = toUTCDateString(endDate);
 
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 300));
-
-  if (USE_VAT_MOCK) {
-    return generateMockVATData(startDateUTC, endDateUTC, channels);
-  }
-
-  const response = await apiClient.post<VATCalculationResponse>(
+  const response = await apiClient.post<ApiEnvelope<VATCalculationResponse> | VATCalculationResponse>(
     '/accounting/vat/calculate',
     {
       start_date: startDateUTC,
       end_date: endDateUTC,
       channels,
+      ...(orderTypes && orderTypes.length > 0 && { order_types: orderTypes }),
     }
   );
 
-  return response;
+  if (
+    response &&
+    typeof response === 'object' &&
+    'data' in response &&
+    (response as ApiEnvelope<unknown>).data &&
+    typeof (response as ApiEnvelope<unknown>).data === 'object' &&
+    'total_vat' in ((response as ApiEnvelope<unknown>).data as Record<string, unknown>)
+  ) {
+    return (response as ApiEnvelope<VATCalculationResponse>).data;
+  }
+
+  return response as VATCalculationResponse;
 };
 
 export const exportVATCSV = async (
   startDate: Date | string,
   endDate: Date | string,
-  channels: string[]
+  channels: string[],
+  orderTypes?: string[]
 ): Promise<Blob> => {
   const startDateUTC = toUTCDateString(startDate);
   const endDateUTC = toUTCDateString(endDate);
@@ -167,6 +111,7 @@ export const exportVATCSV = async (
         start_date: startDateUTC,
         end_date: endDateUTC,
         channels,
+        ...(orderTypes && orderTypes.length > 0 && { order_types: orderTypes }),
       }),
     }
   );

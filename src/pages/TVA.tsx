@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
+import { MultiSelectDropdown } from '@/components/shared';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
-import { ChannelSelector } from '@/components/accounting/ChannelSelector';
 import { VATBreakdownTable } from '@/components/accounting/VATBreakdownTable';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,11 +13,24 @@ import {
   exportVATCSV,
   generateVATExportFilename,
   downloadCSV,
-  vatChannels,
+  vatOrderTypes,
   type VATCalculationResponse,
 } from '@/services/vatService';
 import { toUTCDateString } from '@/utils/apiDate';
-import { Download, AlertCircle, DollarSign, Percent } from 'lucide-react';
+import { Download, AlertCircle, DollarSign, Percent, Search } from 'lucide-react';
+
+const vatSalesChannelOptions = [
+  { id: 'restaurant', label: 'Restaurant' },
+  { id: 'ubereats', label: 'Uber Eats' },
+  { id: 'deliveroo', label: 'Deliveroo' },
+  { id: 'scannorder', label: 'ScannOrder' },
+];
+
+const vatOrderTypeLabels: Record<string, string> = {
+  in: 'Sur place',
+  take_away: 'Emporter',
+  delivery: 'Livraison',
+};
 
 const VAT = () => {
   // State
@@ -29,8 +42,12 @@ const VAT = () => {
   });
 
   const [selectedChannels, setSelectedChannels] = useState<string>(
-    vatChannels.map((c) => c.id).join(',')
+    vatSalesChannelOptions.map((c) => c.id).join(',')
   );
+  const [selectedOrderTypes, setSelectedOrderTypes] = useState<string>(
+    vatOrderTypes.map((t) => t.id).join(',')
+  );
+  const [searchVersion, setSearchVersion] = useState(0);
   const [vatData, setVatData] = useState<VATCalculationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -41,20 +58,33 @@ const VAT = () => {
   const parsedChannels = useMemo(() => {
     return selectedChannels
       .split(',')
-      .filter((c) => c.trim() !== '' && vatChannels.some((ch) => ch.id === c.trim()));
+      .filter((c) => c.trim() !== '' && vatSalesChannelOptions.some((ch) => ch.id === c.trim()));
   }, [selectedChannels]);
 
-  // Load VAT data when period or channels change
+  // Memoize parsed order types to prevent unnecessary re-renders
+  const parsedOrderTypes = useMemo(() => {
+    return selectedOrderTypes
+      .split(',')
+      .filter((t) => t.trim() !== '' && vatOrderTypes.some((ot) => ot.id === t.trim()));
+  }, [selectedOrderTypes]);
+
+  // Load VAT data only when user clicks search (and once on first render)
   useEffect(() => {
     // Don't load if no channels selected
     if (parsedChannels.length === 0) {
+      setLoading(false);
       return;
     }
 
     const loadData = async () => {
       setLoading(true);
       try {
-        const data = await calculateVAT(dateRange.from, dateRange.to, parsedChannels);
+        const data = await calculateVAT(
+          dateRange.from,
+          dateRange.to,
+          parsedChannels,
+          parsedOrderTypes.length > 0 ? parsedOrderTypes : undefined
+        );
         setVatData(data);
       } catch (error) {
         console.error('Error loading VAT data:', error);
@@ -70,7 +100,7 @@ const VAT = () => {
 
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateRange, parsedChannels]);
+  }, [searchVersion]);
 
   const handleExportCSV = async () => {
     if (!vatData || parsedChannels.length === 0) {
@@ -84,7 +114,12 @@ const VAT = () => {
 
     setExporting(true);
     try {
-      const blob = await exportVATCSV(dateRange.from, dateRange.to, parsedChannels);
+      const blob = await exportVATCSV(
+        dateRange.from,
+        dateRange.to,
+        parsedChannels,
+        parsedOrderTypes.length > 0 ? parsedOrderTypes : undefined
+      );
       const filename = generateVATExportFilename(
         toUTCDateString(dateRange.from),
         toUTCDateString(dateRange.to)
@@ -109,6 +144,23 @@ const VAT = () => {
 
   const handleChannelChange = (channels: string[]) => {
     setSelectedChannels(channels.join(','));
+  };
+
+  const handleOrderTypeChange = (orderTypes: string[]) => {
+    setSelectedOrderTypes(orderTypes.join(','));
+  };
+
+  const handleSearch = () => {
+    if (parsedChannels.length === 0) {
+      toast({
+        title: 'Erreur',
+        description: 'Veuillez sélectionner au moins un canal de vente',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSearchVersion((previous) => previous + 1);
   };
 
   // Format currency
@@ -157,19 +209,43 @@ const VAT = () => {
         }
       >
         <div className="space-y-8">
-          {/* Period & Channels Selection */}
-          <div className="w-full max-w-md">
-            <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
-          </div>
-
-          {/* ═══ CHANNELS SECTION ═══ */}
+          {/* ═══ FILTERS SECTION ═══ */}
           <Card>
-            <CardContent className="pt-6">
-              <ChannelSelector
-                channels={vatChannels}
-                selectedChannels={parsedChannels}
-                onChange={handleChannelChange}
-              />
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Filtres</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:gap-4">
+                <div className="xl:w-[330px]">
+                  <p className="mb-2 text-xs font-medium text-muted-foreground">Période</p>
+                  <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
+                </div>
+                <div className="xl:w-[300px]">
+                  <MultiSelectDropdown
+                    label="Types de commandes"
+                    options={vatOrderTypes}
+                    selectedIds={parsedOrderTypes}
+                    onChange={handleOrderTypeChange}
+                  />
+                </div>
+                <div className="xl:w-[300px]">
+                  <MultiSelectDropdown
+                    label="Canaux de vente"
+                    options={vatSalesChannelOptions}
+                    selectedIds={parsedChannels}
+                    onChange={handleChannelChange}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleSearch}
+                  disabled={loading}
+                  className="xl:ml-auto gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  {loading ? 'Recherche...' : 'Rechercher'}
+                </Button>
+              </div>
               {parsedChannels.length === 0 && (
                 <div className="mt-4 flex items-center gap-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">
                   <AlertCircle className="w-4 h-4 flex-shrink-0" />
@@ -230,13 +306,43 @@ const VAT = () => {
                 <CardContent>
                   <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-5 lg:gap-8">
                     {Object.entries(vatData?.by_channel || {}).map(([channel, data]) => {
-                      const channelLabel = vatChannels.find((c) => c.id === channel)?.label || channel;
+                      const channelLabel = vatSalesChannelOptions.find((c) => c.id === channel)?.label || channel;
                       return (
                         <div
                           key={channel}
                           className="p-4 border rounded-lg hover:bg-muted/30 transition-colors"
                         >
                           <p className="text-sm text-muted-foreground mb-1">{channelLabel}</p>
+                          <p className="text-xl font-bold font-mono">
+                            {formatCurrency(data.vat)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            {data.percentage}% de la TVA totale
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Distribution by Order Type */}
+            {!loading && Object.keys(vatData?.by_order_type || {}).length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Répartition par type de commande</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 lg:gap-8">
+                    {Object.entries(vatData?.by_order_type || {}).map(([orderType, data]) => {
+                      const label = vatOrderTypeLabels[orderType] || orderType;
+                      return (
+                        <div
+                          key={orderType}
+                          className="p-4 border rounded-lg hover:bg-muted/30 transition-colors"
+                        >
+                          <p className="text-sm text-muted-foreground mb-1">{label}</p>
                           <p className="text-xl font-bold font-mono">
                             {formatCurrency(data.vat)}
                           </p>
