@@ -18,6 +18,7 @@ import { Edit, Save, X } from 'lucide-react';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
 import { useProductData } from '@/hooks/useProductData';
+import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 
 interface ProductDetailsSheetProps {
   /** Product ID to load - if provided, product data will be fetched automatically */
@@ -48,6 +49,7 @@ export const ProductDetailsSheet = ({
   allergens,
   onSave
 }: ProductDetailsSheetProps) => {
+  const { statuses } = useIntegrationStatus();
   // Load product data if productId is provided
   const { product: loadedProduct, loading } = useProductData(productId || null, open);
   
@@ -422,7 +424,7 @@ export const ProductDetailsSheet = ({
               </div>
             </div>
 
-            {/* Uber Eats - Always Visible */}
+            {statuses.uberEats.active && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -483,8 +485,9 @@ export const ProductDetailsSheet = ({
                 )}
               </CardContent>
             </Card>
+            )}
 
-            {/* Deliveroo - Always Visible */}
+            {statuses.deliveroo.active && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
@@ -545,6 +548,7 @@ export const ProductDetailsSheet = ({
                 )}
               </CardContent>
             </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="composition">

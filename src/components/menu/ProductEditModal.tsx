@@ -16,6 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 
 interface ProductEditModalProps {
   product: Product | null;
@@ -39,6 +40,7 @@ export const ProductEditModal = ({
   onSave
 }: ProductEditModalProps) => {
   const [formData, setFormData] = useState<Partial<Product>>({});
+  const { statuses } = useIntegrationStatus();
 
   useEffect(() => {
     if (product) {
@@ -289,6 +291,7 @@ export const ProductEditModal = ({
               </CardContent>
             </Card>
 
+            {statuses.uberEats.active && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Uber Eats</CardTitle>
@@ -332,7 +335,9 @@ export const ProductEditModal = ({
                 )}
               </CardContent>
             </Card>
+            )}
 
+            {statuses.deliveroo.active && (
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Deliveroo</CardTitle>
@@ -376,6 +381,7 @@ export const ProductEditModal = ({
                 )}
               </CardContent>
             </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="composition" className="space-y-4">

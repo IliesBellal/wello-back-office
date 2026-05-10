@@ -14,6 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
+import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,16 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
   const [editedPrices, setEditedPrices] = useState<Record<string, Record<string, number>>>({});
   const [priceDisplayValues, setPriceDisplayValues] = useState<Record<string, Record<string, string>>>({});
   const { toast } = useToast();
+  const { statuses } = useIntegrationStatus();
+
+  const visibleColumns = useMemo(
+    () => COLUMNS.filter((col) => {
+      if (col.key === 'uber_eats') return statuses.uberEats.active;
+      if (col.key === 'deliveroo') return statuses.deliveroo.active;
+      return true;
+    }),
+    [statuses]
+  );
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -277,7 +288,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
-              {COLUMNS.map(col => (
+              {visibleColumns.map(col => (
                 <TableHead
                   key={col.key}
                   onClick={() => handleSort(col.key)}
@@ -294,7 +305,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={visibleColumns.length} className="text-center py-12 text-muted-foreground">
                   Aucun produit trouvé
                 </TableCell>
               </TableRow>
@@ -407,21 +418,25 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
                   )}
                 </TableCell>
                 {/* Uber Eats */}
-                <TableCell className="font-mono text-sm">
-                  {uberPrice !== undefined ? (
-                    formatPrice(uberPrice)
-                  ) : (
-                    <span className="text-muted-foreground text-xs">Non activé</span>
-                  )}
-                </TableCell>
+                {statuses.uberEats.active && (
+                  <TableCell className="font-mono text-sm">
+                    {uberPrice !== undefined ? (
+                      formatPrice(uberPrice)
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Non active</span>
+                    )}
+                  </TableCell>
+                )}
                 {/* Deliveroo */}
-                <TableCell className="font-mono text-sm">
-                  {deliverooPrice !== undefined ? (
-                    formatPrice(deliverooPrice)
-                  ) : (
-                    <span className="text-muted-foreground text-xs">Non activé</span>
-                  )}
-                </TableCell>
+                {statuses.deliveroo.active && (
+                  <TableCell className="font-mono text-sm">
+                    {deliverooPrice !== undefined ? (
+                      formatPrice(deliverooPrice)
+                    ) : (
+                      <span className="text-muted-foreground text-xs">Non active</span>
+                    )}
+                  </TableCell>
+                )}
               </TableRow>
             );
           })
@@ -437,10 +452,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
 // PROFITABILITY TAB
 // ════════════════════════════════════════════════════════════════════════════
 
-// Uber Eats commission rate — TODO: pull from user/establishment settings
-const UBER_COMMISSION = 0.30;
-
-type ProfitSortKey = 'name' | 'price' | 'cost' | 'margin' | 'margin_rate' | 'uber_rate';
+type ProfitSortKey = 'name' | 'price' | 'cost' | 'margin' | 'margin_rate' | 'uber_rate' | 'deliveroo_rate';
 
 interface ProfitRow {
   product: EnrichedProduct;
@@ -451,22 +463,49 @@ interface ProfitRow {
   uberPrice: number;    // cents (override or price)
   uberNetRevenue: number; // cents after commission
   uberMarginRate: number; // 0-100
+  deliverooPrice: number; // cents (override or price)
+  deliverooNetRevenue: number; // cents after commission
+  deliverooMarginRate: number; // 0-100
   hasData: boolean;
 }
 
-function buildProfitRow(p: EnrichedProduct): ProfitRow {
+function buildProfitRow(p: EnrichedProduct, uberCommissionRate: number, deliverooCommissionRate: number): ProfitRow {
   const price = p.price ?? 0;
   const cost = p.cost_price ?? 0;
   const hasData = price > 0 && p.cost_price !== undefined;
   const margin = price - cost;
   const marginRate = price > 0 ? (margin / price) * 100 : 0;
+  const uberCommission = uberCommissionRate / 100;
+  const deliverooCommission = deliverooCommissionRate / 100;
+
   const uberEnabled = p.integrations?.uber_eats?.enabled;
   const uberPrice = uberEnabled && p.integrations?.uber_eats?.price_override
     ? p.integrations.uber_eats.price_override
     : price;
-  const uberNetRevenue = uberPrice * (1 - UBER_COMMISSION);
+  const uberNetRevenue = uberPrice * (1 - uberCommission);
   const uberMarginRate = uberNetRevenue > 0 ? ((uberNetRevenue - cost) / uberNetRevenue) * 100 : 0;
-  return { product: p, price, cost, margin, marginRate, uberPrice, uberNetRevenue, uberMarginRate, hasData };
+
+  const deliverooEnabled = p.integrations?.deliveroo?.enabled;
+  const deliverooPrice = deliverooEnabled && p.integrations?.deliveroo?.price_override
+    ? p.integrations.deliveroo.price_override
+    : price;
+  const deliverooNetRevenue = deliverooPrice * (1 - deliverooCommission);
+  const deliverooMarginRate = deliverooNetRevenue > 0 ? ((deliverooNetRevenue - cost) / deliverooNetRevenue) * 100 : 0;
+
+  return {
+    product: p,
+    price,
+    cost,
+    margin,
+    marginRate,
+    uberPrice,
+    uberNetRevenue,
+    uberMarginRate,
+    deliverooPrice,
+    deliverooNetRevenue,
+    deliverooMarginRate,
+    hasData
+  };
 }
 
 /** Tailwind classes for margin/rate colouring */
@@ -539,7 +578,6 @@ const PROFIT_COLS: { key: ProfitSortKey; label: string }[] = [
   { key: 'cost', label: 'Coût matières' },
   { key: 'margin', label: 'Marge (€)' },
   { key: 'margin_rate', label: 'Taux de marge' },
-  { key: 'uber_rate', label: `Taux après Uber (${(UBER_COMMISSION * 100).toFixed(0)}%)` },
 ];
 
 function getProfitValue(row: ProfitRow, key: ProfitSortKey): number | string {
@@ -550,6 +588,7 @@ function getProfitValue(row: ProfitRow, key: ProfitSortKey): number | string {
     case 'margin': return row.margin;
     case 'margin_rate': return row.marginRate;
     case 'uber_rate': return row.uberMarginRate;
+    case 'deliveroo_rate': return row.deliverooMarginRate;
   }
 }
 
@@ -557,6 +596,27 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<ProfitSortKey>('margin_rate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
+  const { statuses, commissionRates } = useIntegrationStatus();
+
+  const visibleProfitCols = useMemo(() => {
+    const dynamicCols: { key: ProfitSortKey; label: string }[] = [...PROFIT_COLS];
+
+    if (statuses.uberEats.active) {
+      dynamicCols.push({
+        key: 'uber_rate',
+        label: `Uber Eats (${commissionRates.uberEats}%)`,
+      });
+    }
+
+    if (statuses.deliveroo.active) {
+      dynamicCols.push({
+        key: 'deliveroo_rate',
+        label: `Deliveroo (${commissionRates.deliveroo}%)`,
+      });
+    }
+
+    return dynamicCols;
+  }, [statuses, commissionRates]);
 
   const handleSort = (key: ProfitSortKey) => {
     if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -570,8 +630,8 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
   );
 
   const rows: ProfitRow[] = useMemo(
-    () => eligibleProducts.map(buildProfitRow),
-    [eligibleProducts]
+    () => eligibleProducts.map((p) => buildProfitRow(p, commissionRates.uberEats, commissionRates.deliveroo)),
+    [eligibleProducts, commissionRates]
   );
 
   const rowsWithData = useMemo(() => rows.filter(r => r.hasData), [rows]);
@@ -653,7 +713,7 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
-              {PROFIT_COLS.map(col => (
+              {visibleProfitCols.map(col => (
                 <TableHead
                   key={col.key}
                   onClick={() => handleSort(col.key)}
@@ -670,7 +730,7 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={visibleProfitCols.length} className="text-center py-12 text-muted-foreground">
                   Aucun produit trouvé
                 </TableCell>
               </TableRow>
@@ -732,13 +792,26 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
                   </TableCell>
 
                   {/* Taux après Uber */}
-                  <TableCell>
-                    {row.hasData ? (
-                      <span className={`font-mono text-sm font-semibold ${uberRateColor(row.uberMarginRate)}`}>
-                        {fmtPct(row.uberMarginRate)}
-                      </span>
-                    ) : <span className="text-muted-foreground text-xs">—</span>}
-                  </TableCell>
+                  {statuses.uberEats.active && (
+                    <TableCell>
+                      {row.hasData ? (
+                        <span className={`font-mono text-sm font-semibold ${uberRateColor(row.uberMarginRate)}`}>
+                          {fmtPct(row.uberMarginRate)}
+                        </span>
+                      ) : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
+                  )}
+
+                  {/* Taux après Deliveroo */}
+                  {statuses.deliveroo.active && (
+                    <TableCell>
+                      {row.hasData ? (
+                        <span className={`font-mono text-sm font-semibold ${uberRateColor(row.deliverooMarginRate)}`}>
+                          {fmtPct(row.deliverooMarginRate)}
+                        </span>
+                      ) : <span className="text-muted-foreground text-xs">—</span>}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
@@ -746,9 +819,18 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
         </Table>
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        * Le taux après Uber Eats est calculé après déduction de la commission de {(UBER_COMMISSION * 100).toFixed(0)} % sur le prix de vente Uber Eats.
-      </p>
+      <div className="text-xs text-muted-foreground space-y-1">
+        {statuses.uberEats.active && (
+          <p>
+            * Le taux après Uber Eats est calculé après déduction de la commission de {commissionRates.uberEats}% sur le prix de vente Uber Eats.
+          </p>
+        )}
+        {statuses.deliveroo.active && (
+          <p>
+            * Le taux après Deliveroo est calculé après déduction de la commission de {commissionRates.deliveroo}% sur le prix de vente Deliveroo.
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -786,6 +868,21 @@ function TableSkeleton({ colCount = 7 }: { colCount?: number }) {
 export default function PriceGrid() {
   const { menuData, loading, bulkUpdatePrices } = usePriceGridData();
   const [activeTab, setActiveTab] = useState('products');
+  const { statuses } = useIntegrationStatus();
+
+  const productTableColCount = useMemo(() => {
+    let count = 5;
+    if (statuses.uberEats.active) count += 1;
+    if (statuses.deliveroo.active) count += 1;
+    return count;
+  }, [statuses]);
+
+  const profitabilityTableColCount = useMemo(() => {
+    let count = 5;
+    if (statuses.uberEats.active) count += 1;
+    if (statuses.deliveroo.active) count += 1;
+    return count;
+  }, [statuses]);
 
   const categories: Category[] = useMemo(
     () => menuData?.products_types ?? [],
@@ -846,14 +943,14 @@ export default function PriceGrid() {
           renderContent={(tabId) => {
             if (tabId === 'products') {
               return loading ? (
-                <TableSkeleton />
+                <TableSkeleton colCount={productTableColCount} />
               ) : (
                 <ProductPriceTable products={enrichedProducts} categories={categories} bulkUpdatePrices={bulkUpdatePrices} />
               );
             }
             if (tabId === 'profitability') {
               return loading ? (
-                <TableSkeleton colCount={6} />
+                <TableSkeleton colCount={profitabilityTableColCount} />
               ) : (
                 <ProfitabilityTable products={enrichedProducts} />
               );

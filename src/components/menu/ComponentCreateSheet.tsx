@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -72,6 +72,37 @@ export function ComponentCreateSheet({
       purchase_cost_qty: undefined,
     },
   });
+
+  const selectedUnitId = form.watch('unit_id');
+
+  const compatiblePurchaseUnits = useMemo(() => {
+    const baseUnit = units.find(
+      (unit) => unit.id.toString() === selectedUnitId?.toString()
+    );
+
+    if (!baseUnit) return units;
+
+    const compatibleIds = (baseUnit.compatible_with || []).map((id) => id.toString());
+    if (compatibleIds.length === 0) return [baseUnit];
+
+    return units.filter((unit) => compatibleIds.includes(unit.id.toString()));
+  }, [units, selectedUnitId]);
+
+  useEffect(() => {
+    const selectedPurchaseUnitId = form.getValues('purchase_unit_id');
+    if (!selectedPurchaseUnitId || selectedPurchaseUnitId === 'none') return;
+
+    const isCompatible = compatiblePurchaseUnits.some(
+      (unit) => unit.id.toString() === selectedPurchaseUnitId.toString()
+    );
+
+    if (!isCompatible) {
+      form.setValue('purchase_unit_id', 'none', {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [compatiblePurchaseUnits, form]);
 
   const onSubmit = async (data: ComponentFormValues) => {
     setIsSubmitting(true);
@@ -241,7 +272,7 @@ export function ComponentCreateSheet({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="none">Aucune</SelectItem>
-                        {units.map((unit) => (
+                        {compatiblePurchaseUnits.map((unit) => (
                           <SelectItem key={unit.id} value={unit.id.toString()}>
                             {unit.name}
                           </SelectItem>

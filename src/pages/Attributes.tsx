@@ -189,6 +189,7 @@ function ListView({ attributes, components, onNew, onEdit, onDelete }: ListViewP
 // ─── sortable option row ──────────────────────────────────────────────────────
 
 interface SortableOptionRowProps {
+  sortableId: string;
   option: AttributeOption;
   components: any[];
   compatibleUnits: any[];
@@ -197,6 +198,7 @@ interface SortableOptionRowProps {
 }
 
 function SortableOptionRow({
+  sortableId,
   option,
   components,
   compatibleUnits,
@@ -204,7 +206,7 @@ function SortableOptionRow({
   onRemove,
 }: SortableOptionRowProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
-    id: option.id,
+    id: sortableId,
   });
 
   const style: React.CSSProperties = {
@@ -328,6 +330,9 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
       : emptyForm()
   );
 
+  const getOptionRowId = (option: AttributeOption, index: number) =>
+    option.id && option.id.trim().length > 0 ? `opt-${option.id}` : `tmp-${index}`;
+
   const handleAddOption = () => {
     setFormData(prev => ({
       ...prev,
@@ -338,18 +343,18 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
     }));
   };
 
-  const handleRemoveOption = (optionId: string) => {
+  const handleRemoveOption = (optionIndex: number) => {
     setFormData(prev => ({
       ...prev,
-      options: (prev.options || []).filter(o => o.id !== optionId),
+      options: (prev.options || []).filter((_, idx) => idx !== optionIndex),
     }));
   };
 
-  const handleUpdateOption = (optionId: string, field: keyof AttributeOption, value: unknown) => {
+  const handleUpdateOption = (optionIndex: number, field: keyof AttributeOption, value: unknown) => {
     setFormData(prev => ({
       ...prev,
-      options: (prev.options || []).map(o => {
-        if (o.id === optionId) {
+      options: (prev.options || []).map((o, idx) => {
+        if (idx === optionIndex) {
           const updated = { ...o, [field]: value };
           
           // Auto-fill option title from selected component if empty
@@ -382,8 +387,8 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
     if (!over || active.id === over.id) return;
 
     const options = formData.options || [];
-    const activeIndex = options.findIndex(o => o.id === active.id);
-    const overIndex = options.findIndex(o => o.id === over.id);
+    const activeIndex = options.findIndex((o, idx) => getOptionRowId(o, idx) === active.id);
+    const overIndex = options.findIndex((o, idx) => getOptionRowId(o, idx) === over.id);
 
     if (activeIndex === -1 || overIndex === -1) return;
 
@@ -542,17 +547,19 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        <SortableContext items={formData.options?.map(o => o.id) || []} strategy={verticalListSortingStrategy}>
-                          {(formData.options ?? []).map((option) => {
+                        <SortableContext items={(formData.options ?? []).map((o, idx) => getOptionRowId(o, idx))} strategy={verticalListSortingStrategy}>
+                          {(formData.options ?? []).map((option, index) => {
+                            const sortableId = getOptionRowId(option, index);
                             const compatibleUnits = option.component_id ? getCompatibleUnits(option.component_id) : [];
                             return (
                               <SortableOptionRow
-                                key={option.id}
+                                key={sortableId}
+                                sortableId={sortableId}
                                 option={option}
                                 components={components}
                                 compatibleUnits={compatibleUnits}
-                                onUpdate={(field, value) => handleUpdateOption(option.id, field, value)}
-                                onRemove={() => handleRemoveOption(option.id)}
+                                onUpdate={(field, value) => handleUpdateOption(index, field, value)}
+                                onRemove={() => handleRemoveOption(index)}
                               />
                             );
                           })}

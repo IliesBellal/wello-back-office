@@ -47,6 +47,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useProductEditData } from '@/hooks/useProductEditData';
 import { useProductData } from '@/hooks/useProductData';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
+import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 
 interface SimpleProductSheetProps {
   /** Product ID to load - if provided, product data will be fetched automatically */
@@ -111,6 +112,7 @@ export const SimpleProductSheet = ({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { statuses } = useIntegrationStatus();
   
   // Use loaded product if available, otherwise use initial product prop
   const baseProduct = loadedProduct || initialProduct;
@@ -886,6 +888,7 @@ export const SimpleProductSheet = ({
                     <h3 className="font-semibold text-sm">Plateformes Externes</h3>
                     <div className="space-y-3">
                       {/* Uber Eats */}
+                      {statuses.uberEats.active && (
                       <Card className="border">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center gap-2">
@@ -924,8 +927,10 @@ export const SimpleProductSheet = ({
                           )}
                         </CardContent>
                       </Card>
+                      )}
 
                       {/* Deliveroo */}
+                      {statuses.deliveroo.active && (
                       <Card className="border">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm flex items-center gap-2">
@@ -964,6 +969,7 @@ export const SimpleProductSheet = ({
                           )}
                         </CardContent>
                       </Card>
+                      )}
 
                       {/* ScanNOrder */}
                       <Card className="border">
@@ -1132,13 +1138,13 @@ export const SimpleProductSheet = ({
                 {/* Integration Badges and Action Buttons */}
                 <div className="flex items-center justify-between gap-3 mt-3">
                   <div className="flex gap-2 flex-wrap">
-                    {product?.integrations?.uber_eats?.enabled && (
+                    {statuses.uberEats.active && product?.integrations?.uber_eats?.enabled && (
                       <Badge variant="default" className="text-xs">
                         <img src="/uber_eats_logo.png" alt="Uber Eats" className="w-3 h-3 mr-1 object-contain rounded" />
                         Uber Eats
                       </Badge>
                     )}
-                    {product?.integrations?.deliveroo?.enabled && (
+                    {statuses.deliveroo.active && product?.integrations?.deliveroo?.enabled && (
                       <Badge variant="default" className="text-xs">
                         <img src="/deliveroo_logo.png" alt="Deliveroo" className="w-3 h-3 mr-1 object-contain rounded" />
                         Deliveroo
@@ -1657,6 +1663,7 @@ export const SimpleProductSheet = ({
                 <h3 className="font-semibold text-sm text-foreground">Plateformes Externes</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {/* Uber Eats */}
+                  {statuses.uberEats.active && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -1714,8 +1721,10 @@ export const SimpleProductSheet = ({
                       )}
                     </CardContent>
                   </Card>
+                  )}
 
                   {/* Deliveroo */}
+                  {statuses.deliveroo.active && (
                   <Card>
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm flex items-center gap-2">
@@ -1773,6 +1782,7 @@ export const SimpleProductSheet = ({
                       )}
                     </CardContent>
                   </Card>
+                  )}
 
                   {/* ScanNOrder */}
                   <Card>

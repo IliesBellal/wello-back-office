@@ -852,7 +852,7 @@ export const menuService = {
     );
   },
 
-  async createComponent(data: { name: string; unit_id: string; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string }): Promise<Component> {
+  async createComponent(data: { name: string; unit_id: string; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }): Promise<Component> {
     logAPI('POST', '/menu/components', data);
     return withMock(
       () => ({ 
@@ -866,11 +866,60 @@ export const menuService = {
         category: data.category_id || '',
         purchase_cost: data.purchase_cost,
         purchase_unit_id: data.purchase_unit_id,
-        purchase_cost_qty: 1,
+        purchase_cost_qty: data.purchase_cost_qty || 1,
         status: '1',
         available: true
       } as unknown as Component),
-      () => apiClient.post<Component>('/menu/components', data)
+      async () => {
+        interface ApiComponentResponse {
+          component_id: string;
+          name: string;
+          category?: string;
+          category_id?: string;
+          price: number;
+          unit_of_measure: string;
+          unit_of_measure_id: string;
+          unit_of_measure_short_name?: string;
+          purchase_price?: number;
+          purchase_price_qty?: number;
+          purchase_cost?: number;
+          purchase_cost_qty?: number;
+          purchase_price_per_unit?: number;
+          purchase_unit_of_measure_id?: string;
+          purchase_unit_of_measure?: string;
+          status: string;
+        }
+
+        const response = await apiClient.post<WelloApiResponse<{ component: ApiComponentResponse }>>('/menu/components', data);
+        const apiComponent = response.data?.component;
+
+        if (!apiComponent) {
+          throw new Error('Invalid create component response: missing component data');
+        }
+
+        const purchaseCost = apiComponent.purchase_price ?? apiComponent.purchase_cost;
+        const purchaseCostQty = apiComponent.purchase_price_qty ?? apiComponent.purchase_cost_qty;
+
+        return {
+          component_id: apiComponent.component_id,
+          name: apiComponent.name,
+          category: apiComponent.category,
+          category_id: apiComponent.category_id || apiComponent.category || data.category_id,
+          price: apiComponent.price,
+          unit_id: Number.parseInt(apiComponent.unit_of_measure_id, 10),
+          unit_of_measure: apiComponent.unit_of_measure,
+          unit_of_measure_id: apiComponent.unit_of_measure_id,
+          unit_of_measure_short_name: apiComponent.unit_of_measure_short_name ?? apiComponent.unit_of_measure,
+          purchase_cost: purchaseCost,
+          purchase_cost_qty: purchaseCostQty,
+          purchase_price_per_unit: apiComponent.purchase_price_per_unit ?? (purchaseCost && purchaseCostQty ? Math.round(purchaseCost / purchaseCostQty) : undefined),
+          purchase_unit_id: apiComponent.purchase_unit_of_measure_id,
+          purchase_unit_of_measure: apiComponent.purchase_unit_of_measure,
+          purchase_unit_of_measure_id: apiComponent.purchase_unit_of_measure_id,
+          status: apiComponent.status,
+          available: apiComponent.status === '1'
+        } as Component;
+      }
     );
   },
 

@@ -53,12 +53,13 @@ export const useComponentsData = () => {
       unit_id: data.unit_id,
       price: data.price,
       purchase_cost: data.purchase_cost,
-      purchase_unit_id: data.purchase_unit_id
+      purchase_unit_id: data.purchase_unit_id,
+      purchase_cost_qty: data.purchase_cost_qty
     });
     setComponents(prev => [...prev, newComponent]);
   };
 
-  const updateComponent = async (componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string }): Promise<void> => {
+  const updateComponent = async (componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }): Promise<void> => {
     const updated = await menuService.updateComponent(componentId, data);
     setComponents(prev => prev.map(c => c.component_id === componentId ? updated : c));
   };
