@@ -107,6 +107,15 @@ export const integrationsService = {
     );
   },
 
+  startScanNOrderOnboarding: async (): Promise<{ url: string }> => {
+    logAPI('POST', '/integrations/scannorder/onboarding');
+
+    return withMock(
+      () => ({ url: 'https://connect.stripe.com/setup/mock/' }),
+      () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/scannorder/onboarding', {}).then(res => res.data)
+    );
+  },
+
   updateUberEats: async (data: {
     commission_rate: number;
     auto_accept_orders: boolean;
@@ -187,7 +196,7 @@ export const integrationsService = {
             '/integrations/global/close-temporary',
             data
           )
-          .then(res => res.data.data)
+          .then(res => res.data)
     );
   },
 
@@ -200,7 +209,7 @@ export const integrationsService = {
     
     return withMock(
       () => ({ status: 'verified' as const }),
-      () => apiClient.get<WelloApiResponse<{ status: 'verified' | 'action_required' }>>('/integrations/stripe/status').then(res => res.data.data)
+      () => apiClient.get<WelloApiResponse<{ status: 'verified' | 'action_required' }>>('/integrations/stripe/status').then(res => res.data)
     );
   },
 
@@ -209,7 +218,7 @@ export const integrationsService = {
     
     return withMock(
       () => ({ url: 'https://connect.stripe.com/setup/mock/' }),
-      () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/stripe/onboarding-link', {}).then(res => res.data.data)
+      () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/stripe/onboarding-link', {}).then(res => res.data)
     );
   },
 
@@ -243,7 +252,14 @@ export const integrationsService = {
           },
         ]
       }),
-      () => apiClient.get<WelloApiResponse<{ accounts: any[] }>>('/integrations/stripe/bank-accounts').then(res => res.data.data)
+      () => apiClient.get<WelloApiResponse<{ accounts: Array<{
+        id: string;
+        bank_name: string;
+        last4: string;
+        currency: string;
+        status: 'verified' | 'pending' | 'errored';
+        account_holder_name?: string;
+      }> }>>('/integrations/stripe/bank-accounts').then(res => res.data)
     );
   },
 
@@ -252,7 +268,7 @@ export const integrationsService = {
     
     return withMock(
       () => ({ url: 'https://connect.stripe.com/setup/bank-account/mock/' }),
-      () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/stripe/bank-account-link', {}).then(res => res.data.data)
+      () => apiClient.post<WelloApiResponse<{ url: string }>>('/integrations/stripe/bank-account-link', {}).then(res => res.data)
     );
   },
 
@@ -265,8 +281,8 @@ export const integrationsService = {
         apiClient
           .get<WelloApiResponse<{ available: Array<{ amount: number; currency: string }>; pending: Array<{ amount: number; currency: string }> }>>('/integrations/stripe/balance')
           .then((res) => ({
-            available: res.data.data.available.reduce((sum, e) => sum + e.amount, 0),
-            pending: res.data.data.pending.reduce((sum, e) => sum + e.amount, 0),
+            available: res.data.available.reduce((sum, e) => sum + e.amount, 0),
+            pending: res.data.pending.reduce((sum, e) => sum + e.amount, 0),
           }))
     );
   },

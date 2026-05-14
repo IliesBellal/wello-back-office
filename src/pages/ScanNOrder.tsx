@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -22,9 +22,11 @@ import {
   uploadBanner,
   OnlineOrdersConfig,
 } from '@/services/onlineOrdersService';
-import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp, Wallet, Loader2 } from 'lucide-react';
+import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp, Wallet, Loader2, Store, User, Phone, FileText, MapPin, Globe, Mail, Calendar } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
+import { settingsService } from '@/services/settingsService';
+import { type UserProfile, type EstablishmentSettings } from '@/types/settings';
 import { useToast } from '@/hooks/use-toast';
 import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
 
@@ -99,6 +101,7 @@ function ImageUploadField({
 
 export default function ScanNOrder() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const [config, setConfig] = useState<OnlineOrdersConfig | null>(null);
   const [loading, setLoading] = useState(true);
@@ -110,21 +113,52 @@ export default function ScanNOrder() {
   const [stripeBalance, setStripeBalance] = useState<{ available: number; pending: number } | null>(null);
   const [kpis, setKpis] = useState<{ revenue: number; orders: number; avg_basket: number } | null>(null);
   const [scanStatus, setScanStatus] = useState<IntegrationStatus | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [establishment, setEstablishment] = useState<EstablishmentSettings | null>(null);
   const [showDisableDialog, setShowDisableDialog] = useState(false);
   const [disabling, setDisabling] = useState(false);
+  const [activating, setActivating] = useState(false);
+
 
   useEffect(() => {
     fetchConfig();
-    integrationsService.getStripeBalance()
-      .then(setStripeBalance)
-      .catch(() => {/* balance stays null */});
+
+    settingsService.getUserProfile()
+      .then(setProfile)
+      .catch(() => {/* profile stays null */});
+
+    settingsService.getEstablishmentSettings()
+      .then(setEstablishment)
+      .catch(() => {/* establishment stays null */});
+
     integrationsService.getScanNOrderStatus()
       .then(status => {
         setScanStatus(status);
         setKpis(status.kpis);
+        if (status.active) {
+          integrationsService.getStripeBalance()
+            .then(setStripeBalance)
+            .catch(() => {/* balance stays null */});
+          // Si besoin d'appeler getStripeStatus, ajouter ici
+        }
       })
       .catch(() => {/* kpis stay null */});
   }, []);
+
+  useEffect(() => {
+    if (searchParams.get('stripe') !== 'success') {
+      return;
+    }
+
+    toast({
+      title: 'Parametrage en cours de validation...',
+      description: 'Vous allez etre redirige vers WelloResto automatiquement une fois la verification Stripe terminee.',
+    });
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('stripe');
+    setSearchParams(nextParams, { replace: true });
+  }, [searchParams, setSearchParams, toast]);
 
   const closureDate = (() => {
     const closedUntil = scanStatus?.closed_until;
@@ -228,6 +262,41 @@ export default function ScanNOrder() {
       setDisabling(false);
     }
   };
+
+  const handleActivate = async () => {
+    setActivating(true);
+    try {
+      const { url } = await integrationsService.startScanNOrderOnboarding();
+      toast({
+        title: 'Redirection vers Stripe',
+        description: 'Vous quittez temporairement WelloResto pour finaliser l\'activation de ScanNOrder.',
+      });
+      window.location.href = url;
+    } catch {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de lancer l\'onboarding ScanNOrder pour le moment.',
+        variant: 'destructive',
+      });
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const establishmentInfo = establishment?.info;
+  const fullAddress =
+    establishmentInfo?.address ||
+    [establishmentInfo?.street, establishmentInfo?.postal_code, establishmentInfo?.city, establishmentInfo?.country]
+      .filter(Boolean)
+      .join(', ');
+
+  const formattedBirthDate = (() => {
+    const value = profile?.birth_date;
+    if (!value) return 'Non renseignée';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('fr-FR');
+  })();
 
   const renderAppearanceTab = () => (
     <div className="w-full max-w-7xl mx-auto px-6 md:px-8 py-10">
@@ -622,6 +691,84 @@ export default function ScanNOrder() {
     );
   }
 
+  if (scanStatus && !scanStatus.active) {
+    return (
+      <DashboardLayout>
+        <PageContainer
+          header={
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold">ScanNOrder</h1>
+              <p className="text-sm text-muted-foreground">
+                Vérifiez les informations avant d'activer l'intégration.
+              </p>
+            </div>
+          }
+          className="space-y-6"
+        >
+          <Card className="border-yellow-300/60 bg-yellow-100/60 dark:border-yellow-800 dark:bg-yellow-950/30">
+            <CardContent className="pt-6 text-sm text-yellow-900 dark:text-yellow-200">
+              Merci de vous assurer que les données ci-dessous sont correctes. Si nécessaire, modifiez-les dans les paramètres avant activation.
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Store className="h-4 w-4" />
+                  Etablissement
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="flex items-start gap-2 text-muted-foreground"><Store className="h-4 w-4 mt-0.5" /><span>{establishmentInfo?.name || 'Non renseigné'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><Phone className="h-4 w-4 mt-0.5" /><span>{establishmentInfo?.phone || 'Non renseigné'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><FileText className="h-4 w-4 mt-0.5" /><span>SIRET: {establishmentInfo?.siret || 'Non renseigné'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><MapPin className="h-4 w-4 mt-0.5" /><span>{fullAddress || 'Non renseignée'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><Globe className="h-4 w-4 mt-0.5" /><span>{establishmentInfo?.website || 'Non renseigné'}</span></p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <User className="h-4 w-4" />
+                  Utilisateur
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <p className="flex items-start gap-2 text-muted-foreground"><User className="h-4 w-4 mt-0.5" /><span>{profile?.lastname || 'Non renseigné'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><User className="h-4 w-4 mt-0.5" /><span>{profile?.firstname || 'Non renseigné'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><Phone className="h-4 w-4 mt-0.5" /><span>{profile?.phone || 'Non renseigné'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><Mail className="h-4 w-4 mt-0.5" /><span>{profile?.email || 'Non renseigné'}</span></p>
+                <p className="flex items-start gap-2 text-muted-foreground"><Calendar className="h-4 w-4 mt-0.5" /><span>{formattedBirthDate}</span></p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" onClick={() => navigate('/settings/establishment')}>
+                Modifier l'établissement
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/settings/profile')}>
+                Modifier l'utilisateur
+              </Button>
+            </div>
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <Button onClick={handleActivate} disabled={activating}>
+                {activating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                {activating ? 'Redirection vers Stripe...' : 'Activer ScanNOrder'}
+              </Button>
+              <p className="max-w-sm text-xs text-muted-foreground sm:text-right">
+                Vous allez être redirigé vers notre plateforme de paiement sécurisée.
+              </p>
+            </div>
+          </div>
+        </PageContainer>
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout>
       <PageContainer
@@ -731,7 +878,7 @@ export default function ScanNOrder() {
           />
 
         {/* ═══ Stripe Status Card ═══ */}
-        <StripeStatusCard />
+        {scanStatus?.active && <StripeStatusCard active={true} />}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 mb-8">

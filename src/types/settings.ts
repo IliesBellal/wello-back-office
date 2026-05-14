@@ -5,6 +5,7 @@ export interface UserProfile {
   lastname: string;
   email: string;
   phone: string;
+  birth_date?: string;
   address?: string;
   street?: string;
   city?: string;
@@ -21,6 +22,7 @@ export interface UserProfile {
 export interface EstablishmentInfo {
   name: string;
   phone: string;
+  website?: string;
   country_code?: string;
   siret: string;
   address: string;

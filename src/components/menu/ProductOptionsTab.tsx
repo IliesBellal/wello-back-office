@@ -61,7 +61,7 @@ export const ProductOptionsTab = ({
                 .filter(attr => !productAttributes.some(pa => pa.attribute_id === attr.id))
                 .map((attr) => (
                   <SelectItem key={attr.id} value={attr.id}>
-                    {attr.title}
+                    {attr.name}
                   </SelectItem>
                 ))}
             </SelectContent>

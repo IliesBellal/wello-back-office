@@ -11,7 +11,11 @@ interface PaymentStatusResponse {
   status: PaymentStatus;
 }
 
-export const StripeStatusCard: React.FC = () => {
+interface StripeStatusCardProps {
+  active?: boolean;
+}
+
+export const StripeStatusCard: React.FC<StripeStatusCardProps> = ({ active = true }) => {
   const { toast } = useToast();
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,6 +23,11 @@ export const StripeStatusCard: React.FC = () => {
 
   // ═══ Fetch payment status on mount ═══
   useEffect(() => {
+    if (!active) {
+      setStatus(null);
+      setLoading(false);
+      return;
+    }
     const fetchPaymentStatus = async () => {
       try {
         setLoading(true);
@@ -35,9 +44,8 @@ export const StripeStatusCard: React.FC = () => {
         setLoading(false);
       }
     };
-
     fetchPaymentStatus();
-  }, [toast]);
+  }, [toast, active]);
 
   // ═══ Handle action button click ═══
   const handleActionClick = async () => {

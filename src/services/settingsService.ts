@@ -14,6 +14,7 @@ const mockUserProfile: UserProfile = {
   lastname: "Martinez",
   email: "lucas@wello.fr",
   phone: "+33612345678",
+  birth_date: "1990-05-17",
   avatar: "https://i.pravatar.cc/150?u=a042581f4e29026024d",
   mfa_type: ''
 };
@@ -22,6 +23,7 @@ const mockEstablishmentSettings: EstablishmentSettings = {
   info: {
     name: "Brasserie du midi",
     phone: "0102030405",
+    website: "https://www.brasseriedumidi.fr",
     country_code: "FR",
     siret: "12345678900012",
     address: "12 Rue de la Paix, Paris",
