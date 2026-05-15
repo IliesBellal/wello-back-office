@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,7 @@ import {
 } from '@/services/cashRegisterService';
 import { CashRegisterHistoryRecord } from '@/services/cashRegisterHistoryService';
 import { cn } from '@/lib/utils';
+import { getCashRegisterStatus } from '@/lib/cashRegisterStatus';
 
 interface ClosureModalProps {
   register: CashRegisterHistoryRecord | null;
@@ -139,8 +140,9 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
   const [comment, setComment] = useState('');
 
   const isEnclosed = Boolean(summary?.enclosed);
+  const isClosed = register ? getCashRegisterStatus(register) !== 'open' : false;
 
-  const loadSummary = async () => {
+  const loadSummary = useCallback(async () => {
     if (!register) return;
     setLoading(true);
     setError(null);
@@ -152,12 +154,12 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
     } finally {
       setLoading(false);
     }
-  };
+  }, [register]);
 
   useEffect(() => {
     if (!open || !register) return;
     loadSummary();
-  }, [open, register?.id]);
+  }, [open, loadSummary, register]);
 
   const theoreticalByMop = useMemo(() => {
     const result = new Map<string, number>();
@@ -487,7 +489,7 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
             </Button>
             <Button
               onClick={startEncloseFlow}
-              disabled={!summary || isEnclosed || closing || loading}
+              disabled={!summary || !isClosed || isEnclosed || closing || loading}
             >
               {isEnclosed ? 'Déjà clôturé' : 'Clôturer'}
             </Button>

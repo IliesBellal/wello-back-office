@@ -158,6 +158,7 @@ export interface Order {
     start_date: string | null;
     end_date: string | null;
     closed: boolean;
+    enclosed: boolean;
     cash_desk?: {
       cash_desk_id: string;
       cash_desk_name: string;

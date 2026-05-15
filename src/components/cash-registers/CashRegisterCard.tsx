@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Lock, LockOpen } from "lucide-react";
 import { CashRegister } from "@/services/cashRegisterService";
+import { getCashRegisterStatus } from "@/lib/cashRegisterStatus";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -11,8 +12,10 @@ interface CashRegisterCardProps {
 }
 
 const CashRegisterCard = ({ register, onClick }: CashRegisterCardProps) => {
+  const statusValue = getCashRegisterStatus(register);
+
   const getStatusDisplay = () => {
-    if (!register.closed) {
+    if (statusValue === 'open') {
       return {
         label: "Actif",
         variant: "default" as const,
@@ -24,7 +27,7 @@ const CashRegisterCard = ({ register, onClick }: CashRegisterCardProps) => {
         ),
       };
     }
-    if (!register.enclosed) {
+    if (statusValue === 'closed') {
       return {
         label: "Pré-clôturé",
         variant: "secondary" as const,

@@ -35,6 +35,7 @@ export interface CashRegisterSummary {
   final_cash_fund?: number;
   items: SummaryItem[];
   custom_items: CustomItem[];
+  closed?: boolean;
   enclosed: boolean;
   enclose_comment?: string;
   users_summary?: ServerSummary[];
@@ -317,6 +318,7 @@ const normalizeSummary = (payload: SummaryApiShape): CashRegisterSummary => {
       source.final_cash_fund !== undefined ? Number(source.final_cash_fund) : undefined,
     items: normalizedItems,
     custom_items: normalizedCustomItems,
+    closed: toBool((source as Partial<{ closed: boolean | number | string }>).closed),
     enclosed: toBool(source.enclosed),
     enclose_comment: source.enclose_comment ?? source.closure_comment,
     users_summary: Array.isArray(usersSummary) ? usersSummary : [],

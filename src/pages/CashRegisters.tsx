@@ -29,6 +29,7 @@ import {
   getCashRegisterHistory,
   closeCashRegister,
 } from "@/services/cashRegisterService";
+import { getCashRegisterStatus } from "@/lib/cashRegisterStatus";
 
 const CashRegisters = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -57,7 +58,7 @@ const CashRegisters = () => {
   }, [date]);
 
   const handleCardClick = (register: CashRegister) => {
-    if (!register.closed) {
+    if (getCashRegisterStatus(register) === 'open') {
       // Case A: Active register - show confirmation
       setPendingRegister(register);
       setCloseDialogOpen(true);

@@ -46,6 +46,7 @@ import {
   deleteCustomItem,
   encloseCashRegister,
 } from "@/services/cashRegisterService";
+import { getCashRegisterStatus } from "@/lib/cashRegisterStatus";
 
 interface CashRegisterDetailsSheetProps {
   register: CashRegister | null;
@@ -172,6 +173,7 @@ const CashRegisterDetailsSheet = ({
     : customTotal - theoreticalTotal;
 
   const isEnclosed = summary?.enclosed || false;
+  const currentStatus = register ? getCashRegisterStatus(register) : 'open';
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -187,7 +189,7 @@ const CashRegisterDetailsSheet = ({
                 </Button>
               )}
               <Badge variant={isEnclosed ? "secondary" : "default"}>
-                {isEnclosed ? "Archivé" : "En cours"}
+                {isEnclosed ? "Archivé" : currentStatus === 'closed' ? "Fermé" : "En cours"}
               </Badge>
             </div>
           </div>

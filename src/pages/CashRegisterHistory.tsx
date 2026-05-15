@@ -26,6 +26,7 @@ import {
   getCashRegisterHistory,
 } from '@/services/cashRegisterHistoryService';
 import { closeCashRegister } from '@/services/cashRegisterService';
+import { getCashRegisterStatus } from '@/lib/cashRegisterStatus';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -292,7 +293,9 @@ const CashRegisterHistory = () => {
                     key: 'id',
                     label: 'Actions',
                     render: (val: string, row: CashRegisterHistoryRecord) => {
-                      if (row.closed && !row.enclosed) {
+                      const status = getCashRegisterStatus(row);
+
+                      if (status === 'closed') {
                         return (
                           <Button
                             size="sm"
@@ -308,7 +311,7 @@ const CashRegisterHistory = () => {
                             Clôturer
                           </Button>
                         );
-                      } else if (!row.closed && !row.enclosed) {
+                      } else if (status === 'open') {
                         return (
                           <Button
                             size="sm"
@@ -353,7 +356,13 @@ const CashRegisterHistory = () => {
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Statut :</span>
-                          <span className="font-medium">{register.closed ? 'Fermé (Z)' : 'Ouvert (X)'}</span>
+                          <span className="font-medium">
+                            {getCashRegisterStatus(register) === 'enclosed'
+                              ? 'Clôturé (Z)'
+                              : getCashRegisterStatus(register) === 'closed'
+                                ? 'Fermé (Z)'
+                                : 'Ouvert (X)'}
+                          </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Fond de caisse initial :</span>
