@@ -1,0 +1,48 @@
+name: 🤖 Agent IA Dev
+
+# On écoute le signal envoyé par l'orchestrateur (Render)
+on:
+  repository_dispatch:
+    types: [start_ai_agent]
+
+permissions:
+  contents: write # Autorise l'Agent à pousser du code
+
+jobs:
+  ai-developer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Récupérer le code (Checkout)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.client_payload.branch }}
+          fetch-depth: 0
+
+      - name: 🐍 Configurer Python (Pour faire tourner l'Agent)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: ⚙️ Installer Aider (L'Agent IA)
+        run: python -m pip install aider-chat
+
+      - name: 🧑‍💻 Configurer Git
+        run: |
+          git config --global user.name "AI Orchestrator"
+          git config --global user.email "bot@wello.app"
+
+      - name: 🧠 Exécuter l'Agent IA
+        env:
+          # Change ça en ANTHROPIC_API_KEY si tu utilises Claude 3.5 Sonnet
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }} 
+        run: |
+          echo "🚀 Lancement de l'agent sur la tâche : ${{ github.event.client_payload.title }}"
+          
+          # On lance Aider avec le contexte de Linear
+          # --yes : Accepte les modifications sans demander
+          # --message : Le prompt de ce qu'il doit coder
+          aider --yes --message "Tâche Linear : ${{ github.event.client_payload.title }}. Description détaillée : ${{ github.event.client_payload.description }}. Merci d'implémenter cette fonctionnalité et de la commiter."
+
+      - name: 🚀 Pousser les modifications
+        run: |
+          git push origin ${{ github.event.client_payload.branch }}
