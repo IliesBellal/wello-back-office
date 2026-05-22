@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { settingsService } from '@/services/settingsService';
-import { UserProfile, EstablishmentSettings, MfaType } from '@/types/settings';
+import { UserProfile, EstablishmentSettings, MfaType, HourOfOperationPayload } from '@/types/settings';
 import { toast } from '@/hooks/use-toast';
 
 export const useUserProfile = () => {
@@ -131,9 +131,11 @@ export const useEstablishmentSettings = () => {
   const updateSettings = async (updates: Partial<EstablishmentSettings>) => {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { siret: _siret, ...infoWithoutSiret } = updates.info ?? {};
+    // Opening hours are managed by dedicated CRUD endpoints.
+    const { hours_of_operations: _hoursOfOperations, ...updatesWithoutHours } = updates;
     const sanitized: Partial<EstablishmentSettings> = updates.info
-      ? { ...updates, info: infoWithoutSiret as typeof updates.info }
-      : updates;
+      ? { ...updatesWithoutHours, info: infoWithoutSiret as typeof updates.info }
+      : updatesWithoutHours;
     try {
       setIsSaving(true);
       const updated = await settingsService.updateEstablishmentSettings(sanitized);
@@ -153,5 +155,99 @@ export const useEstablishmentSettings = () => {
     }
   };
 
-  return { settings, isLoading, isSaving, updateSettings };
+  const createHourOfOperation = async (payload: HourOfOperationPayload) => {
+    try {
+      setIsSaving(true);
+      const created = await settingsService.createHourOfOperation(payload);
+      setSettings((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          hours_of_operations: [...prev.hours_of_operations, created],
+        };
+      });
+      toast({
+        title: 'Horaire ajouté',
+        description: "Le créneau d'ouverture a été créé.",
+      });
+      return created;
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: "Impossible de créer le créneau d'ouverture.",
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateHourOfOperation = async (hourId: string, payload: HourOfOperationPayload) => {
+    try {
+      setIsSaving(true);
+      const updated = await settingsService.updateHourOfOperation(hourId, payload);
+      setSettings((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          hours_of_operations: prev.hours_of_operations.map((hour) => (
+            hour.id === hourId ? updated : hour
+          )),
+        };
+      });
+      toast({
+        title: 'Horaire modifié',
+        description: "Le créneau d'ouverture a été mis à jour.",
+      });
+      return updated;
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: "Impossible de modifier le créneau d'ouverture.",
+        variant: 'destructive',
+      });
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteHourOfOperation = async (hourId: string) => {
+    try {
+      setIsSaving(true);
+      await settingsService.deleteHourOfOperation(hourId);
+      setSettings((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          hours_of_operations: prev.hours_of_operations.filter((hour) => hour.id !== hourId),
+        };
+      });
+      toast({
+        title: 'Horaire supprimé',
+        description: "Le créneau d'ouverture a été supprimé.",
+      });
+      return true;
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: "Impossible de supprimer le créneau d'ouverture.",
+        variant: 'destructive',
+      });
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return {
+    settings,
+    isLoading,
+    isSaving,
+    updateSettings,
+    createHourOfOperation,
+    updateHourOfOperation,
+    deleteHourOfOperation,
+  };
 };

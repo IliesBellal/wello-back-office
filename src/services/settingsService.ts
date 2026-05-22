@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
-import { UserProfile, EstablishmentSettings } from "@/types/settings";
+import { UserProfile, EstablishmentSettings, HourOfOperation, HourOfOperationPayload } from "@/types/settings";
 
 const unwrapWelloData = <T>(response: WelloApiResponse<T> | T): T => {
   if (response && typeof response === "object" && "data" in response) {
@@ -19,7 +19,7 @@ const mockUserProfile: UserProfile = {
   mfa_type: ''
 };
 
-const mockEstablishmentSettings: EstablishmentSettings = {
+let mockEstablishmentSettings: EstablishmentSettings = {
   info: {
     name: "Brasserie du midi",
     phone: "0102030405",
@@ -57,8 +57,28 @@ const mockEstablishmentSettings: EstablishmentSettings = {
     allow_scheduled: true,
     max_schedule_days: 2,
     enable_rating: true
-  }
+  },
+  hours_of_operations: [
+    {
+      id: "171",
+      day_of_week_from: 1,
+      day_of_week_to: 1,
+      hour_from: "09:00:00",
+      hour_to: "18:00:00",
+      booking_capacity: 20,
+      first_booking_time: null,
+      last_booking_time: null,
+      valid_from: "2026-02-12 22:22:42",
+      valid_to: null,
+      enabled: true
+    }
+  ]
 };
+
+const cloneSettings = (settings: EstablishmentSettings): EstablishmentSettings => ({
+  ...settings,
+  hours_of_operations: settings.hours_of_operations.map((hour) => ({ ...hour })),
+});
 
 // ============= API Functions =============
 export const settingsService = {
@@ -99,7 +119,7 @@ export const settingsService = {
   async getEstablishmentSettings(): Promise<EstablishmentSettings> {
     logAPI('GET', '/pos/settings');
     return withMock(
-      () => ({ ...mockEstablishmentSettings }),
+      () => cloneSettings(mockEstablishmentSettings),
       async () => {
         const response = await apiClient.get<WelloApiResponse<EstablishmentSettings> | EstablishmentSettings>('/pos/settings');
         return unwrapWelloData(response);
@@ -110,9 +130,78 @@ export const settingsService = {
   async updateEstablishmentSettings(data: Partial<EstablishmentSettings>): Promise<EstablishmentSettings> {
     logAPI('PATCH', '/pos/settings', data);
     return withMock(
-      () => ({ ...mockEstablishmentSettings, ...data }),
+      () => {
+        mockEstablishmentSettings = {
+          ...mockEstablishmentSettings,
+          ...data,
+        };
+        return cloneSettings(mockEstablishmentSettings);
+      },
       async () => {
         const response = await apiClient.patch<WelloApiResponse<EstablishmentSettings> | EstablishmentSettings>('/pos/settings', data);
+        return unwrapWelloData(response);
+      }
+    );
+  },
+
+  async createHourOfOperation(payload: HourOfOperationPayload): Promise<HourOfOperation> {
+    logAPI('POST', '/pos/settings/hours_of_operations', payload);
+    return withMock(
+      () => {
+        const created: HourOfOperation = {
+          ...payload,
+          id: String(Date.now()),
+          enabled: true,
+        };
+        mockEstablishmentSettings = {
+          ...mockEstablishmentSettings,
+          hours_of_operations: [...mockEstablishmentSettings.hours_of_operations, created],
+        };
+        return created;
+      },
+      async () => {
+        const response = await apiClient.post<WelloApiResponse<HourOfOperation> | HourOfOperation>('/pos/settings/hours_of_operations', payload);
+        return unwrapWelloData(response);
+      }
+    );
+  },
+
+  async updateHourOfOperation(hourId: string, payload: HourOfOperationPayload): Promise<HourOfOperation> {
+    logAPI('PATCH', `/pos/settings/hours_of_operations/${hourId}`, payload);
+    return withMock(
+      () => {
+        const updated: HourOfOperation = {
+          ...payload,
+          id: hourId,
+          enabled: true,
+        };
+        mockEstablishmentSettings = {
+          ...mockEstablishmentSettings,
+          hours_of_operations: mockEstablishmentSettings.hours_of_operations.map((hour) => (
+            hour.id === hourId ? updated : hour
+          )),
+        };
+        return updated;
+      },
+      async () => {
+        const response = await apiClient.patch<WelloApiResponse<HourOfOperation> | HourOfOperation>(`/pos/settings/hours_of_operations/${hourId}`, payload);
+        return unwrapWelloData(response);
+      }
+    );
+  },
+
+  async deleteHourOfOperation(hourId: string): Promise<{ status: number }> {
+    logAPI('DELETE', `/pos/settings/hours_of_operations/${hourId}`);
+    return withMock(
+      () => {
+        mockEstablishmentSettings = {
+          ...mockEstablishmentSettings,
+          hours_of_operations: mockEstablishmentSettings.hours_of_operations.filter((hour) => hour.id !== hourId),
+        };
+        return { status: 1 };
+      },
+      async () => {
+        const response = await apiClient.delete<WelloApiResponse<{ status: number }> | { status: number }>(`/pos/settings/hours_of_operations/${hourId}`);
         return unwrapWelloData(response);
       }
     );

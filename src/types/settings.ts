@@ -67,11 +67,38 @@ export interface EstablishmentScanOrder {
   enable_rating: boolean;
 }
 
+export interface HourOfOperation {
+  id: string;
+  day_of_week_from: number;
+  day_of_week_to: number;
+  hour_from: string;
+  hour_to: string;
+  booking_capacity: number;
+  first_booking_time?: string | null;
+  last_booking_time?: string | null;
+  valid_from: string;
+  valid_to?: string | null;
+  enabled: boolean;
+}
+
+export interface HourOfOperationPayload {
+  day_of_week_from: number;
+  day_of_week_to: number;
+  hour_from: string;
+  hour_to: string;
+  booking_capacity: number;
+  first_booking_time?: string | null;
+  last_booking_time?: string | null;
+  valid_from: string;
+  valid_to?: string | null;
+}
+
 export interface EstablishmentSettings {
   info: EstablishmentInfo;
   timings: EstablishmentTimings;
   ordering: EstablishmentOrdering;
   scan_order: EstablishmentScanOrder;
+  hours_of_operations: HourOfOperation[];
 }
 
 export type FieldType = 'text' | 'email' | 'tel' | 'number' | 'color' | 'switch' | 'select';

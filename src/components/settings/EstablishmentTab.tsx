@@ -8,7 +8,7 @@ import { useEstablishmentSettings } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
 import { OpeningHours } from "./OpeningHours";
-import { EstablishmentSettings } from "@/types/settings";
+import { EstablishmentSettings, HourOfOperationPayload } from "@/types/settings";
 import {
   establishmentInfoFields,
   establishmentTimingsFields,
@@ -19,7 +19,15 @@ import { toast } from "@/hooks/use-toast";
 import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressAutocomplete";
 
 export const EstablishmentTab = () => {
-  const { settings, isLoading, isSaving, updateSettings } = useEstablishmentSettings();
+  const {
+    settings,
+    isLoading,
+    isSaving,
+    updateSettings,
+    createHourOfOperation,
+    updateHourOfOperation,
+    deleteHourOfOperation,
+  } = useEstablishmentSettings();
   const [formData, setFormData] = useState<EstablishmentSettings | null>(null);
   const [activeTab, setActiveTab] = useState<string>("general");
 
@@ -29,7 +37,7 @@ export const EstablishmentTab = () => {
     }
   }, [settings]);
 
-  const handleFieldChange = (group: keyof EstablishmentSettings, key: string, value: any) => {
+  const handleFieldChange = (group: keyof EstablishmentSettings, key: string, value: unknown) => {
     if (!formData) return;
     setFormData({
       ...formData,
@@ -134,7 +142,6 @@ export const EstablishmentTab = () => {
                   values={formData.info}
                   onChange={(key, value) => handleFieldChange('info', key, value)}
                   defaultPhoneCountry={formData.info.country_code}
-                  useGrid={true}
                 />
                 <AddressAutocomplete
                   label="Adresse"
@@ -279,13 +286,15 @@ export const EstablishmentTab = () => {
               <CardDescription>Gérez vos horaires d'ouverture</CardDescription>
             </CardHeader>
             <CardContent>
-              <OpeningHours />
+              <OpeningHours
+                hours={formData.hours_of_operations}
+                isSaving={isSaving}
+                onCreateHour={(payload: HourOfOperationPayload) => createHourOfOperation(payload)}
+                onUpdateHour={(hourId: string, payload: HourOfOperationPayload) => updateHourOfOperation(hourId, payload)}
+                onDeleteHour={(hourId: string) => deleteHourOfOperation(hourId)}
+              />
             </CardContent>
           </Card>
-
-          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
-            {isSaving ? "Enregistrement..." : "Enregistrer"}
-          </Button>
         </div>
       );
     }
