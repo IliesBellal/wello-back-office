@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Trash2, X } from 'lucide-react';
+import { Minus, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import {
@@ -73,6 +73,11 @@ export function TablePropertiesPanel({
     }
   };
 
+  const updateSeats = (nextSeats: number) => {
+    const clamped = Math.min(20, Math.max(1, nextSeats));
+    onUpdate({ seats: clamped });
+  };
+
   const content = (
     <div className="space-y-6">
       {/* Name */}
@@ -107,22 +112,40 @@ export function TablePropertiesPanel({
 
       {/* Seats */}
       <div className="space-y-2">
-        <Label htmlFor="table-seats">
+        <Label htmlFor="table-seats-value">
           Nombre de places
-          <span className="ml-2 font-semibold text-primary">{location.seats}</span>
         </Label>
-        <Slider
-          id="table-seats"
-          min={1}
-          max={20}
-          step={1}
-          value={[location.seats]}
-          onValueChange={([seats]) => onUpdate({ seats })}
-        />
-        <div className="flex gap-2 text-xs text-muted-foreground">
-          <span>1</span>
-          <div className="flex-1" />
-          <span>20</span>
+        <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/30 p-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => updateSeats(location.seats - 1)}
+            disabled={location.seats <= 1}
+            aria-label="Diminuer le nombre de places"
+          >
+            <Minus className="h-4 w-4" />
+          </Button>
+
+          <span
+            id="table-seats-value"
+            className="min-w-14 text-center text-base font-semibold text-foreground"
+          >
+            {location.seats}
+          </span>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => updateSeats(location.seats + 1)}
+            disabled={location.seats >= 20}
+            aria-label="Augmenter le nombre de places"
+          >
+            <Plus className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

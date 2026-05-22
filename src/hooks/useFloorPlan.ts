@@ -198,6 +198,7 @@ export function useFloorPlan(): UseFloorPlanReturn {
         return updateLocation(locationId, {
           location_name: location.location_name,
           seats: location.seats,
+          floor_id: location.floor_id,
           shape: location.shape,
           angle: location.angle,
           x: location.x,
