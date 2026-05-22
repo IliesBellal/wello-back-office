@@ -157,7 +157,7 @@ export const deleteFloor = async (floorId: string): Promise<void> => {
 };
 
 export const createLocation = async (data: Partial<Location>): Promise<Location> => {
-  logAPI('POST', '/locations', data);
+  logAPI('POST', `/locations/floors/${data.floor_id || null}/tables`, data);
   
   return withMock(
     () => {
@@ -177,12 +177,12 @@ export const createLocation = async (data: Partial<Location>): Promise<Location>
       mockData.data.locations.push(newLocation);
       return newLocation;
     },
-    () => apiClient.post<Location>('/locations', data)
+    () => apiClient.post<Location>(`/locations/floors/${data.floor_id || null}/tables`, data)
   );
 };
 
 export const updateLocation = async (locationId: string, data: Partial<Location>): Promise<void> => {
-  logAPI('PATCH', `/locations/${locationId}`, data);
+  logAPI('PATCH', `/locations/tables/${locationId}`, data);
   
   return withMock(
     () => {
@@ -191,17 +191,17 @@ export const updateLocation = async (locationId: string, data: Partial<Location>
         Object.assign(location, data);
       }
     },
-    () => apiClient.patch<void>(`/locations/${locationId}`, data)
+    () => apiClient.patch<void>(`/locations/tables/${locationId}`, data)
   );
 };
 
 export const deleteLocation = async (locationId: string): Promise<void> => {
-  logAPI('DELETE', `/locations/${locationId}`);
+  logAPI('DELETE', `/locations/tables/${locationId}`);
   
   return withMock(
     () => {
       mockData.data.locations = mockData.data.locations.filter(l => l.location_id !== locationId);
     },
-    () => apiClient.delete<void>(`/locations/${locationId}`)
+    () => apiClient.delete<void>(`/locations/tables/${locationId}`)
   );
 };
