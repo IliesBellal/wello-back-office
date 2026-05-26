@@ -21,8 +21,9 @@ export interface ColumnConfig<T> {
 export interface ExpandableDataTableProps<T> {
   columns: ColumnConfig<T>[];
   data: T[];
-  expandableRowKey: keyof T;
-  renderExpandedRow: (row: T) => React.ReactNode;
+  expandableRowKey?: keyof T;
+  renderExpandedRow?: (row: T) => React.ReactNode;
+  onRowClick?: (row: T) => void;
   initialSortBy?: keyof T;
   initialSortDir?: 'asc' | 'desc';
   emptyMessage?: string;
@@ -35,12 +36,14 @@ export function ExpandableDataTable<T extends Record<string, any>>({
   data,
   expandableRowKey,
   renderExpandedRow,
+  onRowClick,
   initialSortBy,
   initialSortDir = 'desc',
   emptyMessage = 'Aucune donnée',
   emptyIcon,
   headerClassName,
 }: ExpandableDataTableProps<T>) {
+  const isExpandable = Boolean(renderExpandedRow && expandableRowKey);
   const [expandedRows, setExpandedRows] = useState<Set<string | number>>(new Set());
   const [sortColumn, setSortColumn] = useState<keyof T | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(initialSortDir);
@@ -54,7 +57,11 @@ export function ExpandableDataTable<T extends Record<string, any>>({
     }
   };
 
-  const toggleRowExpand = (rowId: string | number) => {
+  const toggleRowExpand = (rowId: string | number | undefined) => {
+    if (!isExpandable || rowId === undefined || rowId === null) {
+      return;
+    }
+
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(rowId)) {
       newExpanded.delete(rowId);
@@ -112,7 +119,7 @@ export function ExpandableDataTable<T extends Record<string, any>>({
       <Table>
         <TableHeader className={headerClassName}>
           <TableRow>
-            <TableHead className="w-10"></TableHead>
+            {isExpandable && <TableHead className="w-10"></TableHead>}
             {columns.map((col) => (
               <TableHead
                 key={String(col.key)}
@@ -137,22 +144,27 @@ export function ExpandableDataTable<T extends Record<string, any>>({
         </TableHeader>
         <TableBody>
           {sortedData.map((row, idx) => {
-            const rowId = row[expandableRowKey];
-            const isExpanded = expandedRows.has(rowId);
+            const rowId = isExpandable ? row[expandableRowKey as keyof T] : undefined;
+            const isExpanded = isExpandable && rowId !== undefined && expandedRows.has(rowId);
 
             return (
               <React.Fragment key={rowId ?? idx}>
                 <TableRow 
-                  className="hover:bg-muted/50 cursor-pointer transition-colors"
-                  onClick={() => toggleRowExpand(rowId)}
+                  className={isExpandable || onRowClick ? 'hover:bg-muted/50 cursor-pointer transition-colors' : 'hover:bg-muted/50 transition-colors'}
+                  onClick={() => {
+                    if (isExpandable) toggleRowExpand(rowId);
+                    onRowClick?.(row);
+                  }}
                 >
-                  <TableCell className="w-10">
-                    {isExpanded ? (
-                      <ChevronUp className="w-4 h-4" />
-                    ) : (
-                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </TableCell>
+                  {isExpandable && (
+                    <TableCell className="w-10">
+                      {isExpanded ? (
+                        <ChevronUp className="w-4 h-4" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </TableCell>
+                  )}
                   {columns.map((col) => (
                     <TableCell
                       key={String(col.key)}
@@ -162,9 +174,9 @@ export function ExpandableDataTable<T extends Record<string, any>>({
                     </TableCell>
                   ))}
                 </TableRow>
-                {isExpanded && (
+                {isExpanded && renderExpandedRow && (
                   <TableRow className="bg-muted/30">
-                    <TableCell colSpan={columns.length + 1} className="p-4">
+                    <TableCell colSpan={columns.length + (isExpandable ? 1 : 0)} className="p-4">
                       {renderExpandedRow(row)}
                     </TableCell>
                   </TableRow>

@@ -1,0 +1,376 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
+import { PageContainer } from '@/components/shared';
+import { Tile } from '@/components/shared/Tile';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
+import { DatePicker } from '@/components/ui/date-picker';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Download, FileText, ClipboardList, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import {
+  HaccpActivity,
+  HaccpActivityStatusFilter,
+  HaccpActivityTypeFilter,
+  HaccpActivitiesPagination,
+  getHaccpActivities,
+} from '@/services/haccpService';
+import { HaccpActivityDetailSheet } from '@/components/haccp/HaccpActivityDetailSheet';
+
+const getStatusConfig = (status: string) => {
+  switch (status) {
+    case 'done':
+    case 'ok':
+      return {
+        badge: 'bg-green-100 text-green-700 hover:bg-green-100',
+        label: status === 'done' ? 'Termine' : 'OK',
+        color: 'text-green-700',
+      };
+    case 'pending':
+    case 'in_progress':
+      return {
+        badge: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100',
+        label: status === 'in_progress' ? 'En cours' : 'En attente',
+        color: 'text-yellow-700',
+      };
+    case 'alert':
+      return {
+        badge: 'bg-orange-100 text-orange-700 hover:bg-orange-100',
+        label: 'Alerte',
+        color: 'text-orange-700',
+      };
+    case 'critical':
+      return {
+        badge: 'bg-red-100 text-red-700 hover:bg-red-100',
+        label: 'Critique',
+        color: 'text-red-700',
+      };
+    case 'failed':
+    case 'error':
+      return {
+        badge: 'bg-red-100 text-red-700 hover:bg-red-100',
+        label: status === 'failed' ? 'Echec' : 'Erreur',
+        color: 'text-red-700',
+      };
+    default:
+      return {
+        badge: 'bg-gray-100 text-gray-700 hover:bg-gray-100',
+        label: status,
+        color: 'text-gray-700',
+      };
+  }
+};
+
+const getTypeLabel = (type: string) => {
+  switch (type) {
+    case 'cleanings':
+      return 'Nettoyages';
+    case 'temperatures':
+      return 'Temperatures';
+    case 'checklists':
+      return 'Checklists';
+    case 'incidents':
+      return 'Incidents';
+    default:
+      return type;
+  }
+};
+
+const getActivityDetails = (activity: HaccpActivity): string => {
+  if (activity.type === 'temperatures') {
+    const readingsCount = Number(activity.metadata?.readings_count);
+    if (Number.isFinite(readingsCount) && readingsCount > 0) {
+      return `${readingsCount} zones controlees`;
+    }
+    return activity.subtitle;
+  }
+
+  if (activity.type === 'cleanings') {
+    const executionsCount = Number(activity.metadata?.executions_count);
+    if (Number.isFinite(executionsCount) && executionsCount > 0) {
+      return `${executionsCount} surfaces nettoyees`;
+    }
+    return activity.subtitle;
+  }
+
+  return activity.subtitle;
+};
+
+export const Activity = () => {
+  const [selectedDate, setSelectedDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
+  const [typeFilter, setTypeFilter] = useState<HaccpActivityTypeFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<HaccpActivityStatusFilter>('all');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<HaccpActivitiesPagination>({
+    page: 1,
+    page_size: 20,
+    total_items: 0,
+    total_pages: 1,
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [records, setRecords] = useState<HaccpActivity[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<HaccpActivity | null>(null);
+  const [detailSheetOpen, setDetailSheetOpen] = useState(false);
+  const { toast } = useToast();
+
+  const handleRowClick = (activity: HaccpActivity) => {
+    if (activity.type === 'temperatures' || activity.type === 'cleanings') {
+      setSelectedActivity(activity);
+      setDetailSheetOpen(true);
+    }
+  };
+
+  useEffect(() => {
+    setPage(1);
+  }, [selectedDate, typeFilter, statusFilter]);
+
+  useEffect(() => {
+    const loadActivity = async () => {
+      setLoading(true);
+      try {
+        const response = await getHaccpActivities({
+          date: selectedDate,
+          page,
+          pageSize: 20,
+          type: typeFilter,
+          status: statusFilter,
+        });
+        setRecords(response.activities);
+        setPagination(response.pagination);
+      } catch (error) {
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger l\'activité HACCP.',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadActivity();
+  }, [selectedDate, page, typeFilter, statusFilter, toast]);
+
+  const stats = useMemo(() => {
+    const done = records.filter((record) => record.status === 'done').length;
+    const ok = records.filter((record) => record.status === 'ok').length;
+    const alert = records.filter((record) => record.status === 'alert').length;
+    const critical = records.filter((record) => record.status === 'critical').length;
+
+    return {
+      total: records.length,
+      done,
+      ok,
+      alert,
+      critical,
+    };
+  }, [records]);
+
+  const currentPage = pagination.page || page;
+  const totalPages = Math.max(1, pagination.total_pages || 1);
+  const totalItems = pagination.total_items || 0;
+  const currentLimit = pagination.page_size || 20;
+  const displayStart = records.length === 0 ? 0 : ((currentPage - 1) * currentLimit) + 1;
+  const displayEnd = records.length === 0 ? 0 : displayStart + records.length - 1;
+
+  const handleExportCSV = () => {
+    // Export as CSV
+    const headers = ['Date', 'Heure', 'Type', 'Titre', 'Sous-titre', 'Operateur', 'Statut'];
+    const rows = records.map((record) => {
+      const date = new Date(record.performed_at);
+      return [
+        format(date, 'dd/MM/yyyy', { locale: fr }),
+        format(date, 'HH:mm', { locale: fr }),
+        getTypeLabel(record.type),
+        record.title,
+        record.subtitle,
+        record.performed_by?.name || '-',
+        getStatusConfig(record.status).label,
+      ];
+    });
+
+    // Create CSV content
+    const csv = [
+      headers.join(','),
+      ...rows.map((row) => row.map((cell) => `"${cell}"`).join(',')),
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `activite-haccp-${format(new Date(), 'yyyy-MM-dd', { locale: fr })}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  return (
+    <DashboardLayout>
+      <PageContainer
+        header={
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <h1 className="text-3xl font-bold">HACCP - Activité</h1>
+              <p className="text-sm text-muted-foreground">
+                Suivi consolidé des controles et evenements sanitaires sur la date selectionnee.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="w-full">
+                <DatePicker value={selectedDate} onDateChange={(value) => setSelectedDate(value || selectedDate)} />
+              </div>
+              <div className="w-full">
+                <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as HaccpActivityTypeFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrer par type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les types</SelectItem>
+                    <SelectItem value="temperatures">temperatures</SelectItem>
+                    <SelectItem value="cleanings">cleanings</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-full">
+                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as HaccpActivityStatusFilter)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Filtrer par statut" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous les statuts</SelectItem>
+                    <SelectItem value="ok">ok</SelectItem>
+                    <SelectItem value="alert">alert</SelectItem>
+                    <SelectItem value="critical">critical</SelectItem>
+                    <SelectItem value="done">done</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={handleExportCSV} variant="outline" className="shrink-0">
+                <Download className="mr-2 h-4 w-4" />
+                Exporter en CSV
+              </Button>
+            </div>
+          </div>
+        }
+      >
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Tile title="Activites" value={stats.total} icon={ClipboardList} isHighlighted />
+            <Tile title="done" value={stats.done} icon={CheckCircle2} />
+            <Tile title="ok" value={stats.ok} icon={CheckCircle2} />
+            <Tile title="alert / critical" value={stats.alert + stats.critical} icon={ShieldAlert} />
+          </div>
+
+          <Card>
+          {loading ? (
+            <CardContent className="pt-6 space-y-3">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Skeleton key={i} className="h-12" />
+              ))}
+            </CardContent>
+          ) : records.length === 0 ? (
+            <CardContent className="pt-6">
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <FileText className="h-12 w-12 mb-4" />
+                <p>Aucune activite pour les filtres selectionnes</p>
+                <p className="text-sm">Ajustez la date, le type ou le statut</p>
+              </div>
+            </CardContent>
+          ) : (
+            <CardContent className="p-0">
+              <ExpandableDataTable<HaccpActivity>
+                columns={[
+                  {
+                    key: 'performed_at',
+                    label: 'Date & Heure',
+                    sortable: true,
+                    render: (val: string) => {
+                      const date = new Date(val);
+                      return `${format(date, 'dd/MM/yyyy', { locale: fr })} à ${format(date, 'HH:mm')}`;
+                    },
+                  },
+                  {
+                    key: 'type',
+                    label: 'Type',
+                    sortable: true,
+                    render: (val: string) => getTypeLabel(val),
+                  },
+                  {
+                    key: 'details',
+                    label: 'Details',
+                    render: (_val: unknown, row: HaccpActivity) => getActivityDetails(row),
+                  },
+                  {
+                    key: 'performed_by',
+                    label: 'Operateur',
+                    render: (val: HaccpActivity['performed_by']) => val?.name || '-',
+                  },
+                  {
+                    key: 'status',
+                    label: 'Statut',
+                    render: (val: string) => (
+                      <Badge className={cn('font-semibold capitalize', getStatusConfig(val as any).badge)}>
+                        {getStatusConfig(val as any).label}
+                      </Badge>
+                    ),
+                  },
+                ]}
+                data={records}
+                initialSortBy="performed_at"
+                initialSortDir="desc"
+                onRowClick={handleRowClick}
+              />
+            </CardContent>
+          )}
+          </Card>
+
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Affichage {displayStart} a {displayEnd} sur {totalItems}
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1 || loading}
+                className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+                aria-label="Page precedente"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
+                Page {currentPage} sur {totalPages}
+              </span>
+              <button
+                onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage >= totalPages || loading}
+                className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+                aria-label="Page suivante"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </PageContainer>
+      <HaccpActivityDetailSheet
+        activity={selectedActivity}
+        open={detailSheetOpen}
+        onOpenChange={setDetailSheetOpen}
+      />
+    </DashboardLayout>
+  );
+};
+
+export default Activity;

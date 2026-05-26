@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import { MFAProvider } from "./contexts/MFAContext";
 import { ProductCreateSheetProvider } from "./contexts/ProductCreateSheetContext";
@@ -40,8 +40,9 @@ import EquipeEmployes from './pages/equipe/Employees';
 import EquipePointages from './pages/equipe/Timesheets';
 import EquipeConges from './pages/equipe/Leaves';
 import HacCPCompliance from './pages/haccp/Compliance';
-import HacCPHistory from './pages/haccp/History';
+import HacCPActivity from './pages/haccp/Activity';
 import HacCPAlerts from './pages/haccp/Alerts';
+import HacCPSettings from './pages/haccp/Settings';
 import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
 
@@ -113,8 +114,10 @@ const App = () => (
               
               {/* HACCP - Hygiene & Safety */}
               <Route path="/haccp/compliance" element={<ProtectedRoute><HacCPCompliance /></ProtectedRoute>} />
-              <Route path="/haccp/history" element={<ProtectedRoute><HacCPHistory /></ProtectedRoute>} />
+              <Route path="/haccp/activity" element={<ProtectedRoute><HacCPActivity /></ProtectedRoute>} />
+              <Route path="/haccp/history" element={<Navigate to="/haccp/activity" replace />} />
               <Route path="/haccp/alerts" element={<ProtectedRoute><HacCPAlerts /></ProtectedRoute>} />
+              <Route path="/haccp/settings" element={<ProtectedRoute><HacCPSettings /></ProtectedRoute>} />
               
               {/* 404 Fallback */}
               <Route path="*" element={<NotFound />} />
