@@ -31,7 +31,7 @@ Modifiez avec vos valeurs staging:
 ```env
 VITE_API_BASE_URL=https://api-staging.youromain.com
 VITE_USE_MOCK=false
-VITE_ENABLE_LOGS=false
+VITE_ENABLE_LOGS=true
 ```
 
 ### 3. Configuration production
@@ -45,7 +45,7 @@ Modifiez avec vos valeurs production:
 ```env
 VITE_API_BASE_URL=https://api.youromain.com
 VITE_USE_MOCK=false
-VITE_ENABLE_LOGS=false
+VITE_ENABLE_LOGS=true
 ```
 
 ## 📦 Variables d'environnement disponibles

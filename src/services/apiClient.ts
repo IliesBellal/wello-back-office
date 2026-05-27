@@ -3,7 +3,7 @@ import { toast } from "@/hooks/use-toast";
 // ============= Configuration =============
 export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK === 'true';
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com";
-export const ENABLE_LOGS = import.meta.env.VITE_ENABLE_LOGS !== 'false';
+export const ENABLE_LOGS = import.meta.env.VITE_ENABLE_LOGS === 'true';
 
 
 // ============= Types =============
@@ -96,7 +96,7 @@ const startRequestLog = (method: string, endpoint: string, url: string, payload?
   const context: LogContext = { method, endpoint, url, startTime: performance.now() };
   
   if (ENABLE_LOGS) {
-    console.groupCollapsed(`%c🌐 API Request: [${method}] ${endpoint}`, 'color: #3b82f6; font-weight: bold;');
+    console.log(`%c🌐 API Request: [${method}] ${endpoint}`, 'color: #3b82f6; font-weight: bold;');
     console.log('%cURL:', 'color: #6b7280;', url);
     if (payload) {
       console.log('%cPayload:', 'color: #6b7280;', maskSensitiveData(payload));

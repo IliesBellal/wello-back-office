@@ -818,7 +818,15 @@
               {
                 "id": "string",
                 "name": "string",
-                "compatible_with": "string[]"
+                "short_name": "string",
+                "conversions": [
+                  {
+                    "to_unit_id": "string",
+                    "to_unit_name": "string",
+                    "to_unit_short_name": "string",
+                    "multiplier": "number"
+                  }
+                ]
               }
             ]
           },

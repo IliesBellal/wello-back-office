@@ -3,12 +3,14 @@ import { Component, UnitOfMeasure } from '@/types/menu';
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -25,7 +27,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -35,7 +37,8 @@ import {
 } from '@/components/ui/select';
 import { Edit, Save, X, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { formatPrice, parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
+import { decimalToDisplayValue, formatPrice, parseDecimalInput, parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
+import { findUnitById, getCompatibleUnits } from '@/utils/unitConversions';
 
 interface IngredientDetailSheetProps {
   componentId?: string | null;
@@ -49,25 +52,38 @@ interface IngredientDetailSheetProps {
 
 const getUnitLabel = (unitId: string | number | undefined, units: UnitOfMeasure[]): string => {
   if (!unitId) return '—';
-  return units.find(u => u.id === unitId || u.id.toString() === unitId.toString())?.name || unitId.toString();
+  return findUnitById(units, unitId)?.name || unitId.toString();
+};
+
+const getPurchaseUnitLabel = (component: Component, units: UnitOfMeasure[]): string => {
+  if (component.purchase_unit_of_measure) return component.purchase_unit_of_measure;
+  return getUnitLabel(component.purchase_unit_of_measure_id || component.purchase_unit_id, units);
+};
+
+const getPurchaseQuantityLabel = (component: Component, units: UnitOfMeasure[]): string => {
+  const quantityLabel = decimalToDisplayValue(component.purchase_cost_qty);
+  const purchaseUnitLabel = getPurchaseUnitLabel(component, units);
+  const hasPurchaseUnit = purchaseUnitLabel !== '—';
+
+  if (quantityLabel && hasPurchaseUnit) {
+    return `${quantityLabel} ${purchaseUnitLabel}`;
+  }
+
+  if (quantityLabel) {
+    return quantityLabel;
+  }
+
+  return hasPurchaseUnit ? purchaseUnitLabel : '—';
 };
 
 // View Content Component (declared outside to prevent remounting)
 interface ViewContentProps {
   displayedComponent: Component;
   units: UnitOfMeasure[];
-  onEdit: () => void;
-  onDelete: () => void;
-  hasDelete: boolean;
 }
 
-const ViewContent = ({ displayedComponent, units, onEdit, onDelete, hasDelete }: ViewContentProps) => (
-  <div className="space-y-6">
-    {/* Header with Title */}
-    <div className="border-b pb-4">
-      <h2 className="text-2xl font-bold text-foreground">{displayedComponent.name}</h2>
-    </div>
-
+const ViewContent = ({ displayedComponent, units }: ViewContentProps) => (
+  <div className="space-y-4">
     {/* Main Info Cards */}
     <div className="grid grid-cols-1 gap-4">
       {/* Storage Unit */}
@@ -91,7 +107,7 @@ const ViewContent = ({ displayedComponent, units, onEdit, onDelete, hasDelete }:
           <div className="space-y-2">
             <p className="text-lg font-semibold">{formatPrice(displayedComponent.purchase_cost)}</p>
             <p className="text-sm text-muted-foreground">
-              Unité : {getUnitLabel(displayedComponent.purchase_unit_id, units)}
+              {getPurchaseQuantityLabel(displayedComponent, units)}
             </p>
           </div>
         </CardContent>
@@ -107,28 +123,39 @@ const ViewContent = ({ displayedComponent, units, onEdit, onDelete, hasDelete }:
         </CardContent>
       </Card>
     </div>
+  </div>
+);
 
-    {/* Action Buttons */}
-    <div className="flex gap-2 pt-4">
+interface DetailViewActionsProps {
+  onEdit: () => void;
+  onDelete: () => void;
+  hasDelete: boolean;
+  compact?: boolean;
+}
+
+const DetailViewActions = ({ onEdit, onDelete, hasDelete, compact = false }: DetailViewActionsProps) => (
+  <div className="flex items-center gap-1">
+    <Button
+      onClick={onEdit}
+      variant={compact ? 'ghost' : 'outline'}
+      size={compact ? 'icon' : 'sm'}
+      className={compact ? 'h-8 w-8' : ''}
+      title="Modifier l'ingrédient"
+    >
+      <Edit className={`w-4 h-4 ${compact ? '' : 'mr-2'}`} />
+      {!compact && 'Modifier'}
+    </Button>
+    {hasDelete && (
       <Button
-        onClick={onEdit}
-        className="flex-1"
-        variant="default"
+        onClick={onDelete}
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+        title="Supprimer l'ingrédient"
       >
-        <Edit className="w-4 h-4 mr-2" />
-        Modifier
+        <Trash2 className="w-4 h-4" />
       </Button>
-      {hasDelete && (
-        <Button
-          onClick={onDelete}
-          variant="outline"
-          size="icon"
-          className="text-destructive hover:bg-destructive/10"
-        >
-          <Trash2 className="w-4 h-4" />
-        </Button>
-      )}
-    </div>
+    )}
   </div>
 );
 
@@ -136,12 +163,15 @@ const ViewContent = ({ displayedComponent, units, onEdit, onDelete, hasDelete }:
 interface EditContentProps {
   formData: Partial<Component>;
   priceDisplayValues: { purchase_cost: string; price: string };
+  purchaseCostQtyDisplayValue: string;
   units: UnitOfMeasure[];
+  compatiblePurchaseUnits: UnitOfMeasure[];
   onNameChange: (value: string) => void;
   onPurchaseCostChange: (value: string) => void;
   onPurchaseCostBlur: (value: string) => void;
   onPurchaseUnitChange: (value: string) => void;
-  onPurchaseCostQtyChange: (value: number) => void;
+  onPurchaseCostQtyChange: (value: string) => void;
+  onPurchaseCostQtyBlur: (value: string) => void;
   onSupplementPriceChange: (value: string) => void;
   onSupplementPriceBlur: (value: string) => void;
   onSave: () => Promise<void>;
@@ -152,12 +182,15 @@ interface EditContentProps {
 const EditContent = ({
   formData,
   priceDisplayValues,
+  purchaseCostQtyDisplayValue,
   units,
+  compatiblePurchaseUnits,
   onNameChange,
   onPurchaseCostChange,
   onPurchaseCostBlur,
   onPurchaseUnitChange,
   onPurchaseCostQtyChange,
+  onPurchaseCostQtyBlur,
   onSupplementPriceChange,
   onSupplementPriceBlur,
   onSave,
@@ -165,113 +198,137 @@ const EditContent = ({
   isSaving,
 }: EditContentProps) => (
   <div className="space-y-6">
-    {/* Name */}
-    <div>
-      <Label htmlFor="ingredient-name">Nom de l'ingrédient</Label>
-      <Input
-        id="ingredient-name"
-        value={formData.name || ''}
-        onChange={(e) => onNameChange(e.target.value)}
-        placeholder="ex: Tomate"
-        className="mt-2"
-      />
-    </div>
+    <Card className="border-slate-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-sm font-semibold text-slate-900">Identité</CardTitle>
+        <CardDescription>Le nom affiché dans la liste ingrédients et les fiches produit.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <Label htmlFor="ingredient-name" className="text-sm font-medium text-slate-700">
+          Nom de l'ingrédient
+        </Label>
+        <Input
+          id="ingredient-name"
+          value={formData.name || ''}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder="ex: Tomate"
+          className="border-slate-200 bg-slate-50 focus:bg-white"
+        />
+      </CardContent>
+    </Card>
 
-    {/* Purchase Cost */}
-    <div>
-      <Label htmlFor="purchase-cost">Prix d'achat (€)</Label>
-      <Input
-        id="purchase-cost"
-        type="text"
-        inputMode="decimal"
-        value={priceDisplayValues.purchase_cost}
-        onChange={(e) => onPurchaseCostChange(e.target.value)}
-        onBlur={(e) => onPurchaseCostBlur(e.target.value)}
-        placeholder="0,00"
-        className="mt-2"
-      />
-    </div>
+    <Card className="border-slate-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-sm font-semibold text-slate-900">Approvisionnement</CardTitle>
+        <CardDescription>Renseignez le coût d'achat, l'unité et la quantité de référence.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="purchase-cost" className="text-sm font-medium text-slate-700">
+            Prix d'achat (€)
+          </Label>
+          <Input
+            id="purchase-cost"
+            type="text"
+            inputMode="decimal"
+            value={priceDisplayValues.purchase_cost}
+            onChange={(e) => onPurchaseCostChange(e.target.value)}
+            onBlur={(e) => onPurchaseCostBlur(e.target.value)}
+            placeholder="0,00"
+            className="border-slate-200 bg-slate-50 focus:bg-white"
+          />
+        </div>
 
-    {/* Purchase Unit */}
-    <div>
-      <Label htmlFor="purchase-unit">Unité d'achat</Label>
-      <Select
-        value={formData.purchase_unit_id?.toString() || ''}
-        onValueChange={onPurchaseUnitChange}
-      >
-        <SelectTrigger id="purchase-unit" className="mt-2">
-          <SelectValue placeholder="Sélectionner une unité" />
-        </SelectTrigger>
-        <SelectContent>
-          {units
-            .filter(u => u.id && u.id.toString().trim() !== '')
-            .map((unit) => (
-            <SelectItem key={unit.id} value={unit.id.toString()}>
-              {unit.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+        <div className="space-y-2">
+          <Label htmlFor="purchase-unit" className="text-sm font-medium text-slate-700">
+            Unité d'achat
+          </Label>
+          <Select
+            value={formData.purchase_unit_id?.toString() || ''}
+            onValueChange={onPurchaseUnitChange}
+          >
+            <SelectTrigger id="purchase-unit" className="border-slate-200 bg-slate-50 focus:bg-white">
+              <SelectValue placeholder="Sélectionner une unité" />
+            </SelectTrigger>
+            <SelectContent>
+              {compatiblePurchaseUnits.map((unit) => (
+                <SelectItem key={unit.id} value={unit.id.toString()}>
+                  {unit.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
 
-    {/* Purchase Cost Quantity */}
-    <div>
-      <Label htmlFor="purchase-cost-qty">Quantité pour le coût d'achat</Label>
-      <Input
-        id="purchase-cost-qty"
-        type="number"
-        inputMode="numeric"
-        min="1"
-        step="1"
-        value={formData.purchase_cost_qty || 1}
-        onChange={(e) => onPurchaseCostQtyChange(parseInt(e.target.value) || 1)}
-        className="mt-2"
-      />
-    </div>
+        <div className="space-y-2">
+          <Label htmlFor="purchase-cost-qty" className="text-sm font-medium text-slate-700">
+            Quantité pour le coût d'achat
+          </Label>
+          <Input
+            id="purchase-cost-qty"
+            type="text"
+            inputMode="decimal"
+            placeholder="1 ou 0,5"
+            value={purchaseCostQtyDisplayValue}
+            onChange={(e) => onPurchaseCostQtyChange(e.target.value)}
+            onBlur={(e) => onPurchaseCostQtyBlur(e.target.value)}
+            className="border-slate-200 bg-slate-50 focus:bg-white"
+          />
+        </div>
+      </CardContent>
+    </Card>
 
-    {/* Supplement Price */}
-    <div>
-      <Label htmlFor="supplement-price">Prix en supplément (€)</Label>
-      <Input
-        id="supplement-price"
-        type="text"
-        inputMode="decimal"
-        value={priceDisplayValues.price}
-        onChange={(e) => onSupplementPriceChange(e.target.value)}
-        onBlur={(e) => onSupplementPriceBlur(e.target.value)}
-        placeholder="0,00"
-        className="mt-2"
-      />
-    </div>
+    <Card className="border-slate-200 bg-white shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-sm font-semibold text-slate-900">Tarification client</CardTitle>
+        <CardDescription>Prix appliqué lorsqu'un supplément ingrédient est facturé au client.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-2">
+        <Label htmlFor="supplement-price" className="text-sm font-medium text-slate-700">
+          Prix en supplément (€)
+        </Label>
+        <Input
+          id="supplement-price"
+          type="text"
+          inputMode="decimal"
+          value={priceDisplayValues.price}
+          onChange={(e) => onSupplementPriceChange(e.target.value)}
+          onBlur={(e) => onSupplementPriceBlur(e.target.value)}
+          placeholder="0,00"
+          className="border-slate-200 bg-slate-50 focus:bg-white"
+        />
+      </CardContent>
+    </Card>
 
-    {/* Action Buttons */}
-    <div className="flex gap-2 pt-4">
-      <Button
-        onClick={onSave}
-        disabled={isSaving}
-        className="flex-1"
-      >
-        {isSaving ? (
-          <>
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-            Enregistrement...
-          </>
-        ) : (
-          <>
-            <Save className="w-4 h-4 mr-2" />
-            Enregistrer
-          </>
-        )}
-      </Button>
-      <Button
-        onClick={onCancel}
-        disabled={isSaving}
-        variant="outline"
-        className="flex-1"
-      >
-        Annuler
-      </Button>
-    </div>
+    <Card className="border-slate-200 bg-white shadow-sm">
+      <CardContent className="flex gap-2 pt-6">
+        <Button
+          onClick={onSave}
+          disabled={isSaving}
+          className="flex-1"
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Enregistrement...
+            </>
+          ) : (
+            <>
+              <Save className="w-4 h-4 mr-2" />
+              Enregistrer
+            </>
+          )}
+        </Button>
+        <Button
+          onClick={onCancel}
+          disabled={isSaving}
+          variant="outline"
+          className="flex-1 border-slate-200 bg-white hover:bg-slate-50"
+        >
+          Annuler
+        </Button>
+      </CardContent>
+    </Card>
   </div>
 );
 
@@ -308,8 +365,32 @@ export const IngredientDetailSheet = ({
     purchase_cost: '',
     price: '',
   });
+  const [purchaseCostQtyDisplayValue, setPurchaseCostQtyDisplayValue] = useState('');
 
   const [displayedComponent, setDisplayedComponent] = useState<Component | null>(null);
+
+  const compatiblePurchaseUnits = useMemo(() => {
+    const validUnits = units.filter((unit) => unit.id && unit.id.toString().trim() !== '');
+    if (!displayedComponent) return validUnits;
+
+    const storageUnitId = displayedComponent.unit_of_measure_id || displayedComponent.unit_id;
+    const currentPurchaseUnitId = formData.purchase_unit_id?.toString();
+    const filteredUnits = getCompatibleUnits(storageUnitId, validUnits);
+
+    if (filteredUnits.length === 0) return validUnits;
+
+    if (!currentPurchaseUnitId) return filteredUnits;
+
+    const currentPurchaseUnit = validUnits.find(
+      (unit) => unit.id.toString() === currentPurchaseUnitId
+    );
+
+    if (!currentPurchaseUnit) return filteredUnits;
+
+    return filteredUnits.some((unit) => unit.id.toString() === currentPurchaseUnitId)
+      ? filteredUnits
+      : [...filteredUnits, currentPurchaseUnit];
+  }, [displayedComponent, formData.purchase_unit_id, units]);
 
   // Initialize form when component opens or initialComponent changes
   useEffect(() => {
@@ -318,13 +399,15 @@ export const IngredientDetailSheet = ({
       setFormData({
         name: initialComponent.name || '',
         purchase_cost: initialComponent.purchase_cost || 0,
-        purchase_unit_id: initialComponent.purchase_unit_id?.toString() || '',
+        purchase_unit_id: (initialComponent.purchase_unit_of_measure_id ?? initialComponent.purchase_unit_id)?.toString() || '',
         price: initialComponent.price || 0,
+        purchase_cost_qty: initialComponent.purchase_cost_qty ?? 1,
       });
       setPriceDisplayValues({
         purchase_cost: priceToDisplayValue(initialComponent.purchase_cost),
         price: priceToDisplayValue(initialComponent.price),
       });
+      setPurchaseCostQtyDisplayValue(decimalToDisplayValue(initialComponent.purchase_cost_qty ?? 1));
       // Reset to view mode when opening
       setIsEditMode(false);
     }
@@ -382,14 +465,15 @@ export const IngredientDetailSheet = ({
       setFormData({
         name: initialComponent.name || '',
         purchase_cost: initialComponent.purchase_cost || 0,
-        purchase_unit_id: initialComponent.purchase_unit_id?.toString() || '',
+        purchase_unit_id: (initialComponent.purchase_unit_of_measure_id ?? initialComponent.purchase_unit_id)?.toString() || '',
         price: initialComponent.price || 0,
-        purchase_cost_qty: initialComponent.purchase_cost_qty || 1,
+        purchase_cost_qty: initialComponent.purchase_cost_qty ?? 1,
       });
       setPriceDisplayValues({
         purchase_cost: priceToDisplayValue(initialComponent.purchase_cost),
         price: priceToDisplayValue(initialComponent.price),
       });
+      setPurchaseCostQtyDisplayValue(decimalToDisplayValue(initialComponent.purchase_cost_qty ?? 1));
     }
   }, [initialComponent]);
 
@@ -415,8 +499,13 @@ export const IngredientDetailSheet = ({
     setFormData(prev => ({ ...prev, purchase_unit_id: value }));
   }, []);
 
-  const handlePurchaseCostQtyChange = useCallback((value: number) => {
-    setFormData(prev => ({ ...prev, purchase_cost_qty: value }));
+  const handlePurchaseCostQtyChange = useCallback((displayValue: string) => {
+    setPurchaseCostQtyDisplayValue(displayValue);
+    setFormData(prev => ({ ...prev, purchase_cost_qty: parseDecimalInput(displayValue) }));
+  }, []);
+
+  const handlePurchaseCostQtyBlur = useCallback((displayValue: string) => {
+    setPurchaseCostQtyDisplayValue(decimalToDisplayValue(parseDecimalInput(displayValue)));
   }, []);
 
   const handleSupplementPriceChange = useCallback((displayValue: string) => {
@@ -441,12 +530,15 @@ export const IngredientDetailSheet = ({
         <EditContent
           formData={formData}
           priceDisplayValues={priceDisplayValues}
+          purchaseCostQtyDisplayValue={purchaseCostQtyDisplayValue}
           units={units}
+          compatiblePurchaseUnits={compatiblePurchaseUnits}
           onNameChange={handleNameChange}
           onPurchaseCostChange={handlePurchaseCostChange}
           onPurchaseCostBlur={handlePurchaseCostBlur}
           onPurchaseUnitChange={handlePurchaseUnitChange}
           onPurchaseCostQtyChange={handlePurchaseCostQtyChange}
+          onPurchaseCostQtyBlur={handlePurchaseCostQtyBlur}
           onSupplementPriceChange={handleSupplementPriceChange}
           onSupplementPriceBlur={handleSupplementPriceBlur}
           onSave={handleSave}
@@ -457,9 +549,6 @@ export const IngredientDetailSheet = ({
         <ViewContent
           displayedComponent={displayedComponent}
           units={units}
-          onEdit={() => setIsEditMode(true)}
-          onDelete={() => setShowDeleteDialog(true)}
-          hasDelete={!!onDelete}
         />
       );
     },
@@ -468,18 +557,20 @@ export const IngredientDetailSheet = ({
       displayedComponent,
       formData,
       priceDisplayValues,
+      purchaseCostQtyDisplayValue,
       units,
+      compatiblePurchaseUnits,
       isSaving,
       handleNameChange,
       handlePurchaseCostChange,
       handlePurchaseCostBlur,
       handlePurchaseUnitChange,
       handlePurchaseCostQtyChange,
+      handlePurchaseCostQtyBlur,
       handleSupplementPriceChange,
       handleSupplementPriceBlur,
       handleSave,
       handleCancel,
-      onDelete,
     ]
   );
 
@@ -492,9 +583,34 @@ export const IngredientDetailSheet = ({
     return (
       <>
         <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent className="sm:max-w-md">
-            <SheetHeader>
-              <SheetTitle>Détail Ingrédient</SheetTitle>
+          <SheetContent className="sm:max-w-md [&>button]:hidden">
+            <SheetHeader className="border-b pb-4">
+              <div className="flex items-center gap-3">
+                <SheetTitle className="min-w-0 flex-1 truncate">
+                  {isEditMode ? "Modifier l'ingrédient" : displayedComponent.name}
+                </SheetTitle>
+                {!isEditMode && (
+                  <DetailViewActions
+                    onEdit={() => setIsEditMode(true)}
+                    onDelete={() => setShowDeleteDialog(true)}
+                    hasDelete={!!onDelete}
+                  />
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => onOpenChange(false)}
+                  className="h-8 w-8 flex-shrink-0"
+                  title="Fermer"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              {isEditMode && (
+                <SheetDescription className="pr-10">
+                  Ajustez les informations principales avec la même structure que la vue détail.
+                </SheetDescription>
+              )}
             </SheetHeader>
             <div className="mt-6 overflow-y-auto max-h-[calc(100vh-120px)]">
               {content}
@@ -537,7 +653,7 @@ export const IngredientDetailSheet = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full h-screen max-w-full rounded-none flex flex-col gap-0 p-0">
+        <DialogContent className="w-full h-screen max-w-full rounded-none flex flex-col gap-0 p-0 [&>button]:hidden">
           {/* Fixed Header */}
           <DialogHeader className="border-b px-6 py-4 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">
@@ -549,9 +665,25 @@ export const IngredientDetailSheet = ({
               >
                 <X className="w-4 h-4" />
               </Button>
-              <DialogTitle className="text-center flex-1">{displayedComponent.name}</DialogTitle>
-              <div className="w-8" /> {/* Spacer for alignment */}
+              <DialogTitle className="text-center flex-1">
+                {isEditMode ? "Modifier l'ingrédient" : displayedComponent.name}
+              </DialogTitle>
+              {!isEditMode ? (
+                <DetailViewActions
+                  onEdit={() => setIsEditMode(true)}
+                  onDelete={() => setShowDeleteDialog(true)}
+                  hasDelete={!!onDelete}
+                  compact
+                />
+              ) : (
+                <div className="w-8 flex-shrink-0" />
+              )}
             </div>
+            {isEditMode && (
+              <DialogDescription className="px-10 text-center">
+                Ajustez les informations principales avec la même structure que la vue détail.
+              </DialogDescription>
+            )}
           </DialogHeader>
 
           {/* Scrollable Content */}

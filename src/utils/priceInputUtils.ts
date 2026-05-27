@@ -17,6 +17,28 @@ export const parsePriceInput = (value: string): number => {
 };
 
 /**
+ * Convert display string (with . or ,) to decimal number
+ * @example "0,5" or "0.5" -> 0.5
+ * @example "200" -> 200
+ */
+export const parseDecimalInput = (value: string): number | undefined => {
+  if (!value?.trim()) return undefined;
+  const normalized = value.replace(',', '.').trim();
+  const parsed = Number.parseFloat(normalized);
+  return Number.isNaN(parsed) ? undefined : parsed;
+};
+
+/**
+ * Convert decimal number to display string with comma separator
+ * @example 0.5 -> "0,5"
+ * @example 200 -> "200"
+ */
+export const decimalToDisplayValue = (value: number | undefined): string => {
+  if (value === undefined || value === null || Number.isNaN(value)) return '';
+  return value.toString().replace('.', ',');
+};
+
+/**
  * Convert cents to display string (format: XX,XX with comma as separator)
  * @example 550 → "5,50"
  * @example 1000 → "10,00"

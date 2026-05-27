@@ -40,7 +40,15 @@ export interface SubProduct {
 export interface UnitOfMeasure {
   id: string | number;  // String format from real API, number from legacy
   name: string;
-  compatible_with: string[];
+  short_name?: string;
+  conversions: UnitConversion[];
+}
+
+export interface UnitConversion {
+  to_unit_id: string | number;
+  to_unit_name?: string;
+  to_unit_short_name?: string;
+  multiplier: number;
 }
 
 export interface Component {
@@ -56,7 +64,7 @@ export interface Component {
   quantity?: number;  // Quantity in the product composition
   cost?: number;  // Cost of the component in the product
   purchase_cost?: number;  // Purchase price (prix d'achat) in cents
-  purchase_price_per_unit?: number;  // Purchase price per unit (prix d'achat unitaire) in cents
+  purchase_price_per_unit?: number;  // Purchase price per purchase unit in cents
   purchase_unit_id?: string | number;  // Purchase unit of measure ID
   purchase_unit_of_measure?: string;  // Purchase unit label
   purchase_unit_of_measure_id?: string;  // Purchase unit of measure ID from API (string)

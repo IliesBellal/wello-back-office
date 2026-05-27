@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { convertQuantity, convertUnitPrice, findUnitById } from '@/utils/unitConversions';
 
 type SortKey = 'name' | 'category' | 'price' | 'unit';
 type SortDir = 'asc' | 'desc';
@@ -37,7 +38,36 @@ const formatPrice = (cents: number | undefined): string => {
 
 const getUnitLabel = (unitId: string | number | undefined, units: UnitOfMeasure[]): string => {
   if (!unitId) return '—';
-  return units.find(u => u.id === unitId || u.id.toString() === unitId.toString())?.name || unitId.toString();
+  return findUnitById(units, unitId)?.name || unitId.toString();
+};
+
+const getPurchasePricePerDisplayedUnit = (ingredient: Component, units: UnitOfMeasure[]): number | undefined => {
+  const storageUnitId = ingredient.unit_of_measure_id || ingredient.unit_id;
+  const purchaseUnitId = ingredient.purchase_unit_of_measure_id || ingredient.purchase_unit_id || storageUnitId;
+
+  if (
+    ingredient.purchase_cost !== undefined
+    && ingredient.purchase_cost_qty !== undefined
+    && ingredient.purchase_cost_qty > 0
+  ) {
+    const purchaseQuantityInStorageUnit = convertQuantity(
+      ingredient.purchase_cost_qty,
+      purchaseUnitId,
+      storageUnitId,
+      units,
+    );
+
+    if (purchaseQuantityInStorageUnit !== undefined && purchaseQuantityInStorageUnit > 0) {
+      return ingredient.purchase_cost / purchaseQuantityInStorageUnit;
+    }
+  }
+
+  const pricePerPurchaseUnit = ingredient.purchase_price_per_unit;
+  if (pricePerPurchaseUnit === undefined) {
+    return undefined;
+  }
+
+  return convertUnitPrice(pricePerPurchaseUnit, purchaseUnitId, storageUnitId, units);
 };
 
 export const IngredientsTable = ({
@@ -98,6 +128,11 @@ export const IngredientsTable = ({
               ? categories[ingredient.category_id] || ingredient.category || '—'
               : ingredient.category || '—';
             const unitLabel = getUnitLabel(ingredient.unit_of_measure_id || ingredient.unit_id, units);
+            const purchasePricePerDisplayedUnit = getPurchasePricePerDisplayedUnit(ingredient, units);
+            const displayedUnitLabel = ingredient.unit_of_measure_short_name
+              || findUnitById(units, ingredient.unit_of_measure_id || ingredient.unit_id)?.short_name
+              || ingredient.unit_of_measure
+              || unitLabel;
 
             return (
               <TableRow
@@ -115,8 +150,8 @@ export const IngredientsTable = ({
                 </TableCell>
                 <TableCell>{formatPrice(ingredient.price)}</TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {ingredient.purchase_price_per_unit && (ingredient.unit_of_measure_short_name || ingredient.unit_of_measure)
-                    ? `${formatPrice(ingredient.purchase_price_per_unit)} / ${ingredient.unit_of_measure_short_name ?? ingredient.unit_of_measure}`
+                  {purchasePricePerDisplayedUnit !== undefined && displayedUnitLabel
+                    ? `${formatPrice(purchasePricePerDisplayedUnit)} / ${displayedUnitLabel}`
                     : '—'}
                 </TableCell>
               </TableRow>

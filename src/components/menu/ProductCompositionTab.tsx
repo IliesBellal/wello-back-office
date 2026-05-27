@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { getCompatibleUnits as getCompatibleUnitsForBaseUnit } from '@/utils/unitConversions';
 
 interface ProductCompositionTabProps {
   composition: ProductComposition[];
@@ -55,7 +56,7 @@ export const ProductCompositionTab = ({
     return units.find(u => u.id === unitId);
   };
 
-  const getCompatibleUnits = (componentId: string) => {
+  const getCompatibleUnitsForComponent = (componentId: string) => {
     const component = getComponentDetails(componentId);
     if (!component) return [];
 
@@ -65,17 +66,24 @@ export const ProductCompositionTab = ({
       // If component has unit_of_measure directly, return as single option
       if (component.unit_of_measure) {
         return [{
-          id: 0,
+          id: component.unit_of_measure,
           name: component.unit_of_measure,
-          compatible_with: []
+          short_name: component.unit_of_measure,
+          conversions: [
+            {
+              to_unit_id: component.unit_of_measure,
+              to_unit_name: component.unit_of_measure,
+              to_unit_short_name: component.unit_of_measure,
+              multiplier: 1,
+            },
+          ],
         }];
       }
       return [];
     }
 
-    return units.filter(u => 
-      baseUnit.compatible_with.includes(u.id.toString())
-    );
+    const compatibleUnits = getCompatibleUnitsForBaseUnit(baseUnit.id, units);
+    return compatibleUnits.length > 0 ? compatibleUnits : [baseUnit];
   };
 
   const handleAddItem = () => {
@@ -169,7 +177,7 @@ export const ProductCompositionTab = ({
                   <SelectValue placeholder="Sélectionner une unité" />
                 </SelectTrigger>
                 <SelectContent>
-                  {getCompatibleUnits(newItem.component_id || '').map((unit) => (
+                  {getCompatibleUnitsForComponent(newItem.component_id || '').map((unit) => (
                     <SelectItem key={unit.id} value={unit.id.toString()}>
                       {unit.name}
                     </SelectItem>

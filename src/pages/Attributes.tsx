@@ -33,6 +33,7 @@ import { Plus, Trash2, Edit, ChevronLeft, Settings2, GripVertical } from 'lucide
 import { useAttributesData } from '@/hooks/useAttributesData';
 import { Attribute, AttributeOption } from '@/types/menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { getCompatibleUnits as getCompatibleUnitsForBaseUnit } from '@/utils/unitConversions';
 import {
   DndContext,
   closestCenter,
@@ -373,13 +374,15 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
   };
 
   // Get compatible units for a component
-  const getCompatibleUnits = (componentId: string) => {
+  const getCompatibleUnitsForComponent = (componentId: string) => {
     const component = components.find(c => c.component_id === componentId);
     if (!component) return units || [];
     const componentUnitId = component.unit_of_measure_id || component.unit_id;
     const componentUnit = (units || []).find(u => u.id === componentUnitId || u.id.toString() === componentUnitId?.toString());
-    if (!componentUnit || !componentUnit.compatible_with) return [componentUnit].filter(Boolean);
-    return (units || []).filter(u => componentUnit.compatible_with?.includes(u.id.toString()) || componentUnit.compatible_with?.includes(u.id as any));
+    if (!componentUnit) return [];
+
+    const compatibleUnits = getCompatibleUnitsForBaseUnit(componentUnitId, units || []);
+    return compatibleUnits.length > 0 ? compatibleUnits : [componentUnit];
   };
 
   const handleOptionDragEnd = (event: any) => {
@@ -550,7 +553,7 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
                         <SortableContext items={(formData.options ?? []).map((o, idx) => getOptionRowId(o, idx))} strategy={verticalListSortingStrategy}>
                           {(formData.options ?? []).map((option, index) => {
                             const sortableId = getOptionRowId(option, index);
-                            const compatibleUnits = option.component_id ? getCompatibleUnits(option.component_id) : [];
+                            const compatibleUnits = option.component_id ? getCompatibleUnitsForComponent(option.component_id) : [];
                             return (
                               <SortableOptionRow
                                 key={sortableId}

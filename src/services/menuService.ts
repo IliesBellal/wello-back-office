@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
-import { TvaRateGroup, Menu, UnitOfMeasure, Component, Attribute, Product, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
 
 // ============= Mock Data =============
 const mockTvaRates: TvaRateGroup[] = [
@@ -35,12 +35,62 @@ const mockTvaRates: TvaRateGroup[] = [
 ];
 
 const mockUnitsOfMeasure: UnitOfMeasure[] = [
-  { id: "1", name: "Pièces", compatible_with: ["1"] },
-  { id: "2", name: "Grammes", compatible_with: ["2", "3"] },
-  { id: "3", name: "Kilogrammes", compatible_with: ["2", "3"] },
-  { id: "4", name: "Litres", compatible_with: ["4", "5", "6"] },
-  { id: "5", name: "Millilitres", compatible_with: ["4", "5", "6"] },
-  { id: "6", name: "Centilitres", compatible_with: ["4", "5"] }
+  {
+    id: "1",
+    name: "Pièces",
+    short_name: "Pce",
+    conversions: [
+      { to_unit_id: "1", to_unit_name: "Pièces", to_unit_short_name: "Pce", multiplier: 1 },
+    ],
+  },
+  {
+    id: "2",
+    name: "Grammes",
+    short_name: "g",
+    conversions: [
+      { to_unit_id: "2", to_unit_name: "Grammes", to_unit_short_name: "g", multiplier: 1 },
+      { to_unit_id: "3", to_unit_name: "Kilogrammes", to_unit_short_name: "Kg", multiplier: 0.001 },
+    ],
+  },
+  {
+    id: "3",
+    name: "Kilogrammes",
+    short_name: "Kg",
+    conversions: [
+      { to_unit_id: "3", to_unit_name: "Kilogrammes", to_unit_short_name: "Kg", multiplier: 1 },
+      { to_unit_id: "2", to_unit_name: "Grammes", to_unit_short_name: "g", multiplier: 1000 },
+    ],
+  },
+  {
+    id: "4",
+    name: "Litres",
+    short_name: "L",
+    conversions: [
+      { to_unit_id: "4", to_unit_name: "Litres", to_unit_short_name: "L", multiplier: 1 },
+      { to_unit_id: "5", to_unit_name: "Millilitres", to_unit_short_name: "mL", multiplier: 1000 },
+      { to_unit_id: "6", to_unit_name: "Centilitres", to_unit_short_name: "cL", multiplier: 100 },
+    ],
+  },
+  {
+    id: "5",
+    name: "Millilitres",
+    short_name: "mL",
+    conversions: [
+      { to_unit_id: "5", to_unit_name: "Millilitres", to_unit_short_name: "mL", multiplier: 1 },
+      { to_unit_id: "4", to_unit_name: "Litres", to_unit_short_name: "L", multiplier: 0.001 },
+      { to_unit_id: "6", to_unit_name: "Centilitres", to_unit_short_name: "cL", multiplier: 0.1 },
+    ],
+  },
+  {
+    id: "6",
+    name: "Centilitres",
+    short_name: "cL",
+    conversions: [
+      { to_unit_id: "6", to_unit_name: "Centilitres", to_unit_short_name: "cL", multiplier: 1 },
+      { to_unit_id: "4", to_unit_name: "Litres", to_unit_short_name: "L", multiplier: 0.01 },
+      { to_unit_id: "5", to_unit_name: "Millilitres", to_unit_short_name: "mL", multiplier: 10 },
+    ],
+  },
 ];
 
 const mockComponents: Component[] = [
@@ -584,9 +634,34 @@ export const menuService = {
 
   async getUnitsOfMeasure(): Promise<UnitOfMeasure[]> {
     logAPI('GET', '/menu/units_of_measures');
+    type ApiUnitOfMeasure = Omit<UnitOfMeasure, 'conversions'> & {
+      conversions?: UnitConversion[];
+      conversion?: UnitConversion[];
+    };
+
+    const normalizeUnitsOfMeasure = (units: ApiUnitOfMeasure[] | undefined): UnitOfMeasure[] => (
+      Array.isArray(units)
+        ? units.map((unit) => ({
+            ...unit,
+            short_name: unit.short_name ?? unit.name,
+            conversions: Array.isArray(unit.conversions)
+              ? unit.conversions.map((conversion) => ({
+                  ...conversion,
+                  multiplier: Number(conversion.multiplier),
+                }))
+              : Array.isArray(unit.conversion)
+                ? unit.conversion.map((conversion) => ({
+                  ...conversion,
+                  multiplier: Number(conversion.multiplier),
+                }))
+                : [],
+          }))
+        : []
+    );
+
     return withMock(
-      () => [...mockUnitsOfMeasure],
-      () => apiClient.get<WelloApiResponse<UnitOfMeasure[]>>('/menu/units_of_measures').then(res => res.data)
+      () => normalizeUnitsOfMeasure(mockUnitsOfMeasure),
+      () => apiClient.get<WelloApiResponse<UnitOfMeasure[]>>('/menu/units_of_measures').then(res => normalizeUnitsOfMeasure(res.data))
     );
   },
 
@@ -625,8 +700,11 @@ export const menuService = {
           unit_of_measure_short_name?: string;
           purchase_price?: number;
           purchase_price_qty?: number;
+          purchase_price_per_unit?: number;
           purchase_cost?: number;
           purchase_cost_qty?: number;
+          purchase_unit_of_measure_id?: string;
+          purchase_unit_of_measure?: string;
           status: string;
         }
         
@@ -635,6 +713,9 @@ export const menuService = {
             categories.push(category);
             if (category.components && Array.isArray(category.components)) {
               category.components.forEach((comp: ApiComponent) => {
+                const purchaseCost = comp.purchase_price ?? comp.purchase_cost;
+                const purchaseCostQty = comp.purchase_price_qty ?? comp.purchase_cost_qty;
+
                 components.push({
                   component_id: comp.component_id,
                   name: comp.name,
@@ -645,13 +726,16 @@ export const menuService = {
                   unit_of_measure: comp.unit_of_measure,
                   unit_of_measure_id: comp.unit_of_measure_id,
                   unit_of_measure_short_name: comp.unit_of_measure_short_name ?? comp.unit_of_measure,
-                  purchase_cost: comp.purchase_price || comp.purchase_cost,
-                  purchase_cost_qty: comp.purchase_price_qty || comp.purchase_cost_qty,
-                  purchase_price_per_unit: (() => {
-                    const cost = comp.purchase_price || comp.purchase_cost;
-                    const qty = comp.purchase_price_qty || comp.purchase_cost_qty;
-                    return cost && qty ? Math.round(cost / qty) : undefined;
-                  })(),
+                  purchase_cost: purchaseCost,
+                  purchase_cost_qty: purchaseCostQty,
+                  purchase_price_per_unit: comp.purchase_price_per_unit ?? (
+                    purchaseCost !== undefined && purchaseCostQty !== undefined && purchaseCostQty !== 0
+                      ? purchaseCost / purchaseCostQty
+                      : undefined
+                  ),
+                  purchase_unit_id: comp.purchase_unit_of_measure_id,
+                  purchase_unit_of_measure: comp.purchase_unit_of_measure,
+                  purchase_unit_of_measure_id: comp.purchase_unit_of_measure_id,
                   status: comp.status,
                   available: comp.status === '1'
                 });
@@ -923,7 +1007,7 @@ export const menuService = {
     );
   },
 
-  async updateComponent(componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string }): Promise<Component> {
+  async updateComponent(componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }): Promise<Component> {
     logAPI('PATCH', `/menu/components/${componentId}`, data);
     return withMock(
       () => ({ 
@@ -938,29 +1022,40 @@ export const menuService = {
           price: number;
           unit_of_measure: string;
           unit_of_measure_id: string;
+          unit_of_measure_short_name?: string;
           purchase_price?: number;
           purchase_price_qty?: number;
+          purchase_price_per_unit?: number;
           purchase_cost?: number;
           purchase_cost_qty?: number;
-          purchase_unit_of_measure_id: string;
-          purchase_unit_of_measure: string;
+          purchase_unit_of_measure_id?: string;
+          purchase_unit_of_measure?: string;
           status: string;
         }
 
         const response = await apiClient.patch<WelloApiResponse<{ component: ApiComponentResponse }>>(`/menu/components/${componentId}`, data);
         const apiComponent = response.data.component;
+        const purchaseCost = apiComponent.purchase_price ?? apiComponent.purchase_cost;
+        const purchaseCostQty = apiComponent.purchase_price_qty ?? apiComponent.purchase_cost_qty;
 
         return {
           component_id: apiComponent.component_id,
           name: apiComponent.name,
           category: apiComponent.category,
+          category_id: apiComponent.category,
           price: apiComponent.price,
-          unit_id: parseInt(apiComponent.unit_of_measure_id),
+          unit_id: Number.parseInt(apiComponent.unit_of_measure_id, 10),
           unit_of_measure: apiComponent.unit_of_measure,
           unit_of_measure_id: apiComponent.unit_of_measure_id,
-          purchase_cost: apiComponent.purchase_price || apiComponent.purchase_cost,
-          purchase_cost_qty: apiComponent.purchase_price_qty || apiComponent.purchase_cost_qty,
-          purchase_unit_id: parseInt(apiComponent.purchase_unit_of_measure_id),
+          unit_of_measure_short_name: apiComponent.unit_of_measure_short_name ?? apiComponent.unit_of_measure,
+          purchase_cost: purchaseCost,
+          purchase_cost_qty: purchaseCostQty,
+          purchase_price_per_unit: apiComponent.purchase_price_per_unit ?? (
+            purchaseCost !== undefined && purchaseCostQty !== undefined && purchaseCostQty !== 0
+              ? purchaseCost / purchaseCostQty
+              : undefined
+          ),
+          purchase_unit_id: apiComponent.purchase_unit_of_measure_id,
           purchase_unit_of_measure: apiComponent.purchase_unit_of_measure,
           purchase_unit_of_measure_id: apiComponent.purchase_unit_of_measure_id,
           status: apiComponent.status,
