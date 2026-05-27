@@ -29,7 +29,6 @@ import {
   ArrowLeftRight,
   ShieldCheck,
   ClipboardList,
-  AlertTriangle,
   Home,
   ShoppingBag,
 } from 'lucide-react';
@@ -306,22 +305,10 @@ export const NAV_ITEMS: NavItem[] = [
     icon: ShieldCheck,
     children: [
       {
-        id: 'haccp-compliance',
-        title: 'Conformité',
-        icon: ShieldCheck,
-        href: '/haccp/compliance',
-      },
-      {
         id: 'haccp-activity',
         title: 'Activité',
         icon: ClipboardList,
         href: '/haccp/activity',
-      },
-      {
-        id: 'haccp-alerts',
-        title: 'Alertes',
-        icon: AlertTriangle,
-        href: '/haccp/alerts',
       },
       {
         id: 'haccp-settings',

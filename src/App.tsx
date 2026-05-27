@@ -39,9 +39,7 @@ import EquipePlanning from './pages/equipe/Planning';
 import EquipeEmployes from './pages/equipe/Employees';
 import EquipePointages from './pages/equipe/Timesheets';
 import EquipeConges from './pages/equipe/Leaves';
-import HacCPCompliance from './pages/haccp/Compliance';
 import HacCPActivity from './pages/haccp/Activity';
-import HacCPAlerts from './pages/haccp/Alerts';
 import HacCPSettings from './pages/haccp/Settings';
 import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
@@ -113,10 +111,8 @@ const App = () => (
               <Route path="/integrations/deliveroo" element={<ProtectedRoute><Deliveroo /></ProtectedRoute>} />
               
               {/* HACCP - Hygiene & Safety */}
-              <Route path="/haccp/compliance" element={<ProtectedRoute><HacCPCompliance /></ProtectedRoute>} />
               <Route path="/haccp/activity" element={<ProtectedRoute><HacCPActivity /></ProtectedRoute>} />
               <Route path="/haccp/history" element={<Navigate to="/haccp/activity" replace />} />
-              <Route path="/haccp/alerts" element={<ProtectedRoute><HacCPAlerts /></ProtectedRoute>} />
               <Route path="/haccp/settings" element={<ProtectedRoute><HacCPSettings /></ProtectedRoute>} />
               
               {/* 404 Fallback */}

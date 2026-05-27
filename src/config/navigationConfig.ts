@@ -29,7 +29,6 @@ import {
   ArrowLeftRight,
   ShieldCheck,
   ClipboardList,
-  AlertTriangle,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -288,22 +287,10 @@ export const navigationConfig: NavigationItem[] = [
     icon: ShieldCheck,
     subItems: [
       {
-        id: 'haccp-compliance',
-        label: 'Conformité',
-        icon: ShieldCheck,
-        path: '/haccp/compliance',
-      },
-      {
         id: 'haccp-activity',
         label: 'Activité',
         icon: ClipboardList,
         path: '/haccp/activity',
-      },
-      {
-        id: 'haccp-alerts',
-        label: 'Alertes',
-        icon: AlertTriangle,
-        path: '/haccp/alerts',
       },
       {
         id: 'haccp-settings',
