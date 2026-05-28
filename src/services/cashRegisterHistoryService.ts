@@ -1,4 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from '@/services/apiClient';
+import { getStoredAuthToken } from '@/types/auth';
 import { toUTCDateString } from '@/utils/apiDate';
 
 // ============= TYPES =============
@@ -378,7 +379,7 @@ export const exportRegisterPDF = async (registerId: string): Promise<void> => {
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+            Authorization: `Bearer ${getStoredAuthToken() || ''}`,
           },
         }
       );
@@ -427,7 +428,7 @@ export const exportPeriodRegisters = async (
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${localStorage.getItem('authToken') || ''}`,
+            Authorization: `Bearer ${getStoredAuthToken() || ''}`,
           },
           body: JSON.stringify({
             start_date: startDateUTC,

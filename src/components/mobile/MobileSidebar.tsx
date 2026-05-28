@@ -34,7 +34,7 @@ export const MobileSidebar = ({ onClose }: MobileSidebarProps) => {
     <div className="flex flex-col h-full bg-sidebar">
       <NavHeader
         title="Wello Resto"
-        subtitle={authData.merchantName || 'Wello Resto'}
+        subtitle={authData.merchant.business_name || authData.merchant.name || 'Wello Resto'}
         className="h-auto min-h-20 py-4"
       />
 

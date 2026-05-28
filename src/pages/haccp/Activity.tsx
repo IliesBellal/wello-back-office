@@ -82,7 +82,12 @@ const getTypeLabel = (type: string) => {
   }
 };
 
-const getActivityDetails = (activity: HaccpActivity): string => {
+const toFiniteNumber = (value: unknown): number | null => {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const getActivitySummary = (activity: HaccpActivity): string => {
   if (activity.type === 'temperatures') {
     const readingsCount = Number(activity.metadata?.readings_count);
     if (Number.isFinite(readingsCount) && readingsCount > 0) {
@@ -100,6 +105,52 @@ const getActivityDetails = (activity: HaccpActivity): string => {
   }
 
   return activity.subtitle;
+};
+
+const getCorrectiveActionsSummary = (activity: HaccpActivity): string | null => {
+  if (activity.type !== 'temperatures') {
+    return null;
+  }
+
+  const readingsWithCorrectiveActions = toFiniteNumber(activity.metadata?.readings_with_corrective_actions_count);
+  if (readingsWithCorrectiveActions && readingsWithCorrectiveActions > 0) {
+    return `${readingsWithCorrectiveActions} relevé${readingsWithCorrectiveActions > 1 ? 's' : ''} avec action corrective`;
+  }
+
+  const correctiveActionsCount = toFiniteNumber(activity.metadata?.corrective_actions_count);
+  if (correctiveActionsCount && correctiveActionsCount > 0) {
+    return `${correctiveActionsCount} action${correctiveActionsCount > 1 ? 's' : ''} corrective${correctiveActionsCount > 1 ? 's' : ''}`;
+  }
+
+  if (activity.metadata?.has_corrective_actions === true) {
+    return 'Actions correctives renseignées';
+  }
+
+  return null;
+};
+
+const getActivityDetails = (activity: HaccpActivity): React.ReactNode => {
+  const summary = getActivitySummary(activity);
+  const correctiveActionsSummary = getCorrectiveActionsSummary(activity);
+
+  if (!correctiveActionsSummary) {
+    return summary;
+  }
+
+  return (
+    <div className="space-y-1">
+      <div>{summary}</div>
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <Badge
+          variant="outline"
+          className="border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-50"
+        >
+          Actions correctives
+        </Badge>
+        <span>{correctiveActionsSummary}</span>
+      </div>
+    </div>
+  );
 };
 
 export const Activity = () => {

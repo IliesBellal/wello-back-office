@@ -29,6 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 import { notificationsService, UserNotification } from '@/services/notificationsService';
 import type { AuthData } from '@/types/auth';
+import { hasModuleAccess } from '@/lib/moduleAccess';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,18 +78,20 @@ export const NotificationBell = ({ authData }: NotificationBellProps) => {
   }, []);
 
   const notifications: Notification[] = useMemo(
-    () => notificationsData.map((notif) => {
-      const defaultAction =
-        notif.type === 'STOCK_RUPTURE'
-          ? () => { window.location.href = '/stocks'; }
-          : () => { window.location.href = '/settings?tab=account'; };
+    () => notificationsData
+      .filter((notif) => notif.type !== 'STOCK_RUPTURE' || hasModuleAccess(authData, 'stock'))
+      .map((notif) => {
+        const defaultAction =
+          notif.type === 'STOCK_RUPTURE'
+            ? () => { window.location.href = '/stocks'; }
+            : () => { window.location.href = '/settings?tab=account'; };
 
-      return {
-        ...notif,
-        onAction: notif.actionLabel ? defaultAction : undefined,
-      };
-    }),
-    [notificationsData]
+        return {
+          ...notif,
+          onAction: notif.actionLabel ? defaultAction : undefined,
+        };
+      }),
+    [authData, notificationsData]
   );
 
   const count = notifications.length;

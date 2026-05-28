@@ -1,4 +1,6 @@
 import { SVGProps } from 'react';
+import type { AuthData, ModuleCapability } from '@/types/auth';
+import { hasModuleAccess } from '@/lib/moduleAccess';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -39,6 +41,7 @@ export interface NavigationSubItem {
   icon: IconComponent;
   path: string;
   badge?: number;
+  requiredModule?: ModuleCapability;
 }
 
 export interface NavigationItem {
@@ -48,6 +51,7 @@ export interface NavigationItem {
   path?: string | null;
   badge?: number;
   subItems?: NavigationSubItem[];
+  requiredModule?: ModuleCapability;
 }
 
 /**
@@ -140,15 +144,30 @@ export const navigationConfig: NavigationItem[] = [
   },
   // ═══ LOCATION & SERVICE ═══
   {
+    id: 'floor-plan',
+    label: 'Plan de salle',
+    icon: LayoutGrid,
+    path: '/locations',
+  },
+  {
     id: 'reservations',
     label: 'Réservations',
     icon: LayoutGrid,
+    requiredModule: 'bookings',
     subItems: [
       {
-        id: 'floor-plan',
-        label: 'Plan de salle',
-        icon: LayoutGrid,
-        path: '/locations',
+        id: 'reservations-list',
+        label: 'Liste des réservations',
+        icon: ClipboardList,
+        path: '/reservations/list',
+        requiredModule: 'bookings',
+      },
+      {
+        id: 'reservations-settings',
+        label: 'Paramètres',
+        icon: Settings,
+        path: '/reservations/settings',
+        requiredModule: 'bookings',
       },
     ],
   },
@@ -176,6 +195,7 @@ export const navigationConfig: NavigationItem[] = [
     label: 'Stocks',
     icon: Boxes,
     path: '/stocks',
+    requiredModule: 'stock',
   },
 
   // ═══ TEAM MANAGEMENT ═══
@@ -189,6 +209,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Planning',
         icon: Calendar,
         path: '/equipe/planning',
+        requiredModule: 'planning',
       },
       {
         id: 'team-employees',
@@ -201,12 +222,14 @@ export const navigationConfig: NavigationItem[] = [
         label: 'Pointages',
         icon: Clock,
         path: '/equipe/pointages',
+        requiredModule: 'planning',
       },
       {
         id: 'team-leaves',
         label: 'Congés & Échanges',
         icon: Umbrella,
         path: '/equipe/conges',
+        requiredModule: 'planning',
       },
     ],
   },
@@ -264,6 +287,7 @@ export const navigationConfig: NavigationItem[] = [
         label: 'ScanNOrder',
         icon: Store,
         path: '/integrations/scannorder',
+        requiredModule: 'scannorder',
       },
       {
         id: 'uber-eats',
@@ -285,18 +309,21 @@ export const navigationConfig: NavigationItem[] = [
     id: 'haccp',
     label: 'HACCP',
     icon: ShieldCheck,
+    requiredModule: 'haccp',
     subItems: [
       {
         id: 'haccp-activity',
         label: 'Activité',
         icon: ClipboardList,
         path: '/haccp/activity',
+        requiredModule: 'haccp',
       },
       {
         id: 'haccp-settings',
         label: 'Paramètres',
         icon: Settings,
         path: '/haccp/settings',
+        requiredModule: 'haccp',
       },
     ],
   },
@@ -322,3 +349,29 @@ export const navigationConfig: NavigationItem[] = [
     ],
   },
 ];
+
+export const getVisibleNavigationConfig = (authData: AuthData | null | undefined): NavigationItem[] => {
+  return navigationConfig.reduce<NavigationItem[]>((items, item) => {
+    if (!hasModuleAccess(authData, item.requiredModule)) {
+      return items;
+    }
+
+    if (!item.subItems) {
+      items.push(item);
+      return items;
+    }
+
+    const visibleSubItems = item.subItems.filter((subItem) => hasModuleAccess(authData, subItem.requiredModule));
+
+    if (visibleSubItems.length === 0 && !item.path) {
+      return items;
+    }
+
+    items.push({
+      ...item,
+      subItems: visibleSubItems,
+    });
+
+    return items;
+  }, []);
+};

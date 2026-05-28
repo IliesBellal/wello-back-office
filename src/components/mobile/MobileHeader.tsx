@@ -81,6 +81,10 @@ export const MobileHeader = () => {
 
   if (!authData) return null;
 
+  const currentMerchantName = authData.merchant.business_name || authData.merchant.name;
+  const currentMerchantId = authData.session.merchant_id;
+  const sessionMerchants = authData.session.merchants;
+
   return (
     <header className="h-14 bg-card border-b border-border shadow-soft flex items-center justify-between px-3 safe-area-top md:hidden">
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
@@ -103,18 +107,18 @@ export const MobileHeader = () => {
             disabled={isSwitching}
           >
             <Building2 className="w-4 h-4 text-primary flex-shrink-0" />
-            <span className="font-medium truncate max-w-[120px]">{authData.merchantName}</span>
+            <span className="font-medium truncate max-w-[120px]">{currentMerchantName}</span>
             <ChevronDown className="w-3 h-3 opacity-50 flex-shrink-0" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="center" className="w-72 bg-popover z-50">
           <DropdownMenuLabel>Établissements</DropdownMenuLabel>
           <DropdownMenuSeparator />
-          {authData.merchants.map((merchant, index) => {
-            const isActive = merchant.merchant_id === authData.merchantId;
+          {sessionMerchants.map((merchant, index) => {
+            const isActive = merchant.id === currentMerchantId;
             return (
               <DropdownMenuItem
-                key={merchant.merchant_id || `merchant-${index}`}
+                key={merchant.id || `merchant-${index}`}
                 onClick={() => !isActive && handleMerchantSwitch(merchant.token, merchant.business_name)}
                 className={`flex flex-col items-start gap-0.5 py-3 cursor-pointer min-h-[44px] ${
                   isActive ? 'bg-primary/10' : ''

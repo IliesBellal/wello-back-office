@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { NavLink } from '@/components/NavLink';
-import { NAV_ITEMS, NavItem } from '@/config/navConfig';
+import { getVisibleNavItems, NavItem } from '@/config/navConfig';
 import { Collapsible, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useAuth } from '@/contexts/AuthContext';
 
 export type NavigationVariant = 'desktop' | 'mobile';
 
@@ -68,7 +69,9 @@ export const NavMenuContent: React.FC<NavMenuContentProps> = ({
   collapsedItemClassName,
 }) => {
   const location = useLocation();
+  const { authData } = useAuth();
   const [mobileOpenSections, setMobileOpenSections] = useState<Record<string, boolean>>({});
+  const visibleNavItems = getVisibleNavItems(authData);
 
   const handleNavClick = () => {
     onClose?.();
@@ -83,7 +86,7 @@ export const NavMenuContent: React.FC<NavMenuContentProps> = ({
 
   return (
     <nav className={containerClassName}>
-      {NAV_ITEMS.map((item) => {
+      {visibleNavItems.map((item) => {
         const Icon = item.icon;
         const hasChildren = Boolean(item.children && item.children.length > 0);
 

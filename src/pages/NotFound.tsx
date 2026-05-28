@@ -17,7 +17,7 @@ const NotFound = () => {
       <Card className="w-full max-w-md shadow-card">
         <CardContent className="pt-10 pb-8 text-center">
           <div className="mb-6">
-            <span className="text-8xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            <span className="text-8xl font-bold text-primary">
               404
             </span>
           </div>
@@ -27,7 +27,7 @@ const NotFound = () => {
           <p className="mb-8 text-muted-foreground">
             La page que vous recherchez n'existe pas ou a été déplacée.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <div className="flex flex-col justify-center gap-3 sm:flex-row">
             <Button
               variant="outline"
               onClick={() => navigate(-1)}

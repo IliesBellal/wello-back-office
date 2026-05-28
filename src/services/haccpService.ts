@@ -8,6 +8,28 @@ export interface HaccpActivityPerformer {
 export type HaccpActivityTypeFilter = 'all' | 'temperatures' | 'cleanings';
 export type HaccpActivityStatusFilter = 'all' | 'ok' | 'alert' | 'critical' | 'done';
 
+export interface HaccpActivityMetadata {
+  session_id?: string;
+  readings_count?: number;
+  executions_count?: number;
+  zone?: string;
+  expected_max?: number;
+  measured?: number;
+  corrective_actions_count?: number;
+  readings_with_corrective_actions_count?: number;
+  has_corrective_actions?: boolean;
+  [key: string]: unknown;
+}
+
+export interface TemperatureReadingCorrectiveAction {
+  action_id: string;
+  code: string;
+  label: string;
+  note?: string | null;
+  photo_url?: string | null;
+  follow_up_value?: string | number | null;
+}
+
 export interface HaccpActivity {
   id: string;
   type: string;
@@ -16,7 +38,7 @@ export interface HaccpActivity {
   performed_by: HaccpActivityPerformer;
   title: string;
   subtitle: string;
-  metadata: Record<string, unknown>;
+  metadata: HaccpActivityMetadata;
 }
 
 export interface HaccpActivitiesFilters {
@@ -70,7 +92,7 @@ const mockActivities: HaccpActivity[] = [
   {
     id: 'haccp-ts-5b27209e-18aa-4d07-ac70-87d4f0046c49',
     type: 'temperatures',
-    status: 'ok',
+    status: 'alert',
     performed_at: '2026-05-24T23:32:06Z',
     performed_by: {
       id: '2',
@@ -81,6 +103,9 @@ const mockActivities: HaccpActivity[] = [
     metadata: {
       readings_count: 2,
       session_id: 'haccp-ts-5b27209e-18aa-4d07-ac70-87d4f0046c49',
+      corrective_actions_count: 2,
+      readings_with_corrective_actions_count: 1,
+      has_corrective_actions: true,
     },
   },
   {
@@ -161,6 +186,7 @@ export interface TemperatureReading {
   zone_name: string;
   photo_url?: string | null;
   comment?: string | null;
+  corrective_actions?: TemperatureReadingCorrectiveAction[] | null;
   value: number;
   status: string;
   created_by: string;
@@ -188,7 +214,7 @@ interface TemperatureSessionResponse {
 const mockTemperatureSession: TemperatureSession = {
   id: 'haccp-ts-5b27209e-18aa-4d07-ac70-87d4f0046c49',
   merchant_id: '2',
-  status: 'ok',
+  status: 'alert',
   performed_at: '2026-05-24T23:32:06Z',
   performed_by: { id: '2', name: 'walid' },
   readings: [
@@ -213,9 +239,27 @@ const mockTemperatureSession: TemperatureSession = {
       zone_id: 'haccp-tz-9e78706b-d7f6-440d-bc2b-73d3414110e1',
       zone_name: 'Cuisine chaude',
       photo_url: null,
-      comment: null,
+      comment: 'Remise sous contrôle après anomalie détectée.',
       value: 3.8,
-      status: 'ok',
+      status: 'alert',
+      corrective_actions: [
+        {
+          action_id: 'haccp-ca-move-product',
+          code: 'move_product',
+          label: 'Déplacer le produit',
+          note: null,
+          photo_url: null,
+          follow_up_value: null,
+        },
+        {
+          action_id: 'haccp-ca-other',
+          code: 'other',
+          label: 'Autre',
+          note: 'Sonde nettoyée puis nouveau contrôle effectué après stabilisation.',
+          photo_url: 'https://placehold.co/160x160',
+          follow_up_value: 2.9,
+        },
+      ],
       created_by: '2',
       created_at: '2026-05-24T23:32:06Z',
       updated_at: '2026-05-24T23:32:06Z',

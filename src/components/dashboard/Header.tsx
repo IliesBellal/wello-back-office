@@ -92,12 +92,16 @@ export const Header = () => {
 
   if (!authData) return null;
 
+  const currentMerchantName = authData.merchant.business_name || authData.merchant.name;
+  const currentMerchantId = authData.session.merchant_id;
+  const sessionMerchants = authData.session.merchants;
+
   return (
     <header className="h-16 bg-card border-b border-border shadow-soft flex items-center justify-between gap-4 px-6">
       {/* Left Section - Greeting */}
       <div className="flex-shrink-0 min-w-max">
         <h2 className="text-lg font-semibold text-foreground">
-          Bonjour, {authData.first_name}
+          Bonjour, {authData.user.first_name}
         </h2>
         <p className="text-sm text-muted-foreground">
           {new Date().toLocaleDateString('fr-FR', { 
@@ -120,19 +124,19 @@ export const Header = () => {
           <DropdownMenuTrigger asChild>
             <Button variant="outline" className="gap-2 h-10 rounded-xl" disabled={isSwitching}>
               <Building2 className="w-4 h-4" />
-              <span className="font-medium">{authData.merchantName}</span>
+              <span className="font-medium">{currentMerchantName}</span>
               <ChevronDown className="w-4 h-4 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-72 bg-popover">
             <DropdownMenuLabel>Établissements</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {authData.merchants.map((merchant, index) => (
+            {sessionMerchants.map((merchant, index) => (
               <DropdownMenuItem
-                key={merchant.merchant_id || `merchant-${index}`}
+                key={merchant.id || `merchant-${index}`}
                 onClick={() => handleMerchantSwitch(merchant.token, merchant.business_name)}
                 className={`flex flex-col items-start gap-0.5 py-3 cursor-pointer ${
-                  merchant.merchant_id === authData.merchantId
+                  merchant.id === currentMerchantId
                     ? 'bg-primary/10'
                     : ''
                 }`}
@@ -140,7 +144,7 @@ export const Header = () => {
                 <div className="flex items-center gap-2 w-full">
                   <Building2 className="w-4 h-4 flex-shrink-0" />
                   <span className={`font-medium ${
-                    merchant.merchant_id === authData.merchantId ? 'text-primary' : ''
+                    merchant.id === currentMerchantId ? 'text-primary' : ''
                   }`}>
                     {merchant.business_name}
                   </span>

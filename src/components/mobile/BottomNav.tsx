@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { NavLink } from '@/components/NavLink';
-import { NAV_ITEMS, type NavItem } from '@/config/navConfig';
+import { getPrimaryNavItems, type NavItem } from '@/config/navConfig';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 /**
  * Mobile Bottom Navigation
@@ -19,16 +20,18 @@ import { cn } from '@/lib/utils';
  */
 export const BottomNav = () => {
   const location = useLocation();
+  const { authData } = useAuth();
+  const primaryNavItems = useMemo(() => getPrimaryNavItems(authData), [authData]);
 
   const { menuItem, homeItem, settingsItem } = useMemo(() => {
-    const findItem = (id: string): NavItem | undefined => NAV_ITEMS.find((item) => item.id === id);
+    const findItem = (id: string): NavItem | undefined => primaryNavItems.find((item) => item.id === id);
 
     return {
       menuItem: findItem('menu'),
       homeItem: findItem('home'),
       settingsItem: findItem('settings'),
     };
-  }, []);
+  }, [primaryNavItems]);
 
   const isParentActive = (item?: NavItem) => {
     if (!item) return false;

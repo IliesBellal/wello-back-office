@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react';
 import { Command } from 'cmdk';
-import { commandRegistry, commandCategories } from '@/config/commandRegistry';
+import { getCommandRegistry, commandCategories } from '@/config/commandRegistry';
 import { useFuzzySearch } from '@/hooks/useFuzzySearch';
 import { CommandAction } from '@/hooks/useCommandPalette';
 import { Search, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface CommandPaletteDialogProps {
   isOpen: boolean;
@@ -30,9 +31,11 @@ export function CommandPaletteDialog({
 }: CommandPaletteDialogProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const { authData } = useAuth();
+  const availableCommands = useMemo(() => getCommandRegistry(authData), [authData]);
 
   // Get fuzzy search results
-  const searchResults = useFuzzySearch(searchQuery, commandRegistry);
+  const searchResults = useFuzzySearch(searchQuery, availableCommands);
 
   // Group results by category
   const groupedResults = useMemo(() => {

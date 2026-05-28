@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { getStoredAuthToken } from '@/types/auth';
 import { toUTCDateString } from '@/utils/apiDate';
 
 export interface VATRate {
@@ -95,8 +96,7 @@ export const exportVATCSV = async (
   const startDateUTC = toUTCDateString(startDate);
   const endDateUTC = toUTCDateString(endDate);
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com";
-  const authData = localStorage.getItem("authData");
-  const authToken = authData ? JSON.parse(authData).token : null;
+  const authToken = getStoredAuthToken();
 
   const response = await fetch(
     `${API_BASE_URL}/accounting/vat/export-csv`,

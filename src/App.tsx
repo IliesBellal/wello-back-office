@@ -41,6 +41,8 @@ import EquipePointages from './pages/equipe/Timesheets';
 import EquipeConges from './pages/equipe/Leaves';
 import HacCPActivity from './pages/haccp/Activity';
 import HacCPSettings from './pages/haccp/Settings';
+import ReservationsListPage from './pages/reservations/List';
+import ReservationsSettingsPage from './pages/reservations/Settings';
 import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
 
@@ -74,11 +76,13 @@ const App = () => (
               
               {/* Location & Service */}
               <Route path="/locations" element={<ProtectedRoute><Locations /></ProtectedRoute>} />
+              <Route path="/reservations/list" element={<ProtectedRoute requiredModule="bookings"><ReservationsListPage /></ProtectedRoute>} />
+              <Route path="/reservations/settings" element={<ProtectedRoute requiredModule="bookings"><ReservationsSettingsPage /></ProtectedRoute>} />
               <Route path="/customers/list" element={<ProtectedRoute><CustomersList /></ProtectedRoute>} />
               <Route path="/customers/loyalty-programs" element={<ProtectedRoute><LoyaltyPrograms /></ProtectedRoute>} />
               
               {/* Stocks */}
-              <Route path="/stocks" element={<ProtectedRoute><Stocks /></ProtectedRoute>} />
+              <Route path="/stocks" element={<ProtectedRoute requiredModule="stock"><Stocks /></ProtectedRoute>} />
               
               {/* Accounting */}
               <Route path="/accounting/registers" element={<ProtectedRoute><CashRegisterHistory /></ProtectedRoute>} />
@@ -98,22 +102,22 @@ const App = () => (
               <Route path="/dashboard/order-history" element={<ProtectedRoute><DashboardOrderHistory /></ProtectedRoute>} />
               
               {/* Team Management */}
-              <Route path="/equipe/planning" element={<ProtectedRoute><EquipePlanning /></ProtectedRoute>} />
+              <Route path="/equipe/planning" element={<ProtectedRoute requiredModule="planning"><EquipePlanning /></ProtectedRoute>} />
               <Route path="/equipe/employes" element={<ProtectedRoute><EquipeEmployes /></ProtectedRoute>} />
-              <Route path="/equipe/pointages" element={<ProtectedRoute><EquipePointages /></ProtectedRoute>} />
-              <Route path="/equipe/conges" element={<ProtectedRoute><EquipeConges /></ProtectedRoute>} />
+              <Route path="/equipe/pointages" element={<ProtectedRoute requiredModule="planning"><EquipePointages /></ProtectedRoute>} />
+              <Route path="/equipe/conges" element={<ProtectedRoute requiredModule="planning"><EquipeConges /></ProtectedRoute>} />
               
               {/* Integrations */}
               <Route path="/integrations" element={<ProtectedRoute><IntegrationsOverview /></ProtectedRoute>} />
               <Route path="/integrations/overview" element={<ProtectedRoute><IntegrationsOverview /></ProtectedRoute>} />
-              <Route path="/integrations/scannorder" element={<ProtectedRoute><ScanNOrder /></ProtectedRoute>} />
+              <Route path="/integrations/scannorder" element={<ProtectedRoute requiredModule="scannorder"><ScanNOrder /></ProtectedRoute>} />
               <Route path="/integrations/uber-eats" element={<ProtectedRoute><UberEats /></ProtectedRoute>} />
               <Route path="/integrations/deliveroo" element={<ProtectedRoute><Deliveroo /></ProtectedRoute>} />
               
               {/* HACCP - Hygiene & Safety */}
-              <Route path="/haccp/activity" element={<ProtectedRoute><HacCPActivity /></ProtectedRoute>} />
-              <Route path="/haccp/history" element={<Navigate to="/haccp/activity" replace />} />
-              <Route path="/haccp/settings" element={<ProtectedRoute><HacCPSettings /></ProtectedRoute>} />
+              <Route path="/haccp/activity" element={<ProtectedRoute requiredModule="haccp"><HacCPActivity /></ProtectedRoute>} />
+              <Route path="/haccp/history" element={<ProtectedRoute requiredModule="haccp"><Navigate to="/haccp/activity" replace /></ProtectedRoute>} />
+              <Route path="/haccp/settings" element={<ProtectedRoute requiredModule="haccp"><HacCPSettings /></ProtectedRoute>} />
               
               {/* 404 Fallback */}
               <Route path="*" element={<NotFound />} />

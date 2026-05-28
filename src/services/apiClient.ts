@@ -1,4 +1,5 @@
 import { toast } from "@/hooks/use-toast";
+import { getStoredAuthToken } from "@/types/auth";
 
 // ============= Configuration =============
 export const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK === 'true';
@@ -137,16 +138,7 @@ const endRequestLogWithError = (context: LogContext, error: unknown) => {
 
 // ============= Auth Helpers =============
 const getAuthToken = (): string | null => {
-  const authData = localStorage.getItem("authData");
-  if (authData) {
-    try {
-      const parsed = JSON.parse(authData);
-      return parsed.token || null;
-    } catch {
-      return null;
-    }
-  }
-  return null;
+  return getStoredAuthToken();
 };
 
 const clearAuthAndRedirect = () => {

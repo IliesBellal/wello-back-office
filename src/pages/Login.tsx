@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type InputHTMLAttributes } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { OTPVerification } from '@/components/auth';
 import { AuthData } from '@/types/auth';
-import { Mail, Lock, Eye, EyeOff, Shield, Check } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Shield, Check, type LucideIcon } from 'lucide-react';
 
 // Animated background component
 const AnimatedBackground = () => {
@@ -65,6 +65,16 @@ const AnimatedBackground = () => {
 };
 
 // Input field with icon
+interface InputWithIconProps extends InputHTMLAttributes<HTMLInputElement> {
+  icon: LucideIcon;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  label: string;
+  showToggle?: boolean;
+  isPasswordVisible?: boolean;
+  onTogglePassword?: () => void;
+}
+
 const InputWithIcon = ({
   icon: Icon,
   type,
@@ -76,18 +86,7 @@ const InputWithIcon = ({
   isPasswordVisible,
   onTogglePassword,
   ...props
-}: {
-  icon: any;
-  type: string;
-  placeholder: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  label: string;
-  showToggle?: boolean;
-  isPasswordVisible?: boolean;
-  onTogglePassword?: () => void;
-  [key: string]: any;
-}) => {
+}: InputWithIconProps) => {
   return (
     <div className="space-y-2">
       <Label htmlFor={label} className="text-sm font-semibold text-slate-700">
@@ -144,10 +143,10 @@ const Login = () => {
   };
 
   const handleMFASuccess = async () => {
-    if (pendingAuthData?.token) {
+    if (pendingAuthData?.session.token) {
       try {
         setIsLoading(true);
-        const response = await authService.loginWithToken(pendingAuthData.token);
+        const response = await authService.loginWithToken(pendingAuthData.session.token);
 
         if (response.data.status === '1') {
           setAuthData(response.data);
@@ -155,7 +154,7 @@ const Login = () => {
           setPendingAuthData(null);
           toast({
             title: 'Connexion réussie',
-            description: `Bienvenue ${response.data.first_name}!`,
+            description: `Bienvenue ${response.data.user.first_name}!`,
           });
           navigate('/');
         } else {
@@ -223,7 +222,7 @@ const Login = () => {
 
         case '1':
         case 'success':
-          if (response.data.mfa_status === 'pending') {
+          if (response.data.session.mfa_status === 'pending') {
             setPendingAuthData(response.data);
             setShowMFAModal(true);
             toast({
@@ -234,7 +233,7 @@ const Login = () => {
             setAuthData(response.data);
             toast({
               title: 'Connexion réussie',
-              description: `Bienvenue ${response.data.first_name}!`,
+              description: `Bienvenue ${response.data.user.first_name}!`,
             });
             navigate('/');
           }
@@ -424,7 +423,7 @@ const Login = () => {
         isOpen={showMFAModal}
         onSuccess={handleMFASuccess}
         onCancel={handleMFACancel}
-        token={pendingAuthData?.token}
+        token={pendingAuthData?.session.token}
       />
     </div>
   );

@@ -21,8 +21,10 @@ import {
 import { Label } from '@/components/ui/label';
 import { integrationsService, type IntegrationPlatform } from '@/services/integrationsService';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasModuleAccess } from '@/lib/moduleAccess';
 
-const AVAILABLE_INTEGRATIONS: Array<{ id: IntegrationPlatform; label: string }> = [
+const ALL_INTEGRATIONS: Array<{ id: IntegrationPlatform; label: string }> = [
   { id: 'uber_eats', label: 'Uber Eats' },
   { id: 'deliveroo', label: 'Deliveroo' },
   { id: 'scannorder', label: 'ScanNOrder' },
@@ -37,23 +39,28 @@ interface EstablishmentClosureModalProps {
 export const EstablishmentClosureModal = ({
   triggerMode = 'button',
 }: EstablishmentClosureModalProps) => {
+  const { authData } = useAuth();
   const { toast } = useToast();
+  const availableIntegrations = useMemo(
+    () => ALL_INTEGRATIONS.filter((integration) => integration.id !== 'scannorder' || hasModuleAccess(authData, 'scannorder')),
+    [authData],
+  );
   const [open, setOpen] = useState(false);
   const [durationMinutes, setDurationMinutes] = useState('30');
   const [selectedIntegrations, setSelectedIntegrations] = useState<IntegrationPlatform[]>(
-    AVAILABLE_INTEGRATIONS.map(item => item.id)
+    availableIntegrations.map(item => item.id)
   );
   const [submitting, setSubmitting] = useState(false);
 
   const submitDisabled = submitting || selectedIntegrations.length === 0;
 
   const selectedLabel = useMemo(() => {
-    if (selectedIntegrations.length === AVAILABLE_INTEGRATIONS.length) {
+    if (selectedIntegrations.length === availableIntegrations.length) {
       return 'Toutes les integrations';
     }
 
     return `${selectedIntegrations.length} integration(s) selectionnee(s)`;
-  }, [selectedIntegrations]);
+  }, [availableIntegrations.length, selectedIntegrations]);
 
   const toggleIntegration = (integrationId: IntegrationPlatform, checked: boolean) => {
     if (checked) {
@@ -69,7 +76,7 @@ export const EstablishmentClosureModal = ({
 
     if (nextOpen) {
       setDurationMinutes('30');
-      setSelectedIntegrations(AVAILABLE_INTEGRATIONS.map(item => item.id));
+      setSelectedIntegrations(availableIntegrations.map(item => item.id));
     }
   };
 
@@ -166,7 +173,7 @@ export const EstablishmentClosureModal = ({
             <Label>Intégrations impactées</Label>
             <p className="text-xs text-muted-foreground">{selectedLabel}</p>
             <div className="grid gap-2 rounded-lg border p-3 sm:grid-cols-3">
-              {AVAILABLE_INTEGRATIONS.map(integration => {
+              {availableIntegrations.map(integration => {
                 const checked = selectedIntegrations.includes(integration.id);
 
                 return (

@@ -1,5 +1,13 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
 import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
+import { getStoredAuthToken } from "@/types/auth";
+
+interface MarketingCategoryApiItem {
+  category_id: string;
+  name: string;
+  display_order?: number;
+  available?: boolean;
+}
 
 // ============= Mock Data =============
 const mockTvaRates: TvaRateGroup[] = [
@@ -455,10 +463,10 @@ export const menuService = {
     return withMock(
       () => [...mockCategories],
       async () => {
-        const response = await apiClient.get<WelloApiResponse<{ categories: any[] }>>('/menu/marketing-categories');
+        const response = await apiClient.get<WelloApiResponse<{ categories: MarketingCategoryApiItem[] }>>('/menu/marketing-categories');
         const categories = response.data?.categories || [];
         // Map marketing category fields to standard Category structure
-        return categories.map((cat: any) => ({
+        return categories.map((cat) => ({
           category_id: cat.category_id,
           category: cat.name,
           category_name: cat.name,
@@ -929,9 +937,17 @@ export const menuService = {
         }
       } as Product),
       async () => {
-        const response = await apiClient.post<any>('/menu/products', payload);
+        const response = await apiClient.post<WelloApiResponse<{ product: Product }> | { product?: Product } | Product>('/menu/products', payload);
         // API returns { id, data: { product } }, extract the product
-        return response.data?.product || response;
+        if ('data' in response && response.data?.product) {
+          return response.data.product;
+        }
+
+        if ('product' in response && response.product) {
+          return response.product;
+        }
+
+        return response as Product;
       }
     );
   },
@@ -1087,16 +1103,7 @@ export const menuService = {
         const formData = new FormData();
         formData.append('photo', file);
         
-        const authToken = localStorage.getItem("authData");
-        let token = null;
-        if (authToken) {
-          try {
-            const parsed = JSON.parse(authToken);
-            token = parsed.token;
-          } catch {
-            // ignore
-          }
-        }
+        const token = getStoredAuthToken();
 
         const headers: Record<string, string> = {};
         if (token) {

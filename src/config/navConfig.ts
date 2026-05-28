@@ -1,4 +1,6 @@
 import { SVGProps } from 'react';
+import type { AuthData, ModuleCapability } from '@/types/auth';
+import { hasModuleAccess } from '@/lib/moduleAccess';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -41,6 +43,7 @@ export interface NavChild {
   icon: IconComponent;
   href: string;
   badge?: number;
+  requiredModule?: ModuleCapability;
 }
 
 export interface NavItem {
@@ -50,6 +53,7 @@ export interface NavItem {
   href?: string | null;
   children?: NavChild[];
   badge?: number;
+  requiredModule?: ModuleCapability;
   // For BottomNav: mark primary items that should appear in mobile bottom navigation
   primaryNav?: boolean;
 }
@@ -156,15 +160,31 @@ export const NAV_ITEMS: NavItem[] = [
 
   // ═══ LOCATIONS & RESERVATIONS ═══
   {
+    id: 'floor-plan',
+    title: 'Plan de salle',
+    icon: LayoutGrid,
+    href: '/locations',
+  },
+
+  {
     id: 'reservations',
     title: 'Réservations',
     icon: LayoutGrid,
+    requiredModule: 'bookings',
     children: [
       {
-        id: 'floor-plan',
-        title: 'Plan de salle',
-        icon: LayoutGrid,
-        href: '/locations',
+        id: 'reservations-list',
+        title: 'Liste des réservations',
+        icon: ClipboardList,
+        href: '/reservations/list',
+        requiredModule: 'bookings',
+      },
+      {
+        id: 'reservations-settings',
+        title: 'Paramètres',
+        icon: Settings,
+        href: '/reservations/settings',
+        requiredModule: 'bookings',
       },
     ],
   },
@@ -196,6 +216,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: 'Stocks',
     icon: Boxes,
     href: '/stocks',
+    requiredModule: 'stock',
   },
 
   // ═══ TEAM MANAGEMENT ═══
@@ -209,6 +230,7 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Planning',
         icon: Calendar,
         href: '/equipe/planning',
+        requiredModule: 'planning',
       },
       {
         id: 'team-employees',
@@ -221,12 +243,14 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Pointages',
         icon: Clock,
         href: '/equipe/pointages',
+        requiredModule: 'planning',
       },
       {
         id: 'team-leaves',
         title: 'Congés & Échanges',
         icon: Umbrella,
         href: '/equipe/conges',
+        requiredModule: 'planning',
       },
     ],
     primaryNav: true,
@@ -282,6 +306,7 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'ScanNOrder',
         icon: Store,
         href: '/integrations/scannorder',
+        requiredModule: 'scannorder',
       },
       {
         id: 'uber-eats',
@@ -303,18 +328,21 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'haccp',
     title: 'HACCP',
     icon: ShieldCheck,
+    requiredModule: 'haccp',
     children: [
       {
         id: 'haccp-activity',
         title: 'Activité',
         icon: ClipboardList,
         href: '/haccp/activity',
+        requiredModule: 'haccp',
       },
       {
         id: 'haccp-settings',
         title: 'Paramètres',
         icon: Settings,
         href: '/haccp/settings',
+        requiredModule: 'haccp',
       },
     ],
   },
@@ -343,9 +371,38 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /**
+ * Filter navigation items based on module access.
+ */
+export const getVisibleNavItems = (authData: AuthData | null | undefined): NavItem[] => {
+  return NAV_ITEMS.reduce<NavItem[]>((items, item) => {
+    if (!hasModuleAccess(authData, item.requiredModule)) {
+      return items;
+    }
+
+    if (!item.children) {
+      items.push(item);
+      return items;
+    }
+
+    const visibleChildren = item.children.filter((child) => hasModuleAccess(authData, child.requiredModule));
+
+    if (visibleChildren.length === 0 && !item.href) {
+      return items;
+    }
+
+    items.push({
+      ...item,
+      children: visibleChildren,
+    });
+
+    return items;
+  }, []);
+};
+
+/**
  * Get primary navigation items for BottomNav
  * Returns only items marked with primaryNav: true
  */
-export const getPrimaryNavItems = (): NavItem[] => {
-  return NAV_ITEMS.filter(item => item.primaryNav);
+export const getPrimaryNavItems = (authData: AuthData | null | undefined): NavItem[] => {
+  return getVisibleNavItems(authData).filter(item => item.primaryNav);
 };

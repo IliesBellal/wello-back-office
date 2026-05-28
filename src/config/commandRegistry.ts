@@ -1,6 +1,8 @@
-import { navigationConfig } from './navigationConfig';
+import { getVisibleNavigationConfig } from './navigationConfig';
 import { Search, Settings, LogOut, Moon, Sun, FileText, Plus, AlertTriangle, LayoutGrid } from 'lucide-react';
 import { SVGProps } from 'react';
+import type { AuthData, ModuleCapability } from '@/types/auth';
+import { hasModuleAccess } from '@/lib/moduleAccess';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
 
@@ -16,16 +18,17 @@ export interface CommandRegistry {
   icon: IconComponent;
   keywords: string[];
   action: CommandAction;
+  requiredModule?: ModuleCapability;
 }
 
 /**
  * Auto-generated navigation commands from navigationConfig
  * Extracts all navigation items and creates commands with automatic keywords
  */
-const generateNavigationCommands = (): CommandRegistry[] => {
+const generateNavigationCommands = (items: ReturnType<typeof getVisibleNavigationConfig>): CommandRegistry[] => {
   const commands: CommandRegistry[] = [];
 
-  navigationConfig.forEach((item) => {
+  items.forEach((item) => {
     // Add main item if it has a path
     if (item.path) {
       commands.push({
@@ -38,6 +41,7 @@ const generateNavigationCommands = (): CommandRegistry[] => {
           type: 'navigate' as const,
           path: item.path,
         },
+        requiredModule: item.requiredModule,
       });
     }
 
@@ -58,6 +62,7 @@ const generateNavigationCommands = (): CommandRegistry[] => {
           type: 'navigate' as const,
           path: subItem.path,
         },
+        requiredModule: subItem.requiredModule ?? item.requiredModule,
       });
     });
   });
@@ -105,6 +110,7 @@ const manualCommands: CommandRegistry[] = [
       type: 'navigate' as const,
       path: '/menu/components',
     },
+    requiredModule: 'stock',
   },
   {
     id: 'setting-theme',
@@ -136,10 +142,12 @@ const manualCommands: CommandRegistry[] = [
  * Combined registry: auto-generated navigation + manual commands
  * Total registry includes both route-based and callback-based actions
  */
-export const commandRegistry: CommandRegistry[] = [
-  ...generateNavigationCommands(),
-  ...manualCommands,
+export const getCommandRegistry = (authData: AuthData | null | undefined): CommandRegistry[] => [
+  ...generateNavigationCommands(getVisibleNavigationConfig(authData)),
+  ...manualCommands.filter((command) => hasModuleAccess(authData, command.requiredModule)),
 ];
+
+export const commandRegistry: CommandRegistry[] = getCommandRegistry(null);
 
 /**
  * Category order for grouping in UI

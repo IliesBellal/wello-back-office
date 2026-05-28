@@ -6,22 +6,24 @@ export const useIntegrationStatus = () => {
   const { authData } = useAuth();
 
   const statuses: IntegrationStatusMap = useMemo(() => {
-    const uberStoreId = authData?.integration_uber_eats?.store_id;
-    const deliverooLocationId = authData?.integration_deliveroo?.location_id;
+    const uberStoreId = authData?.integrations.uber_eats?.store_id;
+    const deliverooLocationId = authData?.integrations.deliveroo?.location_id;
+    const uberFeatureActive = authData?.capabilities.integrations.uber_eats ?? false;
+    const deliverooFeatureActive = authData?.capabilities.integrations.deliveroo ?? false;
 
     const hasValue = (value: unknown) =>
       typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
 
-    const hasUberConfig = Boolean(authData?.integration_uber_eats) && hasValue(uberStoreId);
-    const hasDeliverooConfig = Boolean(authData?.integration_deliveroo) && hasValue(deliverooLocationId);
+    const hasUberConfig = hasValue(uberStoreId);
+    const hasDeliverooConfig = hasValue(deliverooLocationId);
 
     return {
       uberEats: {
-        active: hasUberConfig,
+        active: uberFeatureActive,
         reason: hasUberConfig ? 'configured' : 'missing_config',
       },
       deliveroo: {
-        active: hasDeliverooConfig,
+        active: deliverooFeatureActive,
         reason: hasDeliverooConfig ? 'configured' : 'missing_config',
       },
     };
@@ -36,8 +38,8 @@ export const useIntegrationStatus = () => {
     };
 
     return {
-      uberEats: toRate(authData?.integration_uber_eats?.commission_rate, 30),
-      deliveroo: toRate(authData?.integration_deliveroo?.commission_rate, 20),
+      uberEats: toRate(authData?.integrations.uber_eats?.commission_rate, 30),
+      deliveroo: toRate(authData?.integrations.deliveroo?.commission_rate, 20),
     };
   }, [authData]);
 

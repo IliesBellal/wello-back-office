@@ -1,6 +1,7 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
-import { navigationConfig } from '@/config/navigationConfig';
+import { getVisibleNavigationConfig } from '@/config/navigationConfig';
+import { useAuth } from '@/contexts/AuthContext';
 
 const SIDEBAR_EXPANDED_KEY = 'wello-sidebar-expanded';
 const SIDEBAR_OPEN_MENU_KEY = 'wello-sidebar-open-menu';
@@ -23,8 +24,11 @@ export interface UseSidebarActions {
  * ✨ Auto-detect which parent menu should be open based on current URL
  * Scans navigationConfig and finds the parent menu containing the current path
  */
-const detectActiveMenuFromPath = (pathname: string): string | null => {
-  for (const item of navigationConfig) {
+const detectActiveMenuFromPath = (
+  pathname: string,
+  items: ReturnType<typeof getVisibleNavigationConfig>,
+): string | null => {
+  for (const item of items) {
     if (item.subItems) {
       const matchingSubItem = item.subItems.find(sub => sub.path === pathname);
       if (matchingSubItem) {
@@ -37,6 +41,8 @@ const detectActiveMenuFromPath = (pathname: string): string | null => {
 
 export const useSidebar = (): UseSidebarState & UseSidebarActions => {
   const location = useLocation();  // ✨ NEW: Track current URL for auto-detection
+  const { authData } = useAuth();
+  const visibleNavigationConfig = useMemo(() => getVisibleNavigationConfig(authData), [authData]);
 
   // Initialize expanded state from localStorage with SSR safety
   const [isExpanded, setIsExpanded] = useState(() => {
@@ -62,11 +68,11 @@ export const useSidebar = (): UseSidebarState & UseSidebarActions => {
 
   // ✨ NEW: Auto-detect and open the menu for the current page
   useEffect(() => {
-    const activeMenuId = detectActiveMenuFromPath(location.pathname);
+    const activeMenuId = detectActiveMenuFromPath(location.pathname, visibleNavigationConfig);
     if (activeMenuId) {
       setOpenMenuId(activeMenuId);
     }
-  }, [location.pathname]);
+  }, [location.pathname, visibleNavigationConfig]);
 
   // Persist expanded state
   useEffect(() => {

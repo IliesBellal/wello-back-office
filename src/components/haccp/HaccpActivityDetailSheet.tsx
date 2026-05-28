@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { Thermometer, Droplets, User, Calendar, MapPin, Camera, MessageCircle } from 'lucide-react';
+import { Thermometer, Droplets, User, Calendar, MapPin, Camera, MessageCircle, ShieldAlert } from 'lucide-react';
 import {
   HaccpActivity,
   TemperatureSession,
@@ -57,6 +57,9 @@ const statusLabel = (status: string) => {
 
 const formatDateTime = (iso: string) =>
   format(new Date(iso), 'dd MMMM yyyy à HH:mm', { locale: fr });
+
+const hasDisplayableValue = (value: string | number | null | undefined): boolean =>
+  value !== null && value !== undefined && value !== '';
 
 // ── Temperature Session Detail ──────────────────────────────────────────────
 
@@ -191,6 +194,61 @@ function TemperatureSessionDetail({ sessionId }: { sessionId: string }) {
                     <div className="mt-2 flex items-start gap-2 text-sm text-slate-600">
                       <MessageCircle className="mt-0.5 h-4 w-4 text-blue-500 shrink-0" />
                       <span className="text-slate-900">{reading.comment}</span>
+                    </div>
+                  )}
+                  {Array.isArray(reading.corrective_actions) && reading.corrective_actions.length > 0 && (
+                    <div className="mt-3 rounded-md border border-orange-200 bg-orange-50/60 p-3">
+                      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-orange-700">
+                        <ShieldAlert className="h-3.5 w-3.5" />
+                        <span>Actions correctives</span>
+                      </div>
+                      <div className="mt-2 space-y-2">
+                        {reading.corrective_actions.map((action, index) => (
+                          <div
+                            key={`${reading.id}-${action.action_id}-${index}`}
+                            className="rounded-md border border-orange-100 bg-white/90 p-3"
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge
+                                variant="outline"
+                                className="border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-50"
+                              >
+                                {action.label}
+                              </Badge>
+                              {hasDisplayableValue(action.follow_up_value) && (
+                                <span className="text-xs text-slate-500">
+                                  Valeur de suivi : <span className="font-medium text-slate-700">{action.follow_up_value}</span>
+                                </span>
+                              )}
+                            </div>
+
+                            {action.note && (
+                              <div className="mt-2 flex items-start gap-2 text-sm text-slate-600">
+                                <MessageCircle className="mt-0.5 h-4 w-4 text-orange-500 shrink-0" />
+                                <span className="text-slate-900">{action.note}</span>
+                              </div>
+                            )}
+
+                            {action.photo_url && (
+                              <button
+                                type="button"
+                                onClick={() => setPreviewImageUrl(action.photo_url ?? null)}
+                                className="mt-2 flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-2 py-2 text-left transition hover:bg-slate-100"
+                              >
+                                <img
+                                  src={action.photo_url}
+                                  alt={`Photo liée à ${action.label}`}
+                                  className="h-10 w-10 rounded object-cover"
+                                />
+                                <span className="flex items-center gap-1.5 text-xs text-slate-600">
+                                  <Camera className="h-3.5 w-3.5" />
+                                  Voir la photo liée
+                                </span>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

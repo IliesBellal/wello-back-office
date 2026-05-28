@@ -10,6 +10,8 @@ import { integrationsService, type IntegrationStatus } from '@/services/integrat
 import { CheckCircle, AlertCircle, ArrowRight, Euro, ShoppingCart, TrendingUp, Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
+import { useAuth } from '@/contexts/AuthContext';
+import { hasModuleAccess } from '@/lib/moduleAccess';
 
 interface IntegrationOverviewProps {
   platform: string;
@@ -282,16 +284,18 @@ const ScanNOrderOverview = ({ status, loading, icon, accessUrl = 'https://app.sc
 };
 
 export default function IntegrationsOverviewPage() {
+  const { authData } = useAuth();
   const [uberStatus, setUberStatus] = useState<IntegrationStatus | null>(null);
   const [deliverooStatus, setDeliverooStatus] = useState<IntegrationStatus | null>(null);
   const [scanNOrderStatus, setScanNOrderStatus] = useState<IntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const canAccessScanNOrder = hasModuleAccess(authData, 'scannorder');
 
   useEffect(() => {
     Promise.all([
       integrationsService.getUberEatsStatus(),
       integrationsService.getDeliverooStatus(),
-      integrationsService.getScanNOrderStatus(),
+      canAccessScanNOrder ? integrationsService.getScanNOrderStatus() : Promise.resolve(null),
     ])
       .then(([uber, deliveroo, scanorder]) => {
         setUberStatus(uber);
@@ -299,13 +303,14 @@ export default function IntegrationsOverviewPage() {
         setScanNOrderStatus(scanorder);
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [canAccessScanNOrder]);
 
-  const activeCount = (uberStatus?.active ? 1 : 0) + (deliverooStatus?.active ? 1 : 0) + (scanNOrderStatus?.active ? 1 : 0);
+  const totalPlatforms = 2 + (canAccessScanNOrder ? 1 : 0);
+  const activeCount = (uberStatus?.active ? 1 : 0) + (deliverooStatus?.active ? 1 : 0) + (canAccessScanNOrder && scanNOrderStatus?.active ? 1 : 0);
   const totalRevenue =
-    (uberStatus?.kpis.revenue || 0) + (deliverooStatus?.kpis.revenue || 0) + (scanNOrderStatus?.kpis.revenue || 0);
+    (uberStatus?.kpis.revenue || 0) + (deliverooStatus?.kpis.revenue || 0) + (canAccessScanNOrder ? (scanNOrderStatus?.kpis.revenue || 0) : 0);
   const totalOrders =
-    (uberStatus?.kpis.orders || 0) + (deliverooStatus?.kpis.orders || 0) + (scanNOrderStatus?.kpis.orders || 0);
+    (uberStatus?.kpis.orders || 0) + (deliverooStatus?.kpis.orders || 0) + (canAccessScanNOrder ? (scanNOrderStatus?.kpis.orders || 0) : 0);
 
   return (
     <DashboardLayout>
@@ -331,7 +336,7 @@ export default function IntegrationsOverviewPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-3xl font-bold">{activeCount}</div>
-                <p className="text-xs text-muted-foreground mt-1">sur 3 plateformes</p>
+                <p className="text-xs text-muted-foreground mt-1">sur {totalPlatforms} plateformes</p>
               </CardContent>
             </Card>
 
@@ -386,12 +391,14 @@ export default function IntegrationsOverviewPage() {
             icon={<img src="/deliveroo_logo.png" alt="Deliveroo" className="h-10 w-10 object-cover rounded-xl shadow-md" />}
             path="/integrations/deliveroo"
           />
-          <ScanNOrderOverview
-            status={scanNOrderStatus}
-            loading={loading}
-            icon={<img src="/scannorder_logo.png" alt="ScanNOrder" className="h-10 w-10 object-cover rounded-xl shadow-md" />}
-            accessUrl="https://app.scanorder.com"
-          />
+          {canAccessScanNOrder && (
+            <ScanNOrderOverview
+              status={scanNOrderStatus}
+              loading={loading}
+              icon={<img src="/scannorder_logo.png" alt="ScanNOrder" className="h-10 w-10 object-cover rounded-xl shadow-md" />}
+              accessUrl="https://app.scanorder.com"
+            />
+          )}
         </div>
       </PageContainer>
     </DashboardLayout>
