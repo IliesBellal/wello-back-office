@@ -25,14 +25,13 @@ import {
   Percent,
   LineChart,
   History,
-  Briefcase,
-  Calendar,
-  Umbrella,
   ArrowLeftRight,
   ShieldCheck,
   ClipboardList,
   Home,
   ShoppingBag,
+  UsersRound,
+  CalendarDays,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -44,6 +43,7 @@ export interface NavChild {
   href: string;
   badge?: number;
   requiredModule?: ModuleCapability;
+  visibilityCheck?: (authData: AuthData | null | undefined) => boolean;
 }
 
 export interface NavItem {
@@ -54,6 +54,7 @@ export interface NavItem {
   children?: NavChild[];
   badge?: number;
   requiredModule?: ModuleCapability;
+  visibilityCheck?: (authData: AuthData | null | undefined) => boolean;
   // For BottomNav: mark primary items that should appear in mobile bottom navigation
   primaryNav?: boolean;
 }
@@ -210,6 +211,45 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
 
+  // ═══ TEAM ═══
+  {
+    id: 'equipe',
+    title: 'Équipe',
+    icon: UsersRound,
+    children: [
+      {
+        id: 'equipiers',
+        title: 'Équipiers',
+        icon: Users,
+        href: '/equipe/equipiers',
+      },
+      {
+        id: 'planning',
+        title: 'Planning',
+        icon: CalendarDays,
+        href: '/equipe/planning',
+      },
+      {
+        id: 'pointages',
+        title: 'Pointages',
+        icon: Clock,
+        href: '/equipe/pointages',
+      },
+      {
+        id: 'conges-echanges',
+        title: 'Congés & échanges',
+        icon: ArrowLeftRight,
+        href: '/equipe/conges-echanges',
+      },
+      {
+        id: 'equipe-parametres',
+        title: 'Paramètres',
+        icon: Settings,
+        href: '/equipe/parametres',
+      },
+    ],
+  },
+
   // ═══ STOCKS ═══
   {
     id: 'stocks',
@@ -218,44 +258,6 @@ export const NAV_ITEMS: NavItem[] = [
     href: '/stocks',
     requiredModule: 'stock',
   },
-
-  // ═══ TEAM MANAGEMENT ═══
-  {
-    id: 'team',
-    title: 'Équipe',
-    icon: Briefcase,
-    children: [
-      {
-        id: 'team-planning',
-        title: 'Planning',
-        icon: Calendar,
-        href: '/equipe/planning',
-        requiredModule: 'planning',
-      },
-      {
-        id: 'team-employees',
-        title: 'Employés',
-        icon: Users,
-        href: '/equipe/employes',
-      },
-      {
-        id: 'team-timesheets',
-        title: 'Pointages',
-        icon: Clock,
-        href: '/equipe/pointages',
-        requiredModule: 'planning',
-      },
-      {
-        id: 'team-leaves',
-        title: 'Congés & Échanges',
-        icon: Umbrella,
-        href: '/equipe/conges',
-        requiredModule: 'planning',
-      },
-    ],
-    primaryNav: true,
-  },
-
   // ═══ ACCOUNTING ═══
   {
     id: 'accounting',
@@ -379,12 +381,26 @@ export const getVisibleNavItems = (authData: AuthData | null | undefined): NavIt
       return items;
     }
 
+    if (item.visibilityCheck && !item.visibilityCheck(authData)) {
+      return items;
+    }
+
     if (!item.children) {
       items.push(item);
       return items;
     }
 
-    const visibleChildren = item.children.filter((child) => hasModuleAccess(authData, child.requiredModule));
+    const visibleChildren = item.children.filter((child) => {
+      if (!hasModuleAccess(authData, child.requiredModule)) {
+        return false;
+      }
+
+      if (child.visibilityCheck && !child.visibilityCheck(authData)) {
+        return false;
+      }
+
+      return true;
+    });
 
     if (visibleChildren.length === 0 && !item.href) {
       return items;

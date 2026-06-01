@@ -35,10 +35,11 @@ import IntegrationsOverview from './pages/IntegrationsOverview';
 import UberEats from './pages/UberEats';
 import Deliveroo from './pages/Deliveroo';
 import ScanNOrder from './pages/ScanNOrder';
-import EquipePlanning from './pages/equipe/Planning';
-import EquipeEmployes from './pages/equipe/Employees';
-import EquipePointages from './pages/equipe/Timesheets';
-import EquipeConges from './pages/equipe/Leaves';
+import EquipePage from './pages/equipe/EquipePage';
+import PlanningPage from './pages/equipe/PlanningPage';
+import Pointages from './pages/equipe/Pointages';
+import CongesEchanges from './pages/equipe/CongesEchanges';
+import EquipeSettings from './pages/equipe/EquipeSettings';
 import HacCPActivity from './pages/haccp/Activity';
 import HacCPSettings from './pages/haccp/Settings';
 import ReservationsListPage from './pages/reservations/List';
@@ -101,11 +102,13 @@ const App = () => (
               <Route path="/dashboard/analysis" element={<ProtectedRoute><DashboardAnalysis /></ProtectedRoute>} />
               <Route path="/dashboard/order-history" element={<ProtectedRoute><DashboardOrderHistory /></ProtectedRoute>} />
               
-              {/* Team Management */}
-              <Route path="/equipe/planning" element={<ProtectedRoute requiredModule="planning"><EquipePlanning /></ProtectedRoute>} />
-              <Route path="/equipe/employes" element={<ProtectedRoute><EquipeEmployes /></ProtectedRoute>} />
-              <Route path="/equipe/pointages" element={<ProtectedRoute requiredModule="planning"><EquipePointages /></ProtectedRoute>} />
-              <Route path="/equipe/conges" element={<ProtectedRoute requiredModule="planning"><EquipeConges /></ProtectedRoute>} />
+              {/* Équipe */}
+              <Route path="/equipe" element={<Navigate to="/equipe/equipiers" replace />} />
+              <Route path="/equipe/equipiers" element={<ProtectedRoute><EquipePage /></ProtectedRoute>} />
+              <Route path="/equipe/planning" element={<ProtectedRoute><PlanningPage /></ProtectedRoute>} />
+              <Route path="/equipe/pointages" element={<ProtectedRoute><Pointages /></ProtectedRoute>} />
+              <Route path="/equipe/conges-echanges" element={<ProtectedRoute><CongesEchanges /></ProtectedRoute>} />
+              <Route path="/equipe/parametres" element={<ProtectedRoute><EquipeSettings /></ProtectedRoute>} />
               
               {/* Integrations */}
               <Route path="/integrations" element={<ProtectedRoute><IntegrationsOverview /></ProtectedRoute>} />

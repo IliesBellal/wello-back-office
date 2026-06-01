@@ -25,12 +25,11 @@ import {
   Percent,
   LineChart,
   History,
-  Briefcase,
-  Calendar,
-  Umbrella,
   ArrowLeftRight,
   ShieldCheck,
   ClipboardList,
+  UsersRound,
+  CalendarDays,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -42,6 +41,7 @@ export interface NavigationSubItem {
   path: string;
   badge?: number;
   requiredModule?: ModuleCapability;
+  visibilityCheck?: (authData: AuthData | null | undefined) => boolean;
 }
 
 export interface NavigationItem {
@@ -52,6 +52,7 @@ export interface NavigationItem {
   badge?: number;
   subItems?: NavigationSubItem[];
   requiredModule?: ModuleCapability;
+  visibilityCheck?: (authData: AuthData | null | undefined) => boolean;
 }
 
 /**
@@ -190,6 +191,26 @@ export const navigationConfig: NavigationItem[] = [
       },
     ],
   },
+  // ═══ TEAM ═══
+  {
+    id: 'equipe',
+    label: 'Équipe',
+    icon: UsersRound,
+    subItems: [
+      {
+        id: 'equipiers',
+        label: 'Équipiers',
+        icon: Users,
+        path: '/equipe/equipiers',
+      },
+      {
+        id: 'planning',
+        label: 'Planning',
+        icon: CalendarDays,
+        path: '/equipe/planning',
+      },
+    ],
+  },
   {
     id: 'stocks',
     label: 'Stocks',
@@ -197,43 +218,6 @@ export const navigationConfig: NavigationItem[] = [
     path: '/stocks',
     requiredModule: 'stock',
   },
-
-  // ═══ TEAM MANAGEMENT ═══
-  {
-    id: 'team',
-    label: 'Équipe',
-    icon: Briefcase,
-    subItems: [
-      {
-        id: 'team-planning',
-        label: 'Planning',
-        icon: Calendar,
-        path: '/equipe/planning',
-        requiredModule: 'planning',
-      },
-      {
-        id: 'team-employees',
-        label: 'Employés',
-        icon: Users,
-        path: '/equipe/employes',
-      },
-      {
-        id: 'team-timesheets',
-        label: 'Pointages',
-        icon: Clock,
-        path: '/equipe/pointages',
-        requiredModule: 'planning',
-      },
-      {
-        id: 'team-leaves',
-        label: 'Congés & Échanges',
-        icon: Umbrella,
-        path: '/equipe/conges',
-        requiredModule: 'planning',
-      },
-    ],
-  },
-
   // ═══ ACCOUNTING ═══
   {
     id: 'accounting',
@@ -356,12 +340,26 @@ export const getVisibleNavigationConfig = (authData: AuthData | null | undefined
       return items;
     }
 
+    if (item.visibilityCheck && !item.visibilityCheck(authData)) {
+      return items;
+    }
+
     if (!item.subItems) {
       items.push(item);
       return items;
     }
 
-    const visibleSubItems = item.subItems.filter((subItem) => hasModuleAccess(authData, subItem.requiredModule));
+    const visibleSubItems = item.subItems.filter((subItem) => {
+      if (!hasModuleAccess(authData, subItem.requiredModule)) {
+        return false;
+      }
+
+      if (subItem.visibilityCheck && !subItem.visibilityCheck(authData)) {
+        return false;
+      }
+
+      return true;
+    });
 
     if (visibleSubItems.length === 0 && !item.path) {
       return items;

@@ -1,16 +1,22 @@
 import { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import type { ModuleCapability } from '@/types/auth';
+import type { AuthData, ModuleCapability } from '@/types/auth';
 import { hasModuleAccess } from '@/lib/moduleAccess';
 
 interface ProtectedRouteProps {
   children: ReactNode;
   requiredModule?: ModuleCapability;
   fallbackPath?: string;
+  accessCheck?: (authData: AuthData | null | undefined) => boolean;
 }
 
-export function ProtectedRoute({ children, requiredModule, fallbackPath = '/' }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  requiredModule,
+  fallbackPath = '/',
+  accessCheck,
+}: ProtectedRouteProps) {
   const { authData } = useAuth();
 
   // Pas connecté du tout
@@ -24,6 +30,10 @@ export function ProtectedRoute({ children, requiredModule, fallbackPath = '/' }:
   }
 
   if (!hasModuleAccess(authData, requiredModule)) {
+    return <Navigate to={fallbackPath} replace />;
+  }
+
+  if (accessCheck && !accessCheck(authData)) {
     return <Navigate to={fallbackPath} replace />;
   }
 

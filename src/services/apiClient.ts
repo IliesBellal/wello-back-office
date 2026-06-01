@@ -207,6 +207,101 @@ const handleNetworkError = () => {
   });
 };
 
+type ApiHttpError = Error & {
+  status: number;
+  responseBody?: unknown;
+  responseText?: string;
+};
+
+const ERROR_BODY_MAX_LENGTH = 2000;
+
+const truncateText = (value: string, maxLength: number): string => {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength)}... [truncated]`;
+};
+
+const parseErrorResponse = async (
+  response: Response,
+): Promise<{ errorMessage?: string; errorBody?: unknown; errorBodyText?: string }> => {
+  let errorBodyText: string | undefined;
+
+  try {
+    errorBodyText = await response.text();
+  } catch {
+    return {};
+  }
+
+  if (!errorBodyText) {
+    return {};
+  }
+
+  const truncatedBodyText = truncateText(errorBodyText, ERROR_BODY_MAX_LENGTH);
+
+  try {
+    const parsedBody = JSON.parse(errorBodyText) as Record<string, unknown>;
+    const errorMessage =
+      typeof parsedBody.message === "string"
+        ? parsedBody.message
+        : typeof parsedBody.error === "string"
+          ? parsedBody.error
+          : undefined;
+
+    return {
+      errorMessage,
+      errorBody: parsedBody,
+      errorBodyText: truncatedBodyText,
+    };
+  } catch {
+    return {
+      errorBodyText: truncatedBodyText,
+    };
+  }
+};
+
+const createApiHttpError = (
+  status: number,
+  message?: string,
+  errorBody?: unknown,
+  errorBodyText?: string,
+): ApiHttpError => {
+  const baseMessage = message || `HTTP error ${status}`;
+  const bodyPreview = errorBody !== undefined
+    ? truncateText(JSON.stringify(errorBody), ERROR_BODY_MAX_LENGTH)
+    : errorBodyText;
+  const fullMessage = bodyPreview ? `${baseMessage} | response body: ${bodyPreview}` : baseMessage;
+
+  const error = new Error(fullMessage) as ApiHttpError;
+  error.name = "ApiHttpError";
+  error.status = status;
+
+  if (errorBody !== undefined) {
+    error.responseBody = errorBody;
+  }
+  if (errorBodyText !== undefined) {
+    error.responseText = errorBodyText;
+  }
+
+  return error;
+};
+
+const isApiHttpError = (error: unknown): error is ApiHttpError => {
+  return error instanceof Error && typeof (error as Partial<ApiHttpError>).status === "number";
+};
+
+const logApiError = (method: string, endpoint: string, error: unknown) => {
+  if (isApiHttpError(error)) {
+    console.error(`❌ [API ERROR] ${method} ${endpoint}`, error, {
+      status: error.status,
+      responseBody: error.responseBody ?? error.responseText,
+    });
+    return;
+  }
+
+  console.error(`❌ [API ERROR] ${method} ${endpoint}`, error);
+};
+
 // ============= Main API Client =============
 async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
 
@@ -243,14 +338,11 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     const response = await fetch(url, fetchOptions);
 
     if (!response.ok) {
-      let errorMessage: string | undefined;
-      let errorData: Record<string, unknown> | undefined;
-      try {
-        errorData = await response.json() as Record<string, unknown>;
-        errorMessage = (errorData.message as string) || (errorData.error as string);
-      } catch {
-        // Response is not JSON
-      }
+      const { errorMessage, errorBody, errorBodyText } = await parseErrorResponse(response);
+      const errorData =
+        typeof errorBody === "object" && errorBody !== null
+          ? (errorBody as Record<string, unknown>)
+          : undefined;
 
       // Handle MFA requirement (401 with status: "mfa_required")
       if (response.status === 401 && errorData?.status === 'mfa_required' && mfaHandler) {
@@ -268,9 +360,9 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
         }
       }
 
-      endRequestLog(logContext, response.status, errorMessage, true);
+      endRequestLog(logContext, response.status, errorBody ?? errorBodyText ?? errorMessage, true);
       handleApiError(response.status, errorMessage);
-      throw new Error(errorMessage || `HTTP error ${response.status}`);
+      throw createApiHttpError(response.status, errorMessage, errorBody, errorBodyText);
     }
 
     // Handle empty responses
@@ -284,10 +376,10 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
     if (error instanceof TypeError && error.message === "Failed to fetch") {
       endRequestLogWithError(logContext, "Network Error: Failed to fetch");
       handleNetworkError();
-    } else if (!(error instanceof Error && error.message.startsWith("HTTP error"))) {
+    } else if (!isApiHttpError(error) && !(error instanceof Error && error.message.startsWith("HTTP error"))) {
       endRequestLogWithError(logContext, error);
     }
-    console.error(`❌ [API ERROR] ${method} ${endpoint}`, error);
+    logApiError(method, endpoint, error);
     throw error;
   } finally {
     decrementLoading();
@@ -318,14 +410,11 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
     });
 
     if (!response.ok) {
-      let errorMessage: string | undefined;
-      let errorData: Record<string, unknown> | undefined;
-      try {
-        errorData = await response.json() as Record<string, unknown>;
-        errorMessage = (errorData.message as string) || (errorData.error as string);
-      } catch {
-        // Response is not JSON
-      }
+      const { errorMessage, errorBody, errorBodyText } = await parseErrorResponse(response);
+      const errorData =
+        typeof errorBody === "object" && errorBody !== null
+          ? (errorBody as Record<string, unknown>)
+          : undefined;
 
       // Handle MFA requirement (401 with status: "mfa_required")
       if (response.status === 401 && errorData?.status === 'mfa_required' && mfaHandler) {
@@ -343,9 +432,9 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
         }
       }
 
-      endRequestLog(logContext, response.status, errorMessage, true);
+      endRequestLog(logContext, response.status, errorBody ?? errorBodyText ?? errorMessage, true);
       handleApiError(response.status, errorMessage);
-      throw new Error(errorMessage || `HTTP error ${response.status}`);
+      throw createApiHttpError(response.status, errorMessage, errorBody, errorBodyText);
     }
 
     // Handle empty responses
@@ -359,10 +448,10 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
     if (error instanceof TypeError && error.message === "Failed to fetch") {
       endRequestLogWithError(logContext, "Network Error: Failed to fetch");
       handleNetworkError();
-    } else if (!(error instanceof Error && error.message.startsWith("HTTP error"))) {
+    } else if (!isApiHttpError(error) && !(error instanceof Error && error.message.startsWith("HTTP error"))) {
       endRequestLogWithError(logContext, error);
     }
-    console.error(`❌ [API ERROR] ${method} ${endpoint}`, error);
+    logApiError(method, endpoint, error);
     throw error;
   } finally {
     decrementLoading();
@@ -402,7 +491,7 @@ export const mockDelay = (ms: number = 500): Promise<void> => {
 export const withMock = async <T>(
   mockFn: () => T | Promise<T>, 
   realFn: () => Promise<T>,
-  logInfo?: { method: string; endpoint: string; payload?: unknown }
+  logInfo?: { method: string; endpoint: string; payload?: unknown; forceMock?: boolean }
 ): Promise<T> => {
   const url = logInfo ? `${API_BASE_URL}${logInfo.endpoint}` : '';
   const logContext = logInfo ? startRequestLog(logInfo.method, logInfo.endpoint, url, logInfo.payload) : null;
@@ -411,7 +500,7 @@ export const withMock = async <T>(
   const startTime = performance.now();
   
   try {
-    if (USE_MOCK_DATA) {
+    if (USE_MOCK_DATA /*|| logInfo?.forceMock*/) {
       await mockDelay();
       const result = await mockFn();
       if (logContext) {
