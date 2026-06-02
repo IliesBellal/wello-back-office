@@ -45,7 +45,7 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
   const [open, setOpen] = useState(false);
   const [firstClick, setFirstClick] = useState<Date | null>(null);
   const [tempRange, setTempRange] = useState<{ from: Date; to: Date } | null>(null);
-  const [displayMonth, setDisplayMonth] = useState(new Date());
+  const [displayMonth, setDisplayMonth] = useState(startOfMonth(new Date()));
 
   // Detect if mobile (< 768px)
   const isMobile = useMediaQuery('(max-width: 767px)');
@@ -144,7 +144,7 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
       // Reset au moment de l'ouverture
       setFirstClick(null);
       setTempRange(null);
-      setDisplayMonth(new Date());
+      setDisplayMonth(startOfMonth(new Date()));
     }
   };
 
@@ -228,6 +228,8 @@ export function AdvancedDatePicker({ value, onChange, disabled = false }: Advanc
                   onDayClick={handleDateClick}
                   locale={fr}
                   numberOfMonths={1}
+                  month={displayMonth}
+                  onMonthChange={setDisplayMonth}
                   className="rounded-md border border-border"
                 />
               </div>

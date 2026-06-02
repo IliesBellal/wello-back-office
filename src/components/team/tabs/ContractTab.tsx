@@ -219,7 +219,7 @@ export function ContractTab({ userId, isActive = true }: ContractTabProps) {
   const { data: member, isLoading: loadingMember } = useQuery({
     queryKey: memberQueryKey,
     queryFn: () => usersApi.getMember(userId),
-    enabled: isActive,
+    enabled: isActive && !!userId,
   });
 
   const { data: positions = [] } = useQuery({
@@ -246,7 +246,10 @@ export function ContractTab({ userId, isActive = true }: ContractTabProps) {
   };
 
   useEffect(() => {
-    if (!member) return;
+    if (!member) {
+      setForm(EMPTY_FORM);
+      return;
+    }
     const normalizedMember: MerchantUserPlanning = {
       ...member,
       contract_start_date: normalizeDateInput(member.contract_start_date),

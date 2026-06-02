@@ -12,11 +12,11 @@ import type { WelloApiResponse } from "@/services/apiClient";
 import { unwrap, unwrapList } from "@/services/apiUnwrap";
 import type { ApiEnvelopeData, UnwrappedList } from "@/services/apiUnwrap";
 import { teamMocks } from "@/services/mocks/teamMocks";
-import { planningMocks } from "@/services/mocks/planningMocks";
 
 import type {
   MerchantUserListItem,
   MerchantUserDetail,
+  MerchantUserPlanning,
   MerchantUserRights,
   MerchantUserUnlinkResult,
   LinkableUser,
@@ -145,6 +145,15 @@ export const usersApi = {
     );
   },
 
+  /** GET /users/{id}/member – read the member HR / planning block */
+  getMember(id: string): Promise<MerchantUserPlanning | null> {
+    const path = `/users/${id}/member`;
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ member: MerchantUserPlanning | null } & Record<string, unknown>>(resp).member ?? null);
+  },
+
   /** GET /users/linkable-search?search= – global user search for linking */
   linkableSearch(search: string): Promise<LinkableUser[]> {
     const path = `/users/linkable-search${qs({ search })}`;
@@ -173,6 +182,15 @@ export const usersApi = {
       },
       { method: "PATCH", endpoint: path, payload, forceMock: TEAM_FORCE_MOCK },
     );
+  },
+
+  /** PATCH /users/{id}/member – update the member HR / planning block */
+  updateMemberContract(id: string, payload: Partial<MerchantUserPlanningUpsertRequest>): Promise<MerchantUserPlanning> {
+    const path = `/users/${id}/member`;
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ member: MerchantUserPlanning } & Record<string, unknown>>(resp).member);
   },
 
   /** POST /users/{id}/merchant-link – link an existing user to the merchant */
@@ -258,30 +276,18 @@ export const usersApi = {
 export const planningSettingsApi = {
   /** GET /planning/settings */
   get(): Promise<PlanningSettings> {
-    return withMock(
-      () => planningMocks.getSettings(),
-      () => {
-        logAPI("GET", "/planning/settings");
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>("/planning/settings")
-          .then((resp) => unwrap<{ settings: PlanningSettings } & Record<string, unknown>>(resp).settings);
-      },
-      { method: "GET", endpoint: "/planning/settings", forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", "/planning/settings");
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>("/planning/settings")
+      .then((resp) => unwrap<{ settings: PlanningSettings } & Record<string, unknown>>(resp).settings);
   },
 
   /** PUT /planning/settings */
   update(payload: PlanningSettingsUpdateRequest): Promise<PlanningSettings> {
-    return withMock(
-      () => planningMocks.updateSettings(payload),
-      () => {
-        logAPI("PUT", "/planning/settings", payload);
-        return apiClient
-          .put<WelloApiResponse<ApiEnvelopeData>>("/planning/settings", payload)
-          .then((resp) => unwrap<{ settings: PlanningSettings } & Record<string, unknown>>(resp).settings);
-      },
-      { method: "PUT", endpoint: "/planning/settings", payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("PUT", "/planning/settings", payload);
+    return apiClient
+      .put<WelloApiResponse<ApiEnvelopeData>>("/planning/settings", payload)
+      .then((resp) => unwrap<{ settings: PlanningSettings } & Record<string, unknown>>(resp).settings);
   },
 };
 
@@ -373,31 +379,19 @@ export const holidaysApi = {
   /** GET /pos/settings/holidays?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD */
   list(params: { start_date?: string; end_date?: string } = {}): Promise<PlanningHoliday[]> {
     const path = `/pos/settings/holidays${qs(params as Record<string, unknown>)}`;
-    return withMock(
-      () => planningMocks.listHolidays(params.start_date, params.end_date),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrapList<PlanningHoliday>(resp, "holidays").items);
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<PlanningHoliday>(resp, "holidays").items);
   },
 
   /** PATCH /pos/settings/holidays/{date} — toggle disabled or override the multiplier. */
   override(date: string, payload: PlanningHolidayOverridePatchRequest): Promise<PlanningHoliday> {
     const path = `/pos/settings/holidays/${date}`;
-    return withMock(
-      () => planningMocks.overrideHoliday(date, payload),
-      () => {
-        logAPI("PATCH", path, payload);
-        return apiClient
-          .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ holiday: PlanningHoliday } & Record<string, unknown>>(resp).holiday);
-      },
-      { method: "PATCH", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ holiday: PlanningHoliday } & Record<string, unknown>>(resp).holiday);
   },
 };
 
@@ -408,123 +402,73 @@ export const holidaysApi = {
 export const planningWeeksApi = {
   /** GET /planning/weeks */
   list(): Promise<PlanningWeek[]> {
-    return withMock(
-      () => planningMocks.listWeeks(),
-      () => {
-        logAPI("GET", "/planning/weeks");
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>("/planning/weeks")
-          .then((resp) => unwrapList<PlanningWeek>(resp, "weeks").items);
-      },
-      { method: "GET", endpoint: "/planning/weeks", forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", "/planning/weeks");
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>("/planning/weeks")
+      .then((resp) => unwrapList<PlanningWeek>(resp, "weeks").items);
   },
 
   /** POST /planning/weeks */
   create(payload: PlanningWeekCreateRequest): Promise<PlanningWeek> {
-    return withMock(
-      () => planningMocks.createWeek(payload),
-      () => {
-        logAPI("POST", "/planning/weeks", payload);
-        return apiClient
-          .post<WelloApiResponse<ApiEnvelopeData>>("/planning/weeks", payload)
-          .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
-      },
-      { method: "POST", endpoint: "/planning/weeks", payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("POST", "/planning/weeks", payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>("/planning/weeks", payload)
+      .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
   },
 
   /** GET /planning/weeks/{id} */
   get(id: string): Promise<PlanningWeek> {
     const path = `/planning/weeks/${id}`;
-    return withMock(
-      () => planningMocks.getWeek(id),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
   },
 
   /** PATCH /planning/weeks/{id} */
   update(id: string, payload: PlanningWeekUpdateRequest): Promise<PlanningWeek> {
     const path = `/planning/weeks/${id}`;
-    return withMock(
-      () => planningMocks.updateWeek(id, payload),
-      () => {
-        logAPI("PATCH", path, payload);
-        return apiClient
-          .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
-      },
-      { method: "PATCH", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
   },
 
   /** DELETE /planning/weeks/{id} */
   delete(id: string): Promise<void> {
     const path = `/planning/weeks/${id}`;
-    return withMock(
-      () => { planningMocks.deleteWeek(id); },
-      () => {
-        logAPI("DELETE", path);
-        return apiClient
-          .delete<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => { unwrap(resp); });
-      },
-      { method: "DELETE", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("DELETE", path);
+    return apiClient
+      .delete<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => { unwrap(resp); });
   },
 
   /** GET /planning/weeks/{id}/shifts – list shifts for a week */
   getShifts(weekId: string): Promise<PlanningShift[]> {
     const path = `/planning/weeks/${weekId}/shifts`;
-    return withMock(
-      () => planningMocks.getShiftsForWeek(weekId),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrapList<PlanningShift>(resp, "shifts").items);
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<PlanningShift>(resp, "shifts").items);
   },
 
     /** GET /planning/shifts?start_date=...&end_date=... – list shifts for a date range */
     getShiftsByRange(startDate: string, endDate: string): Promise<PlanningShift[]> {
-      const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
-      const path = `/planning/shifts?${params.toString()}`;
-      return withMock(
-        () => planningMocks.getShiftsForWeek("range").then !== undefined
-          ? Promise.resolve([] as PlanningShift[])
-          : Promise.resolve([] as PlanningShift[]),
-        () => {
-          logAPI("GET", path);
-          return apiClient
-            .get<WelloApiResponse<ApiEnvelopeData>>(path)
-            .then((resp) => unwrapList<PlanningShift>(resp, "shifts").items);
-        },
-        { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-      );
+        const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+        const path = `/planning/shifts?${params.toString()}`;
+        logAPI("GET", path);
+        return apiClient
+          .get<WelloApiResponse<ApiEnvelopeData>>(path)
+          .then((resp) => unwrapList<PlanningShift>(resp, "shifts").items);
     },
 
   /** POST /planning/weeks/{id}/shifts – create a shift in a week */
   createShift(weekId: string, payload: PlanningShiftCreateRequest): Promise<PlanningShift> {
     const path = `/planning/weeks/${weekId}/shifts`;
-    return withMock(
-      () => planningMocks.createShift(weekId, payload),
-      () => {
-        logAPI("POST", path, payload);
-        return apiClient
-          .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ shift: PlanningShift } & Record<string, unknown>>(resp).shift);
-      },
-      { method: "POST", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("POST", path, payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ shift: PlanningShift } & Record<string, unknown>>(resp).shift);
   },
 };
 
@@ -536,46 +480,28 @@ export const planningShiftsApi = {
   /** GET /planning/shifts/{id} */
   get(id: string): Promise<PlanningShift> {
     const path = `/planning/shifts/${id}`;
-    return withMock(
-      () => planningMocks.getShift(id),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrap<{ shift: PlanningShift } & Record<string, unknown>>(resp).shift);
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ shift: PlanningShift } & Record<string, unknown>>(resp).shift);
   },
 
   /** PATCH /planning/shifts/{id} */
   update(id: string, payload: PlanningShiftUpdateRequest): Promise<PlanningShift> {
     const path = `/planning/shifts/${id}`;
-    return withMock(
-      () => planningMocks.updateShift(id, payload),
-      () => {
-        logAPI("PATCH", path, payload);
-        return apiClient
-          .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ shift: PlanningShift } & Record<string, unknown>>(resp).shift);
-      },
-      { method: "PATCH", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ shift: PlanningShift } & Record<string, unknown>>(resp).shift);
   },
 
   /** DELETE /planning/shifts/{id} */
   delete(id: string): Promise<void> {
     const path = `/planning/shifts/${id}`;
-    return withMock(
-      () => { planningMocks.deleteShift(id); },
-      () => {
-        logAPI("DELETE", path);
-        return apiClient
-          .delete<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => { unwrap(resp); });
-      },
-      { method: "DELETE", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("DELETE", path);
+    return apiClient
+      .delete<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => { unwrap(resp); });
   },
 };
 
@@ -587,16 +513,10 @@ export const planningEmployeesApi = {
   /** GET /planning/employees */
   list(filters: EmployeeListFilters = {}): Promise<UnwrappedList<Employee>> {
     const path = `/planning/employees${qs(filters as Record<string, unknown>)}`;
-    return withMock(
-      () => planningMocks.listEmployees(filters),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrapList<Employee>(resp, "employees"));
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<Employee>(resp, "employees"));
   },
 
   /** POST /planning/employees */
@@ -749,64 +669,40 @@ export const planningTimeEntriesApi = {
   // aggregation by a global `/planning/time-entries` endpoint once available.
   list(employeeId: string): Promise<PlanningTimeEntry[]> {
     const path = `/planning/employees/${employeeId}/time-entries`;
-    return withMock(
-      () => planningMocks.listTimeEntries(employeeId),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrapList<PlanningTimeEntry>(resp, "time_entries").items);
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<PlanningTimeEntry>(resp, "time_entries").items);
   },
 
   /** GET /planning/employees/{employeeId}/time-entries/current */
   current(employeeId: string): Promise<PlanningTimeEntry | null> {
     const path = `/planning/employees/${employeeId}/time-entries/current`;
-    return withMock(
-      () => planningMocks.currentTimeEntry(employeeId),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => {
-            const data = unwrap<{ time_entry?: PlanningTimeEntry } & Record<string, unknown>>(resp);
-            return data.time_entry ?? null;
-          });
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => {
+        const data = unwrap<{ time_entry?: PlanningTimeEntry } & Record<string, unknown>>(resp);
+        return data.time_entry ?? null;
+      });
   },
 
   /** POST /planning/employees/{employeeId}/time-entries/start */
   start(employeeId: string, payload?: PlanningTimeEntryStartRequest): Promise<PlanningTimeEntry> {
     const path = `/planning/employees/${employeeId}/time-entries/start`;
-    return withMock(
-      () => planningMocks.startTimeEntry(employeeId, payload),
-      () => {
-        logAPI("POST", path, payload);
-        return apiClient
-          .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
-      },
-      { method: "POST", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("POST", path, payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
   },
 
   /** POST /planning/employees/{employeeId}/time-entries/stop */
   stop(employeeId: string, payload: PlanningTimeEntryStopRequest): Promise<PlanningTimeEntry> {
     const path = `/planning/employees/${employeeId}/time-entries/stop`;
-    return withMock(
-      () => planningMocks.stopTimeEntry(employeeId, payload),
-      () => {
-        logAPI("POST", path, payload);
-        return apiClient
-          .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
-      },
-      { method: "POST", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("POST", path, payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
   },
 
   /**
@@ -820,16 +716,10 @@ export const planningTimeEntriesApi = {
     payload: PlanningTimeEntryUpdateRequest,
   ): Promise<PlanningTimeEntry> {
     const path = `/planning/employees/${employeeId}/time-entries/${entryId}`;
-    return withMock(
-      () => planningMocks.updateTimeEntry(employeeId, entryId, payload),
-      () => {
-        logAPI("PATCH", path, payload);
-        return apiClient
-          .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
-      },
-      { method: "PATCH", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
   },
 
   /**
@@ -842,16 +732,10 @@ export const planningTimeEntriesApi = {
     payload: PlanningTimeEntryCreateRequest,
   ): Promise<PlanningTimeEntry> {
     const path = `/planning/employees/${employeeId}/time-entries`;
-    return withMock(
-      () => planningMocks.createTimeEntry(employeeId, payload),
-      () => {
-        logAPI("POST", path, payload);
-        return apiClient
-          .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
-      },
-      { method: "POST", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("POST", path, payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ time_entry: PlanningTimeEntry } & Record<string, unknown>>(resp).time_entry);
   },
 
   /**
@@ -862,15 +746,9 @@ export const planningTimeEntriesApi = {
    */
   delete(employeeId: string, entryId: string, reason: string): Promise<void> {
     const path = `/planning/employees/${employeeId}/time-entries/${entryId}`;
-    return withMock(
-      () => planningMocks.deleteTimeEntry(employeeId, entryId, reason),
-      () => {
-        const url = `${path}?reason=${encodeURIComponent(reason)}`;
-        logAPI("DELETE", url);
-        return apiClient.delete<unknown>(url).then(() => undefined);
-      },
-      { method: "DELETE", endpoint: path, payload: { reason }, forceMock: PLANNING_FORCE_MOCK },
-    );
+    const url = `${path}?reason=${encodeURIComponent(reason)}`;
+    logAPI("DELETE", url);
+    return apiClient.delete<unknown>(url).then(() => undefined);
   },
 };
 
@@ -882,45 +760,27 @@ export const planningLeaveApi = {
   /** GET /planning/leave-requests */
   list(filters: PlanningLeaveRequestFilters = {}): Promise<UnwrappedList<PlanningLeaveRequest>> {
     const path = `/planning/leave-requests${qs(filters as Record<string, unknown>)}`;
-    return withMock(
-      () => planningMocks.listLeaveRequests(filters),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrapList<PlanningLeaveRequest>(resp, "leave_requests"));
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<PlanningLeaveRequest>(resp, "leave_requests"));
   },
 
   /** POST /planning/leave-requests */
   create(payload: PlanningLeaveRequestCreateRequest): Promise<PlanningLeaveRequest> {
-    return withMock(
-      () => planningMocks.createLeaveRequest(payload),
-      () => {
-        logAPI("POST", "/planning/leave-requests", payload);
-        return apiClient
-          .post<WelloApiResponse<ApiEnvelopeData>>("/planning/leave-requests", payload)
-          .then((resp) => unwrap<{ leave_request: PlanningLeaveRequest } & Record<string, unknown>>(resp).leave_request);
-      },
-      { method: "POST", endpoint: "/planning/leave-requests", payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("POST", "/planning/leave-requests", payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>("/planning/leave-requests", payload)
+      .then((resp) => unwrap<{ leave_request: PlanningLeaveRequest } & Record<string, unknown>>(resp).leave_request);
   },
 
   /** GET /planning/leave-requests/{id} */
   get(id: string): Promise<PlanningLeaveRequest> {
     const path = `/planning/leave-requests/${id}`;
-    return withMock(
-      () => planningMocks.getLeaveRequest(id),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrap<{ leave_request: PlanningLeaveRequest } & Record<string, unknown>>(resp).leave_request);
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ leave_request: PlanningLeaveRequest } & Record<string, unknown>>(resp).leave_request);
   },
 
   /** GET /planning/leave-requests/{id}/conflicting-shifts */
@@ -941,31 +801,19 @@ export const planningLeaveApi = {
   /** PATCH /planning/leave-requests/{id} */
   update(id: string, payload: PlanningLeaveRequestUpdateRequest): Promise<PlanningLeaveRequest> {
     const path = `/planning/leave-requests/${id}`;
-    return withMock(
-      () => planningMocks.updateLeaveRequest(id, payload),
-      () => {
-        logAPI("PATCH", path, payload);
-        return apiClient
-          .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ leave_request: PlanningLeaveRequest } & Record<string, unknown>>(resp).leave_request);
-      },
-      { method: "PATCH", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ leave_request: PlanningLeaveRequest } & Record<string, unknown>>(resp).leave_request);
   },
 
   /** DELETE /planning/leave-requests/{id} */
   delete(id: string): Promise<void> {
     const path = `/planning/leave-requests/${id}`;
-    return withMock(
-      () => { planningMocks.deleteLeaveRequest(id); return undefined; },
-      () => {
-        logAPI("DELETE", path);
-        return apiClient
-          .delete<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => { unwrap(resp); });
-      },
-      { method: "DELETE", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("DELETE", path);
+    return apiClient
+      .delete<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => { unwrap(resp); });
   },
 };
 
@@ -977,75 +825,45 @@ export const planningSwapApi = {
   /** GET /planning/shift-swap-requests */
   list(filters: PlanningShiftSwapRequestFilters = {}): Promise<UnwrappedList<PlanningShiftSwapRequest>> {
     const path = `/planning/shift-swap-requests${qs(filters as Record<string, unknown>)}`;
-    return withMock(
-      () => planningMocks.listShiftSwapRequests(filters),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrapList<PlanningShiftSwapRequest>(resp, "shift_swap_requests"));
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<PlanningShiftSwapRequest>(resp, "shift_swap_requests"));
   },
 
   /** POST /planning/shift-swap-requests */
   create(payload: PlanningShiftSwapRequestCreateRequest): Promise<PlanningShiftSwapRequest> {
-    return withMock(
-      () => planningMocks.createShiftSwapRequest(payload),
-      () => {
-        logAPI("POST", "/planning/shift-swap-requests", payload);
-        return apiClient
-          .post<WelloApiResponse<ApiEnvelopeData>>("/planning/shift-swap-requests", payload)
-          .then((resp) => unwrap<{ shift_swap_request: PlanningShiftSwapRequest } & Record<string, unknown>>(resp).shift_swap_request);
-      },
-      { method: "POST", endpoint: "/planning/shift-swap-requests", payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("POST", "/planning/shift-swap-requests", payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>("/planning/shift-swap-requests", payload)
+      .then((resp) => unwrap<{ shift_swap_request: PlanningShiftSwapRequest } & Record<string, unknown>>(resp).shift_swap_request);
   },
 
   /** GET /planning/shift-swap-requests/{id} */
   get(id: string): Promise<PlanningShiftSwapRequest> {
     const path = `/planning/shift-swap-requests/${id}`;
-    return withMock(
-      () => planningMocks.getShiftSwapRequest(id),
-      () => {
-        logAPI("GET", path);
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => unwrap<{ shift_swap_request: PlanningShiftSwapRequest } & Record<string, unknown>>(resp).shift_swap_request);
-      },
-      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ shift_swap_request: PlanningShiftSwapRequest } & Record<string, unknown>>(resp).shift_swap_request);
   },
 
   /** PATCH /planning/shift-swap-requests/{id} */
   update(id: string, payload: PlanningShiftSwapRequestUpdateRequest): Promise<PlanningShiftSwapRequest> {
     const path = `/planning/shift-swap-requests/${id}`;
-    return withMock(
-      () => planningMocks.updateShiftSwapRequest(id, payload),
-      () => {
-        logAPI("PATCH", path, payload);
-        return apiClient
-          .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ shift_swap_request: PlanningShiftSwapRequest } & Record<string, unknown>>(resp).shift_swap_request);
-      },
-      { method: "PATCH", endpoint: path, payload, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ shift_swap_request: PlanningShiftSwapRequest } & Record<string, unknown>>(resp).shift_swap_request);
   },
 
   /** DELETE /planning/shift-swap-requests/{id} */
   delete(id: string): Promise<void> {
     const path = `/planning/shift-swap-requests/${id}`;
-    return withMock(
-      () => { planningMocks.deleteShiftSwapRequest(id); return undefined; },
-      () => {
-        logAPI("DELETE", path);
-        return apiClient
-          .delete<WelloApiResponse<ApiEnvelopeData>>(path)
-          .then((resp) => { unwrap(resp); });
-      },
-      { method: "DELETE", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("DELETE", path);
+    return apiClient
+      .delete<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => { unwrap(resp); });
   },
 };
 
@@ -1070,16 +888,10 @@ export const planningRefsApi = {
 
   /** GET /planning/attendance-sources */
   attendanceSources(): Promise<SystemRef[]> {
-    return withMock(
-      () => planningMocks.listAttendanceSources() as SystemRef[],
-      () => {
-        logAPI("GET", "/planning/attendance-sources");
-        return apiClient
-          .get<WelloApiResponse<ApiEnvelopeData>>("/planning/attendance-sources")
-          .then((resp) => unwrapList<SystemRef>(resp, "attendance_sources").items);
-      },
-      { method: "GET", endpoint: "/planning/attendance-sources", forceMock: PLANNING_FORCE_MOCK },
-    );
+    logAPI("GET", "/planning/attendance-sources");
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>("/planning/attendance-sources")
+      .then((resp) => unwrapList<SystemRef>(resp, "attendance_sources").items);
   },
 
   /** GET /planning/event-types */
