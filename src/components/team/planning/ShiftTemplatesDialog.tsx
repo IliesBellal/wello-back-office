@@ -196,7 +196,7 @@ export function ShiftTemplatesDialog({ open, onOpenChange }: ShiftTemplatesDialo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-3x2">
         <DialogHeader>
           <DialogTitle>Modèles de shift</DialogTitle>
           <DialogDescription>

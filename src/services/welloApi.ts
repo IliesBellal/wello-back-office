@@ -494,6 +494,24 @@ export const planningWeeksApi = {
     );
   },
 
+    /** GET /planning/shifts?start_date=...&end_date=... – list shifts for a date range */
+    getShiftsByRange(startDate: string, endDate: string): Promise<PlanningShift[]> {
+      const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+      const path = `/planning/shifts?${params.toString()}`;
+      return withMock(
+        () => planningMocks.getShiftsForWeek("range").then !== undefined
+          ? Promise.resolve([] as PlanningShift[])
+          : Promise.resolve([] as PlanningShift[]),
+        () => {
+          logAPI("GET", path);
+          return apiClient
+            .get<WelloApiResponse<ApiEnvelopeData>>(path)
+            .then((resp) => unwrapList<PlanningShift>(resp, "shifts").items);
+        },
+        { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
+      );
+    },
+
   /** POST /planning/weeks/{id}/shifts – create a shift in a week */
   createShift(weekId: string, payload: PlanningShiftCreateRequest): Promise<PlanningShift> {
     const path = `/planning/weeks/${weekId}/shifts`;
@@ -900,6 +918,21 @@ export const planningLeaveApi = {
         return apiClient
           .get<WelloApiResponse<ApiEnvelopeData>>(path)
           .then((resp) => unwrap<{ leave_request: PlanningLeaveRequest } & Record<string, unknown>>(resp).leave_request);
+      },
+      { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
+    );
+  },
+
+  /** GET /planning/leave-requests/{id}/conflicting-shifts */
+  getConflictingShifts(id: string): Promise<PlanningShift[]> {
+    const path = `/planning/leave-requests/${id}/conflicting-shifts`;
+    return withMock(
+      () => Promise.resolve([]),
+      () => {
+        logAPI("GET", path);
+        return apiClient
+          .get<WelloApiResponse<ApiEnvelopeData>>(path)
+          .then((resp) => unwrapList<PlanningShift>(resp, "conflicting_shifts").items);
       },
       { method: "GET", endpoint: path, forceMock: PLANNING_FORCE_MOCK },
     );

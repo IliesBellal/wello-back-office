@@ -394,12 +394,11 @@ function AttendanceCard({
           <p className="font-medium">Effet du choix :</p>
           <ul className="ml-4 mt-1 list-disc space-y-1">
             <li>
-              <strong>Pointage manuel</strong> : les équipiers ouvrent/ferment leur journée via la
-              borne de pointage.
+              <strong>Pointage manuel</strong> : les équipiers ouvrent/ferment leur journée via l'outil de pointage.
             </li>
             <li>
               <strong>Planning (automatique)</strong> : le pointage manuel est <em>désactivé</em>,
-              les heures effectuées sont déduites des shifts planifiés.
+              les heures prestées sont déduites des shifts planifiés.
             </li>
           </ul>
         </div>

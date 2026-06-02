@@ -136,21 +136,18 @@ export function AddTimeEntryDialog({
         if (!createMut.isPending) onOpenChange(o);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Ajouter un pointage</DialogTitle>
           <DialogDescription>
-            Création manuelle d'un pointage (ex : l'employé a oublié de pointer). Le motif
-            est obligatoire et sera journalisé.
+            Création manuelle d'un pointage.
           </DialogDescription>
         </DialogHeader>
 
         {!settingsAllowManual && (
           <div className="rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-            La création manuelle est désactivée : le paramètre planning{" "}
-            <span className="font-mono">attendance_source</span> vaut{" "}
-            <span className="font-mono">{settingsAttendanceSource ?? "?"}</span>. L'API
-            refuserait la requête.
+            La création manuelle est désactivée : le Mode de pointage est défini sur{" "}
+            <span className="font-mono">{settingsAttendanceSource ?? "?"}</span>. Veuillez utiliser le mode "Pointage".
           </div>
         )}
 
@@ -174,7 +171,7 @@ export function AddTimeEntryDialog({
             </Select>
           </FieldBlock>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-3">
             <FieldBlock label="Entrée *">
               <Input
                 type="datetime-local"
@@ -215,14 +212,14 @@ export function AddTimeEntryDialog({
             />
           </FieldBlock>
 
-          <FieldBlock label="Motif *" hint="Obligatoire — journalisé côté serveur.">
+          <FieldBlock label="Motif *" hint="Obligatoire.">
             <Textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               rows={2}
               required
               disabled={createMut.isPending}
-              placeholder="Ex : oubli de pointage le matin"
+              placeholder="Ex : Oubli de pointage le matin"
             />
           </FieldBlock>
         </div>

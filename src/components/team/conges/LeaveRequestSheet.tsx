@@ -1,10 +1,20 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { AlertCircle, Calendar, CheckCircle2, Trash2, User, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Sheet,
   SheetContent,
@@ -25,11 +35,13 @@ import {
 } from "@/components/ui/select";
 
 import { qk } from "@/lib/queryKeys";
-import { planningLeaveApi } from "@/services/welloApi";
+import { getHttpErrorStatus, getPlanningBusinessStatus, getPlanningMutationMessage } from "@/lib/planningApiErrors";
+import { planningLeaveApi, planningShiftsApi } from "@/services/welloApi";
 import type {
   Employee,
   LeaveType,
   PlanningLeaveRequest,
+  PlanningShift,
 } from "@/types/planning";
 
 import { LEAVE_TYPE_OPTIONS } from "./statusOptions";
@@ -63,9 +75,13 @@ export function LeaveRequestSheet({
   const [endDate, setEndDate] = useState<string>("");
   const [reason, setReason] = useState<string>("");
   const [managerNote, setManagerNote] = useState<string>("");
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [approveConfirmOpen, setApproveConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    setIsEditMode(false);
+    setApproveConfirmOpen(false);
     if (mode === "create") {
       setEmployeeId(employees[0]?.id ?? "");
       setLeaveType("paid");
@@ -83,6 +99,16 @@ export function LeaveRequestSheet({
       setManagerNote(request.manager_note ?? "");
     }
   }, [open, mode, request, employees]);
+
+  const pending = request?.status === "pending";
+  const conflictQuery = useQuery({
+    queryKey: ["planning", "leave-requests", request?.id, "conflicting-shifts"],
+    queryFn: () => planningLeaveApi.getConflictingShifts(request!.id),
+    enabled: open && mode === "view" && !!request && pending,
+  });
+  const conflictingShifts = conflictQuery.data ?? [];
+  const conflictingCount = conflictingShifts.length;
+  const conflictingCountLabel = `${conflictingCount} shift${conflictingCount > 1 ? "s" : ""}`;
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: qk.planningLeave.all });
@@ -123,23 +149,68 @@ export function LeaveRequestSheet({
   });
 
   const approveMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       if (!request) throw new Error("Demande introuvable.");
-      return planningLeaveApi.update(request.id, {
+
+      const latestConflicts = await planningLeaveApi.getConflictingShifts(request.id);
+      const dedupedConflicts: PlanningShift[] = Array.from(
+        new Map(latestConflicts.map((shift) => [shift.id, shift])).values(),
+      );
+
+      for (const shift of dedupedConflicts) {
+        await planningShiftsApi.update(shift.id, { employee_id: null });
+      }
+
+      const updatedLeave = await planningLeaveApi.update(request.id, {
         status: "approved",
         manager_note: managerNote.trim() || null,
       });
+
+      return {
+        updatedLeave,
+        releasedShifts: dedupedConflicts,
+      };
     },
-    onSuccess: () => {
+    onSuccess: ({ updatedLeave, releasedShifts }) => {
       toast.success("Demande approuvée.");
+
+      const touchedWeekIds = new Set(
+        releasedShifts
+          .map((shift) => shift.week_id)
+          .filter((weekId): weekId is string => typeof weekId === "string" && weekId.length > 0),
+      );
+
       invalidate();
+      qc.invalidateQueries({ queryKey: qk.planningLeave.detail(updatedLeave.id) });
+      qc.invalidateQueries({ queryKey: ["planning", "leave-requests", updatedLeave.id, "conflicting-shifts"] });
+      for (const weekId of touchedWeekIds) {
+        qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(weekId) });
+      }
+      for (const shift of releasedShifts) {
+        qc.invalidateQueries({ queryKey: qk.planningShifts.detail(shift.id) });
+      }
+
       onOpenChange(false);
     },
-    onError: (err: Error) =>
-      // The API rejects approval when shifts remain in the period.
-      toast.error(err.message ?? "Approbation refusée par l'API (conflit possible).", {
-        duration: 8000,
-      }),
+    onError: async (err: Error) => {
+      const message = getPlanningMutationMessage(
+        err,
+        err.message ?? "Approbation refusée.",
+        {
+          planning_leave_shift_conflict:
+            "Le conge chevauche encore des shifts assignes. Les conflits ont ete recharges.",
+        },
+      );
+
+      toast.error(message, { duration: 8000 });
+
+      if (
+        getHttpErrorStatus(err) === 409 &&
+        getPlanningBusinessStatus(err)?.toLowerCase() === "planning_leave_shift_conflict"
+      ) {
+        await conflictQuery.refetch();
+      }
+    },
   });
 
   const rejectMut = useMutation({
@@ -171,13 +242,18 @@ export function LeaveRequestSheet({
     onError: (err: Error) => toast.error(err.message ?? "Suppression impossible."),
   });
 
-  const pending = request?.status === "pending";
+  const canEditRequest = mode === "view" && pending;
+  const fieldsEditable = mode === "create" || (canEditRequest && isEditMode);
+  const managerNoteEditable = canEditRequest && isEditMode;
+  const leaveTypeLabel = LEAVE_TYPE_OPTIONS.find((o) => o.value === leaveType)?.label ?? leaveType;
   const anyMut =
     createMut.isPending ||
     editMut.isPending ||
     approveMut.isPending ||
     rejectMut.isPending ||
     deleteMut.isPending;
+  const approvalButtonLabel =
+    conflictingCount > 0 ? `Approuver et liberer ${conflictingCountLabel}` : "Approuver";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -203,86 +279,124 @@ export function LeaveRequestSheet({
 
         {/* ── Conflict info on approve ──────────────────────────────── */}
         {mode === "view" && pending && (
-          <div className="mt-3 flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 p-2 text-[11px] text-amber-900">
-            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <div>
-              À l'approbation, l'API <span className="font-medium">refuse</span> la demande si
-              des shifts restent affectés à l'employé sur la période. Réaffectez ou supprimez
-              ces shifts au préalable.
-            </div>
+          <div className="mt-3 rounded-md border border-amber-300/60 bg-amber-50 p-2 text-[11px] text-amber-900">
+            {conflictQuery.isLoading ? (
+              <div className="flex items-start gap-2">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div>Chargement des shifts en conflit...</div>
+              </div>
+            ) : conflictingCount > 0 ? (
+              <div className="space-y-1">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <div>
+                    Cet employe a {conflictingCountLabel} pendant ce conge. Approuver le conge passera ces shifts en non-assigne.
+                  </div>
+                </div>
+                <ul className="list-disc space-y-0.5 pl-5">
+                  {conflictingShifts.map((shift) => (
+                    <li key={shift.id}>
+                      {formatDateForDisplay(shift.shift_date)} - {formatTimeForDisplay(shift.start_time)}-{formatTimeForDisplay(shift.end_time)} - {shift.position ?? "Poste non precise"}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <div>Aucun shift assigne en conflit pour ce conge.</div>
+              </div>
+            )}
           </div>
         )}
 
         {/* ── Form ──────────────────────────────────────────────────── */}
         <section className="mt-4 space-y-3 rounded-md border bg-card p-3 text-sm">
           <Field label="Employé" icon={User}>
-            <Select
-              value={employeeId}
-              onValueChange={setEmployeeId}
-              disabled={mode !== "create"}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="Sélectionner un employé" />
-              </SelectTrigger>
-              <SelectContent>
-                {employees.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.first_name} {e.last_name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {mode === "create" ? (
+              <Select
+                value={employeeId}
+                onValueChange={setEmployeeId}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue placeholder="Sélectionner un employé" />
+                </SelectTrigger>
+                <SelectContent>
+                  {employees.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.first_name} {e.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <ReadOnlyValue>
+                {employee ? `${employee.first_name} ${employee.last_name}` : "-"}
+              </ReadOnlyValue>
+            )}
           </Field>
 
           <Field label="Type">
-            <Select
-              value={leaveType}
-              onValueChange={(v) => setLeaveType(v as LeaveType)}
-              disabled={mode === "view" && !pending}
-            >
-              <SelectTrigger className="h-8 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LEAVE_TYPE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {fieldsEditable ? (
+              <Select
+                value={leaveType}
+                onValueChange={(v) => setLeaveType(v as LeaveType)}
+              >
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEAVE_TYPE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <ReadOnlyValue>{leaveTypeLabel}</ReadOnlyValue>
+            )}
           </Field>
 
           <div className="grid grid-cols-2 gap-2">
             <Field label="Début" icon={Calendar}>
-              <Input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                disabled={mode === "view" && !pending}
-                className="h-8 text-sm"
-              />
+              {fieldsEditable ? (
+                <Input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <ReadOnlyValue>{formatDateForDisplay(startDate)}</ReadOnlyValue>
+              )}
             </Field>
             <Field label="Fin" icon={Calendar}>
-              <Input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                disabled={mode === "view" && !pending}
-                className="h-8 text-sm"
-              />
+              {fieldsEditable ? (
+                <Input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="h-8 text-sm"
+                />
+              ) : (
+                <ReadOnlyValue>{formatDateForDisplay(endDate)}</ReadOnlyValue>
+              )}
             </Field>
           </div>
 
           <Field label="Motif">
-            <Textarea
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={2}
-              placeholder="Optionnel"
-              disabled={mode === "view" && !pending}
-              className="text-sm"
-            />
+            {fieldsEditable ? (
+              <Textarea
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                rows={2}
+                placeholder="Optionnel"
+                className="text-sm"
+              />
+            ) : (
+              <ReadOnlyValue className="min-h-16 whitespace-pre-wrap">{reason.trim() || "Aucun motif"}</ReadOnlyValue>
+            )}
           </Field>
         </section>
 
@@ -290,14 +404,17 @@ export function LeaveRequestSheet({
         {mode === "view" && request && (
           <section className="mt-4 space-y-2 rounded-md border bg-card p-3 text-sm">
             <Field label="Note manager">
-              <Textarea
-                value={managerNote}
-                onChange={(e) => setManagerNote(e.target.value)}
-                rows={2}
-                placeholder="Justifier l'approbation ou le rejet"
-                disabled={!pending}
-                className="text-sm"
-              />
+              {managerNoteEditable ? (
+                <Textarea
+                  value={managerNote}
+                  onChange={(e) => setManagerNote(e.target.value)}
+                  rows={2}
+                  placeholder="Justifier l'approbation ou le rejet"
+                  className="text-sm"
+                />
+              ) : (
+                <ReadOnlyValue className="min-h-16 whitespace-pre-wrap">{managerNote.trim() || "Aucune note"}</ReadOnlyValue>
+              )}
             </Field>
             {request.processed_at && (
               <div className="text-[11px] text-muted-foreground">
@@ -315,15 +432,22 @@ export function LeaveRequestSheet({
             </Button>
           ) : (
             <>
-              {pending && (
+              {pending && !isEditMode && (
                 <div className="grid w-full grid-cols-2 gap-2">
                   <Button
                     variant="default"
-                    onClick={() => approveMut.mutate()}
-                    disabled={anyMut}
+                    onClick={() => {
+                      if (conflictingCount > 0) {
+                        setApproveConfirmOpen(true);
+                        return;
+                      }
+                      approveMut.mutate();
+                    }}
+                    disabled={anyMut || conflictQuery.isLoading}
+                    className="bg-emerald-600 text-white hover:bg-emerald-700"
                   >
                     <CheckCircle2 className="mr-2 h-4 w-4" />
-                    Approuver
+                    {approvalButtonLabel}
                   </Button>
                   <Button
                     variant="destructive"
@@ -335,17 +459,41 @@ export function LeaveRequestSheet({
                   </Button>
                 </div>
               )}
-              {pending && (
-                <Button
-                  variant="outline"
-                  onClick={() => editMut.mutate()}
-                  disabled={anyMut}
-                  className="w-full"
-                >
-                  Enregistrer les modifications
+              {canEditRequest && !isEditMode && (
+                <Button variant="outline" onClick={() => setIsEditMode(true)} disabled={anyMut} className="w-full">
+                  Modifier
                 </Button>
               )}
-              {request && request.status !== "cancelled" && (
+              {canEditRequest && isEditMode && (
+                <div className="grid w-full grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      if (!request) return;
+                      setLeaveType(request.leave_type);
+                      setStartDate(request.start_date);
+                      setEndDate(request.end_date);
+                      setReason(request.reason ?? "");
+                      setManagerNote(request.manager_note ?? "");
+                      setIsEditMode(false);
+                    }}
+                    disabled={anyMut}
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      editMut.mutate();
+                      setIsEditMode(false);
+                    }}
+                    disabled={anyMut}
+                  >
+                    Modifier
+                  </Button>
+                </div>
+              )}
+              {request && request.status !== "cancelled" && !isEditMode && (
                 <Button
                   variant="ghost"
                   onClick={() => deleteMut.mutate()}
@@ -356,12 +504,33 @@ export function LeaveRequestSheet({
                   Annuler la demande
                 </Button>
               )}
-              <Button variant="outline" onClick={() => onOpenChange(false)} className="w-full">
-                Fermer
-              </Button>
             </>
           )}
         </SheetFooter>
+
+        <AlertDialog open={approveConfirmOpen} onOpenChange={setApproveConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmer l'approbation et la liberation des shifts</AlertDialogTitle>
+              <AlertDialogDescription>
+                Cette action va desassigner tous les shifts en conflit renvoyes par le backend, puis approuver la demande de conge.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={anyMut}>Annuler</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={anyMut}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setApproveConfirmOpen(false);
+                  approveMut.mutate();
+                }}
+              >
+                Approuver et liberer {conflictingCountLabel}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );
@@ -383,4 +552,31 @@ function Field({ label, icon: Icon, children }: FieldProps) {
       <div className="mt-1">{children}</div>
     </div>
   );
+}
+
+interface ReadOnlyValueProps {
+  children: React.ReactNode;
+  className?: string;
+}
+
+function ReadOnlyValue({ children, className = "" }: ReadOnlyValueProps) {
+  return (
+    <div className={`rounded-md border bg-muted/40 px-3 py-2 text-sm ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function formatDateForDisplay(value: string): string {
+  if (!value) return "-";
+  try {
+    return format(parseISO(value), "dd/MM/yyyy", { locale: fr });
+  } catch {
+    return value;
+  }
+}
+
+function formatTimeForDisplay(value: string): string {
+  if (!value) return "--:--";
+  return value.slice(0, 5);
 }

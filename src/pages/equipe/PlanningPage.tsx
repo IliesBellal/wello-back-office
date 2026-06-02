@@ -65,6 +65,7 @@ import {
   partitionForBulkAssign,
   shiftsOfRowInRange,
 } from "@/lib/planningOverlap";
+import { getHttpErrorStatus, getPlanningShiftMutationMessage } from "@/lib/planningApiErrors";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -83,22 +84,8 @@ function visibleRange(view: PlanningViewMode, anchor: Date): { from: Date; to: D
   return { from, to: addDays(from, 6) };
 }
 
-function getErrorStatus(error: unknown): number | undefined {
-  if (typeof error === "object" && error !== null) {
-    const status = (error as { status?: unknown }).status;
-    if (typeof status === "number") return status;
-  }
-
-  if (error instanceof Error) {
-    const match = error.message.match(/HTTP error\s+(\d{3})/i);
-    if (match) return Number(match[1]);
-  }
-
-  return undefined;
-}
-
 function isPlanningWeekAlreadyExistsConflict(error: unknown): boolean {
-  if (getErrorStatus(error) !== 409) return false;
+  if (getHttpErrorStatus(error) !== 409) return false;
 
   if (typeof error === "object" && error !== null) {
     const responseBody = (error as { responseBody?: unknown }).responseBody;
@@ -119,41 +106,6 @@ function isPlanningWeekAlreadyExistsConflict(error: unknown): boolean {
   }
 
   return false;
-}
-
-function getPlanningBusinessStatus(error: unknown): string | undefined {
-  if (typeof error === "object" && error !== null) {
-    const responseBody = (error as { responseBody?: unknown }).responseBody;
-    if (typeof responseBody === "object" && responseBody !== null) {
-      const body = responseBody as Record<string, unknown>;
-      const nestedData = body.data;
-      if (typeof nestedData === "object" && nestedData !== null) {
-        const nestedStatus = (nestedData as Record<string, unknown>).status;
-        if (typeof nestedStatus === "string") return nestedStatus;
-      }
-
-      const status = body.status;
-      if (typeof status === "string") return status;
-      const errorCode = body.error;
-      if (typeof errorCode === "string") return errorCode;
-      const message = body.message;
-      if (typeof message === "string") return message;
-    }
-  }
-
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return undefined;
-}
-
-function getPlanningShiftMutationMessage(error: unknown, fallback: string): string {
-  const status = getPlanningBusinessStatus(error)?.toLowerCase();
-  if (status === "planning_shift_conflict") {
-    return "Ce créneau chevauche un shift existant pour cet employé.";
-  }
-  return fallback;
 }
 
 /** Find or auto-create the week containing `date`. */
@@ -253,7 +205,7 @@ function PlanningPageContent() {
     enabled: weeksQuery.isSuccess,
     queryFn: () => ensureWeekFor(anchorDate, weeksQuery.data ?? []),
     retry: (failureCount, error) => {
-      const status = getErrorStatus(error);
+      const status = getHttpErrorStatus(error);
       if (typeof status === "number" && status >= 400 && status < 500) return false;
       return failureCount < 3;
     },
@@ -263,9 +215,18 @@ function PlanningPageContent() {
 
   const shiftsQuery = useQuery({
     queryKey: currentWeek ? qk.planningWeeks.shifts(currentWeek.id) : ["planning", "shifts", "noop"],
-    enabled: !!currentWeek,
+    enabled: !!currentWeek && viewMode !== "month",
     queryFn: () => planningWeeksApi.getShifts(currentWeek!.id),
   });
+
+
+  // Month mode: load all shifts for the full visible range via the range endpoint.
+  const shiftsQueryMonth = useQuery({
+    queryKey: qk.planningShifts.range(isoDay(range.from), isoDay(range.to)),
+    enabled: viewMode === "month",
+    queryFn: () => planningWeeksApi.getShiftsByRange(isoDay(range.from), isoDay(range.to)),
+  });
+
 
   const employeesQuery = useQuery({
     queryKey: qk.planningEmployees.list({ active: true }),
@@ -490,11 +451,11 @@ function PlanningPageContent() {
   const loading =
     weeksQuery.isLoading ||
     weekForAnchorQuery.isLoading ||
-    shiftsQuery.isLoading ||
+    (viewMode === "month" ? shiftsQueryMonth.isLoading : shiftsQuery.isLoading) ||
     employeesQuery.isLoading;
 
   const employees = employeesQuery.data?.items ?? [];
-  const shifts = shiftsQuery.data ?? [];
+  const shifts = (viewMode === "month" ? shiftsQueryMonth.data : shiftsQuery.data) ?? [];
   const holidays = holidaysQuery.data ?? [];
   const positions = positionsQuery.data ?? [];
 

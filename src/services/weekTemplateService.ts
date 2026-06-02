@@ -13,6 +13,8 @@
 //   remove(id)       →  apiClient.delete(`/planning/week-templates/${id}`)
 //   createFromWeek() →  apiClient.post<{ week_template: WeekTemplate; week_template_shifts: WeekTemplateShift[] }>("/planning/week-templates/from-week", payload)
 
+import { apiClient, type WelloApiResponse } from "@/services/apiClient";
+import { unwrap, unwrapList, type ApiEnvelopeData } from "@/services/apiUnwrap";
 import type {
   ConflictMode,
   Employee,
@@ -66,6 +68,74 @@ function materializeShifts(inputs: WeekTemplateShiftInput[]): WeekTemplateShift[
   return inputs.map((s) => ({ id: nextId("wts"), ...s }));
 }
 
+function normalizeTime(value: string): string {
+  return /^\d{2}:\d{2}/.test(value) ? value.slice(0, 5) : value;
+}
+
+function normalizeWeekTemplateShift(shift: WeekTemplateShift): WeekTemplateShift {
+  return {
+    ...shift,
+    start_time: normalizeTime(shift.start_time),
+    end_time: normalizeTime(shift.end_time),
+  };
+}
+
+function normalizeWeekTemplate(weekTemplate: WeekTemplate): WeekTemplate {
+  return { ...weekTemplate };
+}
+
+function normalizeWeekTemplateBundle(bundle: {
+  week_template: WeekTemplate;
+  week_template_shifts: WeekTemplateShift[];
+}): {
+  week_template: WeekTemplate;
+  week_template_shifts: WeekTemplateShift[];
+} {
+  return {
+    week_template: normalizeWeekTemplate(bundle.week_template),
+    week_template_shifts: bundle.week_template_shifts.map(normalizeWeekTemplateShift),
+  };
+}
+
+function normalizeInstantiationConflict(conflict: InstantiationConflict): InstantiationConflict {
+  return {
+    ...conflict,
+    target_week_start: conflict.target_week_start.slice(0, 10),
+    day: conflict.day.slice(0, 10),
+    template_shift: {
+      ...conflict.template_shift,
+      start_time: normalizeTime(conflict.template_shift.start_time),
+      end_time: normalizeTime(conflict.template_shift.end_time),
+    },
+  };
+}
+
+function normalizeInstantiationPreview(preview: InstantiationPreview): InstantiationPreview {
+  return {
+    ...preview,
+    target_week_starts: preview.target_week_starts.map((value) => value.slice(0, 10)),
+    conflicts: preview.conflicts.map(normalizeInstantiationConflict),
+  };
+}
+
+function normalizeInstantiationPerWeekResult(result: InstantiationPerWeekResult): InstantiationPerWeekResult {
+  return {
+    ...result,
+    target_week_start: result.target_week_start.slice(0, 10),
+  };
+}
+
+function normalizeInstantiationResult(result: InstantiationResult): InstantiationResult {
+  return {
+    ...result,
+    per_week: result.per_week.map(normalizeInstantiationPerWeekResult),
+  };
+}
+
+function normalizeTemplateList(items: WeekTemplate[]): WeekTemplate[] {
+  return items.map(normalizeWeekTemplate);
+}
+
 /**
  * Convertit une date ISO "YYYY-MM-DD" en `day_of_week` 0..6 (0 = dimanche).
  * Standard du module Planning — JavaScript `Date.getDay()` natif.
@@ -112,124 +182,56 @@ export function shiftToTemplateInput(
 }
 
 export const WeekTemplateService = {
-  /**
-   * GET /planning/week-templates → data.week_templates[]
-   * Retourne la LISTE (méta seule, sans shifts) — `shift_count` dérivé.
-   */
   list(): Promise<WeekTemplate[]> {
-    // TODO(backend): replace with
-    //   apiClient.get<{ week_templates: WeekTemplate[] }>("/planning/week-templates")
-    //     .then(r => r.week_templates);
-    return delay(_store.map(metaOf));
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>("/planning/week-templates")
+      .then((resp) => normalizeTemplateList(unwrapList<WeekTemplate>(resp, "week_templates").items));
   },
 
-  /**
-   * GET /planning/week-templates/{id} → { week_template, week_template_shifts[] }
-   */
   get(id: string): Promise<{ week_template: WeekTemplate; week_template_shifts: WeekTemplateShift[] }> {
-    // TODO(backend): replace with apiClient.get(`/planning/week-templates/${id}`).
-    const found = _store.find((t) => t.meta.id === id);
-    if (!found) return Promise.reject(new Error(`Modèle de semaine introuvable : ${id}`));
-    return delay({
-      week_template: metaOf(found),
-      week_template_shifts: [...found.shifts],
-    });
+    const path = `/planning/week-templates/${id}`;
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => normalizeWeekTemplateBundle(unwrap(resp)));
   },
 
-  /**
-   * POST /planning/week-templates → { week_template, week_template_shifts[] }
-   * `active` par défaut = true.
-   */
   create(payload: WeekTemplateCreateRequest): Promise<{
     week_template: WeekTemplate;
     week_template_shifts: WeekTemplateShift[];
   }> {
-    // TODO(backend): replace with apiClient.post("/planning/week-templates", payload).
-    const label = payload.label.trim();
-    if (!label) return Promise.reject(new Error("Le libellé du modèle est obligatoire."));
-    const shifts = materializeShifts(payload.shifts ?? []);
-    const meta: WeekTemplate = {
-      id: nextId("wtmpl"),
-      merchant_id: MERCHANT_ID,
-      label,
-      notes: payload.notes ?? null,
-      active: payload.active ?? true,
-      shift_count: shifts.length,
-      created_at: NOW(),
-      updated_at: NOW(),
-    };
-    _store.push({ meta, shifts });
-    return delay({ week_template: meta, week_template_shifts: shifts });
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(
+        "/planning/week-templates",
+        payload,
+      )
+      .then((resp) => normalizeWeekTemplateBundle(unwrap(resp)));
   },
 
-  /**
-   * PATCH /planning/week-templates/{id} → { week_template, week_template_shifts[] }
-   * Patch partiel. Si `shifts` est fourni, REMPLACE intégralement la collection.
-   */
   update(
     id: string,
     payload: WeekTemplateUpdateRequest,
   ): Promise<{ week_template: WeekTemplate; week_template_shifts: WeekTemplateShift[] }> {
-    // TODO(backend): replace with apiClient.patch(`/planning/week-templates/${id}`, payload).
-    const idx = _store.findIndex((t) => t.meta.id === id);
-    if (idx === -1) return Promise.reject(new Error(`Modèle de semaine introuvable : ${id}`));
-    const current = _store[idx];
-    const nextShifts = payload.shifts !== undefined ? materializeShifts(payload.shifts) : current.shifts;
-    const nextMeta: WeekTemplate = {
-      ...current.meta,
-      ...(payload.label !== undefined ? { label: payload.label } : {}),
-      ...(payload.notes !== undefined ? { notes: payload.notes } : {}),
-      ...(payload.active !== undefined ? { active: payload.active } : {}),
-      shift_count: nextShifts.length,
-      updated_at: NOW(),
-    };
-    _store[idx] = { meta: nextMeta, shifts: nextShifts };
-    return delay({ week_template: nextMeta, week_template_shifts: nextShifts });
+    const path = `/planning/week-templates/${id}`;
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => normalizeWeekTemplateBundle(unwrap(resp)));
   },
 
-  /**
-   * DELETE /planning/week-templates/{id}
-   * Suppression LOGIQUE : `active=false`. Le record reste consultable.
-   */
   remove(id: string): Promise<void> {
-    // TODO(backend): replace with apiClient.delete(`/planning/week-templates/${id}`).
-    const idx = _store.findIndex((t) => t.meta.id === id);
-    if (idx === -1) return Promise.reject(new Error(`Modèle de semaine introuvable : ${id}`));
-    _store[idx] = {
-      ..._store[idx],
-      meta: { ..._store[idx].meta, active: false, updated_at: NOW() },
-    };
-    return delay(undefined);
+    return apiClient.delete<WelloApiResponse<ApiEnvelopeData>>(`/planning/week-templates/${id}`).then(() => undefined);
   },
 
-  /**
-   * POST /planning/week-templates/from-week
-   *
-   * Crée un modèle À PARTIR d'une semaine existante.
-   * Copie TOUS les shifts en `WeekTemplateShift` en **conservant `employee_id`
-   * ET `position_id`** (assignation nominative préservée — c'est l'intérêt).
-   *
-   * NOTE mock : comme l'API backend n'existe pas encore et que ce service
-   * vit dans le front, le caller doit fournir directement les shifts à copier
-   * + le catalogue de postes pour résoudre les `position_id` (le store mock
-   * de WeekTemplateService n'a pas accès aux autres mocks). Côté API réelle,
-   * le backend résoudra tout seul à partir du seul `week_id`.
-   */
   createFromWeek(
     payload: WeekTemplateFromWeekRequest,
     sourceShifts: PlanningShift[],
     positions: ReadonlyArray<Pick<EmployeePosition, "id" | "label">>,
   ): Promise<{ week_template: WeekTemplate; week_template_shifts: WeekTemplateShift[] }> {
-    // TODO(backend): replace with
-    //   apiClient.post("/planning/week-templates/from-week", payload);
-    //   (côté backend, `sourceShifts` et `positions` ne sont PAS envoyés —
-    //   le serveur les charge à partir de `payload.week_id`).
-    const inputs = sourceShifts.map((s) => shiftToTemplateInput(s, positions));
-    return WeekTemplateService.create({
-      label: payload.label,
-      notes: payload.notes ?? null,
-      shifts: inputs,
-    });
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(
+        "/planning/week-templates/from-week",
+        payload,
+      )
+      .then((resp) => normalizeWeekTemplateBundle(unwrap(resp)));
   },
 
   /** @internal — utilitaire de tests pour réinitialiser le store. */
@@ -238,6 +240,33 @@ export const WeekTemplateService = {
     _seq = 0;
   },
 };
+
+/**
+ * POST /planning/week-templates/{id}/preview
+ */
+export function previewWeekTemplateApi(
+  templateId: string,
+  target_week_starts: string[],
+): Promise<InstantiationPreview> {
+  const path = `/planning/week-templates/${templateId}/preview`;
+  return apiClient
+    .post<WelloApiResponse<ApiEnvelopeData>>(path, { target_week_starts })
+    .then((resp) => normalizeInstantiationPreview(unwrap(resp).preview));
+}
+
+/**
+ * POST /planning/week-templates/{id}/instantiate
+ */
+export function instantiateWeekTemplateApi(
+  templateId: string,
+  target_week_starts: string[],
+  conflict_mode: ConflictMode,
+): Promise<InstantiationResult> {
+  const path = `/planning/week-templates/${templateId}/instantiate`;
+  return apiClient
+    .post<WelloApiResponse<ApiEnvelopeData>>(path, { target_week_starts, conflict_mode })
+    .then((resp) => normalizeInstantiationResult(unwrap(resp).result));
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INSTANCIATION — preview & instantiate

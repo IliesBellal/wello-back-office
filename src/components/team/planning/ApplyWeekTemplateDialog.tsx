@@ -51,25 +51,16 @@ import {
 import { cn } from "@/lib/utils";
 
 import { qk } from "@/lib/queryKeys";
+import { planningWeeksApi } from "@/services/welloApi";
 import {
-  planningLeaveApi,
-  planningPositionsApi,
-  planningShiftsApi,
-  planningWeeksApi,
-} from "@/services/welloApi";
-import {
-  previewWeekTemplate,
-  instantiateWeekTemplate,
-  type InstantiationApiBridge,
-  type InstantiationContext,
+  instantiateWeekTemplateApi,
+  previewWeekTemplateApi,
 } from "@/services/weekTemplateService";
 import type {
   ConflictMode,
   Employee,
-  EmployeePosition,
   InstantiationConflict,
   InstantiationPreview,
-  PlanningShift,
   PlanningWeek,
   WeekTemplate,
 } from "@/types/planning";
@@ -137,7 +128,6 @@ export function ApplyWeekTemplateDialog({
   onOpenChange,
   template,
   defaultWeekStart,
-  employees,
 }: ApplyWeekTemplateDialogProps) {
   const qc = useQueryClient();
 
@@ -170,23 +160,9 @@ export function ApplyWeekTemplateDialog({
     [targetWeekStarts, todayMonday],
   );
 
-  // ─── Données nécessaires à la preview ──────────────────────────────────────
-
   const weeksQuery = useQuery({
     queryKey: qk.planningWeeks.all,
     queryFn: () => planningWeeksApi.list(),
-    enabled: open && !!template,
-  });
-
-  const leavesQuery = useQuery({
-    queryKey: qk.planningLeave.list({ status: "approved" }),
-    queryFn: () => planningLeaveApi.list({ status: "approved" }),
-    enabled: open && !!template,
-  });
-
-  const positionsQuery = useQuery({
-    queryKey: qk.planningPositions.all,
-    queryFn: () => planningPositionsApi.list(),
     enabled: open && !!template,
   });
 
@@ -197,51 +173,17 @@ export function ApplyWeekTemplateDialog({
     return m;
   }, [weeksQuery.data]);
 
-  // Pour chaque semaine cible déjà existante, on récupère ses shifts.
-  // (Les semaines qui n'existent pas encore n'ont pas de shifts ⇒ pas de conflit.)
-  const shiftsQueries = useQuery({
-    queryKey: ["planning", "instantiate", "shifts-of", targetWeekStarts],
-    queryFn: async () => {
-      const out = new Map<string, PlanningShift[]>();
-      await Promise.all(
-        targetWeekStarts.map(async (ws) => {
-          const wk = weekByStart.get(ws);
-          if (!wk) {
-            out.set(ws, []);
-            return;
-          }
-          const shifts = await planningWeeksApi.getShifts(wk.id);
-          out.set(ws, shifts);
-        }),
-      );
-      return out;
-    },
-    enabled: open && !!template && weeksQuery.isSuccess && targetWeekStarts.length > 0,
+  const previewQuery = useQuery({
+    queryKey: ["planning", "week-template-preview", template?.id, targetWeekStarts],
+    queryFn: () => previewWeekTemplateApi(template!.id, targetWeekStarts),
+    enabled: open && !!template && targetWeekStarts.length > 0,
   });
 
-  // ─── Preview (synchrone — mémoïsée sur changement de mode / data) ─────────
-
-  const ctx: InstantiationContext | null = useMemo(() => {
-    if (!leavesQuery.data || !positionsQuery.data || !shiftsQueries.data) return null;
-    return {
-      existingShiftsByWeekStart: shiftsQueries.data,
-      leaves: leavesQuery.data.items,
-      employees,
-      positions: (positionsQuery.data as EmployeePosition[]) ?? [],
-    };
-  }, [leavesQuery.data, positionsQuery.data, shiftsQueries.data, employees]);
-
-  const preview: InstantiationPreview | null = useMemo(() => {
-    if (!template || !ctx || targetWeekStarts.length === 0) return null;
-    try {
-      return previewWeekTemplate(template.id, targetWeekStarts, ctx, conflictMode);
-    } catch {
-      return null;
-    }
-  }, [template, ctx, targetWeekStarts, conflictMode]);
-
-  const previewLoading =
-    !preview && (weeksQuery.isLoading || leavesQuery.isLoading || positionsQuery.isLoading || shiftsQueries.isLoading);
+  const preview: InstantiationPreview | null = previewQuery.data ?? null;
+  const previewLoading = previewQuery.isLoading || previewQuery.isFetching;
+  const previewError = previewQuery.isError
+    ? (previewQuery.error instanceof Error ? previewQuery.error.message : "Impossible de charger la prévisualisation")
+    : null;
 
   // ─── Conflits groupés par employé pour affichage ───────────────────────────
   const conflictsByEmployee = useMemo(() => {
@@ -262,25 +204,8 @@ export function ApplyWeekTemplateDialog({
 
   const applyMut = useMutation({
     mutationFn: async () => {
-      if (!template || !ctx) throw new Error("Contexte non prêt");
-      // Construire le bridge — résout les semaines manquantes à la volée.
-      const bridge: InstantiationApiBridge = {
-        async ensureWeekIdForStart(targetWeekStart) {
-          const existing = weekByStart.get(targetWeekStart);
-          if (existing) return existing.id;
-          const monday = new Date(targetWeekStart + "T00:00:00");
-          const sunday = addDays(monday, 6);
-          const created = await planningWeeksApi.create({
-            label: `Semaine du ${format(monday, "d MMM yyyy", { locale: fr })}`,
-            start_date: targetWeekStart,
-            end_date: isoDay(sunday),
-          });
-          return created.id;
-        },
-        createShift: (weekId, payload) => planningWeeksApi.createShift(weekId, payload),
-        deleteShift: (id) => planningShiftsApi.delete(id),
-      };
-      return instantiateWeekTemplate(template.id, targetWeekStarts, conflictMode, ctx, bridge);
+      if (!template) throw new Error("Contexte non prêt");
+      return instantiateWeekTemplateApi(template.id, targetWeekStarts, conflictMode);
     },
     onSuccess: (result) => {
       // Invalider les shifts de chaque semaine touchée + la liste des semaines.
@@ -365,6 +290,8 @@ export function ApplyWeekTemplateDialog({
         <section className="space-y-2">
           {previewLoading ? (
             <Skeleton className="h-20 w-full" />
+          ) : previewError ? (
+            <p className="text-sm text-destructive">{previewError}</p>
           ) : !preview || targetWeekStarts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Sélectionne au moins une semaine cible.

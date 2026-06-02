@@ -54,9 +54,10 @@ export const qk = {
   // ─── Planning – Shifts ────────────────────────────────────
   planningShifts: {
     detail: (id: string) => ["planning", "shifts", id] as const,
+    range: (from: string, to: string) => ["planning", "shifts", "range", from, to] as const,
   },
 
-  // ─── POS Holidays ─────────────────────────────────────────
+    // ─── POS Holidays ─────────────────────────────────────────
   planningHolidays: {
     all: ["planning", "holidays"] as const,
     range: (from: string, to: string) => ["planning", "holidays", from, to] as const,

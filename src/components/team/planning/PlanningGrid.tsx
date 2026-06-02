@@ -200,7 +200,7 @@ export function PlanningGrid({
   }, [shifts, range]);
 
   // For "month" view we still render a grid but cap columns at 14 to stay readable
-  const displayColumns = viewMode === "month" ? columns.slice(0, Math.min(columns.length, 14)) : columns;
+    const displayColumns = columns;
 
   // Nombre de shifts de chaque ligne sur la fenêtre visible (pour:
   // désactiver le menu d'assignation en masse quand la ligne est vide,
@@ -296,8 +296,8 @@ export function PlanningGrid({
               {displayColumns.map((d) => {
                 const iso = isoDay(d);
                 const cellShifts = shiftsByCell.get(`${emp.id}:${iso}`) ?? [];
-                const isOutsideWeek = iso < week.start_date || iso > week.end_date;
                 const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                  const isOutsideWeek = viewMode !== "month" && (iso < week.start_date || iso > week.end_date);
                 const isHoliday = holidayByDate.has(iso);
                 return (
                   <GridCell
@@ -354,7 +354,7 @@ export function PlanningGrid({
         {displayColumns.map((d) => {
           const iso = isoDay(d);
           const cellShifts = shiftsByCell.get(`${UNASSIGNED_KEY}:${iso}`) ?? [];
-          const isOutsideWeek = iso < week.start_date || iso > week.end_date;
+          const isOutsideWeek = viewMode !== "month" && (iso < week.start_date || iso > week.end_date);
           const isWeekend = d.getDay() === 0 || d.getDay() === 6;
           const isHoliday = holidayByDate.has(iso);
           return (
