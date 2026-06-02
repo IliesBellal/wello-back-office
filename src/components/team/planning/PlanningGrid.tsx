@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { Fragment, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { addDays, format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -56,6 +56,11 @@ function isoDay(d: Date): string {
   return format(d, "yyyy-MM-dd");
 }
 
+function formatProratedQuota(hours: number): string {
+  const rounded = Math.round(hours * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
 // ─── Empty droppable cell ───────────────────────────────────────────────────
 
 function GridCell({
@@ -70,6 +75,7 @@ function GridCell({
   onEmptyCellClick,
   selectionMode,
   selectedShiftIds,
+  className,
 }: {
   /** Sentinelle `UNASSIGNED_KEY` pour la ligne "Non assigné". */
   employeeId: string;
@@ -83,6 +89,7 @@ function GridCell({
   onEmptyCellClick: (employeeId: string | null, dateIso: string) => void;
   selectionMode?: boolean;
   selectedShiftIds?: ReadonlySet<string>;
+  className?: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `cell:${employeeId}:${dateIso}` });
   const isUnassignedRow = employeeId === UNASSIGNED_KEY;
@@ -92,6 +99,7 @@ function GridCell({
       ref={setNodeRef}
       className={cn(
         "relative min-h-[88px] border-b border-r p-1.5 transition-colors",
+        className,
         isHoliday && "bg-amber-50/60",
         isWeekend && !isHoliday && "bg-muted/30",
         isOutsideWeek && "opacity-50",
@@ -220,17 +228,20 @@ export function PlanningGrid({
   // Index id|label → couleur hex pour le rendu des `ShiftCard` (évite un
   // lookup linéaire par carte).
   const colorIndex = useMemo(() => buildPositionColorIndex(positions), [positions]);
+  const visibleDays = displayColumns.length;
 
   const colTemplate = `220px repeat(${displayColumns.length}, minmax(140px, 1fr))`;
 
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
-      {/* ── Header row ──────────────────────────────────────────────── */}
+    <div className="relative overflow-x-auto rounded-md border bg-card">
       <div
-        className="grid border-b bg-muted/40 text-xs font-medium text-muted-foreground"
+        className="grid w-max min-w-full text-xs font-medium text-muted-foreground"
         style={{ gridTemplateColumns: colTemplate }}
       >
-        <div className="border-r px-3 py-2">Employé</div>
+        {/* ── Header row ────────────────────────────────────────────── */}
+        <div className="sticky left-0 z-30 border-b border-r bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
+          Employé
+        </div>
         {displayColumns.map((d) => {
           const iso = isoDay(d);
           const holiday = holidayByDate.get(iso);
@@ -239,7 +250,7 @@ export function PlanningGrid({
             <div
               key={iso}
               className={cn(
-                "border-r px-2 py-2 text-center",
+                "border-b border-r bg-muted/40 px-2 py-2 text-center",
                 today && "bg-primary/5 text-primary",
                 holiday && "bg-amber-50/60 text-amber-900",
               )}
@@ -252,81 +263,78 @@ export function PlanningGrid({
             </div>
           );
         })}
-      </div>
 
-      {/* ── Employee rows ──────────────────────────────────────────── */}
-      {employees.length === 0 ? (
-        <div className="p-12 text-center text-sm text-muted-foreground">
-          Aucun employé actif.
-        </div>
-      ) : (
-        employees.map((emp) => {
-          const hours = hoursByEmployee.get(emp.id) ?? 0;
-          const contract = emp.contract_hours ?? null;
-          const rowCount = shiftsCountByRow.get(emp.id) ?? 0;
-          return (
-            <div
-              key={emp.id}
-              className="group/row grid border-b last:border-b-0"
-              style={{ gridTemplateColumns: colTemplate }}
-            >
-              {/* Employee column */}
-              <div className="flex items-start gap-1 border-r px-3 py-2">
-                <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                  <div className="truncate text-sm font-medium text-foreground">
-                    {emp.first_name} {emp.last_name}
+        {/* ── Employee rows ────────────────────────────────────────── */}
+        {employees.length === 0 ? (
+          <div className="p-12 text-center text-sm text-muted-foreground" style={{ gridColumn: "1 / -1" }}>
+            Aucun employé actif.
+          </div>
+        ) : (
+          employees.map((emp) => {
+            const hours = hoursByEmployee.get(emp.id) ?? 0;
+            const contract = emp.contract_hours ?? null;
+            const proratedQuota =
+              contract !== null && viewMode === "month"
+                ? formatProratedQuota((contract * visibleDays) / 7)
+                : null;
+            const rowCount = shiftsCountByRow.get(emp.id) ?? 0;
+            return (
+              <Fragment key={`row:${emp.id}`}>
+                <div
+                  className="sticky left-0 z-20 flex items-start gap-1 border-b border-r bg-card px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]"
+                >
+                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                    <div className="truncate text-sm font-medium text-foreground">
+                      {emp.first_name} {emp.last_name}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {emp.position ?? "—"}
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">
+                      {hours.toFixed(1)}h
+                      {contract !== null
+                        ? ` / ${viewMode === "month" ? proratedQuota : String(contract)}h`
+                        : ""}
+                    </div>
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {emp.position ?? "—"}
-                  </div>
-                  <div className="mt-1 text-[11px] text-muted-foreground">
-                    {hours.toFixed(1)}h
-                    {contract ? ` / ${contract}h` : ""}
-                  </div>
-                </div>
-                <RowActionsMenu
-                  variant="employee"
-                  disabled={rowCount === 0}
-                  onBulkAssign={() =>
-                    onBulkAssignRow(emp.id, `${emp.first_name} ${emp.last_name}`, rowCount)
-                  }
-                />
-              </div>
-              {/* Day cells */}
-              {displayColumns.map((d) => {
-                const iso = isoDay(d);
-                const cellShifts = shiftsByCell.get(`${emp.id}:${iso}`) ?? [];
-                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                  const isOutsideWeek = viewMode !== "month" && (iso < week.start_date || iso > week.end_date);
-                const isHoliday = holidayByDate.has(iso);
-                return (
-                  <GridCell
-                    key={iso}
-                    employeeId={emp.id}
-                    dateIso={iso}
-                    isHoliday={isHoliday}
-                    isWeekend={isWeekend}
-                    isOutsideWeek={isOutsideWeek}
-                    shifts={cellShifts}
-                    colorIndex={colorIndex}
-                    onShiftClick={onShiftClick}
-                    onEmptyCellClick={onEmptyCellClick}
-                    selectionMode={selectionMode}
-                    selectedShiftIds={selectedShiftIds}
+                  <RowActionsMenu
+                    variant="employee"
+                    disabled={rowCount === 0}
+                    onBulkAssign={() =>
+                      onBulkAssignRow(emp.id, `${emp.first_name} ${emp.last_name}`, rowCount)
+                    }
                   />
-                );
-              })}
-            </div>
-          );
-        })
-      )}
+                </div>
+                {displayColumns.map((d) => {
+                  const iso = isoDay(d);
+                  const cellShifts = shiftsByCell.get(`${emp.id}:${iso}`) ?? [];
+                  const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                  const isOutsideWeek = viewMode !== "month" && (iso < week.start_date || iso > week.end_date);
+                  const isHoliday = holidayByDate.has(iso);
+                  return (
+                    <GridCell
+                      key={`${emp.id}:${iso}`}
+                      employeeId={emp.id}
+                      dateIso={iso}
+                      isHoliday={isHoliday}
+                      isWeekend={isWeekend}
+                      isOutsideWeek={isOutsideWeek}
+                      shifts={cellShifts}
+                      colorIndex={colorIndex}
+                      onShiftClick={onShiftClick}
+                      onEmptyCellClick={onEmptyCellClick}
+                      selectionMode={selectionMode}
+                      selectedShiftIds={selectedShiftIds}
+                    />
+                  );
+                })}
+              </Fragment>
+            );
+          })
+        )}
 
-      {/* ── Unassigned row (always visible, even when empty) ──────── */}
-      <div
-        className="group/row grid border-t-2 bg-muted/20"
-        style={{ gridTemplateColumns: colTemplate }}
-      >
-        <div className="flex items-start gap-1 border-r px-3 py-2">
+        {/* ── Unassigned row (always visible, even when empty) ────── */}
+        <div className="sticky left-0 z-20 flex items-start gap-1 border-b border-r border-t-2 bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
             <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
               <UserX className="h-3.5 w-3.5 text-muted-foreground" />
@@ -359,7 +367,7 @@ export function PlanningGrid({
           const isHoliday = holidayByDate.has(iso);
           return (
             <GridCell
-              key={iso}
+              key={`${UNASSIGNED_KEY}:${iso}`}
               employeeId={UNASSIGNED_KEY}
               dateIso={iso}
               isHoliday={isHoliday}
@@ -371,6 +379,7 @@ export function PlanningGrid({
               onEmptyCellClick={onEmptyCellClick}
               selectionMode={selectionMode}
               selectedShiftIds={selectedShiftIds}
+              className="border-t-2 bg-muted/20"
             />
           );
         })}
