@@ -1,10 +1,16 @@
-import { CalendarIcon, ChevronLeft, ChevronRight, Save } from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight, MoreHorizontal, Save } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import type { PlanningWeek } from "@/types/planning";
 
@@ -20,8 +26,16 @@ interface PlanningDateToolbarProps {
   onPickDate: (d: Date) => void;
   /** Sauvegarde la semaine courante comme nouveau modèle de semaine type. */
   onSaveAsWeekTemplate: () => void;
+  /** Publie la semaine courante (mode semaine uniquement). */
+  onPublishWeek?: () => void;
+  /** Dépublie la semaine courante (mode semaine uniquement). */
+  onUnpublishWeek?: () => void;
   /** Désactive le bouton "Sauvegarder comme semaine type" (ex: aucune semaine ou aucun shift). */
   saveDisabled?: boolean;
+  /** Pending state de l'action publier. */
+  publishPending?: boolean;
+  /** Pending state de l'action dépublier. */
+  unpublishPending?: boolean;
 }
 
 function toValidDate(value: string | null | undefined): Date | null {
@@ -78,9 +92,32 @@ export function PlanningDateToolbar({
   onToday,
   onPickDate,
   onSaveAsWeekTemplate,
+  onPublishWeek,
+  onUnpublishWeek,
   saveDisabled,
+  publishPending,
+  unpublishPending,
 }: PlanningDateToolbarProps) {
   const headerLabel = formatHeaderLabel(viewMode, anchorDate, currentWeek);
+  const weekStatus = (currentWeek?.status ?? "").toLowerCase();
+  const isWeekView = viewMode === "week";
+  const isDraft = weekStatus === "draft";
+  const isPublished = weekStatus === "published";
+  const isLocked = weekStatus === "locked";
+  const hideStatus = weekStatus === "open" || weekStatus.length === 0;
+  const publishedAt = isPublished ? safeFormatDate(toValidDate(currentWeek?.published_at), "d MMM yyyy HH:mm") : "";
+
+  const statusLabel =
+    isDraft ? "Brouillon" : isPublished ? "Publié" : isLocked ? "Verrouillé" : currentWeek?.status;
+
+  const statusClassName =
+    isDraft
+      ? "border border-slate-300 bg-slate-100 text-slate-700"
+      : isPublished
+        ? "border border-emerald-300 bg-emerald-100 text-emerald-700"
+        : isLocked
+          ? "border border-amber-300 bg-amber-100 text-amber-800"
+          : "border border-muted bg-muted text-muted-foreground";
 
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -131,22 +168,58 @@ export function PlanningDateToolbar({
             Aujourd&apos;hui
           </Button>
         </div>
-        {currentWeek?.status && currentWeek.status !== "open" && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-xs font-medium uppercase text-muted-foreground">
-            {currentWeek.status}
-          </span>
+        {!hideStatus && (
+          <div className="flex items-center gap-2">
+            <span className={`rounded px-2 py-0.5 text-xs font-medium ${statusClassName}`}>
+              {statusLabel}
+            </span>
+            {isPublished && publishedAt && (
+              <span className="text-xs text-muted-foreground">Publié le {publishedAt}</span>
+            )}
+          </div>
         )}
       </div>
 
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={onSaveAsWeekTemplate}
-        disabled={saveDisabled}
-      >
-        <Save className="mr-2 h-4 w-4" />
-        Sauvegarder comme semaine type
-      </Button>
+      <div className="flex items-center gap-2">
+        {isWeekView && isDraft && onPublishWeek && (
+          <Button
+            size="sm"
+            onClick={onPublishWeek}
+            disabled={!!publishPending || !!unpublishPending}
+          >
+            Publier la semaine
+          </Button>
+        )}
+
+        {isWeekView && isPublished && onUnpublishWeek && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-8 w-8"
+                aria-label="Actions de publication"
+                disabled={!!publishPending || !!unpublishPending}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onUnpublishWeek}>Dépublier</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onSaveAsWeekTemplate}
+          disabled={saveDisabled}
+        >
+          <Save className="mr-2 h-4 w-4" />
+          Sauvegarder comme semaine type
+        </Button>
+      </div>
     </div>
   );
 }

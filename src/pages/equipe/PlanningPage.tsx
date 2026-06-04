@@ -42,11 +42,12 @@ import { qk } from "@/lib/queryKeys";
 import {
   holidaysApi,
   planningEmployeesApi,
+  planningLeaveApi,
   planningPositionsApi,
   planningShiftsApi,
   planningWeeksApi,
 } from "@/services/welloApi";
-import type { PlanningShift, PlanningWeek } from "@/types/planning";
+import type { PlanningLeaveRequest, PlanningShift, PlanningWeek } from "@/types/planning";
 
 import { PlanningHeader, type PlanningViewMode } from "@/components/team/planning/PlanningHeader";
 import { PlanningDateToolbar } from "@/components/team/planning/PlanningDateToolbar";
@@ -184,6 +185,9 @@ function PlanningPageContent() {
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
+  // Confirmation publication de semaine.
+  const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
+
   // Sauvegarde de la semaine courante en tant que modèle de semaine type.
   const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
   const [saveAsTemplateLabel, setSaveAsTemplateLabel] = useState("");
@@ -192,6 +196,10 @@ function PlanningPageContent() {
   // ── Visible range ────────────────────────────────────────────────────────
   const range = useMemo(() => visibleRange(viewMode, anchorDate), [viewMode, anchorDate]);
   const rangeKey = useMemo(() => `${isoDay(range.from)}_${isoDay(range.to)}`, [range]);
+  const weekForAnchorQueryKey = useMemo(
+    () => ["planning", "weeks", "for-anchor", isoDay(anchorDate)] as const,
+    [anchorDate],
+  );
 
   // ── Queries ──────────────────────────────────────────────────────────────
   const weeksQuery = useQuery({
@@ -201,7 +209,7 @@ function PlanningPageContent() {
 
   // Resolve "current" week for the anchor date (auto-create if missing)
   const weekForAnchorQuery = useQuery({
-    queryKey: ["planning", "weeks", "for-anchor", isoDay(anchorDate)],
+    queryKey: weekForAnchorQueryKey,
     enabled: weeksQuery.isSuccess,
     queryFn: () => ensureWeekFor(anchorDate, weeksQuery.data ?? []),
     retry: (failureCount, error) => {
@@ -243,6 +251,11 @@ function PlanningPageContent() {
     queryFn: () => holidaysApi.list({ start_date: isoDay(range.from), end_date: isoDay(range.to) }),
   });
 
+  const approvedLeavesQuery = useQuery({
+    queryKey: qk.planningLeave.list({ status: "approved", page_size: 500 }),
+    queryFn: () => planningLeaveApi.list({ status: "approved", page_size: 500 }),
+  });
+
   // ── Mutations ────────────────────────────────────────────────────────────
   const createShift = useMutation({
     mutationFn: (payload: Parameters<typeof planningWeeksApi.createShift>[1]) => {
@@ -277,6 +290,52 @@ function PlanningPageContent() {
     onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la suppression"),
   });
 
+  const duplicateShift = useMutation({
+    mutationFn: async ({ sourceShift, targetEmployeeId, targetDate }: {
+      sourceShift: PlanningShift;
+      targetEmployeeId: string | null;
+      targetDate: string;
+    }) => {
+      const targetWeek = await ensureWeekFor(new Date(`${targetDate}T00:00:00`), weeksQuery.data ?? []);
+      return planningWeeksApi.createShift(targetWeek.id, {
+        employee_id: targetEmployeeId,
+        shift_date: targetDate,
+        start_time: sourceShift.start_time,
+        end_time: sourceShift.end_time,
+        break_minutes: sourceShift.break_minutes,
+        position_id: sourceShift.position_id ?? null,
+        title: sourceShift.title ?? null,
+        location: sourceShift.location ?? null,
+        notes: sourceShift.notes ?? null,
+        status: sourceShift.status,
+      });
+    },
+    onError: (err: Error) =>
+      toast.error(getPlanningShiftMutationMessage(err, err.message ?? "Erreur lors de la duplication")),
+  });
+
+  const publishWeekMutation = useMutation({
+    mutationFn: (weekId: string) => planningWeeksApi.publishWeek(weekId),
+    onSuccess: (updatedWeek) => {
+      toast.success("Semaine publiée");
+      // Mise à jour immédiate du badge via setQueryData (évite un refetch async)
+      qc.setQueryData(weekForAnchorQueryKey, updatedWeek);
+      qc.invalidateQueries({ queryKey: qk.planningWeeks.all });
+    },
+    onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la publication"),
+  });
+
+  const unpublishWeekMutation = useMutation({
+    mutationFn: (weekId: string) => planningWeeksApi.unpublishWeek(weekId),
+    onSuccess: (updatedWeek) => {
+      toast.success("Semaine dépubliée");
+      // Mise à jour immédiate du badge via setQueryData
+      qc.setQueryData(weekForAnchorQueryKey, updatedWeek);
+      qc.invalidateQueries({ queryKey: qk.planningWeeks.all });
+    },
+    onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la dépublication"),
+  });
+
   // ── Handlers ─────────────────────────────────────────────────────────────
   const handlePrev = () => {
     if (viewMode === "day") setAnchorDate((d) => addDays(d, -1));
@@ -289,6 +348,16 @@ function PlanningPageContent() {
     else setAnchorDate((d) => addDays(d, 7));
   };
   const handleToday = () => setAnchorDate(new Date());
+
+  const handlePublishWeek = () => {
+    if (!currentWeek) return;
+    setConfirmPublishOpen(true);
+  };
+
+  const handleUnpublishWeek = async () => {
+    if (!currentWeek) return;
+    await unpublishWeekMutation.mutateAsync(currentWeek.id);
+  };
 
   const handleCreateClick = () => {
     setEditingShift(null);
@@ -426,26 +495,92 @@ function PlanningPageContent() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const handleDragEnd = (e: DragEndEvent) => {
+  const shifts = (viewMode === "month" ? shiftsQueryMonth.data : shiftsQuery.data) ?? [];
+  const approvedLeaves = useMemo(() => {
+    const data = approvedLeavesQuery.data as
+      | { items?: PlanningLeaveRequest[]; leave_requests?: PlanningLeaveRequest[] }
+      | undefined;
+    return data?.items ?? data?.leave_requests ?? [];
+  }, [approvedLeavesQuery.data]);
+
+  const approvedLeaveLookup = useMemo(() => {
+    const s = new Set<string>();
+    for (const leave of approvedLeaves) {
+      if (!leave.employee_id) continue;
+      if (leave.status !== "approved") continue;
+      let d = new Date(`${leave.start_date}T00:00:00`);
+      const end = new Date(`${leave.end_date}T00:00:00`);
+      while (d <= end) {
+        s.add(`${leave.employee_id}:${isoDay(d)}`);
+        d = addDays(d, 1);
+      }
+    }
+    return s;
+  }, [approvedLeaves]);
+
+  const invalidatePlanningGridQueries = () => {
+    if (currentWeek) {
+      qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(currentWeek.id) });
+    }
+    qc.invalidateQueries({ queryKey: qk.planningShifts.range(isoDay(range.from), isoDay(range.to)) });
+    qc.invalidateQueries({ queryKey: qk.planningWeeks.all });
+  };
+
+  const warnIfApprovedLeave = (employeeId: string | null, isoDate: string) => {
+    if (!employeeId) return;
+    const onLeave = approvedLeaves.some(
+      (leave) =>
+        leave.employee_id === employeeId &&
+        leave.status === "approved" &&
+        leave.start_date <= isoDate &&
+        leave.end_date >= isoDate,
+    );
+    if (onLeave) {
+      toast.warning("Attention : l'employe cible est en conge approuve ce jour-la.");
+    }
+  };
+
+  const handleDragEnd = async (e: DragEndEvent) => {
     const shiftId = String(e.active.id);
     const targetId = e.over?.id ? String(e.over.id) : null;
     if (!targetId || !targetId.startsWith("cell:")) return;
-    // cell:<employeeId|UNASSIGNED_KEY>:<isoDate>
-    const [, targetKey, isoDate] = targetId.split(":");
-    if (!targetKey || !isoDate) return;
-    const shift = (shiftsQuery.data ?? []).find((s) => s.id === shiftId);
+    // cell:<move|dup>:<employeeId|UNASSIGNED_KEY>:<isoDate>
+    const [, action, targetKey, isoDate] = targetId.split(":");
+    if (!action || !targetKey || !isoDate) return;
+    const shift = shifts.find((s) => s.id === shiftId);
     if (!shift) return;
     const targetEmployeeId = fromKey(targetKey); // null si UNASSIGNED_KEY
-    // No-op si on droppe sur la même cellule (même assignation + même date).
-    if (shift.employee_id === targetEmployeeId && shift.shift_date === isoDate) return;
-    // NOTE: si l'API backend rejette encore `employee_id: null` (mise à jour pas
-    // encore déployée), l'erreur HTTP remontera dans le toast onError de la
-    // mutation — c'est volontaire. En mode mock (planningMocks.ts), la désassignation
-    // est déjà supportée de bout en bout.
-    updateShift.mutate({
-      id: shiftId,
-      payload: { employee_id: targetEmployeeId, shift_date: isoDate },
-    });
+
+    warnIfApprovedLeave(targetEmployeeId, isoDate);
+
+    if (action === "move") {
+      // No-op si on droppe sur la même cellule (même assignation + même date).
+      if (shift.employee_id === targetEmployeeId && shift.shift_date === isoDate) return;
+      try {
+        await updateShift.mutateAsync({
+          id: shiftId,
+          payload: { employee_id: targetEmployeeId, shift_date: isoDate },
+        });
+        invalidatePlanningGridQueries();
+      } catch {
+        // Error feedback is handled by mutation onError.
+      }
+      return;
+    }
+
+    if (action === "dup") {
+      try {
+        await duplicateShift.mutateAsync({
+          sourceShift: shift,
+          targetEmployeeId,
+          targetDate: isoDate,
+        });
+        toast.success("Shift duplique");
+        invalidatePlanningGridQueries();
+      } catch {
+        // Error feedback is handled by mutation onError.
+      }
+    }
   };
 
   const loading =
@@ -455,7 +590,6 @@ function PlanningPageContent() {
     employeesQuery.isLoading;
 
   const employees = employeesQuery.data?.items ?? [];
-  const shifts = (viewMode === "month" ? shiftsQueryMonth.data : shiftsQuery.data) ?? [];
   const holidays = holidaysQuery.data ?? [];
   const positions = positionsQuery.data ?? [];
 
@@ -507,6 +641,10 @@ function PlanningPageContent() {
               onNext={handleNext}
               onToday={handleToday}
               onPickDate={(d) => setAnchorDate(d)}
+              onPublishWeek={handlePublishWeek}
+              onUnpublishWeek={handleUnpublishWeek}
+              publishPending={publishWeekMutation.isPending}
+              unpublishPending={unpublishWeekMutation.isPending}
               onSaveAsWeekTemplate={() => {
                 setSaveAsTemplateLabel(
                   currentWeek
@@ -556,6 +694,7 @@ function PlanningPageContent() {
               employees={employees}
               shifts={shifts}
               holidays={holidays}
+              approvedLeaveLookup={approvedLeaveLookup}
               positions={positions}
               onShiftClick={handleShiftClick}
               onEmptyCellClick={handleEmptyCellClick}
@@ -631,6 +770,36 @@ function PlanningPageContent() {
         isSubmitting={bulkSubmitting}
         onConfirm={handleBulkConfirm}
       />
+
+      <AlertDialog
+        open={confirmPublishOpen}
+        onOpenChange={(o) => {
+          if (!publishWeekMutation.isPending) setConfirmPublishOpen(o);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Publier cette semaine ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Les employés pourront la consulter.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={publishWeekMutation.isPending}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={publishWeekMutation.isPending}
+              onClick={async (e) => {
+                e.preventDefault();
+                if (!currentWeek) return;
+                await publishWeekMutation.mutateAsync(currentWeek.id);
+                setConfirmPublishOpen(false);
+              }}
+            >
+              Publier
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog
         open={confirmDeleteOpen}

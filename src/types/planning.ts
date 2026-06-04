@@ -235,6 +235,7 @@ export interface PlanningWeek {
   start_date: string;
   end_date: string;
   status: string;
+  published_at?: string | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;

@@ -1,8 +1,8 @@
 import { Fragment, useMemo } from "react";
-import { useDroppable } from "@dnd-kit/core";
+import { useDndContext, useDroppable } from "@dnd-kit/core";
 import { addDays, format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Plus, UserX } from "lucide-react";
+import { Copy, MoveRight, Palmtree, Plus, UserX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { UNASSIGNED_KEY, toKey } from "@/lib/planningUnassigned";
@@ -26,6 +26,8 @@ interface PlanningGridProps {
   employees: Employee[];
   shifts: PlanningShift[];
   holidays: PlanningHoliday[];
+  /** Set of `${employee_id}:${YYYY-MM-DD}` for approved leaves (inclusive ranges) */
+  approvedLeaveLookup?: ReadonlySet<string>;
   /**
    * Catalogue de postes (avec `color` hex) pour dériver la couleur
    * de chaque `ShiftCard`. Si vide, les cartes auront la couleur neutre.
@@ -76,6 +78,7 @@ function GridCell({
   selectionMode,
   selectedShiftIds,
   className,
+  isOnLeave,
 }: {
   /** Sentinelle `UNASSIGNED_KEY` pour la ligne "Non assigné". */
   employeeId: string;
@@ -90,23 +93,73 @@ function GridCell({
   selectionMode?: boolean;
   selectedShiftIds?: ReadonlySet<string>;
   className?: string;
+  isOnLeave?: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `cell:${employeeId}:${dateIso}` });
+  const { active } = useDndContext();
+  const { setNodeRef: setMoveRef, isOver: isMoveOver } = useDroppable({
+    id: `cell:move:${employeeId}:${dateIso}`,
+  });
+  const { setNodeRef: setDupRef, isOver: isDupOver } = useDroppable({
+    id: `cell:dup:${employeeId}:${dateIso}`,
+  });
   const isUnassignedRow = employeeId === UNASSIGNED_KEY;
+  const isDragging = !!active;
 
   return (
     <div
-      ref={setNodeRef}
       className={cn(
         "relative min-h-[88px] border-b border-r p-1.5 transition-colors",
         className,
         isHoliday && "bg-amber-50/60",
         isWeekend && !isHoliday && "bg-muted/30",
         isOutsideWeek && "opacity-50",
-        isOver && "ring-2 ring-inset ring-primary/40 bg-primary/5",
+        (isMoveOver || isDupOver) && "ring-2 ring-inset ring-primary/40",
       )}
     >
-      <div className="flex flex-col gap-1">
+      {/* Leave background (behind shifts) */}
+      {isOnLeave && (
+        <div className="absolute inset-0 z-0 rounded-sm bg-rose-50/60">
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-rose-700/80">
+            <Palmtree className="h-4 w-4" />
+            <span className="text-[10px] font-medium">Congé</span>
+          </div>
+        </div>
+      )}
+      <div ref={setMoveRef} className="pointer-events-none absolute inset-y-0 left-0 z-0 w-1/2" />
+      <div ref={setDupRef} className="pointer-events-none absolute inset-y-0 right-0 z-0 w-1/2" />
+
+      {isDragging && (
+        <>
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-y-0 left-0 z-[1] w-1/2 border-r border-dashed border-border/70 bg-transparent transition-colors",
+              isMoveOver && "bg-primary/15",
+            )}
+          >
+            <div className="flex h-full items-center justify-center p-1">
+              <span className="inline-flex flex-col items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                <MoveRight className="h-3 w-3" />
+                Déplacer
+              </span>
+            </div>
+          </div>
+          <div
+            className={cn(
+              "pointer-events-none absolute inset-y-0 right-0 z-[1] w-1/2 bg-transparent transition-colors",
+              isDupOver && "bg-emerald-500/15",
+            )}
+          >
+            <div className="flex h-full items-center justify-center p-1">
+              <span className="inline-flex flex-col items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                <Copy className="h-3 w-3" />
+                Dupliquer
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+
+      <div className="flex flex-col gap-1 relative z-10">
         {shifts.map((s) => (
           <ShiftCard
             key={s.id}
@@ -123,7 +176,7 @@ function GridCell({
           type="button"
           onClick={() => onEmptyCellClick(isUnassignedRow ? null : employeeId, dateIso)}
           className={cn(
-            "absolute inset-0 flex items-center justify-center text-muted-foreground/40 opacity-0 transition-opacity hover:text-muted-foreground hover:opacity-100",
+            "absolute inset-0 z-20 flex items-center justify-center text-muted-foreground/40 opacity-0 transition-opacity hover:text-muted-foreground hover:opacity-100",
           )}
           aria-label="Ajouter un shift"
         >
@@ -143,6 +196,7 @@ export function PlanningGrid({
   employees,
   shifts,
   holidays,
+  approvedLeaveLookup,
   positions,
   onShiftClick,
   onEmptyCellClick,
@@ -281,7 +335,7 @@ export function PlanningGrid({
             return (
               <Fragment key={`row:${emp.id}`}>
                 <div
-                  className="sticky left-0 z-20 flex items-start gap-1 border-b border-r bg-card px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]"
+                  className="group/row sticky left-0 z-20 flex items-start gap-1 border-b border-r bg-card px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]"
                 >
                   <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
                     <div className="truncate text-sm font-medium text-foreground">
@@ -308,6 +362,7 @@ export function PlanningGrid({
                 {displayColumns.map((d) => {
                   const iso = isoDay(d);
                   const cellShifts = shiftsByCell.get(`${emp.id}:${iso}`) ?? [];
+                  const isOnLeave = approvedLeaveLookup?.has(`${emp.id}:${iso}`) ?? false;
                   const isWeekend = d.getDay() === 0 || d.getDay() === 6;
                   const isOutsideWeek = viewMode !== "month" && (iso < week.start_date || iso > week.end_date);
                   const isHoliday = holidayByDate.has(iso);
@@ -325,6 +380,7 @@ export function PlanningGrid({
                       onEmptyCellClick={onEmptyCellClick}
                       selectionMode={selectionMode}
                       selectedShiftIds={selectedShiftIds}
+                      isOnLeave={isOnLeave}
                     />
                   );
                 })}
@@ -334,7 +390,7 @@ export function PlanningGrid({
         )}
 
         {/* ── Unassigned row (always visible, even when empty) ────── */}
-        <div className="sticky left-0 z-20 flex items-start gap-1 border-b border-r border-t-2 bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
+        <div className="group/row sticky left-0 z-20 flex items-start gap-1 border-b border-r border-t-2 bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
           <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
             <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
               <UserX className="h-3.5 w-3.5 text-muted-foreground" />
@@ -379,6 +435,7 @@ export function PlanningGrid({
               onEmptyCellClick={onEmptyCellClick}
               selectionMode={selectionMode}
               selectedShiftIds={selectedShiftIds}
+              isOnLeave={false}
               className="border-t-2 bg-muted/20"
             />
           );

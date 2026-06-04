@@ -443,6 +443,24 @@ export const planningWeeksApi = {
       .then((resp) => { unwrap(resp); });
   },
 
+  /** POST /planning/weeks/{id}/publish */
+  publishWeek(id: string): Promise<PlanningWeek> {
+    const path = `/planning/weeks/${id}/publish`;
+    logAPI("POST", path);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
+  },
+
+  /** POST /planning/weeks/{id}/unpublish */
+  unpublishWeek(id: string): Promise<PlanningWeek> {
+    const path = `/planning/weeks/${id}/unpublish`;
+    logAPI("POST", path);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
+  },
+
   /** GET /planning/weeks/{id}/shifts – list shifts for a week */
   getShifts(weekId: string): Promise<PlanningShift[]> {
     const path = `/planning/weeks/${weekId}/shifts`;

@@ -198,7 +198,7 @@ export function LeaveRequestSheet({
         err.message ?? "Approbation refusée.",
         {
           planning_leave_shift_conflict:
-            "Le conge chevauche encore des shifts assignes. Les conflits ont ete recharges.",
+            "Le congé chevauche encore des shifts assignés. Les conflits ont été rechargés.",
         },
       );
 
@@ -253,11 +253,11 @@ export function LeaveRequestSheet({
     rejectMut.isPending ||
     deleteMut.isPending;
   const approvalButtonLabel =
-    conflictingCount > 0 ? `Approuver et liberer ${conflictingCountLabel}` : "Approuver";
+    conflictingCount > 0 ? `Approuver et libérer ${conflictingCountLabel}` : "Approuver";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>
             {mode === "create" ? "Nouvelle demande de congé" : "Demande de congé"}
@@ -290,7 +290,7 @@ export function LeaveRequestSheet({
                 <div className="flex items-start gap-2">
                   <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                   <div>
-                    Cet employe a {conflictingCountLabel} pendant ce conge. Approuver le conge passera ces shifts en non-assigne.
+                    Cet employé a {conflictingCountLabel} pendant ce congé. Approuver le congé passera ces shifts en non-assignés.
                   </div>
                 </div>
                 <ul className="list-disc space-y-0.5 pl-5">
@@ -304,7 +304,7 @@ export function LeaveRequestSheet({
             ) : (
               <div className="flex items-start gap-2">
                 <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                <div>Aucun shift assigne en conflit pour ce conge.</div>
+                <div>Aucun shift assigne en conflit pour ce congé.</div>
               </div>
             )}
           </div>
@@ -511,9 +511,9 @@ export function LeaveRequestSheet({
         <AlertDialog open={approveConfirmOpen} onOpenChange={setApproveConfirmOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Confirmer l'approbation et la liberation des shifts</AlertDialogTitle>
+              <AlertDialogTitle>Confirmer l'approbation et la libération des shifts</AlertDialogTitle>
               <AlertDialogDescription>
-                Cette action va desassigner tous les shifts en conflit renvoyes par le backend, puis approuver la demande de conge.
+                Cette action va désassigner tous les shifts en conflit renvoyés par le backend, puis approuver la demande de congé.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -526,7 +526,7 @@ export function LeaveRequestSheet({
                   approveMut.mutate();
                 }}
               >
-                Approuver et liberer {conflictingCountLabel}
+                Approuver et libérer {conflictingCountLabel}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

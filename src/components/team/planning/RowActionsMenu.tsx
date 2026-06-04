@@ -43,7 +43,7 @@ export function RowActionsMenu({ variant, disabled, onBulkAssign }: RowActionsMe
           variant="ghost"
           aria-label="Actions sur la ligne"
           className={cn(
-            "h-6 w-6 shrink-0 text-muted-foreground",
+            "relative z-10 h-6 w-6 shrink-0 text-muted-foreground",
             // Masqué par défaut, révélé au survol de la ligne (group/row sur le parent).
             "opacity-0 transition-opacity group-hover/row:opacity-100",
             // Toujours visible quand le menu est ouvert (data-state="open" sur le trigger).

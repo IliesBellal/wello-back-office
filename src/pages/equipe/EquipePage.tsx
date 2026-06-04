@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, Search } from "lucide-react";
+import { UserPlus, Search, MoreVertical, BriefcaseBusiness } from "lucide-react";
 import { MembersTable } from "@/components/team/MembersTable";
 import { MemberSheet } from "@/components/team/MemberSheet";
 import { CreateMemberSheet } from "@/components/team/CreateMemberSheet";
@@ -21,6 +21,13 @@ import { usersApi } from "@/services/welloApi";
 import { qk } from "@/lib/queryKeys";
 import { usePermissions } from "@/hooks/usePermissions";
 import type { MerchantUserListItem, MerchantUserListFilters } from "@/types/adminUsers";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { PositionsModal } from "@/components/team/planning/PositionsModal";
 
 // ─── Pagination helpers ────────────────────────────────────────────────────────
 
@@ -141,6 +148,7 @@ function EquipePageContent() {
   const [selectedMember, setSelectedMember] = useState<MerchantUserListItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [positionsOpen, setPositionsOpen] = useState(false);
 
   const handleRowClick = useCallback((member: MerchantUserListItem) => {
     setSelectedMember(member);
@@ -201,10 +209,26 @@ function EquipePageContent() {
                 Gestion des membres et de leurs accès
               </p>
             </div>
-            <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <UserPlus className="h-4 w-4 mr-2" />
-              Ajouter un membre
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" onClick={() => setCreateOpen(true)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Ajouter un membre
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 w-9 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                    <span className="sr-only">Actions</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setPositionsOpen(true)}>
+                    <BriefcaseBusiness className="h-4 w-4 mr-2" />
+                    Gérer les postes
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         }
       >
@@ -289,6 +313,9 @@ function EquipePageContent() {
         onOpenChange={setCreateOpen}
         onSuccess={() => refetch()}
       />
+
+      {/* ── Gestion des postes (réutilise le même composant que le Planning) */}
+      <PositionsModal open={positionsOpen} onOpenChange={setPositionsOpen} />
     </DashboardLayout>
   );
 }
