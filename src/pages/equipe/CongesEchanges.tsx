@@ -13,12 +13,12 @@
  *       * target_employee_required → seul l'employé cible peut approuver.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ArrowDown, ArrowUp, ArrowUpDown, Plus, RefreshCw } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Plus, RefreshCw } from "lucide-react";
 
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { PageContainer } from "@/components/shared";
@@ -64,6 +64,9 @@ import {
   StatusBadge,
 } from "@/components/team/conges/statusBadges";
 import { STATUS_OPTIONS } from "@/components/team/conges/statusOptions";
+
+const LEAVES_PAGE_SIZE = 20;
+const SWAPS_PAGE_SIZE = 20;
 
 export default function CongesEchanges() {
   const { canManagePlannings } = usePermissions();
@@ -125,6 +128,7 @@ function CongesEchangesContent() {
 
 function LeavesTab({ employees }: { employees: Employee[] }) {
   const [statusFilter, setStatusFilter] = useState<LeaveStatus | "all">("all");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<PlanningLeaveRequest | null>(null);
   const [sheetMode, setSheetMode] = useState<"view" | "create">("view");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -138,14 +142,29 @@ function LeavesTab({ employees }: { employees: Employee[] }) {
   };
 
   const filters = useMemo(
-    () => (statusFilter === "all" ? {} : { status: statusFilter }),
-    [statusFilter],
+    () => ({
+      ...(statusFilter === "all" ? {} : { status: statusFilter }),
+      page,
+      page_size: LEAVES_PAGE_SIZE,
+    }),
+    [statusFilter, page],
   );
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
 
   const listQ = useQuery({
     queryKey: qk.planningLeave.list(filters),
     queryFn: () => planningLeaveApi.list(filters),
   });
+
+  useEffect(() => {
+    const apiPage = listQ.data?.pagination?.current_page;
+    if (typeof apiPage === "number" && apiPage > 0 && apiPage !== page) {
+      setPage(apiPage);
+    }
+  }, [listQ.data?.pagination?.current_page, page]);
 
   const employeeById = useMemo(
     () => new Map(employees.map((e) => [e.id, e])),
@@ -174,6 +193,12 @@ function LeavesTab({ employees }: { employees: Employee[] }) {
     };
     return [...list].sort((a, b) => cmp(a, b) * dirMul);
   }, [listQ.data?.items, sortField, sortDir, employeeById]);
+
+  const pagination = listQ.data?.pagination;
+  const totalItems = pagination?.total_items ?? rows.length;
+  const currentPage = pagination?.current_page ?? page;
+  const currentLimit = pagination?.limit ?? LEAVES_PAGE_SIZE;
+  const totalPages = Math.max(1, pagination?.total_pages ?? 1);
 
   function openCreate() {
     setSelected(null);
@@ -229,56 +254,67 @@ function LeavesTab({ employees }: { employees: Employee[] }) {
       ) : rows.length === 0 ? (
         <EmptyState label="Aucune demande de congé." />
       ) : (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-border">
-                <SortableHead field="employee" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Employé</SortableHead>
-                <SortableHead field="type" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Type</SortableHead>
-                <SortableHead field="period" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Période</SortableHead>
-                <SortableHead field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Statut</SortableHead>
-                <TableHead className="font-semibold">Motif</TableHead>
-                <TableHead className="font-semibold">Traité par</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => {
-                const emp = employeeById.get(r.employee_id);
-                return (
-                  <TableRow
-                    key={r.id}
-                    className="cursor-pointer"
-                    onClick={() => openView(r)}
-                  >
-                    <TableCell className="font-medium">
-                      {emp ? `${emp.first_name} ${emp.last_name}` : (
-                        <span className="font-mono text-xs">{r.employee_id}</span>
-                      )}
-                    </TableCell>
-                    <TableCell><LeaveTypeBadge value={r.leave_type} /></TableCell>
-                    <TableCell className="text-xs">
-                      <span className="capitalize">
-                        {format(parseISO(r.start_date), "d MMM", { locale: fr })}
-                      </span>
-                      {" → "}
-                      <span className="capitalize">
-                        {format(parseISO(r.end_date), "d MMM yyyy", { locale: fr })}
-                      </span>
-                    </TableCell>
-                    <TableCell><StatusBadge value={r.status} /></TableCell>
-                    <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
-                      {r.reason || "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {r.processed_by_user_id ?? "—"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        <div className="space-y-3">
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-border">
+                  <SortableHead field="employee" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Employé</SortableHead>
+                  <SortableHead field="type" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Type</SortableHead>
+                  <SortableHead field="period" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Période</SortableHead>
+                  <SortableHead field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Statut</SortableHead>
+                  <TableHead className="font-semibold">Motif</TableHead>
+                  <TableHead className="font-semibold">Traité par</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const emp = employeeById.get(r.employee_id);
+                  return (
+                    <TableRow
+                      key={r.id}
+                      className="cursor-pointer"
+                      onClick={() => openView(r)}
+                    >
+                      <TableCell className="font-medium">
+                        {emp ? `${emp.first_name} ${emp.last_name}` : (
+                          <span className="font-mono text-xs">{r.employee_id}</span>
+                        )}
+                      </TableCell>
+                      <TableCell><LeaveTypeBadge value={r.leave_type} /></TableCell>
+                      <TableCell className="text-xs">
+                        <span className="capitalize">
+                          {format(parseISO(r.start_date), "d MMM", { locale: fr })}
+                        </span>
+                        {" → "}
+                        <span className="capitalize">
+                          {format(parseISO(r.end_date), "d MMM yyyy", { locale: fr })}
+                        </span>
+                      </TableCell>
+                      <TableCell><StatusBadge value={r.status} /></TableCell>
+                      <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
+                        {r.reason || "—"}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {r.processed_by_user_id ?? "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            </div>
           </div>
+          <TablePagination
+            totalItems={totalItems}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageLimit={currentLimit}
+            currentCount={rows.length}
+            isBusy={listQ.isFetching}
+            onPageChange={setPage}
+          />
         </div>
       )}
 
@@ -308,6 +344,7 @@ function SwapsTab({
   approvalMode: import("@/types/planning").ShiftSwapApprovalMode | null;
 }) {
   const [statusFilter, setStatusFilter] = useState<ShiftSwapStatus | "all">("all");
+  const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<PlanningShiftSwapRequest | null>(null);
   const [sheetMode, setSheetMode] = useState<"view" | "create">("view");
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -321,14 +358,29 @@ function SwapsTab({
   };
 
   const filters = useMemo(
-    () => (statusFilter === "all" ? {} : { status: statusFilter }),
-    [statusFilter],
+    () => ({
+      ...(statusFilter === "all" ? {} : { status: statusFilter }),
+      page,
+      page_size: SWAPS_PAGE_SIZE,
+    }),
+    [statusFilter, page],
   );
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter]);
 
   const listQ = useQuery({
     queryKey: qk.planningSwaps.list(filters),
     queryFn: () => planningSwapApi.list(filters),
   });
+
+  useEffect(() => {
+    const apiPage = listQ.data?.pagination?.current_page;
+    if (typeof apiPage === "number" && apiPage > 0 && apiPage !== page) {
+      setPage(apiPage);
+    }
+  }, [listQ.data?.pagination?.current_page, page]);
 
   const employeeById = useMemo(
     () => new Map(employees.map((e) => [e.id, e])),
@@ -354,6 +406,12 @@ function SwapsTab({
     };
     return [...list].sort((a, b) => cmp(a, b) * dirMul);
   }, [listQ.data?.items, sortField, sortDir, employeeById]);
+
+  const pagination = listQ.data?.pagination;
+  const totalItems = pagination?.total_items ?? rows.length;
+  const currentPage = pagination?.current_page ?? page;
+  const currentLimit = pagination?.limit ?? SWAPS_PAGE_SIZE;
+  const totalPages = Math.max(1, pagination?.total_pages ?? 1);
 
   function openCreate() {
     setSelected(null);
@@ -415,55 +473,66 @@ function SwapsTab({
       ) : rows.length === 0 ? (
         <EmptyState label="Aucune demande d'échange." />
       ) : (
-        <div className="bg-card rounded-lg border border-border overflow-hidden">
-          <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-border">
-                <SortableHead field="requester" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Demandeur</SortableHead>
-                <TableHead className="font-semibold">Shift demandeur</TableHead>
-                <SortableHead field="target" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Cible</SortableHead>
-                <TableHead className="font-semibold">Shift cible</TableHead>
-                <SortableHead field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Statut</SortableHead>
-                <TableHead className="font-semibold">Motif</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => {
-                const requester = employeeById.get(r.requester_employee_id);
-                const target = employeeById.get(r.target_employee_id);
-                return (
-                  <TableRow
-                    key={r.id}
-                    className="cursor-pointer"
-                    onClick={() => openView(r)}
-                  >
-                    <TableCell className="font-medium">
-                      {requester ? `${requester.first_name} ${requester.last_name}` : (
-                        <span className="font-mono text-xs">{r.requester_employee_id}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-xs text-muted-foreground">{r.requester_shift_id}</span>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      {target ? `${target.first_name} ${target.last_name}` : (
-                        <span className="font-mono text-xs">{r.target_employee_id}</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-mono text-xs text-muted-foreground">{r.target_shift_id}</span>
-                    </TableCell>
-                    <TableCell><StatusBadge value={r.status} /></TableCell>
-                    <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
-                      {r.reason || "—"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        <div className="space-y-3">
+          <div className="bg-card rounded-lg border border-border overflow-hidden">
+            <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-border">
+                  <SortableHead field="requester" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Demandeur</SortableHead>
+                  <TableHead className="font-semibold">Shift demandeur</TableHead>
+                  <SortableHead field="target" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Cible</SortableHead>
+                  <TableHead className="font-semibold">Shift cible</TableHead>
+                  <SortableHead field="status" sortField={sortField} sortDir={sortDir} onSort={handleSort}>Statut</SortableHead>
+                  <TableHead className="font-semibold">Motif</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((r) => {
+                  const requester = employeeById.get(r.requester_employee_id);
+                  const target = employeeById.get(r.target_employee_id);
+                  return (
+                    <TableRow
+                      key={r.id}
+                      className="cursor-pointer"
+                      onClick={() => openView(r)}
+                    >
+                      <TableCell className="font-medium">
+                        {requester ? `${requester.first_name} ${requester.last_name}` : (
+                          <span className="font-mono text-xs">{r.requester_employee_id}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-xs text-muted-foreground">{r.requester_shift_id}</span>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {target ? `${target.first_name} ${target.last_name}` : (
+                          <span className="font-mono text-xs">{r.target_employee_id}</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-xs text-muted-foreground">{r.target_shift_id}</span>
+                      </TableCell>
+                      <TableCell><StatusBadge value={r.status} /></TableCell>
+                      <TableCell className="max-w-[220px] truncate text-xs text-muted-foreground">
+                        {r.reason || "—"}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            </div>
           </div>
+          <TablePagination
+            totalItems={totalItems}
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageLimit={currentLimit}
+            currentCount={rows.length}
+            isBusy={listQ.isFetching}
+            onPageChange={setPage}
+          />
         </div>
       )}
 
@@ -540,6 +609,65 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
       <Button variant="outline" size="sm" onClick={onRetry}>
         Réessayer
       </Button>
+    </div>
+  );
+}
+
+function TablePagination({
+  totalItems,
+  currentPage,
+  totalPages,
+  pageLimit,
+  currentCount,
+  isBusy,
+  onPageChange,
+}: {
+  totalItems: number;
+  currentPage: number;
+  totalPages: number;
+  pageLimit: number;
+  currentCount: number;
+  isBusy: boolean;
+  onPageChange: (nextPage: number) => void;
+}) {
+  const safeTotalPages = Math.max(1, totalPages);
+  const safeCurrentPage = Math.min(Math.max(currentPage, 1), safeTotalPages);
+  const displayStart = currentCount === 0 ? 0 : ((safeCurrentPage - 1) * pageLimit) + 1;
+  const displayEnd = currentCount === 0 ? 0 : Math.min(totalItems, displayStart + currentCount - 1);
+
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage === safeCurrentPage || nextPage < 1 || nextPage > safeTotalPages) {
+      return;
+    }
+    onPageChange(nextPage);
+  };
+
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <p className="text-sm text-muted-foreground">
+        Affichage {displayStart} à {displayEnd} sur {totalItems}
+      </p>
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => handlePageChange(safeCurrentPage - 1)}
+          disabled={safeCurrentPage === 1 || isBusy}
+          className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+          aria-label="Page précédente"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="text-sm font-medium text-foreground min-w-[120px] text-center">
+          Page {safeCurrentPage} sur {safeTotalPages}
+        </span>
+        <button
+          onClick={() => handlePageChange(safeCurrentPage + 1)}
+          disabled={safeCurrentPage >= safeTotalPages || isBusy}
+          className="p-2 border border-border rounded hover:bg-muted transition disabled:opacity-50"
+          aria-label="Page suivante"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
     </div>
   );
 }

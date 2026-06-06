@@ -3,6 +3,7 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer, ConfirmDialog } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PriceInput } from '@/components/shared/PriceInput';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -229,11 +230,9 @@ function SortableOptionRow({
         />
       </TableCell>
       <TableCell>
-        <Input
-          type="number"
-          step="0.01"
-          min={0}
-          value={formatPrice(getOptionPrice(option))}
+        <PriceInput
+          value={getOptionPrice(option)}
+          valueInCents
           onChange={e => {
             const cents = parsePrice(e.target.value);
             onUpdate('price', cents);

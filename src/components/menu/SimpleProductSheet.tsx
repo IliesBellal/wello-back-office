@@ -1120,7 +1120,9 @@ export const SimpleProductSheet = ({
                       {isEditMode ? (formData.name || 'Produit') : (product?.name || 'Produit')}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
-                      {categories.find(c => c.category_id === (isEditMode ? formData.category_id : product?.category))?.category_name || 'Catégorie non définie'}
+                      {categories.find(
+                        c => 
+                        c.category_id === (isEditMode ? formData.category : product?.category))?.category_name || 'Catégorie non définie'}
                     </p>
                   </div>
                   <Badge 
@@ -1395,8 +1397,8 @@ export const SimpleProductSheet = ({
                           <Label>Catégorie</Label>
                           <CategorySelector
                             categories={categories}
-                            value={formData.category_id || ''}
-                            onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId })}
+                            value={formData.category || ''}
+                            onValueChange={(categoryId) => setFormData({ ...formData, category: categoryId })}
                             onCreateCategory={onCreateCategory}
                           />
                         </div>

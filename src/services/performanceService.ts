@@ -27,6 +27,10 @@ import {
 } from "date-fns";
 import { fr } from "date-fns/locale";
 
+import { apiClient } from "@/services/apiClient";
+import type { WelloApiResponse } from "@/services/apiClient";
+import { unwrap } from "@/services/apiUnwrap";
+import type { ApiEnvelopeData } from "@/services/apiUnwrap";
 import { planningEmployeesApi, planningWeeksApi } from "@/services/welloApi";
 import type { Employee, PlanningShift } from "@/types/planning";
 import type {
@@ -331,19 +335,25 @@ async function loadShiftsForRange(from: string, to: string): Promise<PlanningShi
 // Service entry point — single switch from mock to API
 // ─────────────────────────────────────────────────────────────────────────────
 
+const PERFORMANCE_FORCE_MOCK = false;
+
 export const PerformanceService = {
-  /**
-   * TODO: when the backend ships `GET /planning/performance`, replace the
-   * body of this function with:
-   *
-   *   const params = new URLSearchParams({ from: query.from, to: query.to, ... });
-   *   return apiClient
-   *     .get<ReturnType<typeof unwrap>>(`/planning/performance?${params}`)
-   *     .then((resp) => unwrap<{ performance: PerformanceResponse }>(resp).performance);
-   *
-   * The signature and `PerformanceResponse` shape MUST NOT change.
-   */
   async getForRange(query: PerformanceQuery): Promise<PerformanceResponse> {
+    if (!PERFORMANCE_FORCE_MOCK) {
+      const params = new URLSearchParams({
+        from: query.from,
+        to: query.to,
+        granularity: query.granularity,
+      });
+      if (query.compare) {
+        params.set("compare", query.compare);
+      }
+
+      return apiClient
+        .get<WelloApiResponse<ApiEnvelopeData>>(`/planning/performance?${params.toString()}`)
+        .then((resp) => unwrap<{ performance: PerformanceResponse } & Record<string, unknown>>(resp).performance);
+    }
+
     const [shifts, employeesList] = await Promise.all([
       loadShiftsForRange(query.from, query.to),
       planningEmployeesApi.list({ active: true, page_size: 200 }),
@@ -380,6 +390,12 @@ export const PerformanceService = {
       previous_period: previous,
       warnings: { members_without_rate: main.members_without_rate },
     };
+  },
+
+  upsertForecasts(forecasts: { date: string; amount_cents: number | null }[]): Promise<void> {
+    return apiClient
+      .put<WelloApiResponse<ApiEnvelopeData>>("/planning/revenue-forecast", { forecasts })
+      .then((resp) => { unwrap(resp); });
   },
 };
 

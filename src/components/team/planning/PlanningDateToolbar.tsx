@@ -1,4 +1,4 @@
-import { CalendarIcon, ChevronLeft, ChevronRight, MoreHorizontal, Save } from "lucide-react";
+import { CalendarIcon, CalendarX2, ChevronLeft, ChevronRight, MoreHorizontal, MoreVertical, Save } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -191,34 +191,23 @@ export function PlanningDateToolbar({
           </Button>
         )}
 
-        {isWeekView && isPublished && onUnpublishWeek && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-8 w-8"
-                aria-label="Actions de publication"
-                disabled={!!publishPending || !!unpublishPending}
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="icon" className="h-9 w-9">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onUnpublishWeek}>Dépublier</DropdownMenuItem>
+              <DropdownMenuItem onClick={onUnpublishWeek} disabled={!isWeekView || !isPublished || !onUnpublishWeek}>
+                <CalendarX2 className="mr-2 h-4 w-4" />
+                Dépublier
+                </DropdownMenuItem>
+              <DropdownMenuItem onClick={onSaveAsWeekTemplate} disabled={saveDisabled}>
+                <Save className="mr-2 h-4 w-4" />
+                Sauvegarder comme semaine type
+                </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-        )}
-
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={onSaveAsWeekTemplate}
-          disabled={saveDisabled}
-        >
-          <Save className="mr-2 h-4 w-4" />
-          Sauvegarder comme semaine type
-        </Button>
       </div>
     </div>
   );

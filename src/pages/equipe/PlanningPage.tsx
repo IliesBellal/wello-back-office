@@ -317,10 +317,11 @@ function PlanningPageContent() {
   const publishWeekMutation = useMutation({
     mutationFn: (weekId: string) => planningWeeksApi.publishWeek(weekId),
     onSuccess: (updatedWeek) => {
-      toast.success("Semaine publiée");
-      // Mise à jour immédiate du badge via setQueryData (évite un refetch async)
+      // Immediate update for the badge
       qc.setQueryData(weekForAnchorQueryKey, updatedWeek);
-      qc.invalidateQueries({ queryKey: qk.planningWeeks.all });
+      // Invalidate only the exact weeks list (do not invalidate sub-keys)
+      qc.invalidateQueries({ queryKey: qk.planningWeeks.all, exact: true });
+      toast.success("Semaine publiée");
     },
     onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la publication"),
   });
@@ -328,10 +329,11 @@ function PlanningPageContent() {
   const unpublishWeekMutation = useMutation({
     mutationFn: (weekId: string) => planningWeeksApi.unpublishWeek(weekId),
     onSuccess: (updatedWeek) => {
-      toast.success("Semaine dépubliée");
-      // Mise à jour immédiate du badge via setQueryData
+      // Immediate update for the badge
       qc.setQueryData(weekForAnchorQueryKey, updatedWeek);
-      qc.invalidateQueries({ queryKey: qk.planningWeeks.all });
+      // Invalidate only the exact weeks list (do not invalidate sub-keys)
+      qc.invalidateQueries({ queryKey: qk.planningWeeks.all, exact: true });
+      toast.success("Semaine dépubliée");
     },
     onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la dépublication"),
   });
@@ -756,6 +758,7 @@ function PlanningPageContent() {
         from={isoDay(range.from)}
         to={isoDay(range.to)}
         granularity={viewMode === "month" ? "week" : "day"}
+        forecastEditable={viewMode === "week"}
       />
 
       <BulkAssignDialog
