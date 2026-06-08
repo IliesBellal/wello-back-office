@@ -8,6 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useAuth } from '@/contexts/AuthContext';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export const ChangePasswordDialog = ({ open, onOpenChange }: ChangePasswordDialo
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const { authData, setAuthData } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,20 +47,51 @@ export const ChangePasswordDialog = ({ open, onOpenChange }: ChangePasswordDialo
     }
 
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    toast({
-      title: "Mot de passe mis à jour",
-      description: "Votre mot de passe a été modifié avec succès"
-    });
 
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setIsLoading(false);
-    onOpenChange(false);
+    try {
+      const res = await fetch('/users/reset-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          old_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+
+      const responseJson = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        throw new Error(responseJson?.message || 'Échec de la mise à jour du mot de passe');
+      }
+
+      // response wrapper: response.data.token contains the new token
+      const newToken = responseJson?.data?.token;
+
+      // Update auth token in context if available
+      if (newToken && authData && setAuthData) {
+        setAuthData({ ...authData, session: { ...authData.session, token: newToken } });
+      }
+
+      toast({
+        title: 'Mot de passe mis à jour',
+        description: 'Votre mot de passe a été modifié avec succès',
+      });
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setIsLoading(false);
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: 'Erreur',
+        description: error?.message || 'Impossible de modifier le mot de passe',
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
   };
 
   return (

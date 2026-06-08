@@ -42,7 +42,7 @@ const getProductStatus = (product: Product) => {
     'available': { label: 'Disponible', color: 'bg-green-100 text-green-800' },
     'out_of_stock': { label: 'Rupture de stock', color: 'bg-orange-100 text-orange-800' },
     'not_available': { label: 'Indisponible', color: 'bg-red-100 text-red-800' },
-    'removed_from_menu': { label: 'Supprimé du menu', color: 'bg-gray-100 text-gray-800' },
+    'removed_from_menu': { label: 'Retiré du menu', color: 'bg-gray-100 text-gray-800' },
   };
 
   const statusValue = product.status?.toString() || 'available';
