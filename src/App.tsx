@@ -17,6 +17,7 @@ import Menu from "./pages/Menu";
 import CategoriesTable from './pages/CategoriesTable';
 import MarketCategoriesTable from './pages/MarketCategoriesTable';
 import TagsTable from './pages/TagsTable';
+import PrintersTable from './pages/PrintersTable';
 import Components from './pages/Components';
 import FinancialReports from './pages/FinancialReports';
 import Locations from './pages/Locations';
@@ -97,6 +98,7 @@ const App = () => (
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/settings/:section" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/settings/integrations" element={<ProtectedRoute><NotImplementedPage title="Intégrations" /></ProtectedRoute>} />
+              <Route path="/settings/printers" element={<ProtectedRoute><PrintersTable /></ProtectedRoute>} />
               
               {/* Dashboard Sub-pages */}
               <Route path="/dashboard/analysis" element={<ProtectedRoute><DashboardAnalysis /></ProtectedRoute>} />

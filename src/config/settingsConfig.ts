@@ -40,3 +40,8 @@ export const establishmentScanOrderFields: FieldConfig[] = [
   { key: 'max_schedule_days', label: 'Jours de programmation max', type: 'number', group: 'scan_order', min: 1, max: 30 },
   { key: 'enable_rating', label: 'Activer les avis', type: 'switch', group: 'scan_order' },
 ];
+
+export const establishmentSecurityFields: FieldConfig[] = [
+  { key: 'pos_auto_lock_enabled', label: 'Verrouillage automatique de la caisse', type: 'switch', group: 'security' },
+  { key: 'pos_auto_lock_delay_minutes', label: "Délai d'inactivité avant verrouillage (minutes)", type: 'number', group: 'security', min: 5, max: 240 },
+];

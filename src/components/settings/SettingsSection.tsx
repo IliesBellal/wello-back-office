@@ -12,6 +12,7 @@ interface SettingsSectionProps {
   values: Record<string, any>;
   onChange: (key: string, value: any) => void;
   defaultPhoneCountry?: string;
+  errors?: Record<string, string>;
 }
 
 const resolveCountryCode = (countryCode?: string): CountryCode => {
@@ -22,7 +23,7 @@ const resolveCountryCode = (countryCode?: string): CountryCode => {
   return 'FR';
 };
 
-export const SettingsSection = ({ fields, values, onChange, defaultPhoneCountry }: SettingsSectionProps) => {
+export const SettingsSection = ({ fields, values, onChange, defaultPhoneCountry, errors }: SettingsSectionProps) => {
   const phoneDefaultCountry = resolveCountryCode(defaultPhoneCountry);
 
   return (
@@ -108,8 +109,14 @@ export const SettingsSection = ({ fields, values, onChange, defaultPhoneCountry 
                 max={field.max}
                 readOnly={field.readOnly}
                 disabled={field.readOnly}
-                className={field.readOnly ? 'opacity-60 cursor-not-allowed bg-muted' : ''}
+                className={cn(
+                  field.readOnly && 'opacity-60 cursor-not-allowed bg-muted',
+                  errors?.[field.key] && 'border-destructive'
+                )}
               />
+              {errors?.[field.key] && (
+                <p className="text-xs text-destructive">{errors[field.key]}</p>
+              )}
             </div>
           )}
         </div>

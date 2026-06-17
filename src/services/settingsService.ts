@@ -58,6 +58,10 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     max_schedule_days: 2,
     enable_rating: true
   },
+  security: {
+    pos_auto_lock_enabled: false,
+    pos_auto_lock_delay_minutes: 5
+  },
   hours_of_operations: [
     {
       id: "171",

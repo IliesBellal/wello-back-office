@@ -93,4 +93,10 @@ export const qk = {
     attendanceSources: ["planning", "refs", "attendance-sources"] as const,
     eventTypes: ["planning", "refs", "event-types"] as const,
   },
+
+  // ─── Printers ─────────────────────────────────────────────
+  printers: {
+    all: ["printers"] as const,
+    detail: (id: string) => ["printers", "detail", id] as const,
+  },
 } as const;

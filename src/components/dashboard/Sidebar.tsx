@@ -25,6 +25,7 @@ import {
   ChevronsRight,
   Link2,
   Receipt,
+  Printer,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -77,6 +78,7 @@ const menuSubItems: MenuItem[] = [
 const settingsSubItems: MenuItem[] = [
   { title: 'Établissement', icon: Store, path: '/settings/establishment' },
   { title: 'Mon Profil', icon: User, path: '/settings/profile' },
+  { title: 'Imprimantes', icon: Printer, path: '/settings/printers' },
 ];
 
 const accountingSubItems: MenuItem[] = [

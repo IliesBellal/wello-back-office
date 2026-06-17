@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck } from "lucide-react";
+import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock } from "lucide-react";
 import { useEstablishmentSettings } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
@@ -12,7 +12,8 @@ import { EstablishmentSettings, HourOfOperationPayload } from "@/types/settings"
 import {
   establishmentInfoFields,
   establishmentTimingsFields,
-  establishmentOrderingFields
+  establishmentOrderingFields,
+  establishmentSecurityFields
 } from "@/config/settingsConfig";
 import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
@@ -31,6 +32,10 @@ export const EstablishmentTab = () => {
   const [formData, setFormData] = useState<EstablishmentSettings | null>(null);
   const [activeTab, setActiveTab] = useState<string>("general");
 
+  const securityDelayField = establishmentSecurityFields.find((field) => field.key === 'pos_auto_lock_delay_minutes');
+  const securityDelayMin = securityDelayField?.min ?? 5;
+  const securityDelayMax = securityDelayField?.max ?? 240;
+
   useEffect(() => {
     if (settings) {
       setFormData(settings);
@@ -46,6 +51,13 @@ export const EstablishmentTab = () => {
         [key]: value
       }
     });
+  };
+
+  const getSecurityDelayError = (value: number): string | null => {
+    if (value < securityDelayMin || value > securityDelayMax) {
+      return `Le délai doit être compris entre ${securityDelayMin} et ${securityDelayMax} minutes.`;
+    }
+    return null;
   };
 
   const handleAddressSelect = (parsed: ParsedAddress) => {
@@ -72,6 +84,16 @@ export const EstablishmentTab = () => {
         toast({
           title: "Numéro invalide",
           description: "Le numéro de téléphone est incomplet pour le pays sélectionné.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      const securityDelayError = getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes);
+      if (securityDelayError) {
+        toast({
+          title: "Délai invalide",
+          description: securityDelayError,
           variant: "destructive"
         });
         return;
@@ -274,6 +296,41 @@ export const EstablishmentTab = () => {
       );
     }
 
+    if (tabId === "security") {
+      return (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Lock className="h-5 w-5" />
+                Sécurité
+              </CardTitle>
+              <CardDescription>
+                La caisse (POS) se verrouille automatiquement après une période d'inactivité.
+                Ce verrouillage ne s'applique pas à l'application mobile.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SettingsSection
+                fields={establishmentSecurityFields}
+                values={formData.security}
+                onChange={(key, value) => handleFieldChange('security', key, value)}
+                errors={
+                  getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes)
+                    ? { pos_auto_lock_delay_minutes: getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes)! }
+                    : undefined
+                }
+              />
+            </CardContent>
+          </Card>
+
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
+            {isSaving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      );
+    }
+
     if (tabId === "hours") {
       return (
         <div className="space-y-6">
@@ -309,6 +366,7 @@ export const EstablishmentTab = () => {
           { id: "general", label: "Général" },
           { id: "ordering", label: "Prise de commande" },
           { id: "production", label: "Production" },
+          { id: "security", label: "Sécurité" },
           { id: "hours", label: "Horaires d'ouvertures" }
         ]}
         activeTab={activeTab}

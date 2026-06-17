@@ -67,6 +67,11 @@ export interface EstablishmentScanOrder {
   enable_rating: boolean;
 }
 
+export interface EstablishmentSecurity {
+  pos_auto_lock_enabled: boolean;
+  pos_auto_lock_delay_minutes: number;
+}
+
 export interface HourOfOperation {
   id: string;
   day_of_week_from: number;
@@ -98,6 +103,7 @@ export interface EstablishmentSettings {
   timings: EstablishmentTimings;
   ordering: EstablishmentOrdering;
   scan_order: EstablishmentScanOrder;
+  security: EstablishmentSecurity;
   hours_of_operations: HourOfOperation[];
 }
 
