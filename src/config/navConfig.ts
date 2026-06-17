@@ -32,6 +32,7 @@ import {
   ShoppingBag,
   UsersRound,
   CalendarDays,
+  Printer,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -360,6 +361,12 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Établissement',
         icon: Store,
         href: '/settings/establishment',
+      },
+      {
+        id: 'printers',
+        title: 'Imprimantes',
+        icon: Printer,
+        href: '/settings/printers',
       },
       {
         id: 'profile',
