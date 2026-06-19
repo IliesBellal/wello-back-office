@@ -107,7 +107,7 @@ export const kioskService = {
 
   async uploadLogo(file: File): Promise<{ logo_url: string }> {
     const formData = new FormData();
-    formData.append('logo', file);
+    formData.append('file', file);
     const response = await apiClient.post<WelloApiResponse<{ logo_url: string }>>(
       `${KIOSK_BASE}/settings/logo`,
       formData,
@@ -117,7 +117,7 @@ export const kioskService = {
 
   async uploadIdleImage(file: File): Promise<{ idle_image_url: string }> {
     const formData = new FormData();
-    formData.append('idle_image', file);
+    formData.append('file', file);
     const response = await apiClient.post<WelloApiResponse<{ idle_image_url: string }>>(
       `${KIOSK_BASE}/settings/idle-image`,
       formData,
@@ -127,7 +127,7 @@ export const kioskService = {
 
   async uploadIdleVideo(file: File): Promise<{ idle_video_url: string }> {
     const formData = new FormData();
-    formData.append('idle_video', file);
+    formData.append('file', file);
     const response = await apiClient.post<WelloApiResponse<{ idle_video_url: string }>>(
       `${KIOSK_BASE}/settings/idle-video`,
       formData,
