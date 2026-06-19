@@ -99,4 +99,12 @@ export const qk = {
     all: ["printers"] as const,
     detail: (id: string) => ["printers", "detail", id] as const,
   },
+
+  // ─── Kiosks ───────────────────────────────────────────────
+  kiosks: {
+    all: ["kiosks"] as const,
+    detail: (id: string) => ["kiosks", "detail", id] as const,
+    enrollmentCodes: ["kiosks", "enrollment-codes"] as const,
+    settings: ["kiosks", "settings"] as const,
+  },
 } as const;

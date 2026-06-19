@@ -45,6 +45,8 @@ import HacCPActivity from './pages/haccp/Activity';
 import HacCPSettings from './pages/haccp/Settings';
 import ReservationsListPage from './pages/reservations/List';
 import ReservationsSettingsPage from './pages/reservations/Settings';
+import KiosksPage from './pages/kiosks/KiosksPage';
+import KioskSettingsPage from './pages/kiosks/KioskSettingsPage';
 import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
 
@@ -94,6 +96,10 @@ const App = () => (
               {/* Reports & Analytics */}
               {/* Consolidated under Accounting section */}
               
+              {/* Kiosk */}
+              <Route path="/kiosk/devices" element={<ProtectedRoute><KiosksPage /></ProtectedRoute>} />
+              <Route path="/kiosk/settings" element={<ProtectedRoute><KioskSettingsPage /></ProtectedRoute>} />
+
               {/* Administration */}
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/settings/:section" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

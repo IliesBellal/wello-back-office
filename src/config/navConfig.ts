@@ -33,6 +33,9 @@ import {
   UsersRound,
   CalendarDays,
   Printer,
+  MonitorSmartphone,
+  Tablet,
+  Settings2,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -346,6 +349,27 @@ export const NAV_ITEMS: NavItem[] = [
         icon: Settings,
         href: '/haccp/settings',
         requiredModule: 'haccp',
+      },
+    ],
+  },
+
+  // ═══ KIOSK ═══
+  {
+    id: 'kiosk',
+    title: 'Kiosk',
+    icon: MonitorSmartphone,
+    children: [
+      {
+        id: 'kiosk-devices',
+        title: 'Mes bornes',
+        icon: Tablet,
+        href: '/kiosk/devices',
+      },
+      {
+        id: 'kiosk-settings',
+        title: 'Paramètres',
+        icon: Settings2,
+        href: '/kiosk/settings',
       },
     ],
   },
