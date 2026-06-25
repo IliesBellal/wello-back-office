@@ -76,7 +76,7 @@ const emptyPromotion = (): Omit<Promotion, 'id'> => ({
   product_prices: {},
   discounted_quantity: 1,
   min_order_value: 0,
-  min_order_unit: 'QTY',
+  min_order_unit: 'QUANTITY',
   order_type: '',
   is_cumulative: false,
   is_time_limited: false,
@@ -334,12 +334,12 @@ function PromotionFormDialog({
           <Input
             id="promo-min-order"
             type="text"
-            inputMode={form.min_order_unit === 'QTY' ? 'numeric' : 'decimal'}
+            inputMode={form.min_order_unit === 'QUANTITY' ? 'numeric' : 'decimal'}
             value={minOrderValueDisplay}
             onChange={e => {
               const displayValue = e.target.value;
               setMinOrderValueDisplay(displayValue);
-              if (form.min_order_unit === 'QTY') {
+              if (form.min_order_unit === 'QUANTITY') {
                 set('min_order_value', parseInt(displayValue || '0') || 0);
               } else {
                 const parsed = parsePriceInput(displayValue);
@@ -349,7 +349,7 @@ function PromotionFormDialog({
             placeholder="Ex: 2"
             className="flex-1"
           />
-          <Select value={form.min_order_unit ?? 'QTY'} onValueChange={v => {
+          <Select value={form.min_order_unit ?? 'QUANTITY'} onValueChange={v => {
             set('min_order_unit', v);
             // Mettre à jour le display value quand l'unité change
             if (v === 'EUR') {
@@ -362,7 +362,7 @@ function PromotionFormDialog({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="QTY">Qté</SelectItem>
+              <SelectItem value="QUANTITY">Qté</SelectItem>
               <SelectItem value="EUR">€</SelectItem>
             </SelectContent>
           </Select>
@@ -898,7 +898,7 @@ function PromotionsTab() {
                 {/* Min order value */}
                 {promo.min_order_value && (
                   <div className="text-xs text-muted-foreground">
-                    Commande min: {promo.min_order_unit === 'QTY' ? `${promo.min_order_value} articles` : `${formatCents(promo.min_order_value)}`}
+                    Commande min: {promo.min_order_unit === 'QUANTITY' ? `${promo.min_order_value} articles` : `${formatCents(promo.min_order_value)}`}
                   </div>
                 )}
 

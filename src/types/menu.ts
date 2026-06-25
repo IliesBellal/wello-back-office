@@ -71,6 +71,10 @@ export interface Component {
   purchase_cost_qty?: number;  // Quantity for purchase cost calculation (default: 1)
   status?: string;
   available?: boolean;
+  conservation_days?: number | null;  // Durée de conservation après ouverture, en jours
+  conservation_type?: string;  // froid, congele, sec, ambiant
+  storage_temp_min?: number | null;  // Température min de stockage en °C
+  storage_temp_max?: number | null;  // Température max de stockage en °C
 }
 
 export interface ComponentCategory {
@@ -91,6 +95,7 @@ export interface AttributeOption {
   quantity?: number;  // Quantity of ingredient
   unit_of_measure_id?: string | number;  // Unit of ingredient
   order?: number;  // Display order
+  image_url?: string;  // Option thumbnail image
 }
 
 export interface AttributeOptionDetail {
@@ -273,6 +278,10 @@ export interface ComponentUpdatePayload {
   purchase_cost?: number; // in cents
   purchase_unit_id?: string;
   purchase_cost_qty?: number;  // Quantity for purchase cost calculation
+  conservation_days?: number | null;  // Durée de conservation après ouverture, en jours
+  conservation_type?: string;  // froid, congele, sec, ambiant
+  storage_temp_min?: number | null;  // Température min de stockage en °C
+  storage_temp_max?: number | null;  // Température max de stockage en °C
 }
 
 export interface ProductCreatePayload {

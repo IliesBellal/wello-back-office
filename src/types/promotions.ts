@@ -1,7 +1,7 @@
 export type DiscountType = 'percentage' | 'fixed';
 export type DiscountUnit = 'NEWPRICE' | 'PERCENTAGE' | 'CURRENCY';
 export type OrderType = 'IN' | 'TAKE_AWAY' | 'DELIVERY' | string;
-export type MinOrderUnit = 'QTY' | string;
+export type MinOrderUnit = 'QUANTITY' | string;
 
 export interface TimeSlot {
   day: DayOfWeek;

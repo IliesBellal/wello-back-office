@@ -23,6 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -35,7 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Edit, Save, X, Trash2, Loader2 } from 'lucide-react';
+import { Edit, Save, X, Trash2, Loader2, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { decimalToDisplayValue, formatPrice, parseDecimalInput, parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import { findUnitById, getCompatibleUnits } from '@/utils/unitConversions';
@@ -49,6 +50,13 @@ interface IngredientDetailSheetProps {
   onSave: (componentId: string, data: Partial<Component>) => Promise<void>;
   onDelete?: (componentId: string) => Promise<void>;
 }
+
+const CONSERVATION_TYPE_OPTIONS = [
+  { value: 'froid', label: 'Réfrigéré' },
+  { value: 'congele', label: 'Congelé' },
+  { value: 'sec', label: 'Sec' },
+  { value: 'ambiant', label: 'Ambiant' },
+];
 
 const getUnitLabel = (unitId: string | number | undefined, units: UnitOfMeasure[]): string => {
   if (!unitId) return '—';
@@ -76,55 +84,9 @@ const getPurchaseQuantityLabel = (component: Component, units: UnitOfMeasure[]):
   return hasPurchaseUnit ? purchaseUnitLabel : '—';
 };
 
-// View Content Component (declared outside to prevent remounting)
-interface ViewContentProps {
-  displayedComponent: Component;
-  units: UnitOfMeasure[];
-}
-
-const ViewContent = ({ displayedComponent, units }: ViewContentProps) => (
-  <div className="space-y-4">
-    {/* Main Info Cards */}
-    <div className="grid grid-cols-1 gap-4">
-      {/* Storage Unit */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Unité de mesure de stockage</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg font-semibold">
-            {getUnitLabel(displayedComponent.unit_of_measure_id || displayedComponent.unit_id, units)}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Purchase Info */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Prix d'achat</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <p className="text-lg font-semibold">{formatPrice(displayedComponent.purchase_cost)}</p>
-            <p className="text-sm text-muted-foreground">
-              {getPurchaseQuantityLabel(displayedComponent, units)}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Supplement Price */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Prix en supplément (client)</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-lg font-semibold">{formatPrice(displayedComponent.price)}</p>
-        </CardContent>
-      </Card>
-    </div>
-  </div>
-);
+const getConservationTypeLabel = (value: string | undefined): string => {
+  return CONSERVATION_TYPE_OPTIONS.find((option) => option.value === value)?.label || '—';
+};
 
 interface DetailViewActionsProps {
   onEdit: () => void;
@@ -159,9 +121,132 @@ const DetailViewActions = ({ onEdit, onDelete, hasDelete, compact = false }: Det
   </div>
 );
 
+// View Content Component (declared outside to prevent remounting)
+interface ViewContentProps {
+  displayedComponent: Component;
+  units: UnitOfMeasure[];
+}
+
+const ViewContent = ({ displayedComponent, units }: ViewContentProps) => (
+  <Tabs defaultValue="general" className="w-full">
+    <TabsList className="grid w-full grid-cols-3">
+      <TabsTrigger value="general">Général</TabsTrigger>
+      <TabsTrigger value="pricing">Prix & Achats</TabsTrigger>
+      <TabsTrigger value="haccp">Conservation</TabsTrigger>
+    </TabsList>
+
+    <TabsContent value="general" className="mt-4 space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Nom</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">{displayedComponent.name}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Catégorie</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">{displayedComponent.category || '—'}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Unité de mesure de stockage</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">
+            {getUnitLabel(displayedComponent.unit_of_measure_id || displayedComponent.unit_id, units)}
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Statut</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">{displayedComponent.available ? 'Actif' : 'Inactif'}</p>
+        </CardContent>
+      </Card>
+    </TabsContent>
+
+    <TabsContent value="pricing" className="mt-4 space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Prix d'achat</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <p className="text-lg font-semibold">{formatPrice(displayedComponent.purchase_cost)}</p>
+            <p className="text-sm text-muted-foreground">
+              {getPurchaseQuantityLabel(displayedComponent, units)}
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Prix en supplément (client)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">{formatPrice(displayedComponent.price)}</p>
+        </CardContent>
+      </Card>
+    </TabsContent>
+
+    <TabsContent value="haccp" className="mt-4 space-y-4">
+      <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+        <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+        <p>
+          Ces informations sont utilisées pour calculer les DLC secondaires sur les étiquettes HACCP
+          imprimées depuis les tablettes.
+        </p>
+      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Durée de conservation après ouverture</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">
+            {displayedComponent.conservation_days != null ? `${displayedComponent.conservation_days} jours` : '—'}
+          </p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Type de conservation</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">{getConservationTypeLabel(displayedComponent.conservation_type)}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm">Température de stockage</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-lg font-semibold">
+            {displayedComponent.storage_temp_min != null || displayedComponent.storage_temp_max != null
+              ? `${displayedComponent.storage_temp_min ?? '—'}°C à ${displayedComponent.storage_temp_max ?? '—'}°C`
+              : '—'}
+          </p>
+        </CardContent>
+      </Card>
+    </TabsContent>
+  </Tabs>
+);
+
+interface IngredientFormData extends Partial<Component> {
+  conservation_days_display: string;
+  storage_temp_min_display: string;
+  storage_temp_max_display: string;
+}
+
 // Edit Content Component (declared outside to prevent remounting)
 interface EditContentProps {
-  formData: Partial<Component>;
+  formData: IngredientFormData;
   priceDisplayValues: { purchase_cost: string; price: string };
   purchaseCostQtyDisplayValue: string;
   units: UnitOfMeasure[];
@@ -174,6 +259,10 @@ interface EditContentProps {
   onPurchaseCostQtyBlur: (value: string) => void;
   onSupplementPriceChange: (value: string) => void;
   onSupplementPriceBlur: (value: string) => void;
+  onConservationDaysChange: (value: string) => void;
+  onConservationTypeChange: (value: string) => void;
+  onStorageTempMinChange: (value: string) => void;
+  onStorageTempMaxChange: (value: string) => void;
   onSave: () => Promise<void>;
   onCancel: () => void;
   isSaving: boolean;
@@ -183,7 +272,6 @@ const EditContent = ({
   formData,
   priceDisplayValues,
   purchaseCostQtyDisplayValue,
-  units,
   compatiblePurchaseUnits,
   onNameChange,
   onPurchaseCostChange,
@@ -193,112 +281,211 @@ const EditContent = ({
   onPurchaseCostQtyBlur,
   onSupplementPriceChange,
   onSupplementPriceBlur,
+  onConservationDaysChange,
+  onConservationTypeChange,
+  onStorageTempMinChange,
+  onStorageTempMaxChange,
   onSave,
   onCancel,
   isSaving,
 }: EditContentProps) => (
-  <div className="space-y-6">
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-sm font-semibold text-slate-900">Identité</CardTitle>
-        <CardDescription>Le nom affiché dans la liste ingrédients et les fiches produit.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <Label htmlFor="ingredient-name" className="text-sm font-medium text-slate-700">
-          Nom de l'ingrédient
-        </Label>
-        <Input
-          id="ingredient-name"
-          value={formData.name || ''}
-          onChange={(e) => onNameChange(e.target.value)}
-          placeholder="ex: Tomate"
-          className="border-slate-200 bg-slate-50 focus:bg-white"
-        />
-      </CardContent>
-    </Card>
+  <Tabs defaultValue="general" className="w-full">
+    <TabsList className="grid w-full grid-cols-3">
+      <TabsTrigger value="general">Général</TabsTrigger>
+      <TabsTrigger value="pricing">Prix & Achats</TabsTrigger>
+      <TabsTrigger value="haccp">Conservation</TabsTrigger>
+    </TabsList>
 
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-sm font-semibold text-slate-900">Approvisionnement</CardTitle>
-        <CardDescription>Renseignez le coût d'achat, l'unité et la quantité de référence.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="purchase-cost" className="text-sm font-medium text-slate-700">
-            Prix d'achat (€)
+    <TabsContent value="general" className="mt-4 space-y-6">
+      <Card className="border-slate-200 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-slate-900">Identité</CardTitle>
+          <CardDescription>Le nom affiché dans la liste ingrédients et les fiches produit.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="ingredient-name" className="text-sm font-medium text-slate-700">
+            Nom de l'ingrédient
           </Label>
           <Input
-            id="purchase-cost"
+            id="ingredient-name"
+            value={formData.name || ''}
+            onChange={(e) => onNameChange(e.target.value)}
+            placeholder="ex: Tomate"
+            className="border-slate-200 bg-slate-50 focus:bg-white"
+          />
+        </CardContent>
+      </Card>
+    </TabsContent>
+
+    <TabsContent value="pricing" className="mt-4 space-y-6">
+      <Card className="border-slate-200 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-slate-900">Approvisionnement</CardTitle>
+          <CardDescription>Renseignez le coût d'achat, l'unité et la quantité de référence.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="purchase-cost" className="text-sm font-medium text-slate-700">
+              Prix d'achat (€)
+            </Label>
+            <Input
+              id="purchase-cost"
+              type="text"
+              inputMode="decimal"
+              value={priceDisplayValues.purchase_cost}
+              onChange={(e) => onPurchaseCostChange(e.target.value)}
+              onBlur={(e) => onPurchaseCostBlur(e.target.value)}
+              placeholder="0,00"
+              className="border-slate-200 bg-slate-50 focus:bg-white"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="purchase-unit" className="text-sm font-medium text-slate-700">
+              Unité d'achat
+            </Label>
+            <Select
+              value={formData.purchase_unit_id?.toString() || ''}
+              onValueChange={onPurchaseUnitChange}
+            >
+              <SelectTrigger id="purchase-unit" className="border-slate-200 bg-slate-50 focus:bg-white">
+                <SelectValue placeholder="Sélectionner une unité" />
+              </SelectTrigger>
+              <SelectContent>
+                {compatiblePurchaseUnits.map((unit) => (
+                  <SelectItem key={unit.id} value={unit.id.toString()}>
+                    {unit.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="purchase-cost-qty" className="text-sm font-medium text-slate-700">
+              Quantité pour le coût d'achat
+            </Label>
+            <Input
+              id="purchase-cost-qty"
+              type="text"
+              inputMode="decimal"
+              placeholder="1 ou 0,5"
+              value={purchaseCostQtyDisplayValue}
+              onChange={(e) => onPurchaseCostQtyChange(e.target.value)}
+              onBlur={(e) => onPurchaseCostQtyBlur(e.target.value)}
+              className="border-slate-200 bg-slate-50 focus:bg-white"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-slate-200 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-slate-900">Tarification client</CardTitle>
+          <CardDescription>Prix appliqué lorsqu'un supplément ingrédient est facturé au client.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          <Label htmlFor="supplement-price" className="text-sm font-medium text-slate-700">
+            Prix en supplément (€)
+          </Label>
+          <Input
+            id="supplement-price"
             type="text"
             inputMode="decimal"
-            value={priceDisplayValues.purchase_cost}
-            onChange={(e) => onPurchaseCostChange(e.target.value)}
-            onBlur={(e) => onPurchaseCostBlur(e.target.value)}
+            value={priceDisplayValues.price}
+            onChange={(e) => onSupplementPriceChange(e.target.value)}
+            onBlur={(e) => onSupplementPriceBlur(e.target.value)}
             placeholder="0,00"
             className="border-slate-200 bg-slate-50 focus:bg-white"
           />
-        </div>
+        </CardContent>
+      </Card>
+    </TabsContent>
 
-        <div className="space-y-2">
-          <Label htmlFor="purchase-unit" className="text-sm font-medium text-slate-700">
-            Unité d'achat
-          </Label>
-          <Select
-            value={formData.purchase_unit_id?.toString() || ''}
-            onValueChange={onPurchaseUnitChange}
-          >
-            <SelectTrigger id="purchase-unit" className="border-slate-200 bg-slate-50 focus:bg-white">
-              <SelectValue placeholder="Sélectionner une unité" />
-            </SelectTrigger>
-            <SelectContent>
-              {compatiblePurchaseUnits.map((unit) => (
-                <SelectItem key={unit.id} value={unit.id.toString()}>
-                  {unit.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+    <TabsContent value="haccp" className="mt-4 space-y-6">
+      <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+        <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+        <p>
+          Ces informations sont utilisées pour calculer les DLC secondaires sur les étiquettes HACCP
+          imprimées depuis les tablettes.
+        </p>
+      </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="purchase-cost-qty" className="text-sm font-medium text-slate-700">
-            Quantité pour le coût d'achat
-          </Label>
-          <Input
-            id="purchase-cost-qty"
-            type="text"
-            inputMode="decimal"
-            placeholder="1 ou 0,5"
-            value={purchaseCostQtyDisplayValue}
-            onChange={(e) => onPurchaseCostQtyChange(e.target.value)}
-            onBlur={(e) => onPurchaseCostQtyBlur(e.target.value)}
-            className="border-slate-200 bg-slate-50 focus:bg-white"
-          />
-        </div>
-      </CardContent>
-    </Card>
+      <Card className="border-slate-200 bg-white shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-slate-900">Conservation</CardTitle>
+          <CardDescription>Durée et conditions de conservation après ouverture.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="conservation-days" className="text-sm font-medium text-slate-700">
+              Durée de conservation après ouverture (jours)
+            </Label>
+            <Input
+              id="conservation-days"
+              type="number"
+              min={0}
+              placeholder="Ex: 3"
+              value={formData.conservation_days_display}
+              onChange={(e) => onConservationDaysChange(e.target.value)}
+              className="border-slate-200 bg-slate-50 focus:bg-white"
+            />
+          </div>
 
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardHeader>
-        <CardTitle className="text-sm font-semibold text-slate-900">Tarification client</CardTitle>
-        <CardDescription>Prix appliqué lorsqu'un supplément ingrédient est facturé au client.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2">
-        <Label htmlFor="supplement-price" className="text-sm font-medium text-slate-700">
-          Prix en supplément (€)
-        </Label>
-        <Input
-          id="supplement-price"
-          type="text"
-          inputMode="decimal"
-          value={priceDisplayValues.price}
-          onChange={(e) => onSupplementPriceChange(e.target.value)}
-          onBlur={(e) => onSupplementPriceBlur(e.target.value)}
-          placeholder="0,00"
-          className="border-slate-200 bg-slate-50 focus:bg-white"
-        />
-      </CardContent>
-    </Card>
+          <div className="space-y-2">
+            <Label htmlFor="conservation-type" className="text-sm font-medium text-slate-700">
+              Type de conservation
+            </Label>
+            <Select
+              value={formData.conservation_type || 'froid'}
+              onValueChange={onConservationTypeChange}
+            >
+              <SelectTrigger id="conservation-type" className="border-slate-200 bg-slate-50 focus:bg-white">
+                <SelectValue placeholder="Sélectionner un type" />
+              </SelectTrigger>
+              <SelectContent>
+                {CONSERVATION_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="storage-temp-min" className="text-sm font-medium text-slate-700">
+                Température min (°C)
+              </Label>
+              <Input
+                id="storage-temp-min"
+                type="number"
+                step="0.1"
+                placeholder="0"
+                value={formData.storage_temp_min_display}
+                onChange={(e) => onStorageTempMinChange(e.target.value)}
+                className="border-slate-200 bg-slate-50 focus:bg-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storage-temp-max" className="text-sm font-medium text-slate-700">
+                Température max (°C)
+              </Label>
+              <Input
+                id="storage-temp-max"
+                type="number"
+                step="0.1"
+                placeholder="4"
+                value={formData.storage_temp_max_display}
+                onChange={(e) => onStorageTempMaxChange(e.target.value)}
+                className="border-slate-200 bg-slate-50 focus:bg-white"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </TabsContent>
 
     <Card className="border-slate-200 bg-white shadow-sm">
       <CardContent className="flex gap-2 pt-6">
@@ -329,8 +516,23 @@ const EditContent = ({
         </Button>
       </CardContent>
     </Card>
-  </div>
+  </Tabs>
 );
+
+const buildFormData = (component: Component): IngredientFormData => ({
+  name: component.name || '',
+  purchase_cost: component.purchase_cost || 0,
+  purchase_unit_id: (component.purchase_unit_of_measure_id ?? component.purchase_unit_id)?.toString() || '',
+  price: component.price || 0,
+  purchase_cost_qty: component.purchase_cost_qty ?? 1,
+  conservation_days: component.conservation_days ?? null,
+  conservation_type: component.conservation_type || 'froid',
+  storage_temp_min: component.storage_temp_min ?? null,
+  storage_temp_max: component.storage_temp_max ?? null,
+  conservation_days_display: component.conservation_days != null ? component.conservation_days.toString() : '',
+  storage_temp_min_display: component.storage_temp_min != null ? component.storage_temp_min.toString() : '',
+  storage_temp_max_display: component.storage_temp_max != null ? component.storage_temp_max.toString() : '',
+});
 
 export const IngredientDetailSheet = ({
   componentId,
@@ -348,13 +550,20 @@ export const IngredientDetailSheet = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
-  const [formData, setFormData] = useState<Partial<Component>>({
+
+  const [formData, setFormData] = useState<IngredientFormData>({
     name: '',
     purchase_cost: 0,
     purchase_unit_id: '',
     price: 0,
     purchase_cost_qty: 1,
+    conservation_days: null,
+    conservation_type: 'froid',
+    storage_temp_min: null,
+    storage_temp_max: null,
+    conservation_days_display: '',
+    storage_temp_min_display: '',
+    storage_temp_max_display: '',
   });
 
   // Store display values separately to prevent focus loss on recalculation
@@ -396,13 +605,7 @@ export const IngredientDetailSheet = ({
   useEffect(() => {
     if (open && initialComponent) {
       setDisplayedComponent(initialComponent);
-      setFormData({
-        name: initialComponent.name || '',
-        purchase_cost: initialComponent.purchase_cost || 0,
-        purchase_unit_id: (initialComponent.purchase_unit_of_measure_id ?? initialComponent.purchase_unit_id)?.toString() || '',
-        price: initialComponent.price || 0,
-        purchase_cost_qty: initialComponent.purchase_cost_qty ?? 1,
-      });
+      setFormData(buildFormData(initialComponent));
       setPriceDisplayValues({
         purchase_cost: priceToDisplayValue(initialComponent.purchase_cost),
         price: priceToDisplayValue(initialComponent.price),
@@ -418,13 +621,14 @@ export const IngredientDetailSheet = ({
 
     setIsSaving(true);
     try {
-      await onSave(componentId, formData);
+      const { conservation_days_display, storage_temp_min_display, storage_temp_max_display, ...dataToSave } = formData;
+      await onSave(componentId, dataToSave);
       toast({
         title: 'Succès',
         description: 'Ingrédient mis à jour avec succès',
       });
       setIsEditMode(false);
-      setDisplayedComponent(prev => prev ? { ...prev, ...formData } : null);
+      setDisplayedComponent(prev => prev ? { ...prev, ...dataToSave } : null);
     } catch (error) {
       toast({
         title: 'Erreur',
@@ -462,13 +666,7 @@ export const IngredientDetailSheet = ({
   const handleCancel = useCallback(() => {
     setIsEditMode(false);
     if (initialComponent) {
-      setFormData({
-        name: initialComponent.name || '',
-        purchase_cost: initialComponent.purchase_cost || 0,
-        purchase_unit_id: (initialComponent.purchase_unit_of_measure_id ?? initialComponent.purchase_unit_id)?.toString() || '',
-        price: initialComponent.price || 0,
-        purchase_cost_qty: initialComponent.purchase_cost_qty ?? 1,
-      });
+      setFormData(buildFormData(initialComponent));
       setPriceDisplayValues({
         purchase_cost: priceToDisplayValue(initialComponent.purchase_cost),
         price: priceToDisplayValue(initialComponent.price),
@@ -484,8 +682,8 @@ export const IngredientDetailSheet = ({
 
   const handlePurchaseCostChange = useCallback((displayValue: string) => {
     setPriceDisplayValues(prev => ({ ...prev, purchase_cost: displayValue }));
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       purchase_cost: parsePriceInput(displayValue)
     }));
   }, []);
@@ -510,8 +708,8 @@ export const IngredientDetailSheet = ({
 
   const handleSupplementPriceChange = useCallback((displayValue: string) => {
     setPriceDisplayValues(prev => ({ ...prev, price: displayValue }));
-    setFormData(prev => ({ 
-      ...prev, 
+    setFormData(prev => ({
+      ...prev,
       price: parsePriceInput(displayValue)
     }));
   }, []);
@@ -521,11 +719,39 @@ export const IngredientDetailSheet = ({
     setPriceDisplayValues(prev => ({ ...prev, price: formatted }));
   }, []);
 
+  const handleConservationDaysChange = useCallback((displayValue: string) => {
+    setFormData(prev => ({
+      ...prev,
+      conservation_days_display: displayValue,
+      conservation_days: displayValue === '' ? null : Number(displayValue),
+    }));
+  }, []);
+
+  const handleConservationTypeChange = useCallback((value: string) => {
+    setFormData(prev => ({ ...prev, conservation_type: value }));
+  }, []);
+
+  const handleStorageTempMinChange = useCallback((displayValue: string) => {
+    setFormData(prev => ({
+      ...prev,
+      storage_temp_min_display: displayValue,
+      storage_temp_min: displayValue === '' ? null : Number(displayValue),
+    }));
+  }, []);
+
+  const handleStorageTempMaxChange = useCallback((displayValue: string) => {
+    setFormData(prev => ({
+      ...prev,
+      storage_temp_max_display: displayValue,
+      storage_temp_max: displayValue === '' ? null : Number(displayValue),
+    }));
+  }, []);
+
   // Memoized content to prevent unnecessary re-renders
   const content = useMemo(
     () => {
       if (!displayedComponent) return null;
-      
+
       return isEditMode ? (
         <EditContent
           formData={formData}
@@ -541,6 +767,10 @@ export const IngredientDetailSheet = ({
           onPurchaseCostQtyBlur={handlePurchaseCostQtyBlur}
           onSupplementPriceChange={handleSupplementPriceChange}
           onSupplementPriceBlur={handleSupplementPriceBlur}
+          onConservationDaysChange={handleConservationDaysChange}
+          onConservationTypeChange={handleConservationTypeChange}
+          onStorageTempMinChange={handleStorageTempMinChange}
+          onStorageTempMaxChange={handleStorageTempMaxChange}
           onSave={handleSave}
           onCancel={handleCancel}
           isSaving={isSaving}
@@ -569,6 +799,10 @@ export const IngredientDetailSheet = ({
       handlePurchaseCostQtyBlur,
       handleSupplementPriceChange,
       handleSupplementPriceBlur,
+      handleConservationDaysChange,
+      handleConservationTypeChange,
+      handleStorageTempMinChange,
+      handleStorageTempMaxChange,
       handleSave,
       handleCancel,
     ]

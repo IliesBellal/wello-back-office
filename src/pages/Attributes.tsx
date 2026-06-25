@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer, ConfirmDialog } from '@/components/shared';
 import { Button } from '@/components/ui/button';
@@ -30,11 +30,13 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, ChevronLeft, Settings2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Edit, ChevronLeft, Settings2, GripVertical, ImagePlus, Loader2 } from 'lucide-react';
 import { useAttributesData } from '@/hooks/useAttributesData';
 import { Attribute, AttributeOption } from '@/types/menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { getCompatibleUnits as getCompatibleUnitsForBaseUnit } from '@/utils/unitConversions';
+import { useToast } from '@/hooks/use-toast';
+import { menuService } from '@/services/menuService';
 import {
   DndContext,
   closestCenter,
@@ -197,7 +199,11 @@ interface SortableOptionRowProps {
   compatibleUnits: any[];
   onUpdate: (field: keyof AttributeOption, value: unknown) => void;
   onRemove: () => void;
+  onImageUploaded?: () => void;
 }
+
+const MAX_OPTION_IMAGE_SIZE = 2 * 1024 * 1024; // 2 Mo
+const VALID_OPTION_IMAGE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
 
 function SortableOptionRow({
   sortableId,
@@ -206,10 +212,14 @@ function SortableOptionRow({
   compatibleUnits,
   onUpdate,
   onRemove,
+  onImageUploaded,
 }: SortableOptionRowProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({
     id: sortableId,
   });
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const style: React.CSSProperties = {
     transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined,
@@ -217,10 +227,85 @@ function SortableOptionRow({
     transition: isDragging ? 'none' : 'all 0.2s ease',
   };
 
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (e.target) e.target.value = '';
+    if (!file || !option.id) return;
+
+    if (!VALID_OPTION_IMAGE_TYPES.includes(file.type)) {
+      toast({
+        title: 'Format invalide',
+        description: 'Veuillez sélectionner un fichier JPG, PNG ou WebP.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (file.size > MAX_OPTION_IMAGE_SIZE) {
+      toast({
+        title: 'Fichier trop volumineux',
+        description: `La taille maximale autorisée est de 2 Mo. Votre fichier fait ${(file.size / 1024 / 1024).toFixed(2)} Mo.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsUploadingImage(true);
+    try {
+      const result = await menuService.uploadAttributeOptionImage(option.id, file);
+      onUpdate('image_url', result.image_url);
+      onImageUploaded?.();
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : "Impossible d'envoyer l'image de l'option.",
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   return (
     <TableRow ref={setNodeRef} style={style} className={isDragging ? 'bg-muted/50' : ''}>
       <TableCell className="cursor-grab active:cursor-grabbing pl-2 w-8" {...attributes} {...listeners}>
         <GripVertical className="w-4 h-4 text-muted-foreground" />
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          {option.image_url ? (
+            <img
+              src={option.image_url}
+              alt={option.title}
+              className="w-10 h-10 rounded-md object-cover border border-border flex-shrink-0"
+            />
+          ) : null}
+          {isUploadingImage ? (
+            <div className="w-8 h-8 flex items-center justify-center flex-shrink-0">
+              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="w-8 h-8 flex-shrink-0"
+              disabled={!option.id}
+              title={option.id ? "Changer l'image de l'option" : "Enregistrez l'option avant d'ajouter une image"}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <ImagePlus className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            onChange={handleImageSelect}
+            disabled={isUploadingImage}
+            className="hidden"
+          />
+        </div>
       </TableCell>
       <TableCell>
         <Input
@@ -320,9 +405,10 @@ interface FormViewProps {
   initial?: Attribute;
   onSave: (data: Partial<Attribute>) => void;
   onCancel: () => void;
+  onOptionImageUploaded?: () => void;
 }
 
-function FormView({ initial, onSave, onCancel }: FormViewProps) {
+function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormViewProps) {
   const { components, units } = useAttributesData();
   const [formData, setFormData] = useState<Partial<Attribute>>(
     initial
@@ -539,6 +625,7 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
                       <TableHeader>
                         <TableRow className="bg-muted/30">
                           <TableHead className="w-8" />
+                          <TableHead className="w-20">Image</TableHead>
                           <TableHead className="min-w-[120px]">Nom de l'option</TableHead>
                           <TableHead className="min-w-[100px]">Supplément (€)</TableHead>
                           <TableHead className="min-w-[150px]">Ingrédient (optionnel)</TableHead>
@@ -562,6 +649,7 @@ function FormView({ initial, onSave, onCancel }: FormViewProps) {
                                 compatibleUnits={compatibleUnits}
                                 onUpdate={(field, value) => handleUpdateOption(index, field, value)}
                                 onRemove={() => handleRemoveOption(index)}
+                                onImageUploaded={onOptionImageUploaded}
                               />
                             );
                           })}
@@ -666,7 +754,7 @@ function PageSkeleton() {
 type ViewMode = 'list' | 'new' | { editing: Attribute };
 
 export default function AttributesPage() {
-  const { attributes, components, loading, createAttribute, updateAttributeData, deleteAttribute } = useAttributesData();
+  const { attributes, components, loading, createAttribute, updateAttributeData, deleteAttribute, refreshAttributes } = useAttributesData();
   const [view, setView] = useState<ViewMode>('list');
   const [deletingAttribute, setDeletingAttribute] = useState<Attribute | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -735,6 +823,7 @@ export default function AttributesPage() {
             initial={typeof view === 'object' ? view.editing : undefined}
             onSave={handleSave}
             onCancel={() => setView('list')}
+            onOptionImageUploaded={refreshAttributes}
           />
         )}
       </PageContainer>

@@ -71,5 +71,6 @@ export const useAttributesData = () => {
     createAttribute,
     updateAttributeData,
     deleteAttribute,
+    refreshAttributes: loadData,
   };
 };

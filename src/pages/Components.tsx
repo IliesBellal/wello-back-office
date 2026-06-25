@@ -29,7 +29,6 @@ import { menuService } from '@/services/menuService';
 import { IngredientsTable } from '@/components/menu/IngredientsTable';
 import { IngredientDetailSheet } from '@/components/menu/IngredientDetailSheet';
 import { ComponentCreateSheet } from '@/components/menu/ComponentCreateSheet';
-import { ComponentViewEditSheet } from '@/components/menu/ComponentViewEditSheet';
 import { toast } from 'sonner';
 import { Component, ComponentCategory } from '@/types/menu';
 
@@ -59,8 +58,6 @@ export default function Components() {
   } = useComponentsData();
   
   const [createSheetOpen, setCreateSheetOpen] = useState(false);
-  const [editSheetOpen, setEditSheetOpen] = useState(false);
-  const [componentToEdit, setComponentToEdit] = useState<Component | null>(null);
   const [detailSheetOpen, setDetailSheetOpen] = useState(false);
   const [selectedIngredient, setSelectedIngredient] = useState<Component | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -342,21 +339,6 @@ export default function Components() {
           units={units || []}
           onCreateComponent={createComponent}
           onCreateCategory={createComponentCategory}
-        />
-
-        <ComponentViewEditSheet
-          open={editSheetOpen}
-          onOpenChange={setEditSheetOpen}
-          component={componentToEdit}
-          units={units || []}
-          onUpdate={async (componentId, data) => {
-            const convertedData = {
-              ...data,
-              purchase_unit_id: data.purchase_unit_id ? String(data.purchase_unit_id) : undefined
-            };
-            return updateComponent(componentId, convertedData) as Promise<void>;
-          }}
-          onDeleteConfirm={(component) => deleteComponent(component.component_id)}
         />
 
         {/* Delete ingredient dialog */}

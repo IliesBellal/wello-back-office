@@ -18,6 +18,7 @@ import { analyticsService } from '@/services/analyticsService';
 import { subDays, format } from 'date-fns';
 import { TrendingUp, TrendingDown, Download, ChevronRight } from 'lucide-react';
 import { ExportButton } from '@/components/analytics';
+import { UpsellAnalyticsTab } from '@/components/analytics/UpsellAnalyticsTab';
 import { MultiFilter } from '@/components/shared/MultiFilter';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { ChannelToggleButtons } from '@/components/dashboard/ChannelToggleButtons';
@@ -26,7 +27,7 @@ import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
 import { Tile } from '@/components/shared/Tile';
 import { toast } from 'sonner';
 
-type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'tags' | 'annulations' | 'remises' | 'clients' | 'paiements' | 'restaurants';
+type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'tags' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'paiements' | 'restaurants';
 
 interface DateRange {
   from: Date;
@@ -1546,6 +1547,8 @@ export const DashboardAnalysis = () => {
         return renderTagsTab();
       case 'annulations':
         return renderCancellationsTab();
+      case 'upsell':
+        return <UpsellAnalyticsTab dateRange={dateRange} />;
       case 'remises':
         return renderDiscountsTab();
       case 'clients':
@@ -1566,6 +1569,7 @@ export const DashboardAnalysis = () => {
     { id: 'options', label: 'Options' },
     { id: 'tags', label: 'Tags' },
     { id: 'annulations', label: 'Annulations' },
+    { id: 'upsell', label: 'Vente additionnelle' },
     { id: 'remises', label: 'Remises' },
     { id: 'clients', label: 'Clients' },
     { id: 'paiements', label: 'Règlements' },

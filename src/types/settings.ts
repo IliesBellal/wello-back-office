@@ -54,6 +54,7 @@ export interface EstablishmentOrdering {
   active_on_site: boolean;
   active_takeaway: boolean;
   active_delivery: boolean;
+  upsell_enabled: boolean;
 }
 
 export interface EstablishmentScanOrder {
@@ -70,6 +71,14 @@ export interface EstablishmentScanOrder {
 export interface EstablishmentSecurity {
   pos_auto_lock_enabled: boolean;
   pos_auto_lock_delay_minutes: number;
+}
+
+export interface CustomerFormRequirements {
+  [fieldKey: string]: {
+    dine_in: boolean;
+    take_away: boolean;
+    delivery: boolean;
+  };
 }
 
 export interface HourOfOperation {
@@ -105,7 +114,16 @@ export interface EstablishmentSettings {
   scan_order: EstablishmentScanOrder;
   security: EstablishmentSecurity;
   hours_of_operations: HourOfOperation[];
+  customer_form_requirements: CustomerFormRequirements | null;
 }
+
+export const DEFAULT_CUSTOMER_FORM_REQUIREMENTS: CustomerFormRequirements = {
+  first_name: { dine_in: false, take_away: false, delivery: false },
+  name: { dine_in: false, take_away: false, delivery: false },
+  phone: { dine_in: false, take_away: false, delivery: false },
+  postal_address: { dine_in: false, take_away: false, delivery: false },
+  email: { dine_in: false, take_away: false, delivery: false },
+};
 
 export type FieldType = 'text' | 'email' | 'tel' | 'number' | 'color' | 'switch' | 'select';
 

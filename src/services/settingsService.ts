@@ -46,7 +46,8 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     register_required: true,
     active_on_site: true,
     active_takeaway: true,
-    active_delivery: true
+    active_delivery: true,
+    upsell_enabled: false
   },
   scan_order: {
     active_delivery: true,
@@ -62,6 +63,7 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     pos_auto_lock_enabled: false,
     pos_auto_lock_delay_minutes: 5
   },
+  customer_form_requirements: null,
   hours_of_operations: [
     {
       id: "171",

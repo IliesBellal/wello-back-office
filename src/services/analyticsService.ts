@@ -196,6 +196,21 @@ interface CancellationsAnalyticsResponse {
   };
 }
 
+// Upsell Analytics
+export interface UpsellByServer {
+  server_id: string;
+  server_name: string;
+  upsell_lines: number;
+  upsell_revenue_ht: number;
+}
+
+export interface UpsellStatsResponse {
+  total_upsell_lines: number;
+  upsell_revenue_ht: number;
+  orders_with_upsell_rate: number;
+  by_server: UpsellByServer[];
+}
+
 // Discounts Analytics
 interface DiscountByType {
   type: string;
@@ -1429,6 +1444,53 @@ class AnalyticsService {
       console.error('Error exporting tags CSV:', error);
       throw error;
     }
+  }
+
+  /**
+   * Récupère les statistiques de vente additionnelle (upsell)
+   */
+  async getUpsellStats(
+    startDate: string | Date,
+    endDate: string | Date
+  ): Promise<UpsellStatsResponse> {
+    const from = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
+    const to = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
+
+    return withMock(
+      () => {
+        const mockByServer: UpsellByServer[] = [
+          { server_id: 'srv-1', server_name: 'Marie Dupont', upsell_lines: 42, upsell_revenue_ht: 318.50 },
+          { server_id: 'srv-2', server_name: 'Jean Martin', upsell_lines: 35, upsell_revenue_ht: 264.20 },
+          { server_id: 'srv-3', server_name: 'Sophie Bernard', upsell_lines: 28, upsell_revenue_ht: 197.80 },
+          { server_id: 'srv-4', server_name: 'Lucas Petit', upsell_lines: 19, upsell_revenue_ht: 142.90 },
+        ];
+        return {
+          total_upsell_lines: mockByServer.reduce((sum, s) => sum + s.upsell_lines, 0),
+          upsell_revenue_ht: mockByServer.reduce((sum, s) => sum + s.upsell_revenue_ht, 0),
+          orders_with_upsell_rate: 18.4,
+          by_server: mockByServer,
+        };
+      },
+      async () => {
+        const response = await apiClient.get<{
+          total_upsell_lines: number;
+          upsell_revenue_ht: number;
+          orders_with_upsell_rate: number;
+          by_server: UpsellByServer[];
+        }>(`/stats/upsell?from=${from}&to=${to}`);
+
+        return {
+          total_upsell_lines: response.total_upsell_lines,
+          upsell_revenue_ht: response.upsell_revenue_ht / 100,
+          orders_with_upsell_rate: response.orders_with_upsell_rate,
+          by_server: response.by_server.map((server) => ({
+            ...server,
+            upsell_revenue_ht: server.upsell_revenue_ht / 100,
+          })),
+        };
+      },
+      { method: 'GET', endpoint: '/stats/upsell' }
+    );
   }
 
   /**

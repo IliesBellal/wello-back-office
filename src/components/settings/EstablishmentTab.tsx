@@ -3,12 +3,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock } from "lucide-react";
+import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles } from "lucide-react";
 import { useEstablishmentSettings } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
 import { OpeningHours } from "./OpeningHours";
-import { EstablishmentSettings, HourOfOperationPayload } from "@/types/settings";
+import { EstablishmentSettings, HourOfOperationPayload, DEFAULT_CUSTOMER_FORM_REQUIREMENTS } from "@/types/settings";
 import {
   establishmentInfoFields,
   establishmentTimingsFields,
@@ -18,6 +18,20 @@ import {
 import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
 import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressAutocomplete";
+
+const CUSTOMER_FORM_FIELDS: { key: string; label: string }[] = [
+  { key: 'first_name', label: 'Prénom' },
+  { key: 'name', label: 'Nom' },
+  { key: 'phone', label: 'Téléphone' },
+  { key: 'postal_address', label: 'Adresse postale' },
+  { key: 'email', label: 'Email' },
+];
+
+const CUSTOMER_FORM_MODES: { key: 'dine_in' | 'take_away' | 'delivery'; label: string }[] = [
+  { key: 'dine_in', label: 'Sur place' },
+  { key: 'take_away', label: 'À emporter' },
+  { key: 'delivery', label: 'Livraison' },
+];
 
 export const EstablishmentTab = () => {
   const {
@@ -50,6 +64,21 @@ export const EstablishmentTab = () => {
         ...formData[group],
         [key]: value
       }
+    });
+  };
+
+  const handleCustomerFormChange = (fieldKey: string, modeKey: 'dine_in' | 'take_away' | 'delivery', value: boolean) => {
+    if (!formData) return;
+    const currentRequirements = formData.customer_form_requirements ?? DEFAULT_CUSTOMER_FORM_REQUIREMENTS;
+    setFormData({
+      ...formData,
+      customer_form_requirements: {
+        ...currentRequirements,
+        [fieldKey]: {
+          ...(currentRequirements[fieldKey] ?? { dine_in: false, take_away: false, delivery: false }),
+          [modeKey]: value,
+        },
+      },
     });
   };
 
@@ -240,6 +269,80 @@ export const EstablishmentTab = () => {
                     onCheckedChange={(checked) => handleFieldChange('ordering', 'active_delivery', checked)}
                   />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Vente additionnelle */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Sparkles className="h-5 w-5" />
+                Vente additionnelle
+              </CardTitle>
+              <CardDescription>Suggestions d'articles complémentaires sur le POS</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                <div className="flex-1">
+                  <p className="font-medium text-foreground flex items-center gap-2">
+                    <Sparkles className="h-4 w-4" />
+                    Suggestions de vente additionnelle
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Afficher des suggestions d'articles complémentaires lors de la prise de commande sur le POS
+                  </p>
+                </div>
+                <Switch
+                  checked={formData.ordering.upsell_enabled}
+                  onCheckedChange={(checked) => handleFieldChange('ordering', 'upsell_enabled', checked)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Formulaire client */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Utensils className="h-5 w-5" />
+                Formulaire client
+              </CardTitle>
+              <CardDescription>Définissez les informations client requises pour chaque mode de commande</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr>
+                      <th className="text-left font-medium text-muted-foreground py-2"></th>
+                      {CUSTOMER_FORM_MODES.map((mode) => (
+                        <th key={mode.key} className="text-center font-medium text-muted-foreground py-2 px-2">
+                          {mode.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {CUSTOMER_FORM_FIELDS.map((field) => {
+                      const fieldRequirements = formData.customer_form_requirements?.[field.key]
+                        ?? DEFAULT_CUSTOMER_FORM_REQUIREMENTS[field.key];
+                      return (
+                        <tr key={field.key} className="border-t">
+                          <td className="py-3 font-medium text-foreground">{field.label}</td>
+                          {CUSTOMER_FORM_MODES.map((mode) => (
+                            <td key={mode.key} className="text-center py-3 px-2">
+                              <Switch
+                                checked={fieldRequirements[mode.key]}
+                                onCheckedChange={(checked) => handleCustomerFormChange(field.key, mode.key, checked)}
+                              />
+                            </td>
+                          ))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>

@@ -714,8 +714,12 @@ export const menuService = {
           purchase_unit_of_measure_id?: string;
           purchase_unit_of_measure?: string;
           status: string;
+          conservation_days?: number | null;
+          conservation_type?: string;
+          storage_temp_min?: number | null;
+          storage_temp_max?: number | null;
         }
-        
+
         if (Array.isArray(data)) {
           data.forEach((category) => {
             categories.push(category);
@@ -745,7 +749,11 @@ export const menuService = {
                   purchase_unit_of_measure: comp.purchase_unit_of_measure,
                   purchase_unit_of_measure_id: comp.purchase_unit_of_measure_id,
                   status: comp.status,
-                  available: comp.status === '1'
+                  available: comp.status === '1',
+                  conservation_days: comp.conservation_days ?? null,
+                  conservation_type: comp.conservation_type,
+                  storage_temp_min: comp.storage_temp_min ?? null,
+                  storage_temp_max: comp.storage_temp_max ?? null
                 });
               });
             }
@@ -1023,11 +1031,11 @@ export const menuService = {
     );
   },
 
-  async updateComponent(componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }): Promise<Component> {
+  async updateComponent(componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number; conservation_days?: number | null; conservation_type?: string; storage_temp_min?: number | null; storage_temp_max?: number | null }): Promise<Component> {
     logAPI('PATCH', `/menu/components/${componentId}`, data);
     return withMock(
-      () => ({ 
-        component_id: componentId, 
+      () => ({
+        component_id: componentId,
         ...data
       } as unknown as Component),
       async () => {
@@ -1047,6 +1055,10 @@ export const menuService = {
           purchase_unit_of_measure_id?: string;
           purchase_unit_of_measure?: string;
           status: string;
+          conservation_days?: number | null;
+          conservation_type?: string;
+          storage_temp_min?: number | null;
+          storage_temp_max?: number | null;
         }
 
         const response = await apiClient.patch<WelloApiResponse<{ component: ApiComponentResponse }>>(`/menu/components/${componentId}`, data);
@@ -1075,7 +1087,11 @@ export const menuService = {
           purchase_unit_of_measure: apiComponent.purchase_unit_of_measure,
           purchase_unit_of_measure_id: apiComponent.purchase_unit_of_measure_id,
           status: apiComponent.status,
-          available: apiComponent.status === '1'
+          available: apiComponent.status === '1',
+          conservation_days: apiComponent.conservation_days ?? null,
+          conservation_type: apiComponent.conservation_type,
+          storage_temp_min: apiComponent.storage_temp_min ?? null,
+          storage_temp_max: apiComponent.storage_temp_max ?? null
         } as Component;
       }
     );
@@ -1128,6 +1144,50 @@ export const menuService = {
         }
 
         const data = await response.json() as WelloApiResponse<{ photo_url: string }>;
+        return data.data;
+      }
+    );
+  },
+
+  async uploadAttributeOptionImage(optionId: string, file: File): Promise<{ image_url: string }> {
+    logAPI('PUT', `/menu/attribute_options/${optionId}/image`, { fileName: file.name, fileSize: file.size });
+
+    return withMock(
+      async () => {
+        // Mock: simulate upload delay and return fake URL
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return { image_url: `https://storage.welloresto.fr/merchants/2/attribute_options/mock_${Date.now()}.jpg` };
+      },
+      async () => {
+        // Real upload: use FormData and fetch directly (bypassing JSON serialization)
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const token = getStoredAuthToken();
+
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/attribute_options/${optionId}/image`, {
+          method: 'PUT',
+          headers,
+          body: formData
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'Upload failed';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            // ignore
+          }
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json() as WelloApiResponse<{ image_url: string }>;
         return data.data;
       }
     );
