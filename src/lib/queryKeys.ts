@@ -107,4 +107,16 @@ export const qk = {
     enrollmentCodes: ["kiosks", "enrollment-codes"] as const,
     settings: ["kiosks", "settings"] as const,
   },
+
+  // ─── Reservations / Bookings ────────────────────────────
+  reservations: {
+    all: ["reservations"] as const,
+    list: (filters?: Record<string, unknown>) => ["reservations", "list", filters ?? {}] as const,
+    detail: (bookingId: string) => ["reservations", "detail", bookingId] as const,
+    settings: ["reservations", "settings"] as const,
+    durationRules: ["reservations", "duration-rules"] as const,
+    hours: ["reservations", "hours"] as const,
+    deletionReasons: ["reservations", "deletion-reasons"] as const,
+    availability: (date: string) => ["reservations", "availability", date] as const,
+  },
 } as const;
