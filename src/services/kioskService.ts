@@ -39,37 +39,82 @@ const assertNoKioskApiError = (data: unknown) => {
   }
 };
 
+type KioskEntryApi = Partial<KioskEntry> & {
+  _id?: string;
+  device_id?: string;
+  kiosk_id?: string;
+  kioskId?: string;
+  uuid?: string;
+  device?: {
+    id?: string;
+    _id?: string;
+  };
+};
+
+const resolveKioskId = (kiosk: KioskEntryApi): string | undefined => {
+  return (
+    kiosk.id ??
+    kiosk._id ??
+    kiosk.device_id ??
+    kiosk.kiosk_id ??
+    kiosk.kioskId ??
+    kiosk.uuid ??
+    kiosk.device?.id ??
+    kiosk.device?._id
+  );
+};
+
+const normalizeKioskEntry = (kiosk: KioskEntryApi): KioskEntry => {
+  return {
+    ...(kiosk as KioskEntry),
+    id: resolveKioskId(kiosk) ?? "",
+  };
+};
+
+const assertValidKioskId = (id: string | undefined, action: string): string => {
+  if (typeof id === "string" && id.trim().length > 0) {
+    return id;
+  }
+
+  throw new KioskApiException(`Identifiant de borne invalide pour ${action}.`, "kiosk_invalid_id");
+};
+
 export const kioskService = {
   // ─── Kiosks ─────────────────────────────────────────────────────────────
 
   async getKiosks(): Promise<KioskEntry[]> {
-    const response = await apiClient.get<WelloApiResponse<{ devices: KioskEntry[] }>>(`${KIOSK_BASE}/devices`);
-    return response.data.devices;
+    const response = await apiClient.get<WelloApiResponse<{ devices: KioskEntryApi[] }>>(`${KIOSK_BASE}/devices`);
+    return response.data.devices.map(normalizeKioskEntry);
   },
 
   async getKiosk(id: string): Promise<KioskEntry> {
-    const response = await apiClient.get<WelloApiResponse<KioskEntry>>(`${KIOSK_BASE}/devices/${id}`);
-    return response.data;
+    const kioskId = assertValidKioskId(id, "la lecture");
+    const response = await apiClient.get<WelloApiResponse<KioskEntryApi>>(`${KIOSK_BASE}/devices/${kioskId}`);
+    return normalizeKioskEntry(response.data);
   },
 
   async updateKiosk(id: string, data: UpdateKioskRequest): Promise<KioskEntry> {
-    const response = await apiClient.put<WelloApiResponse<KioskEntry>>(`${KIOSK_BASE}/devices/${id}`, data);
-    return response.data;
+    const kioskId = assertValidKioskId(id, "la mise à jour");
+    const response = await apiClient.put<WelloApiResponse<KioskEntryApi>>(`${KIOSK_BASE}/devices/${kioskId}`, data);
+    return normalizeKioskEntry(response.data);
   },
 
   async enableKiosk(id: string): Promise<KioskEntry> {
-    const response = await apiClient.post<WelloApiResponse<KioskEntry>>(`${KIOSK_BASE}/devices/${id}/enable`);
-    return response.data;
+    const kioskId = assertValidKioskId(id, "l'activation");
+    const response = await apiClient.post<WelloApiResponse<KioskEntryApi>>(`${KIOSK_BASE}/devices/${kioskId}/enable`);
+    return normalizeKioskEntry(response.data);
   },
 
   async disableKiosk(id: string): Promise<KioskEntry> {
-    const response = await apiClient.post<WelloApiResponse<KioskEntry>>(`${KIOSK_BASE}/devices/${id}/disable`);
-    return response.data;
+    const kioskId = assertValidKioskId(id, "la désactivation");
+    const response = await apiClient.post<WelloApiResponse<KioskEntryApi>>(`${KIOSK_BASE}/devices/${kioskId}/disable`);
+    return normalizeKioskEntry(response.data);
   },
 
   async revokeKiosk(id: string): Promise<KioskEntry> {
-    const response = await apiClient.post<WelloApiResponse<KioskEntry>>(`${KIOSK_BASE}/devices/${id}/revoke`);
-    return response.data;
+    const kioskId = assertValidKioskId(id, "la révocation");
+    const response = await apiClient.post<WelloApiResponse<KioskEntryApi>>(`${KIOSK_BASE}/devices/${kioskId}/revoke`);
+    return normalizeKioskEntry(response.data);
   },
 
   // ─── Enrollment codes ───────────────────────────────────────────────────
