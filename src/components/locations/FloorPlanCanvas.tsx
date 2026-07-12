@@ -1,13 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Rect } from 'react-konva';
 import { TableShape } from './TableShape';
-import type { Location } from '@/services/locationsService';
+import { ObstacleShape } from './ObstacleShape';
+import type { Location, Obstacle } from '@/services/locationsService';
 
 interface FloorPlanCanvasProps {
   locations: Location[];
+  obstacles: Obstacle[];
   selectedLocationId: string | null;
+  selectedObstacleId: string | null;
   onLocationSelect: (locationId: string) => void;
   onLocationMove: (locationId: string, x: number, y: number) => void;
+  onObstacleSelect: (obstacleId: string) => void;
+  onObstacleMove: (obstacleId: string, x: number, y: number) => void;
   isLoading?: boolean;
 }
 
@@ -17,9 +22,13 @@ interface FloorPlanCanvasProps {
  */
 export function FloorPlanCanvas({
   locations,
+  obstacles,
   selectedLocationId,
+  selectedObstacleId,
   onLocationSelect,
   onLocationMove,
+  onObstacleSelect,
+  onObstacleMove,
   isLoading = false
 }: FloorPlanCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -51,19 +60,21 @@ export function FloorPlanCanvas({
     // Only deselect if clicking the background
     if (e.target === e.target.getStage()) {
       onLocationSelect('');
+      onObstacleSelect('');
     }
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       onLocationSelect('');
+      onObstacleSelect('');
     }
   };
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onLocationSelect]);
+  }, [onLocationSelect, onObstacleSelect]);
 
   return (
     <div
@@ -123,13 +134,26 @@ export function FloorPlanCanvas({
                 );
               })}
 
+              {/* Render all obstacle shapes (below tables) */}
+              {obstacles.map(obstacle => (
+                <ObstacleShape
+                  key={obstacle.id}
+                  obstacle={obstacle}
+                  isSelected={selectedObstacleId === obstacle.id}
+                  onSelect={() => onObstacleSelect(obstacle.id)}
+                  onDragMove={(x, y) => onObstacleMove(obstacle.id, x, y)}
+                  onDragEnd={() => {/* dragEnd déclenche déjà le dirty via onDragMove */}}
+                  scaleRatio={scaleRatio}
+                />
+              ))}
+
               {/* Render all table shapes */}
               {locations.map(location => (
                 <TableShape
                   key={location.location_id}
                   location={location}
                   isSelected={selectedLocationId === location.location_id}
-                  isOccupied={false} // TODO: Get from orders API
+                  booking={location.booking ?? null}
                   onSelect={() => onLocationSelect(location.location_id)}
                   onDragMove={(x, y) => onLocationMove(location.location_id, x, y)}
                   scaleRatio={scaleRatio}

@@ -5,6 +5,7 @@ import { Save, RotateCcw } from 'lucide-react';
 import { useFloorPlan } from '@/hooks/useFloorPlan';
 import { FloorPlanCanvas } from '@/components/locations/FloorPlanCanvas';
 import { TablePropertiesPanel } from '@/components/locations/TablePropertiesPanel';
+import { ObstaclePropertiesPanel } from '@/components/locations/ObstaclePropertiesPanel';
 import { FloorSelector } from '@/components/locations/FloorSelector';
 import { ToolBar } from '@/components/locations/ToolBar';
 
@@ -24,25 +25,37 @@ export default function Locations() {
   const {
     floors,
     locations,
+    obstacles,
     selectedFloorId,
     selectedLocationId,
+    selectedObstacleId,
     isLoading,
     isSaving,
     dirtyLocations,
+    dirtyObstacles,
     createFloor,
+    renameFloor,
+    deleteFloorAction,
     addLocation,
     selectLocation,
     selectFloor,
     updateLocationState,
     deleteLocationAction,
+    addObstacle,
+    setSelectedObstacleId,
+    updateObstacleState,
+    deleteObstacleAction,
     saveChanges,
     cancelChanges,
     getFilteredLocations,
+    getFilteredObstacles,
     hasUnsavedChanges
   } = useFloorPlan();
 
   const filteredLocations = getFilteredLocations();
+  const filteredObstacles = getFilteredObstacles();
   const selectedLocation = locations.find(l => l.location_id === selectedLocationId) || null;
+  const selectedObstacle = obstacles.find(o => o.id === selectedObstacleId) || null;
 
   return (
     <DashboardLayout>
@@ -75,7 +88,7 @@ export default function Locations() {
                 {isSaving ? 'Enregistrement...' : 'Sauvegarder'}
                 {hasUnsavedChanges() && (
                   <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-semibold">
-                    {dirtyLocations.size}
+                    {dirtyLocations.size + dirtyObstacles.size}
                   </span>
                 )}
               </Button>
@@ -85,7 +98,7 @@ export default function Locations() {
           {/* Unsaved indicator */}
           {hasUnsavedChanges() && (
             <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-950 px-3 py-2 rounded-md w-fit">
-              ⚠ {dirtyLocations.size} modification{dirtyLocations.size > 1 ? 's' : ''} non enregistrée{dirtyLocations.size > 1 ? 's' : ''}
+              ⚠ {dirtyLocations.size + dirtyObstacles.size} modification{dirtyLocations.size + dirtyObstacles.size > 1 ? 's' : ''} non enregistrée{dirtyLocations.size + dirtyObstacles.size > 1 ? 's' : ''}
             </div>
           )}
         </div>
@@ -100,6 +113,8 @@ export default function Locations() {
               selectedFloorId={selectedFloorId}
               onFloorSelect={selectFloor}
               onCreateFloor={createFloor}
+              onRenameFloor={renameFloor}
+              onDeleteFloor={deleteFloorAction}
               isCreating={isSaving}
             />
 
@@ -111,6 +126,10 @@ export default function Locations() {
               onAddTable={(shape) => {
                 if (!selectedFloorId) return Promise.resolve();
                 return addLocation(shape, selectedFloorId);
+              }}
+              onAddObstacle={(type) => {
+                if (!selectedFloorId) return Promise.resolve();
+                return addObstacle(selectedFloorId, type);
               }}
               isLoading={isSaving}
             />
@@ -147,10 +166,16 @@ export default function Locations() {
           <div className="flex-1 overflow-hidden relative">
             <FloorPlanCanvas
               locations={filteredLocations}
+              obstacles={filteredObstacles}
               selectedLocationId={selectedLocationId}
+              selectedObstacleId={selectedObstacleId}
               onLocationSelect={selectLocation}
               onLocationMove={(locationId, x, y) => {
                 updateLocationState(locationId, { x, y });
+              }}
+              onObstacleSelect={(obstacleId) => setSelectedObstacleId(obstacleId || null)}
+              onObstacleMove={(obstacleId, x, y) => {
+                updateObstacleState(obstacleId, { x, y });
               }}
               isLoading={isLoading}
             />
@@ -158,23 +183,42 @@ export default function Locations() {
         </div>
 
         {/* Properties Panel (desktop side, mobile bottom sheet) */}
-        <TablePropertiesPanel
-          location={selectedLocation}
-          floors={floors}
-          onUpdate={(updates) => {
-            if (selectedLocation) {
-              updateLocationState(selectedLocation.location_id, updates);
-            }
-          }}
-          onDelete={() => {
-            if (selectedLocation) {
-              return deleteLocationAction(selectedLocation.location_id);
-            }
-            return Promise.resolve();
-          }}
-          onClose={() => selectLocation(null)}
-          isDeleting={isSaving}
-        />
+        {selectedObstacleId ? (
+          <ObstaclePropertiesPanel
+            obstacle={selectedObstacle}
+            onUpdate={(updates) => {
+              if (selectedObstacle) {
+                updateObstacleState(selectedObstacle.id, updates);
+              }
+            }}
+            onDelete={() => {
+              if (selectedObstacle) {
+                return deleteObstacleAction(selectedObstacle.floorId, selectedObstacle.id);
+              }
+              return Promise.resolve();
+            }}
+            onClose={() => setSelectedObstacleId(null)}
+            isDeleting={isSaving}
+          />
+        ) : (
+          <TablePropertiesPanel
+            location={selectedLocation}
+            floors={floors}
+            onUpdate={(updates) => {
+              if (selectedLocation) {
+                updateLocationState(selectedLocation.location_id, updates);
+              }
+            }}
+            onDelete={() => {
+              if (selectedLocation) {
+                return deleteLocationAction(selectedLocation.location_id);
+              }
+              return Promise.resolve();
+            }}
+            onClose={() => selectLocation(null)}
+            isDeleting={isSaving}
+          />
+        )}
       </div>
     </DashboardLayout>
   );

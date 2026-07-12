@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil, Trash2, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -25,6 +25,8 @@ interface FloorSelectorProps {
   selectedFloorId: string | null;
   onFloorSelect: (floorId: string) => void;
   onCreateFloor: (name: string) => Promise<void>;
+  onRenameFloor?: (floorId: string, name: string) => Promise<void>;
+  onDeleteFloor?: (floorId: string) => Promise<void>;
   isCreating?: boolean;
 }
 
@@ -37,11 +39,58 @@ export function FloorSelector({
   selectedFloorId,
   onFloorSelect,
   onCreateFloor,
+  onRenameFloor,
+  onDeleteFloor,
   isCreating = false
 }: FloorSelectorProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [newFloorName, setNewFloorName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [editingFloorId, setEditingFloorId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [busyFloorId, setBusyFloorId] = useState<string | null>(null);
+
+  const startEditing = (floor: Floor) => {
+    setEditingFloorId(floor.id);
+    setEditingName(floor.name);
+  };
+
+  const cancelEditing = () => {
+    setEditingFloorId(null);
+    setEditingName('');
+  };
+
+  const confirmEditing = async () => {
+    if (!editingFloorId || !onRenameFloor) return;
+    if (!editingName.trim()) {
+      toast.error('Le nom de l\'étage ne peut pas être vide');
+      return;
+    }
+    try {
+      setBusyFloorId(editingFloorId);
+      await onRenameFloor(editingFloorId, editingName.trim());
+      cancelEditing();
+    } catch {
+      // Error already handled by onRenameFloor
+    } finally {
+      setBusyFloorId(null);
+    }
+  };
+
+  const handleDeleteFloor = async (floor: Floor) => {
+    if (!onDeleteFloor) return;
+    if (!window.confirm(`Supprimer l'étage "${floor.name}" ? Cette action est irréversible.`)) {
+      return;
+    }
+    try {
+      setBusyFloorId(floor.id);
+      await onDeleteFloor(floor.id);
+    } catch {
+      // Error already handled by onDeleteFloor
+    } finally {
+      setBusyFloorId(null);
+    }
+  };
 
   const handleCreateFloor = async () => {
     if (!newFloorName.trim()) {
@@ -95,6 +144,83 @@ export function FloorSelector({
           </p>
         )}
       </div>
+
+      {(onRenameFloor || onDeleteFloor) && floors.length > 0 && (
+        <div className="space-y-1 pt-1">
+          {floors.map(floor => (
+            <div
+              key={floor.id}
+              className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm ${
+                floor.id === selectedFloorId ? 'bg-muted/60' : ''
+              }`}
+            >
+              {editingFloorId === floor.id ? (
+                <>
+                  <Input
+                    autoFocus
+                    value={editingName}
+                    onChange={e => setEditingName(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') confirmEditing();
+                      if (e.key === 'Escape') cancelEditing();
+                    }}
+                    disabled={busyFloorId === floor.id}
+                    className="h-8 flex-1"
+                  />
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={confirmEditing}
+                    disabled={busyFloorId === floor.id}
+                    title="Valider"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    onClick={cancelEditing}
+                    disabled={busyFloorId === floor.id}
+                    title="Annuler"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 truncate text-foreground">{floor.name}</span>
+                  {onRenameFloor && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => startEditing(floor)}
+                      disabled={busyFloorId === floor.id}
+                      title="Renommer l'étage"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                  {onDeleteFloor && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleDeleteFloor(floor)}
+                      disabled={busyFloorId === floor.id}
+                      title="Supprimer l'étage"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent>

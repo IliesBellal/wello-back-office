@@ -7,7 +7,15 @@ export interface Floor {
   enabled: boolean;
 }
 
-export type TableShape = 'circle' | 'rectangle' | 'square';
+export type TableShape = 'circle' | 'rectangle' | 'square' | 'oval';
+
+export interface LocationBooking {
+  bookingId: string;
+  bookingNumber: string;
+  partySize: number;
+  startsAt: string; // ISO 8601 UTC
+  customerName: string;
+}
 
 export interface Location {
   location_id: string;
@@ -22,6 +30,56 @@ export interface Location {
   width: number; // diameter for circle, side for square, width for rectangle
   height: number; // not used for circle/square
   enabled: boolean;
+  open_order_id?: string | null;
+  available?: boolean;
+  booking?: LocationBooking | null;
+}
+
+// Raw shape of a location as returned by the API (booking is snake_case there)
+interface RawLocationBooking {
+  booking_id: string;
+  booking_number: string;
+  party_size: number;
+  starts_at: string;
+  customer_name: string;
+}
+
+type RawLocation = Omit<Location, 'booking'> & { booking?: RawLocationBooking | null };
+
+interface RawLocationsData {
+  id: number;
+  data: {
+    floors: Floor[];
+    locations: RawLocation[];
+    obstacles: Obstacle[];
+  };
+}
+
+const mapRawLocation = (raw: RawLocation): Location => ({
+  ...raw,
+  booking: raw.booking
+    ? {
+        bookingId: raw.booking.booking_id,
+        bookingNumber: raw.booking.booking_number,
+        partySize: raw.booking.party_size,
+        startsAt: raw.booking.starts_at,
+        customerName: raw.booking.customer_name
+      }
+    : null
+});
+
+export type ObstacleType = 'wall' | 'bar' | 'stairs' | 'door';
+
+export interface Obstacle {
+  id: string;
+  floorId: string;
+  type: ObstacleType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  angle: number;
+  direction?: number; // uniquement pour type === 'door'
 }
 
 export interface LocationsData {
@@ -29,6 +87,7 @@ export interface LocationsData {
   data: {
     floors: Floor[];
     locations: Location[];
+    obstacles: Obstacle[];
   };
 }
 
@@ -65,7 +124,9 @@ const mockData: LocationsData = {
         y: 300,
         width: 120,
         height: 80,
-        enabled: true
+        enabled: true,
+        open_order_id: "order-42",
+        available: false
       },
       {
         location_id: "3",
@@ -78,7 +139,15 @@ const mockData: LocationsData = {
         y: 600,
         width: 80,
         height: 80,
-        enabled: true
+        enabled: true,
+        available: true,
+        booking: {
+          bookingId: "booking-7",
+          bookingNumber: "RES-0007",
+          partySize: 4,
+          startsAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          customerName: "Jean Dupont"
+        }
       },
       {
         location_id: "4",
@@ -92,8 +161,22 @@ const mockData: LocationsData = {
         width: 60,
         height: 60,
         enabled: true
+      },
+      {
+        location_id: "5",
+        location_name: "Table 5",
+        seats: 5,
+        floor_id: "1",
+        shape: "oval",
+        angle: 20,
+        x: 650,
+        y: 620,
+        width: 140,
+        height: 90,
+        enabled: true
       }
-    ]
+    ],
+    obstacles: []
   }
 };
 
@@ -106,10 +189,20 @@ export const getLocations = async (): Promise<LocationsData> => {
       ...mockData,
       data: {
         floors: [...mockData.data.floors],
-        locations: [...mockData.data.locations]
+        locations: [...mockData.data.locations],
+        obstacles: [...(mockData.data.obstacles || [])]
       }
     }),
-    () => apiClient.get<LocationsData>('/locations')
+    async () => {
+      const raw = await apiClient.get<RawLocationsData>('/locations');
+      return {
+        ...raw,
+        data: {
+          ...raw.data,
+          locations: raw.data.locations.map(mapRawLocation)
+        }
+      };
+    }
   );
 };
 
@@ -197,11 +290,57 @@ export const updateLocation = async (locationId: string, data: Partial<Location>
 
 export const deleteLocation = async (locationId: string): Promise<void> => {
   logAPI('DELETE', `/locations/tables/${locationId}`);
-  
+
   return withMock(
     () => {
       mockData.data.locations = mockData.data.locations.filter(l => l.location_id !== locationId);
     },
     () => apiClient.delete<void>(`/locations/tables/${locationId}`)
+  );
+};
+
+export const createObstacle = async (
+  floorId: string,
+  data: Omit<Obstacle, 'id' | 'floorId'>
+): Promise<{ id: string }> => {
+  logAPI('POST', `/floors/${floorId}/obstacles`, data);
+
+  return withMock(
+    () => {
+      const id = String(Math.floor(Math.random() * 10000));
+      const newObstacle: Obstacle = { id, floorId, ...data };
+      mockData.data.obstacles.push(newObstacle);
+      return { id };
+    },
+    () => apiClient.post<{ id: string }>(`/floors/${floorId}/obstacles`, data)
+  );
+};
+
+export const updateObstacle = async (
+  floorId: string,
+  obstacleId: string,
+  data: Partial<Omit<Obstacle, 'id' | 'floorId'>>
+): Promise<void> => {
+  logAPI('PATCH', `/floors/${floorId}/obstacles/${obstacleId}`, data);
+
+  return withMock(
+    () => {
+      const obstacle = mockData.data.obstacles.find(o => o.id === obstacleId);
+      if (obstacle) {
+        Object.assign(obstacle, data);
+      }
+    },
+    () => apiClient.patch<void>(`/floors/${floorId}/obstacles/${obstacleId}`, data)
+  );
+};
+
+export const deleteObstacle = async (floorId: string, obstacleId: string): Promise<void> => {
+  logAPI('DELETE', `/floors/${floorId}/obstacles/${obstacleId}`);
+
+  return withMock(
+    () => {
+      mockData.data.obstacles = mockData.data.obstacles.filter(o => o.id !== obstacleId);
+    },
+    () => apiClient.delete<void>(`/floors/${floorId}/obstacles/${obstacleId}`)
   );
 };

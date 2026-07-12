@@ -164,6 +164,8 @@ export function TablePropertiesPanel({
                 onUpdate({ shape, width: 80, height: 80 });
               } else if (shape === 'rectangle' && location.shape !== 'rectangle') {
                 onUpdate({ shape, width: 120, height: 80 });
+              } else if (shape === 'oval' && location.shape !== 'oval') {
+                onUpdate({ shape, width: 120, height: 80 });
               } else {
                 onUpdate({ shape });
               }
@@ -179,6 +181,9 @@ export function TablePropertiesPanel({
           </ToggleGroupItem>
           <ToggleGroupItem value="rectangle" aria-label="Rectangle" title="Table rectangulaire">
             ▬
+          </ToggleGroupItem>
+          <ToggleGroupItem value="oval" aria-label="Ovale" title="Table ovale">
+            ⬭
           </ToggleGroupItem>
         </ToggleGroup>
       </div>

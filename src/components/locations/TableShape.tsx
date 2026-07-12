@@ -1,68 +1,86 @@
-import { useRef, useEffect } from 'react';
-import { Circle, Rect, Group, Text } from 'react-konva';
-import type { Location } from '@/services/locationsService';
+import { useRef } from 'react';
+import { Circle, Ellipse, Rect, Group, Text } from 'react-konva';
+import type { Location, LocationBooking } from '@/services/locationsService';
+import { getChairPositions } from '@/utils/chairPositions';
+import { snapToGrid } from '@/hooks/useFloorPlan';
 
 interface TableShapeProps {
   location: Location;
   isSelected: boolean;
-  isOccupied?: boolean;
+  booking?: LocationBooking | null;
   onSelect: () => void;
   onDragMove: (x: number, y: number) => void;
   scaleRatio: number; // Pixels per canvas unit (1000x1000)
 }
 
-const COLORS = {
-  free: '#51cf66',
-  occupied: '#ff6b6b',
-  selected: '#228be6'
-};
+const STATUS_STYLES = {
+  available: { fill: '#F1F5F9', stroke: '#CBD5E1', strokeWidth: 1.5, chair: '#94A3B8' },
+  reserved: { fill: '#EFF6FF', stroke: '#3B82F6', strokeWidth: 2, chair: '#93C5FD' },
+  occupied: { fill: '#FEF2F2', stroke: '#EF4444', strokeWidth: 2, chair: '#FCA5A5' }
+} as const;
+
+const SELECTED_STROKE = '#6366F1';
+const SELECTED_STROKE_WIDTH = 2.5;
 
 /**
- * Composant Konva pour afficher une table sur le canvas
- * Supporte les formes : circle, rectangle, square
+ * Composant Konva pour afficher une table sur le canvas (rendu top-down)
+ * Supporte les formes : circle, oval, square, rectangle
  * Gère la sélection et le drag & drop (drag seulement si sélectionné)
  */
 export function TableShape({
   location,
   isSelected,
-  isOccupied = false,
+  booking = null,
   onSelect,
   onDragMove,
   scaleRatio
 }: TableShapeProps) {
   const groupRef = useRef<any>(null);
-  
-  const x = location.x * scaleRatio;
-  const y = location.y * scaleRatio;
-  const width = location.width * scaleRatio;
-  const height = location.height * scaleRatio;
-  
-  // Color based on state
-  const color = isSelected ? COLORS.selected : isOccupied ? COLORS.occupied : COLORS.free;
-  const strokeWidth = isSelected ? 3 : 2;
-  
+
+  const widthPx = location.width * scaleRatio;
+  const heightPx = location.height * scaleRatio;
+  // The Group is positioned at the table's visual center so rotation pivots
+  // correctly, while location.x/y keep meaning the top-left corner in
+  // virtual canvas units (unchanged storage/clamp semantics).
+  const centerX = location.x * scaleRatio + widthPx / 2;
+  const centerY = location.y * scaleRatio + heightPx / 2;
+
+  const status = location.open_order_id != null ? 'occupied' : booking != null ? 'reserved' : 'available';
+  const statusStyle = STATUS_STYLES[status];
+
+  const tableFill = statusStyle.fill;
+  const tableStroke = isSelected ? SELECTED_STROKE : statusStyle.stroke;
+  const strokeWidth = isSelected ? SELECTED_STROKE_WIDTH : statusStyle.strokeWidth;
+  const chairColor = statusStyle.chair;
+
+  const gap = 6 * scaleRatio;
+  const chairRadius = Math.max(4, 6 * scaleRatio);
+  const chairPositions = location.seats
+    ? getChairPositions(location.shape, widthPx, heightPx, location.seats, gap, chairRadius)
+    : [];
+
   const handleDragMove = (e: any) => {
     if (!isSelected) return;
-    
-    const newX = e.target.x() / scaleRatio;
-    const newY = e.target.y() / scaleRatio;
-    
+
+    const newX = (e.target.x() - widthPx / 2) / scaleRatio;
+    const newY = (e.target.y() - heightPx / 2) / scaleRatio;
+
     onDragMove(newX, newY);
   };
 
   const handleDragBoundFunc = (pos: any) => {
     if (!isSelected) return pos;
-    
-    const newX = pos.x / scaleRatio;
-    const newY = pos.y / scaleRatio;
-    
-    // Clamp to canvas boundaries
-    const clampedX = Math.max(0, Math.min(newX, 1000 - location.width));
-    const clampedY = Math.max(0, Math.min(newY, 1000 - location.height));
-    
+
+    const rawX = (pos.x - widthPx / 2) / scaleRatio;
+    const rawY = (pos.y - heightPx / 2) / scaleRatio;
+
+    // Snap to grid then clamp to canvas boundaries.
+    const clampedX = Math.max(0, Math.min(snapToGrid(rawX), 1000 - location.width));
+    const clampedY = Math.max(0, Math.min(snapToGrid(rawY), 1000 - location.height));
+
     return {
-      x: clampedX * scaleRatio,
-      y: clampedY * scaleRatio
+      x: clampedX * scaleRatio + widthPx / 2,
+      y: clampedY * scaleRatio + heightPx / 2
     };
   };
 
@@ -77,59 +95,43 @@ export function TableShape({
       groupRef.current.getStage().container.style.cursor = 'default';
     }
   };
-  
-  const shapeProps = {
-    fill: 'rgba(255, 255, 255, 0.8)',
-    stroke: color,
-    strokeWidth,
-  };
-  
-  const renderShape = () => {
-    if (location.shape === 'circle') {
-      const radius = width / 2;
+
+  const renderTableBody = () => {
+    if (location.shape === 'circle' || location.shape === 'oval') {
       return (
-        <Circle
-          x={radius}
-          y={radius}
-          radius={radius}
-          {...shapeProps}
+        <Ellipse
+          radiusX={widthPx / 2}
+          radiusY={heightPx / 2}
+          fill={tableFill}
+          stroke={tableStroke}
+          strokeWidth={strokeWidth}
         />
       );
     }
-    
-    if (location.shape === 'square') {
-      return (
-        <Rect
-          x={0}
-          y={0}
-          width={width}
-          height={width}
-          cornerRadius={4}
-          rotation={location.angle}
-          {...shapeProps}
-        />
-      );
-    }
-    
-    // rectangle
+
+    // square | rectangle | default
     return (
       <Rect
-        x={0}
-        y={0}
-        width={width}
-        height={height}
-        cornerRadius={4}
-        rotation={location.angle}
-        {...shapeProps}
+        x={-widthPx / 2}
+        y={-heightPx / 2}
+        width={widthPx}
+        height={heightPx}
+        cornerRadius={6}
+        fill={tableFill}
+        stroke={tableStroke}
+        strokeWidth={strokeWidth}
       />
     );
   };
-  
+
   return (
     <Group
       ref={groupRef}
-      x={x}
-      y={y}
+      x={centerX}
+      y={centerY}
+      rotation={location.angle}
+      offsetX={0}
+      offsetY={0}
       draggable={isSelected}
       onDragMove={handleDragMove}
       dragBoundFunc={handleDragBoundFunc}
@@ -138,23 +140,37 @@ export function TableShape({
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      {renderShape()}
-      
-      {/* Label with table name and seats */}
+      {/* Chairs drawn first so they sit behind the table body */}
+      {chairPositions.map((pos, i) => (
+        <Circle key={i} x={pos.x} y={pos.y} radius={chairRadius} fill={chairColor} />
+      ))}
+
+      {renderTableBody()}
+
       <Text
-        x={0}
-        y={0}
-        width={width}
-        height={height}
-        text={`${location.location_name}\n${location.seats} places`}
-        fontSize={Math.max(10, width / 8)}
-        fontFamily="Arial"
-        fill={color}
+        text={location.location_name}
+        fontSize={11 * scaleRatio}
+        fill="#1E293B"
+        fontStyle="bold"
         align="center"
         verticalAlign="middle"
-        pointerEvents="none"
-        wrap="word"
+        width={widthPx}
+        height={heightPx / 2}
+        x={-widthPx / 2}
+        y={-heightPx / 2}
       />
+
+      {location.seats > 0 && (
+        <Text
+          text={`${location.seats} cvts`}
+          fontSize={9 * scaleRatio}
+          fill="#64748B"
+          align="center"
+          width={widthPx}
+          x={-widthPx / 2}
+          y={2 * scaleRatio}
+        />
+      )}
     </Group>
   );
 }
