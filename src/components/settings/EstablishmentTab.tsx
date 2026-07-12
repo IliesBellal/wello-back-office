@@ -42,6 +42,7 @@ export const EstablishmentTab = () => {
     createHourOfOperation,
     updateHourOfOperation,
     deleteHourOfOperation,
+    refreshHoursOfOperations,
   } = useEstablishmentSettings();
   const [formData, setFormData] = useState<EstablishmentSettings | null>(null);
   const [activeTab, setActiveTab] = useState<string>("general");
@@ -443,7 +444,7 @@ export const EstablishmentTab = () => {
                 <Calendar className="h-5 w-5" />
                 Horaires d'ouvertures
               </CardTitle>
-              <CardDescription>Gérez vos horaires d'ouverture</CardDescription>
+              <CardDescription>Définissez vos plages horaires pour chaque jour de la semaine.</CardDescription>
             </CardHeader>
             <CardContent>
               <OpeningHours
@@ -452,6 +453,7 @@ export const EstablishmentTab = () => {
                 onCreateHour={(payload: HourOfOperationPayload) => createHourOfOperation(payload)}
                 onUpdateHour={(hourId: string, payload: HourOfOperationPayload) => updateHourOfOperation(hourId, payload)}
                 onDeleteHour={(hourId: string) => deleteHourOfOperation(hourId)}
+                onSaved={refreshHoursOfOperations}
               />
             </CardContent>
           </Card>

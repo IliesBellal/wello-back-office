@@ -112,9 +112,11 @@ export const useEstablishmentSettings = () => {
     loadSettings();
   }, []);
 
-  const loadSettings = async () => {
+  const loadSettings = async (withLoading = true) => {
     try {
-      setIsLoading(true);
+      if (withLoading) {
+        setIsLoading(true);
+      }
       const data = await settingsService.getEstablishmentSettings();
       setSettings(data);
     } catch (error) {
@@ -124,8 +126,14 @@ export const useEstablishmentSettings = () => {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      if (withLoading) {
+        setIsLoading(false);
+      }
     }
+  };
+
+  const refreshHoursOfOperations = async () => {
+    await loadSettings(false);
   };
 
   const updateSettings = async (updates: Partial<EstablishmentSettings>) => {
@@ -249,5 +257,6 @@ export const useEstablishmentSettings = () => {
     createHourOfOperation,
     updateHourOfOperation,
     deleteHourOfOperation,
+    refreshHoursOfOperations,
   };
 };
