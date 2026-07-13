@@ -1,11 +1,15 @@
 import { Button } from '@/components/ui/button';
-import { Circle, Square, BrickWall, GlassWater, MoveUpRight, DoorOpen } from 'lucide-react';
+import { Circle, Square, BrickWall, GlassWater, MoveUpRight, DoorOpen, Hexagon } from 'lucide-react';
 import type { Location, ObstacleType } from '@/services/locationsService';
 
 interface ToolBarProps {
   selectedFloorId: string | null;
   onAddTable: (shape: Location['shape']) => Promise<void>;
   onAddObstacle: (type: ObstacleType) => Promise<void>;
+  isDrawingArea: boolean;
+  onStartDrawArea: () => void;
+  onFinishDrawArea: () => Promise<void>;
+  onCancelDrawArea: () => void;
   isLoading?: boolean;
 }
 
@@ -16,6 +20,10 @@ export function ToolBar({
   selectedFloorId,
   onAddTable,
   onAddObstacle,
+  isDrawingArea,
+  onStartDrawArea,
+  onFinishDrawArea,
+  onCancelDrawArea,
   isLoading = false
 }: ToolBarProps) {
   const isDisabled = !selectedFloorId || isLoading;
@@ -35,6 +43,17 @@ export function ToolBar({
       await onAddObstacle(type);
     } catch {
       // Error handled by caller
+    }
+  };
+
+  const handleZoneClick = () => {
+    if (!selectedFloorId) return;
+    if (isDrawingArea) {
+      onFinishDrawArea().catch(() => {
+        // Error handled by caller
+      });
+    } else {
+      onStartDrawArea();
     }
   };
 
@@ -130,6 +149,33 @@ export function ToolBar({
           <DoorOpen className="w-4 h-4" />
           <span className="text-xs">Porte</span>
         </Button>
+      </div>
+
+      <div className="border-t border-border pt-3" />
+
+      <h3 className="text-sm font-semibold text-foreground">Zones</h3>
+      <div className="flex gap-2 flex-wrap items-center">
+        <Button
+          variant={isDrawingArea ? 'default' : 'outline'}
+          size="sm"
+          disabled={isDisabled}
+          onClick={handleZoneClick}
+          className={`gap-2 ${isDrawingArea ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
+          title="Dessiner une zone"
+        >
+          <Hexagon className="w-4 h-4" />
+          {isDrawingArea ? 'Terminer' : 'Zone'}
+        </Button>
+        {isDrawingArea && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onCancelDrawArea}
+            className="gap-2"
+          >
+            Annuler
+          </Button>
+        )}
       </div>
     </div>
   );

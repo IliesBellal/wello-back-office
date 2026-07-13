@@ -6,6 +6,7 @@ import { useFloorPlan } from '@/hooks/useFloorPlan';
 import { FloorPlanCanvas } from '@/components/locations/FloorPlanCanvas';
 import { TablePropertiesPanel } from '@/components/locations/TablePropertiesPanel';
 import { ObstaclePropertiesPanel } from '@/components/locations/ObstaclePropertiesPanel';
+import { AreaPropertiesPanel } from '@/components/locations/AreaPropertiesPanel';
 import { FloorSelector } from '@/components/locations/FloorSelector';
 import { ToolBar } from '@/components/locations/ToolBar';
 
@@ -26,13 +27,18 @@ export default function Locations() {
     floors,
     locations,
     obstacles,
+    areas,
     selectedFloorId,
     selectedLocationId,
     selectedObstacleId,
+    selectedAreaId,
     isLoading,
     isSaving,
     dirtyLocations,
     dirtyObstacles,
+    dirtyAreas,
+    isDrawingArea,
+    drawingPoints,
     createFloor,
     renameFloor,
     deleteFloorAction,
@@ -45,17 +51,28 @@ export default function Locations() {
     setSelectedObstacleId,
     updateObstacleState,
     deleteObstacleAction,
+    setSelectedAreaId,
+    startDrawingArea,
+    addDrawingPoint,
+    closeAndSaveArea,
+    cancelDrawing,
+    updateAreaState,
+    deleteAreaAction,
     saveChanges,
     cancelChanges,
     getFilteredLocations,
     getFilteredObstacles,
+    getFilteredAreas,
     hasUnsavedChanges
   } = useFloorPlan();
 
   const filteredLocations = getFilteredLocations();
   const filteredObstacles = getFilteredObstacles();
+  const filteredAreas = getFilteredAreas();
   const selectedLocation = locations.find(l => l.location_id === selectedLocationId) || null;
   const selectedObstacle = obstacles.find(o => o.id === selectedObstacleId) || null;
+  const selectedArea = areas.find(a => a.id === selectedAreaId) || null;
+  const totalDirtyCount = dirtyLocations.size + dirtyObstacles.size + dirtyAreas.size;
 
   return (
     <DashboardLayout>
@@ -88,7 +105,7 @@ export default function Locations() {
                 {isSaving ? 'Enregistrement...' : 'Sauvegarder'}
                 {hasUnsavedChanges() && (
                   <span className="ml-1 px-2 py-0.5 bg-white/20 rounded-full text-xs font-semibold">
-                    {dirtyLocations.size + dirtyObstacles.size}
+                    {totalDirtyCount}
                   </span>
                 )}
               </Button>
@@ -98,7 +115,7 @@ export default function Locations() {
           {/* Unsaved indicator */}
           {hasUnsavedChanges() && (
             <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-500 bg-amber-50 dark:bg-amber-950 px-3 py-2 rounded-md w-fit">
-              ⚠ {dirtyLocations.size + dirtyObstacles.size} modification{dirtyLocations.size + dirtyObstacles.size > 1 ? 's' : ''} non enregistrée{dirtyLocations.size + dirtyObstacles.size > 1 ? 's' : ''}
+              ⚠ {totalDirtyCount} modification{totalDirtyCount > 1 ? 's' : ''} non enregistrée{totalDirtyCount > 1 ? 's' : ''}
             </div>
           )}
         </div>
@@ -131,6 +148,12 @@ export default function Locations() {
                 if (!selectedFloorId) return Promise.resolve();
                 return addObstacle(selectedFloorId, type);
               }}
+              isDrawingArea={isDrawingArea}
+              onStartDrawArea={() => {
+                if (selectedFloorId) startDrawingArea(selectedFloorId);
+              }}
+              onFinishDrawArea={closeAndSaveArea}
+              onCancelDrawArea={cancelDrawing}
               isLoading={isSaving}
             />
 
@@ -167,8 +190,10 @@ export default function Locations() {
             <FloorPlanCanvas
               locations={filteredLocations}
               obstacles={filteredObstacles}
+              areas={filteredAreas}
               selectedLocationId={selectedLocationId}
               selectedObstacleId={selectedObstacleId}
+              selectedAreaId={selectedAreaId}
               onLocationSelect={selectLocation}
               onLocationMove={(locationId, x, y) => {
                 updateLocationState(locationId, { x, y });
@@ -177,6 +202,12 @@ export default function Locations() {
               onObstacleMove={(obstacleId, x, y) => {
                 updateObstacleState(obstacleId, { x, y });
               }}
+              onAreaSelect={(areaId) => setSelectedAreaId(areaId || null)}
+              isDrawingArea={isDrawingArea}
+              drawingPoints={drawingPoints}
+              onAddDrawingPoint={addDrawingPoint}
+              onCloseDrawing={closeAndSaveArea}
+              onCancelDrawing={cancelDrawing}
               isLoading={isLoading}
             />
           </div>
@@ -198,6 +229,23 @@ export default function Locations() {
               return Promise.resolve();
             }}
             onClose={() => setSelectedObstacleId(null)}
+            isDeleting={isSaving}
+          />
+        ) : selectedAreaId ? (
+          <AreaPropertiesPanel
+            area={selectedArea}
+            onUpdate={(updates) => {
+              if (selectedArea) {
+                updateAreaState(selectedArea.id, updates);
+              }
+            }}
+            onDelete={() => {
+              if (selectedArea) {
+                return deleteAreaAction(selectedArea.floorId, selectedArea.id);
+              }
+              return Promise.resolve();
+            }}
+            onClose={() => setSelectedAreaId(null)}
             isDeleting={isSaving}
           />
         ) : (

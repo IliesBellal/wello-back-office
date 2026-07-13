@@ -10,10 +10,15 @@ import {
   createObstacle,
   updateObstacle,
   deleteObstacle,
+  createArea,
+  updateArea,
+  deleteArea,
   type Location,
   type Floor,
   type Obstacle,
-  type ObstacleType
+  type ObstacleType,
+  type Area,
+  type AreaPoint
 } from '@/services/locationsService';
 import { toast } from 'sonner';
 
@@ -21,13 +26,18 @@ export interface FloorPlanState {
   floors: Floor[];
   locations: Location[];
   obstacles: Obstacle[];
+  areas: Area[];
   selectedFloorId: string | null;
   selectedLocationId: string | null;
   selectedObstacleId: string | null;
+  selectedAreaId: string | null;
   isLoading: boolean;
   isSaving: boolean;
   dirtyLocations: Set<string>;
   dirtyObstacles: Set<string>;
+  dirtyAreas: Set<string>;
+  isDrawingArea: boolean;
+  drawingPoints: AreaPoint[];
 }
 
 export interface UseFloorPlanReturn extends FloorPlanState {
@@ -50,6 +60,15 @@ export interface UseFloorPlanReturn extends FloorPlanState {
   updateObstacleState: (obstacleId: string, changes: Partial<Obstacle>) => void;
   deleteObstacleAction: (floorId: string, obstacleId: string) => Promise<void>;
 
+  // Area operations
+  setSelectedAreaId: (areaId: string | null) => void;
+  startDrawingArea: (floorId: string) => void;
+  addDrawingPoint: (point: AreaPoint) => void;
+  closeAndSaveArea: () => Promise<void>;
+  cancelDrawing: () => void;
+  updateAreaState: (areaId: string, changes: Partial<Area>) => void;
+  deleteAreaAction: (floorId: string, areaId: string) => Promise<void>;
+
   // Save/Cancel
   saveChanges: () => Promise<void>;
   cancelChanges: () => Promise<void>;
@@ -57,6 +76,7 @@ export interface UseFloorPlanReturn extends FloorPlanState {
   // Utilities
   getFilteredLocations: () => Location[];
   getFilteredObstacles: () => Obstacle[];
+  getFilteredAreas: () => Area[];
   hasUnsavedChanges: () => boolean;
 }
 
@@ -77,17 +97,25 @@ export function useFloorPlan(): UseFloorPlanReturn {
   const [floors, setFloors] = useState<Floor[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [obstacles, setObstacles] = useState<Obstacle[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
   const [selectedFloorId, setSelectedFloorId] = useState<string | null>(null);
   const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
   const [selectedObstacleId, setSelectedObstacleId] = useState<string | null>(null);
+  const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [dirtyLocations, setDirtyLocations] = useState<Set<string>>(new Set());
   const [dirtyObstacles, setDirtyObstacles] = useState<Set<string>>(new Set());
+  const [dirtyAreas, setDirtyAreas] = useState<Set<string>>(new Set());
+
+  const [isDrawingArea, setIsDrawingArea] = useState(false);
+  const [drawingPoints, setDrawingPoints] = useState<AreaPoint[]>([]);
+  const [drawingFloorId, setDrawingFloorId] = useState<string | null>(null);
 
   // Keep track of original state for cancellation
   const [originalLocations, setOriginalLocations] = useState<Location[]>([]);
   const [originalObstacles, setOriginalObstacles] = useState<Obstacle[]>([]);
+  const [originalAreas, setOriginalAreas] = useState<Area[]>([]);
 
   const loadData = useCallback(async () => {
     try {
@@ -96,10 +124,13 @@ export function useFloorPlan(): UseFloorPlanReturn {
       setFloors(data.data.floors);
       setLocations(data.data.locations);
       setObstacles(data.data.obstacles || []);
+      setAreas(data.data.areas || []);
       setOriginalLocations(JSON.parse(JSON.stringify(data.data.locations)));
       setOriginalObstacles(JSON.parse(JSON.stringify(data.data.obstacles || [])));
+      setOriginalAreas(JSON.parse(JSON.stringify(data.data.areas || [])));
       setDirtyLocations(new Set());
       setDirtyObstacles(new Set());
+      setDirtyAreas(new Set());
 
       if (data.data.floors.length > 0) {
         setSelectedFloorId(data.data.floors[0].id);
@@ -290,8 +321,79 @@ export function useFloorPlan(): UseFloorPlanReturn {
     }
   }, []);
 
+  const startDrawingArea = useCallback((floorId: string) => {
+    setIsDrawingArea(true);
+    setDrawingPoints([]);
+    setDrawingFloorId(floorId);
+    setSelectedLocationId(null);
+    setSelectedObstacleId(null);
+    setSelectedAreaId(null);
+  }, []);
+
+  const addDrawingPoint = useCallback((point: AreaPoint) => {
+    setDrawingPoints(prev => [...prev, point]);
+  }, []);
+
+  const cancelDrawing = useCallback(() => {
+    setIsDrawingArea(false);
+    setDrawingPoints([]);
+  }, []);
+
+  const closeAndSaveArea = useCallback(async () => {
+    if (drawingPoints.length < 3 || !drawingFloorId) return;
+
+    try {
+      const x = Math.min(...drawingPoints.map(p => p.x));
+      const y = Math.min(...drawingPoints.map(p => p.y));
+      const data = {
+        name: 'Nouvelle zone',
+        strokeColor: '#64748B',
+        color: '#E2E8F0',
+        x,
+        y,
+        points: drawingPoints,
+        angle: 0
+      };
+      const { id } = await createArea(drawingFloorId, data);
+      const newArea: Area = { id, floorId: drawingFloorId, ...data };
+
+      setAreas(prev => [...prev, newArea]);
+      setOriginalAreas(prev => [...prev, JSON.parse(JSON.stringify(newArea))]);
+      setIsDrawingArea(false);
+      setDrawingPoints([]);
+      setSelectedAreaId(newArea.id);
+      toast.success('Zone créée');
+    } catch (error) {
+      toast.error('Erreur lors de la création de la zone');
+      throw error;
+    }
+  }, [drawingPoints, drawingFloorId]);
+
+  const updateAreaState = useCallback((areaId: string, changes: Partial<Area>) => {
+    setAreas(prev => prev.map(area => (area.id === areaId ? { ...area, ...changes } : area)));
+    setDirtyAreas(prev => new Set([...prev, areaId]));
+  }, []);
+
+  const deleteAreaAction = useCallback(async (floorId: string, areaId: string) => {
+    try {
+      await deleteArea(floorId, areaId);
+      setAreas(prev => prev.filter(a => a.id !== areaId));
+      setOriginalAreas(prev => prev.filter(a => a.id !== areaId));
+      setDirtyAreas(prev => {
+        const next = new Set(prev);
+        next.delete(areaId);
+        return next;
+      });
+      setSelectedAreaId(null);
+      toast.success('Zone supprimée');
+    } catch (error) {
+      toast.error('Erreur lors de la suppression de la zone');
+      throw error;
+    }
+  }, []);
+
   const saveChanges = useCallback(async () => {
-    if (dirtyLocations.size === 0 && dirtyObstacles.size === 0) {
+    if (dirtyLocations.size === 0 && dirtyObstacles.size === 0 && dirtyAreas.size === 0) {
       toast.info('Aucune modification à enregistrer');
       return;
     }
@@ -339,29 +441,52 @@ export function useFloorPlan(): UseFloorPlanReturn {
 
       await Promise.all(obstacleSavePromises);
 
+      // Save all dirty areas
+      const areaSavePromises = Array.from(dirtyAreas).map(areaId => {
+        const area = areas.find(a => a.id === areaId);
+        if (!area) return Promise.resolve();
+
+        return updateArea(area.floorId, areaId, {
+          name: area.name,
+          strokeColor: area.strokeColor,
+          color: area.color,
+          x: area.x,
+          y: area.y,
+          points: area.points,
+          angle: area.angle
+        });
+      });
+
+      await Promise.all(areaSavePromises);
+
       // Update original state
       setOriginalLocations(JSON.parse(JSON.stringify(locations)));
       setOriginalObstacles(JSON.parse(JSON.stringify(obstacles)));
+      setOriginalAreas(JSON.parse(JSON.stringify(areas)));
       setDirtyLocations(new Set());
       setDirtyObstacles(new Set());
-      toast.success(`${dirtyLocations.size + dirtyObstacles.size} modification(s) enregistrée(s)`);
+      setDirtyAreas(new Set());
+      toast.success(`${dirtyLocations.size + dirtyObstacles.size + dirtyAreas.size} modification(s) enregistrée(s)`);
     } catch (error) {
       toast.error('Erreur lors de l\'enregistrement');
       throw error;
     } finally {
       setIsSaving(false);
     }
-  }, [dirtyLocations, locations, dirtyObstacles, obstacles]);
+  }, [dirtyLocations, locations, dirtyObstacles, obstacles, dirtyAreas, areas]);
 
   const cancelChanges = useCallback(async () => {
     setLocations(JSON.parse(JSON.stringify(originalLocations)));
     setObstacles(JSON.parse(JSON.stringify(originalObstacles)));
+    setAreas(JSON.parse(JSON.stringify(originalAreas)));
     setDirtyLocations(new Set());
     setDirtyObstacles(new Set());
+    setDirtyAreas(new Set());
     setSelectedLocationId(null);
     setSelectedObstacleId(null);
+    setSelectedAreaId(null);
     toast.info('Modifications annulées');
-  }, [originalLocations, originalObstacles]);
+  }, [originalLocations, originalObstacles, originalAreas]);
 
   const getFilteredLocations = useCallback(() => {
     if (!selectedFloorId) return locations;
@@ -373,26 +498,39 @@ export function useFloorPlan(): UseFloorPlanReturn {
     return obstacles.filter(o => o.floorId === selectedFloorId);
   }, [obstacles, selectedFloorId]);
 
+  const getFilteredAreas = useCallback(() => {
+    if (!selectedFloorId) return areas;
+    return areas.filter(a => a.floorId === selectedFloorId);
+  }, [areas, selectedFloorId]);
+
   const hasUnsavedChanges = useCallback(() => {
-    return dirtyLocations.size > 0 || dirtyObstacles.size > 0;
-  }, [dirtyLocations, dirtyObstacles]);
+    return dirtyLocations.size > 0 || dirtyObstacles.size > 0 || dirtyAreas.size > 0;
+  }, [dirtyLocations, dirtyObstacles, dirtyAreas]);
 
   const selectLocation = useCallback((locationId: string | null) => {
     setSelectedLocationId(locationId || null);
-    if (locationId) setSelectedObstacleId(null);
+    if (locationId) {
+      setSelectedObstacleId(null);
+      setSelectedAreaId(null);
+    }
   }, []);
 
   return {
     floors,
     locations,
     obstacles,
+    areas,
     selectedFloorId,
     selectedLocationId,
     selectedObstacleId,
+    selectedAreaId,
     isLoading,
     isSaving,
     dirtyLocations,
     dirtyObstacles,
+    dirtyAreas,
+    isDrawingArea,
+    drawingPoints,
     loadData,
     createFloor,
     renameFloor,
@@ -405,14 +543,31 @@ export function useFloorPlan(): UseFloorPlanReturn {
     addObstacle,
     setSelectedObstacleId: (obstacleId: string | null) => {
       setSelectedObstacleId(obstacleId);
-      if (obstacleId) setSelectedLocationId(null);
+      if (obstacleId) {
+        setSelectedLocationId(null);
+        setSelectedAreaId(null);
+      }
     },
     updateObstacleState,
     deleteObstacleAction,
+    setSelectedAreaId: (areaId: string | null) => {
+      setSelectedAreaId(areaId);
+      if (areaId) {
+        setSelectedLocationId(null);
+        setSelectedObstacleId(null);
+      }
+    },
+    startDrawingArea,
+    addDrawingPoint,
+    closeAndSaveArea,
+    cancelDrawing,
+    updateAreaState,
+    deleteAreaAction,
     saveChanges,
     cancelChanges,
     getFilteredLocations,
     getFilteredObstacles,
+    getFilteredAreas,
     hasUnsavedChanges
   };
 }

@@ -60,6 +60,7 @@ interface RawLocationsData {
     floors: Floor[];
     locations: RawLocation[];
     obstacles: Obstacle[];
+    areas?: Area[];
   };
 }
 
@@ -91,12 +92,30 @@ export interface Obstacle {
   direction?: number; // uniquement pour type === 'door'
 }
 
+export interface AreaPoint {
+  x: number;
+  y: number;
+}
+
+export interface Area {
+  id: string;
+  floorId: string;
+  name: string;
+  strokeColor: string; // hex, ex : "#64748B"
+  color: string; // hex, ex : "#E2E8F0"
+  x: number;
+  y: number;
+  points: AreaPoint[];
+  angle: number;
+}
+
 export interface LocationsData {
   id: number;
   data: {
     floors: Floor[];
     locations: Location[];
     obstacles: Obstacle[];
+    areas: Area[];
   };
 }
 
@@ -185,7 +204,8 @@ const mockData: LocationsData = {
         enabled: true
       }
     ],
-    obstacles: []
+    obstacles: [],
+    areas: []
   }
 };
 
@@ -199,7 +219,8 @@ export const getLocations = async (): Promise<LocationsData> => {
       data: {
         floors: [...mockData.data.floors],
         locations: [...mockData.data.locations],
-        obstacles: [...(mockData.data.obstacles || [])]
+        obstacles: [...(mockData.data.obstacles || [])],
+        areas: [...(mockData.data.areas || [])]
       }
     }),
     async () => {
@@ -208,7 +229,8 @@ export const getLocations = async (): Promise<LocationsData> => {
         ...raw,
         data: {
           ...raw.data,
-          locations: raw.data.locations.map(mapRawLocation)
+          locations: raw.data.locations.map(mapRawLocation),
+          areas: raw.data.areas || []
         }
       };
     }
@@ -351,5 +373,51 @@ export const deleteObstacle = async (floorId: string, obstacleId: string): Promi
       mockData.data.obstacles = mockData.data.obstacles.filter(o => o.id !== obstacleId);
     },
     () => apiClient.delete<void>(`/floors/${floorId}/obstacles/${obstacleId}`)
+  );
+};
+
+export const createArea = async (
+  floorId: string,
+  data: Omit<Area, 'id' | 'floorId'>
+): Promise<{ id: string }> => {
+  logAPI('POST', `/floors/${floorId}/areas`, data);
+
+  return withMock(
+    () => {
+      const id = String(Math.floor(Math.random() * 10000));
+      const newArea: Area = { id, floorId, ...data };
+      mockData.data.areas.push(newArea);
+      return { id };
+    },
+    () => apiClient.post<{ id: string }>(`/floors/${floorId}/areas`, data)
+  );
+};
+
+export const updateArea = async (
+  floorId: string,
+  areaId: string,
+  data: Partial<Omit<Area, 'id' | 'floorId'>>
+): Promise<void> => {
+  logAPI('PATCH', `/floors/${floorId}/areas/${areaId}`, data);
+
+  return withMock(
+    () => {
+      const area = mockData.data.areas.find(a => a.id === areaId);
+      if (area) {
+        Object.assign(area, data);
+      }
+    },
+    () => apiClient.patch<void>(`/floors/${floorId}/areas/${areaId}`, data)
+  );
+};
+
+export const deleteArea = async (floorId: string, areaId: string): Promise<void> => {
+  logAPI('DELETE', `/floors/${floorId}/areas/${areaId}`);
+
+  return withMock(
+    () => {
+      mockData.data.areas = mockData.data.areas.filter(a => a.id !== areaId);
+    },
+    () => apiClient.delete<void>(`/floors/${floorId}/areas/${areaId}`)
   );
 };

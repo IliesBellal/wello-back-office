@@ -1,18 +1,29 @@
 import { useEffect, useRef, useState } from 'react';
 import { Stage, Layer, Rect } from 'react-konva';
+import type Konva from 'konva';
 import { TableShape } from './TableShape';
 import { ObstacleShape } from './ObstacleShape';
-import type { Location, Obstacle } from '@/services/locationsService';
+import { AreaShape } from './AreaShape';
+import { DrawingLayer } from './DrawingLayer';
+import type { Location, Obstacle, Area, AreaPoint } from '@/services/locationsService';
 
 interface FloorPlanCanvasProps {
   locations: Location[];
   obstacles: Obstacle[];
+  areas: Area[];
   selectedLocationId: string | null;
   selectedObstacleId: string | null;
+  selectedAreaId: string | null;
   onLocationSelect: (locationId: string) => void;
   onLocationMove: (locationId: string, x: number, y: number) => void;
   onObstacleSelect: (obstacleId: string) => void;
   onObstacleMove: (obstacleId: string, x: number, y: number) => void;
+  onAreaSelect: (areaId: string) => void;
+  isDrawingArea: boolean;
+  drawingPoints: AreaPoint[];
+  onAddDrawingPoint: (p: AreaPoint) => void;
+  onCloseDrawing: () => void;
+  onCancelDrawing: () => void;
   isLoading?: boolean;
 }
 
@@ -23,17 +34,26 @@ interface FloorPlanCanvasProps {
 export function FloorPlanCanvas({
   locations,
   obstacles,
+  areas,
   selectedLocationId,
   selectedObstacleId,
+  selectedAreaId,
   onLocationSelect,
   onLocationMove,
   onObstacleSelect,
   onObstacleMove,
+  onAreaSelect,
+  isDrawingArea,
+  drawingPoints,
+  onAddDrawingPoint,
+  onCloseDrawing,
+  onCancelDrawing,
   isLoading = false
 }: FloorPlanCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<any>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
+  const [mousePos, setMousePos] = useState<AreaPoint | null>(null);
 
   // Mettre à jour la taille du canvas au redimensionnement du conteneur
   useEffect(() => {
@@ -61,6 +81,7 @@ export function FloorPlanCanvas({
     if (e.target === e.target.getStage()) {
       onLocationSelect('');
       onObstacleSelect('');
+      onAreaSelect('');
     }
   };
 
@@ -68,13 +89,22 @@ export function FloorPlanCanvas({
     if (e.key === 'Escape') {
       onLocationSelect('');
       onObstacleSelect('');
+      onAreaSelect('');
     }
   };
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onLocationSelect, onObstacleSelect]);
+  }, [onLocationSelect, onObstacleSelect, onAreaSelect]);
+
+  const handleMouseMove = (e: Konva.KonvaEventObject<MouseEvent>) => {
+    if (!isDrawingArea) return;
+    const stage = e.target.getStage();
+    const pos = stage?.getPointerPosition();
+    if (!pos) return;
+    setMousePos({ x: pos.x / scaleRatio, y: pos.y / scaleRatio });
+  };
 
   return (
     <div
@@ -91,6 +121,7 @@ export function FloorPlanCanvas({
             width={canvasSize}
             height={canvasSize}
             onClick={handleStageClick}
+            onMouseMove={handleMouseMove}
             style={{ cursor: 'crosshair' }}
           >
             <Layer>
@@ -134,6 +165,17 @@ export function FloorPlanCanvas({
                 );
               })}
 
+              {/* Render existing zones (below obstacles and tables) */}
+              {areas.map(area => (
+                <AreaShape
+                  key={area.id}
+                  area={area}
+                  isSelected={selectedAreaId === area.id}
+                  onSelect={() => onAreaSelect(area.id)}
+                  scaleRatio={scaleRatio}
+                />
+              ))}
+
               {/* Render all obstacle shapes (below tables) */}
               {obstacles.map(obstacle => (
                 <ObstacleShape
@@ -160,6 +202,17 @@ export function FloorPlanCanvas({
                 />
               ))}
             </Layer>
+
+            {isDrawingArea && (
+              <DrawingLayer
+                points={drawingPoints}
+                mousePos={mousePos}
+                scaleRatio={scaleRatio}
+                onAddPoint={onAddDrawingPoint}
+                onClose={onCloseDrawing}
+                onCancel={onCancelDrawing}
+              />
+            )}
           </Stage>
         </div>
       )}
