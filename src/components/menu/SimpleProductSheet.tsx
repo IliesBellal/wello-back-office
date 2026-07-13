@@ -46,6 +46,7 @@ import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
 import { useProductEditData } from '@/hooks/useProductEditData';
 import { useProductData } from '@/hooks/useProductData';
+import { useObjectUrlPreview } from '@/hooks/useObjectUrlPreview';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 
@@ -92,7 +93,6 @@ export const SimpleProductSheet = ({
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [displayedProduct, setDisplayedProduct] = useState<Product | null>(null);
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [newTagName, setNewTagName] = useState('');
   const [isCreatingTag, setIsCreatingTag] = useState(false);
@@ -113,6 +113,7 @@ export const SimpleProductSheet = ({
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const { statuses } = useIntegrationStatus();
+  const imagePreviewUrl = useObjectUrlPreview(selectedImageFile);
   
   // Use loaded product if available, otherwise use initial product prop
   const baseProduct = loadedProduct || initialProduct;
@@ -142,15 +143,11 @@ export const SimpleProductSheet = ({
         price_delivery: priceToDisplayValue(baseProduct.price_delivery),
       });
       setSelectedImageFile(null);
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-      setImagePreviewUrl(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
-  }, [baseProduct, imagePreviewUrl]);
+  }, [baseProduct]);
 
   // Helper function to convert configuration attributes to ProductAttribute format
   const buildFormDataFromProduct = (prod: Product): Partial<Product> => {
@@ -186,6 +183,7 @@ export const SimpleProductSheet = ({
 
     return {
       ...prod,
+      category_id: prod.category_id || prod.category,
       // Ensure composition is initialized (pre-fill with API data)
       components: prod.components || [],
       // Ensure attributes is initialized - use configuration attributes if available, fallback to attributes
@@ -259,18 +257,8 @@ export const SimpleProductSheet = ({
       setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
       setSelectedImageFile(null);
-      setImagePreviewUrl(null);
     }
   }, [product]);
-
-  // Cleanup preview URL on unmount
-  useEffect(() => {
-    return () => {
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-    };
-  }, [imagePreviewUrl]);
 
   const handleSave = async () => {
     if (!product) return;
@@ -303,6 +291,19 @@ export const SimpleProductSheet = ({
         ? formData.allergens.filter(allergen => typeof allergen === 'string')
         : [];
 
+      // Keep category fields aligned for backward/forward API compatibility.
+      const selectedCategoryId =
+        (typeof formData.category_id === 'string' && formData.category_id.trim() !== '')
+          ? formData.category_id
+          : (typeof formData.category === 'string' && formData.category.trim() !== '')
+            ? formData.category
+            : undefined;
+
+      if (selectedCategoryId) {
+        payloadData.category_id = selectedCategoryId;
+        payloadData.category = selectedCategoryId;
+      }
+
       // Save all product data
       await onSave(product.product_id, payloadData);
       
@@ -314,10 +315,6 @@ export const SimpleProductSheet = ({
       
       // Clear image state after successful save
       setSelectedImageFile(null);
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-      setImagePreviewUrl(null);
 
       // Reset file input
       if (fileInputRef.current) {
@@ -381,10 +378,6 @@ export const SimpleProductSheet = ({
       setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
       setSelectedImageFile(null);
-      if (imagePreviewUrl) {
-        URL.revokeObjectURL(imagePreviewUrl);
-      }
-      setImagePreviewUrl(null);
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -452,9 +445,6 @@ export const SimpleProductSheet = ({
       return;
     }
 
-    // Create preview URL
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreviewUrl(previewUrl);
     setSelectedImageFile(file);
   };
 
@@ -690,7 +680,7 @@ export const SimpleProductSheet = ({
                         <CategorySelector
                           categories={categories}
                           value={formData.category_id || ''}
-                          onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId })}
+                          onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId, category: categoryId })}
                           onCreateCategory={onCreateCategory}
                         />
                       </div>
@@ -1122,7 +1112,7 @@ export const SimpleProductSheet = ({
                     <p className="text-sm text-muted-foreground mt-1">
                       {categories.find(
                         c => 
-                        c.category_id === (isEditMode ? formData.category : product?.category))?.category_name || 'Catégorie non définie'}
+                        c.category_id === (isEditMode ? (formData.category_id || formData.category) : (product?.category_id || product?.category)))?.category_name || 'Catégorie non définie'}
                     </p>
                   </div>
                   <Badge 
@@ -1397,8 +1387,8 @@ export const SimpleProductSheet = ({
                           <Label>Catégorie</Label>
                           <CategorySelector
                             categories={categories}
-                            value={formData.category || ''}
-                            onValueChange={(categoryId) => setFormData({ ...formData, category: categoryId })}
+                            value={formData.category_id || formData.category || ''}
+                            onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId, category: categoryId })}
                             onCreateCategory={onCreateCategory}
                           />
                         </div>
