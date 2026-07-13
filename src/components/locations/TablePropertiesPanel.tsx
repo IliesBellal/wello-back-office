@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Minus, Plus, Trash2, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,7 +32,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import type { Location, Floor } from '@/services/locationsService';
+import type { Location, Floor, TableAttributes } from '@/services/locationsService';
+
+const DEFAULT_ATTRIBUTES: TableAttributes = { pmr: false, terrace: false, vip: false, window: false };
+
+const ATTRIBUTE_OPTIONS: { key: keyof TableAttributes; icon: string; label: string }[] = [
+  { key: 'pmr', icon: '♿', label: 'PMR' },
+  { key: 'terrace', icon: '🌿', label: 'Terrasse' },
+  { key: 'vip', icon: '⭐', label: 'VIP' },
+  { key: 'window', icon: '🪟', label: 'Fenêtre' }
+];
 
 interface TablePropertiesPanelProps {
   location: Location | null;
@@ -186,6 +196,35 @@ export function TablePropertiesPanel({
             ⬭
           </ToggleGroupItem>
         </ToggleGroup>
+      </div>
+
+      {/* Attributs */}
+      <div className="space-y-2">
+        <Label>Attributs</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {ATTRIBUTE_OPTIONS.map(({ key, icon, label }) => {
+            const attributes = location.attributes ?? DEFAULT_ATTRIBUTES;
+            const checked = attributes[key];
+            return (
+              <label
+                key={key}
+                htmlFor={`table-attribute-${key}`}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-muted/50"
+              >
+                <Checkbox
+                  id={`table-attribute-${key}`}
+                  checked={checked}
+                  onCheckedChange={() =>
+                    onUpdate({ attributes: { ...attributes, [key]: !checked } })
+                  }
+                />
+                <span className="text-sm">
+                  {icon} {label}
+                </span>
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       {/* Dimensions */}

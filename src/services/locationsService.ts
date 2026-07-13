@@ -9,6 +9,13 @@ export interface Floor {
 
 export type TableShape = 'circle' | 'rectangle' | 'square' | 'oval';
 
+export interface TableAttributes {
+  pmr: boolean;
+  terrace: boolean;
+  vip: boolean;
+  window: boolean;
+}
+
 export interface LocationBooking {
   bookingId: string;
   bookingNumber: string;
@@ -33,6 +40,7 @@ export interface Location {
   open_order_id?: string | null;
   available?: boolean;
   booking?: LocationBooking | null;
+  attributes?: TableAttributes | null;
 }
 
 // Raw shape of a location as returned by the API (booking is snake_case there)
@@ -65,7 +73,8 @@ const mapRawLocation = (raw: RawLocation): Location => ({
         startsAt: raw.booking.starts_at,
         customerName: raw.booking.customer_name
       }
-    : null
+    : null,
+  attributes: raw.attributes ?? null
 });
 
 export type ObstacleType = 'wall' | 'bar' | 'stairs' | 'door';

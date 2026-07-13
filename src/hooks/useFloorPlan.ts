@@ -314,7 +314,8 @@ export function useFloorPlan(): UseFloorPlanReturn {
           y: location.y,
           width: location.width,
           height: location.height,
-          enabled: location.enabled
+          enabled: location.enabled,
+          ...(location.attributes ? { attributes: location.attributes } : {})
         });
       });
 

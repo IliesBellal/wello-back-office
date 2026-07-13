@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { Circle, Ellipse, Rect, Group, Text } from 'react-konva';
-import type { Location, LocationBooking } from '@/services/locationsService';
+import type { Location, LocationBooking, TableAttributes } from '@/services/locationsService';
 import { getChairPositions } from '@/utils/chairPositions';
 import { snapToGrid } from '@/hooks/useFloorPlan';
 
@@ -21,6 +21,13 @@ const STATUS_STYLES = {
 
 const SELECTED_STROKE = '#6366F1';
 const SELECTED_STROKE_WIDTH = 2.5;
+
+const ATTRIBUTE_BADGE_COLORS: Record<keyof TableAttributes, string> = {
+  pmr: '#0EA5E9',
+  terrace: '#22C55E',
+  vip: '#EAB308',
+  window: '#A855F7'
+};
 
 /**
  * Composant Konva pour afficher une table sur le canvas (rendu top-down)
@@ -58,6 +65,17 @@ export function TableShape({
   const chairPositions = location.seats
     ? getChairPositions(location.shape, widthPx, heightPx, location.seats, gap, chairRadius)
     : [];
+
+  const activeAttributeKeys = location.attributes
+    ? (Object.keys(ATTRIBUTE_BADGE_COLORS) as (keyof TableAttributes)[]).filter(
+        key => location.attributes?.[key]
+      )
+    : [];
+  const BADGE_RADIUS = 2.5;
+  const BADGE_GAP = 2;
+  const BADGE_PITCH = BADGE_RADIUS * 2 + BADGE_GAP;
+  const badgeRightEdgeX = widthPx / 2 - BADGE_RADIUS;
+  const badgeY = -heightPx / 2 - BADGE_RADIUS - BADGE_GAP;
 
   const handleDragMove = (e: any) => {
     if (!isSelected) return;
@@ -171,6 +189,17 @@ export function TableShape({
           y={2 * scaleRatio}
         />
       )}
+
+      {activeAttributeKeys.length > 0 &&
+        activeAttributeKeys.map((key, i) => (
+          <Circle
+            key={key}
+            x={badgeRightEdgeX - (activeAttributeKeys.length - 1 - i) * BADGE_PITCH}
+            y={badgeY}
+            radius={BADGE_RADIUS}
+            fill={ATTRIBUTE_BADGE_COLORS[key]}
+          />
+        ))}
     </Group>
   );
 }
