@@ -13,10 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { UserPlus, Search, MoreVertical, BriefcaseBusiness } from "lucide-react";
+import { UserPlus, Search, MoreVertical, BriefcaseBusiness, IdCard } from "lucide-react";
 import { MembersTable } from "@/components/team/MembersTable";
 import { MemberSheet } from "@/components/team/MemberSheet";
 import { CreateMemberSheet } from "@/components/team/CreateMemberSheet";
+import { EmployeesModal } from "@/components/team/EmployeesModal";
 import { usersApi } from "@/services/welloApi";
 import { qk } from "@/lib/queryKeys";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -149,6 +150,7 @@ function EquipePageContent() {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
+  const [employeesOpen, setEmployeesOpen] = useState(false);
 
   const handleRowClick = useCallback((member: MerchantUserListItem) => {
     setSelectedMember(member);
@@ -225,6 +227,10 @@ function EquipePageContent() {
                   <DropdownMenuItem onClick={() => setPositionsOpen(true)}>
                     <BriefcaseBusiness className="h-4 w-4 mr-2" />
                     Gérer les postes
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setEmployeesOpen(true)}>
+                    <IdCard className="h-4 w-4 mr-2" />
+                    Fiches employés
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -316,6 +322,9 @@ function EquipePageContent() {
 
       {/* ── Gestion des postes (réutilise le même composant que le Planning) */}
       <PositionsModal open={positionsOpen} onOpenChange={setPositionsOpen} />
+
+      {/* ── Fiches employés (liste + liaison/déliaison compte utilisateur) ── */}
+      <EmployeesModal open={employeesOpen} onOpenChange={setEmployeesOpen} />
     </DashboardLayout>
   );
 }
