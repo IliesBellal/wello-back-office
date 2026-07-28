@@ -5,13 +5,16 @@ export interface HaccpActivityPerformer {
   name: string;
 }
 
-export type HaccpActivityTypeFilter = 'all' | 'temperatures' | 'cleanings';
+export type HaccpActivityTypeFilter = 'all' | 'temperatures' | 'cleanings' | 'traceability';
 export type HaccpActivityStatusFilter = 'all' | 'ok' | 'alert' | 'critical' | 'done';
 
 export interface HaccpActivityMetadata {
   session_id?: string;
+  record_id?: string;
   readings_count?: number;
   executions_count?: number;
+  photos_count?: number;
+  has_comment?: boolean;
   zone?: string;
   expected_max?: number;
   measured?: number;
@@ -87,6 +90,23 @@ const mockActivities: HaccpActivity[] = [
     metadata: {
       executions_count: 1,
       session_id: 'haccp-csess-d92b4a07-d3bb-4be0-84f2-e50f850e70d2',
+    },
+  },
+  {
+    id: 'haccp-traceability-8f2e98b4-7a84-4b7f-aad9-8cb8c33f7a3d',
+    type: 'traceability',
+    status: 'done',
+    performed_at: '2026-05-25T12:18:42Z',
+    performed_by: {
+      id: '4',
+      name: 'sarah',
+    },
+    title: 'Controle de traçabilité',
+    subtitle: '3 lots vérifiés',
+    metadata: {
+      record_id: 'haccp-traceability-8f2e98b4-7a84-4b7f-aad9-8cb8c33f7a3d',
+      photos_count: 3,
+      has_comment: true,
     },
   },
   {
@@ -276,6 +296,82 @@ export const getTemperatureSession = async (sessionId: string): Promise<Temperat
     async () => {
       const response = await apiClient.get<TemperatureSessionResponse>(endpoint);
       return response.data.temperature_session;
+    }
+  );
+};
+
+// ═══ TRACEABILITY RECORDS ═══
+
+export interface HaccpTraceabilityPhoto {
+  id: string;
+  photo_url: string;
+  label?: string | null;
+  caption?: string | null;
+}
+
+export interface HaccpTraceabilityRecord {
+  id: string;
+  merchant_id: string;
+  performed_at: string;
+  performed_by: HaccpActivityPerformer;
+  comment?: string | null;
+  photos: HaccpTraceabilityPhoto[];
+}
+
+interface HaccpTraceabilityRecordResponse {
+  id: string;
+  data: {
+    status: string;
+    traceability_record: HaccpTraceabilityRecord;
+  };
+}
+
+const mockTraceabilityRecord: HaccpTraceabilityRecord = {
+  id: 'haccp-traceability-8f2e98b4-7a84-4b7f-aad9-8cb8c33f7a3d',
+  merchant_id: '2',
+  performed_at: '2026-05-25T12:18:42Z',
+  performed_by: {
+    id: '4',
+    name: 'sarah',
+  },
+  comment: 'Lots contrôlés conformes aux références attendues.',
+  photos: [
+    {
+      id: 'haccp-traceability-photo-1',
+      photo_url: 'https://placehold.co/640x640',
+      label: 'Étiquette lot 1',
+      caption: 'Référence fournisseur et DLC visibles.',
+    },
+    {
+      id: 'haccp-traceability-photo-2',
+      photo_url: 'https://placehold.co/640x640?text=Lot+2',
+      label: 'Étiquette lot 2',
+      caption: 'Numéro de lot et origine du produit.',
+    },
+    {
+      id: 'haccp-traceability-photo-3',
+      photo_url: 'https://placehold.co/640x640?text=Lot+3',
+      label: 'Étiquette lot 3',
+      caption: 'Contrôle visuel avant mise en stock.',
+    },
+  ],
+};
+
+const cloneTraceabilityRecord = (record: HaccpTraceabilityRecord): HaccpTraceabilityRecord => ({
+  ...record,
+  performed_by: { ...record.performed_by },
+  photos: record.photos.map((photo) => ({ ...photo })),
+});
+
+export const getTraceabilityRecord = async (recordId: string): Promise<HaccpTraceabilityRecord> => {
+  const endpoint = `/haccp/traceability/${recordId}`;
+  logAPI('GET', endpoint);
+
+  return withMock(
+    () => cloneTraceabilityRecord({ ...mockTraceabilityRecord, id: recordId }),
+    async () => {
+      const response = await apiClient.get<HaccpTraceabilityRecordResponse>(endpoint);
+      return response.data.traceability_record;
     }
   );
 };

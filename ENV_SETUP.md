@@ -15,7 +15,7 @@ cp .env.example .env.local
 
 Puis modifiez `.env.local` avec vos valeurs locales:
 ```env
-VITE_API_BASE_URL=http://localhost:3000
+VITE_API_BASE_URL=http://localhost:8081
 VITE_USE_MOCK=false
 VITE_ENABLE_LOGS=true
 ```

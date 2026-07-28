@@ -9,7 +9,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FileText, ClipboardList, CheckCircle2, ShieldAlert, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Download,
+  FileText,
+  ClipboardList,
+  CheckCircle2,
+  ShieldAlert,
+  ChevronLeft,
+  ChevronRight,
+  Thermometer,
+  Droplets,
+  ScanSearch,
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
@@ -72,13 +83,56 @@ const getTypeLabel = (type: string) => {
     case 'cleanings':
       return 'Nettoyages';
     case 'temperatures':
-      return 'Temperatures';
+      return 'Températures';
+    case 'traceability':
+      return 'Traçabilité';
     case 'checklists':
       return 'Checklists';
     case 'incidents':
       return 'Incidents';
     default:
       return type;
+  }
+};
+
+const getTypeConfig = (type: string) => {
+  switch (type) {
+    case 'cleanings':
+      return {
+        label: 'Nettoyages',
+        icon: Droplets,
+        iconClassName: 'text-cyan-500',
+      };
+    case 'temperatures':
+      return {
+        label: 'Températures',
+        icon: Thermometer,
+        iconClassName: 'text-blue-500',
+      };
+    case 'traceability':
+      return {
+        label: 'Traçabilité',
+        icon: ScanSearch,
+        iconClassName: 'text-amber-500',
+      };
+    case 'checklists':
+      return {
+        label: 'Checklists',
+        icon: ClipboardList,
+        iconClassName: 'text-slate-500',
+      };
+    case 'incidents':
+      return {
+        label: 'Incidents',
+        icon: ShieldAlert,
+        iconClassName: 'text-red-500',
+      };
+    default:
+      return {
+        label: type,
+        icon: ClipboardList,
+        iconClassName: 'text-slate-500',
+      };
   }
 };
 
@@ -104,10 +158,45 @@ const getActivitySummary = (activity: HaccpActivity): string => {
     return activity.subtitle;
   }
 
+  if (activity.type === 'traceability') {
+    const photosCount = Number(activity.metadata?.photos_count);
+    if (Number.isFinite(photosCount) && photosCount > 0) {
+      return `${photosCount} photo${photosCount > 1 ? 's' : ''}`;
+    }
+    return activity.subtitle;
+  }
+
   return activity.subtitle;
 };
 
 const getCorrectiveActionsSummary = (activity: HaccpActivity): string | null => {
+  if (activity.type === 'traceability') {
+    const photosCount = toFiniteNumber(activity.metadata?.photos_count);
+    const hasComment = activity.metadata?.has_comment === true;
+
+    if (!photosCount && !hasComment) {
+      return null;
+    }
+
+    return (
+      <div className="space-y-1">
+        <div>{summary}</div>
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          {photosCount && photosCount > 0 && (
+            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">
+              {photosCount} photo{photosCount > 1 ? 's' : ''}
+            </Badge>
+          )}
+          {hasComment && (
+            <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-50">
+              Commentaire
+            </Badge>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (activity.type !== 'temperatures') {
     return null;
   }
@@ -172,7 +261,7 @@ export const Activity = () => {
   const { toast } = useToast();
 
   const handleRowClick = (activity: HaccpActivity) => {
-    if (activity.type === 'temperatures' || activity.type === 'cleanings') {
+    if (activity.type === 'temperatures' || activity.type === 'cleanings' || activity.type === 'traceability') {
       setSelectedActivity(activity);
       setDetailSheetOpen(true);
     }
@@ -289,6 +378,7 @@ export const Activity = () => {
                     <SelectItem value="all">Tous les types</SelectItem>
                     <SelectItem value="temperatures">temperatures</SelectItem>
                     <SelectItem value="cleanings">cleanings</SelectItem>
+                    <SelectItem value="traceability">Traçabilité</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -356,7 +446,17 @@ export const Activity = () => {
                     key: 'type',
                     label: 'Type',
                     sortable: true,
-                    render: (val: string) => getTypeLabel(val),
+                    render: (val: string) => {
+                      const typeConfig = getTypeConfig(val);
+                      const TypeIcon = typeConfig.icon;
+
+                      return (
+                        <span className="inline-flex items-center gap-2">
+                          <TypeIcon className={cn('h-4 w-4', typeConfig.iconClassName)} />
+                          <span>{typeConfig.label}</span>
+                        </span>
+                      );
+                    },
                   },
                   {
                     key: 'details',

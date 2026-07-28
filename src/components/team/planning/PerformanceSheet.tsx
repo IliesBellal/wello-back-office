@@ -1,55 +1,32 @@
-/**
- * Bottom sheet "Indicateurs de performance" — Planning.
- *
- * Reprend `from / to / granularity` de l'écran Planning, et appelle
- * `PerformanceService.getForRange(query)`. Le composant ne sait RIEN du
- * calcul local : quand l'endpoint backend existera, seul le corps du
- * service changera.
- */
+import { Fragment } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { format } from "date-fns";
+import { ArrowDown, ArrowUp, BarChart3, Minus, X } from "lucide-react";
 
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Info, Minus, AlertTriangle } from "lucide-react";
-import { toast } from "sonner";
-
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import type { PerformancePeriod, PerformanceResponse } from "@/types/performance";
 
-import { PerformanceService } from "@/services/performanceService";
-import type {
-  PerformanceGranularity,
-  PerformancePeriod,
-  PerformanceResponse,
-} from "@/types/performance";
+import {
+  PLANNING_PAYROLL_RATIO_TARGET,
+  PLANNING_PAYROLL_RATIO_TARGET_PERCENT,
+  PLANNING_PRODUCTIVITY_TARGET_CENTS_PER_HOUR,
+  PLANNING_PRODUCTIVITY_TARGET_EUR_PER_HOUR,
+} from "./planningPerformanceTargets";
 
 interface PerformanceSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Inclusive range currently visible in the Planning grid. */
-  from: string; // YYYY-MM-DD
-  to: string;   // YYYY-MM-DD
-  /** Granularity to use for the row breakdown — derived from Planning view mode. */
-  granularity: PerformanceGranularity;
-  forecastEditable?: boolean;
+  from: string;
+  to: string;
+  compare: boolean;
+  onCompareChange: (value: boolean) => void;
+  data?: PerformanceResponse;
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
 export function PerformanceSheet({
@@ -57,384 +34,385 @@ export function PerformanceSheet({
   onOpenChange,
   from,
   to,
-  granularity,
-  forecastEditable = false,
+  compare,
+  onCompareChange,
+  data,
+  isLoading = false,
+  error = null,
 }: PerformanceSheetProps) {
-  const queryClient = useQueryClient();
-  const [compare, setCompare] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [draftForecasts, setDraftForecasts] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-
-  const query = useMemo(
-    () => ({ from, to, granularity, compare: compare ? ("previous" as const) : undefined }),
-    [from, to, granularity, compare],
-  );
-
-  const canEditForecasts = forecastEditable && granularity === "day";
-
-  const perfQuery = useQuery({
-    queryKey: ["planning", "performance", from, to, granularity, compare],
-    queryFn: () => PerformanceService.getForRange(query),
-    enabled: open,
-  });
-
-  const data = perfQuery.data;
-
-  useEffect(() => {
-    if (open) return;
-    setEditing(false);
-    setDraftForecasts({});
-    setSaving(false);
-  }, [open]);
-
-  useEffect(() => {
-    if (canEditForecasts) return;
-    setEditing(false);
-    setDraftForecasts({});
-  }, [canEditForecasts]);
-
-  const startEditing = () => {
-    if (!data) return;
-    setDraftForecasts(buildDraftForecasts(data.periods));
-    setEditing(true);
-    setCompare(false);
-  };
-
-  const cancelEditing = () => {
-    setEditing(false);
-    setDraftForecasts({});
-  };
-
-  const saveForecasts = async () => {
-    if (!data) return;
-
-    const payload: Array<{ date: string; amount_cents: number | null }> = [];
-    for (const period of data.periods) {
-      if (period.period_start !== period.period_end) continue;
-
-      const currentValue = draftForecasts[period.period_start] ?? "";
-      const normalizedValue = currentValue.trim();
-      const originalCents = period.revenue_forecast_cents;
-
-      if (normalizedValue === "") {
-        if (originalCents != null) {
-          payload.push({ date: period.period_start, amount_cents: null });
-        }
-        continue;
-      }
-
-      const parsedEuros = Number.parseFloat(normalizedValue);
-      if (Number.isNaN(parsedEuros)) continue;
-      if (parsedEuros < 0) {
-        toast.error("Les prévisions de CA ne peuvent pas être négatives.");
-        return;
-      }
-
-      const nextCents = Math.round(parsedEuros * 100);
-      if (nextCents !== originalCents) {
-        payload.push({ date: period.period_start, amount_cents: nextCents });
-      }
-    }
-
-    if (payload.length === 0) {
-      cancelEditing();
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await PerformanceService.upsertForecasts(payload);
-      await queryClient.invalidateQueries({ queryKey: ["planning", "performance"] });
-      toast.success("Prévisions de CA enregistrées.");
-      cancelEditing();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Erreur lors de l'enregistrement des prévisions.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[85vh] overflow-y-auto rounded-t-xl p-0"
-      >
-        <div className="mx-auto w-full max-w-6xl px-4 py-5 sm:px-6">
-          <SheetHeader className="space-y-1">
-            <SheetTitle>Indicateurs de performance</SheetTitle>
-            <SheetDescription>
-              Période : <strong>{from}</strong> → <strong>{to}</strong> ({granularityLabel(granularity)})
-            </SheetDescription>
-          </SheetHeader>
+    <AnimatePresence initial={false}>
+      {open && (
+        <motion.section
+          initial={{ height: 0, opacity: 0, y: -10 }}
+          animate={{ height: "auto", opacity: 1, y: 0 }}
+          exit={{ height: 0, opacity: 0, y: -10 }}
+          transition={{ duration: 0.24, ease: "easeOut" }}
+          className="overflow-hidden border-b bg-gradient-to-b from-background via-background to-muted/20"
+        >
+          <div className="px-4 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-medium text-primary">
+                  <BarChart3 className="h-3.5 w-3.5" />
+                  Analyse de performance
+                </div>
+                <div>
+                  <h2 className="text-base font-semibold text-foreground">Du {from} au {to}.</h2>
+                </div>
+              </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t pt-4">
-            <div className="flex items-center gap-2">
-              <Switch
-                id="perf-compare"
-                checked={compare}
-                onCheckedChange={setCompare}
-                disabled={editing}
-              />
-              <Label htmlFor="perf-compare" className="text-sm">
-                Comparer à la période précédente
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              {canEditForecasts && !editing && (
-                <Button variant="outline" size="sm" onClick={startEditing}>
-                  Modifier les estimations
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2">
+                  <Switch
+                    id="planning-performance-compare"
+                    checked={compare}
+                    onCheckedChange={onCompareChange}
+                  />
+                  <Label htmlFor="planning-performance-compare" className="text-sm">
+                    Comparer à la période précédente
+                  </Label>
+                </div>
+                <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
+                  <X className="mr-2 h-4 w-4" />
+                  Masquer
                 </Button>
-              )}
-              {canEditForecasts && editing && (
-                <>
-                  <Button variant="outline" size="sm" onClick={cancelEditing} disabled={saving}>
-                    Annuler
-                  </Button>
-                  <Button size="sm" onClick={saveForecasts} disabled={saving}>
-                    {saving ? "Enregistrement..." : "Enregistrer"}
-                  </Button>
-                </>
-              )}
+              </div>
             </div>
-          </div>
 
-          {perfQuery.isLoading || !data ? (
-            <div className="mt-4 space-y-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : perfQuery.error ? (
-            <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-              Erreur de calcul : {(perfQuery.error as Error).message}
-            </div>
-          ) : (
-            <PerformanceContent
-              data={data}
-              compare={compare}
-              editing={editing}
-              draftForecasts={draftForecasts}
-              onDraftChange={(date, value) => {
-                setDraftForecasts((prev) => ({ ...prev, [date]: value }));
-              }}
-            />
-          )}
-
-          <div className="mt-5 flex justify-end">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Fermer
-            </Button>
+            {isLoading ? (
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+              </div>
+            ) : error ? (
+              <div className="mt-4 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                Erreur de calcul : {error.message}
+              </div>
+            ) : !data ? (
+              <div className="mt-4 rounded-md border border-dashed p-6 text-sm text-muted-foreground">
+                Aucune donnée de performance disponible.
+              </div>
+            ) : (
+              <PerformanceSummaryContent data={data} compare={compare} />
+            )}
           </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+        </motion.section>
+      )}
+    </AnimatePresence>
   );
 }
 
-function PerformanceContent({
+function PerformanceSummaryContent({
   data,
   compare,
-  editing,
-  draftForecasts,
-  onDraftChange,
 }: {
   data: PerformanceResponse;
   compare: boolean;
-  editing: boolean;
-  draftForecasts: Record<string, string>;
-  onDraftChange: (date: string, value: string) => void;
 }) {
   return (
     <div className="mt-4 space-y-4">
-      {data.warnings.members_without_rate > 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          <p>
-            <strong>{data.warnings.members_without_rate}</strong>{" "}
-            membre{data.warnings.members_without_rate > 1 ? "s" : ""} sans taux horaire — exclus du calcul de
-            masse salariale.
-          </p>
-        </div>
-      )}
-
-      <TooltipProvider delayDuration={150}>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Période</TableHead>
-                <TableHead className="text-right">CA HT</TableHead>
-                <TableHead className="text-right">CA prévisionnel</TableHead>
-                <TableHead className="text-right">Heures travaillées</TableHead>
-                <TableHead className="text-right">Effectifs</TableHead>
-                <TableHead className="text-right">MS chargée</TableHead>
-                <TableHead className="text-right">Ratio MS/CA</TableHead>
-                <TableHead className="text-right">Productivité (€/h)</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.periods.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-6 text-center text-sm italic text-muted-foreground">
-                    Aucune donnée sur la période.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.periods.map((p) => (
-                  <PeriodRow
-                    key={`${p.period_start}_${p.period_end}`}
-                    p={p}
-                    editing={editing}
-                    draftValue={draftForecasts[p.period_start] ?? ""}
-                    onDraftChange={onDraftChange}
-                  />
-                ))
-              )}
-              <TableRow className="border-t-2 font-semibold">
-                <TableCell>
-                  Total
-                  {compare && data.previous_period && (
-                    <span className="ml-2 text-xs font-normal text-muted-foreground">
-                      vs. {data.previous_period.from} → {data.previous_period.to}
-                    </span>
-                  )}
-                </TableCell>
-                <TotalCell
-                  current={data.totals.revenue_actual_cents}
-                  previous={data.previous_period?.totals.revenue_actual_cents ?? null}
-                  format={fmtMoney}
-                  compare={compare}
-                />
-                <TableCell className="text-right">{moneyOrDash(data.totals.revenue_forecast_cents)}</TableCell>
-                <TotalCell
-                  current={data.totals.worked_hours}
-                  previous={data.previous_period?.totals.worked_hours ?? null}
-                  format={fmtHours}
-                  compare={compare}
-                  higherIsBetter={false}
-                />
-                <TotalCell
-                  current={data.totals.headcount}
-                  previous={data.previous_period?.totals.headcount ?? null}
-                  format={(v) => String(v)}
-                  compare={compare}
-                  higherIsBetter
-                />
-                <TotalCell
-                  current={data.totals.payroll_cost_loaded_cents}
-                  previous={data.previous_period?.totals.payroll_cost_loaded_cents ?? null}
-                  format={fmtMoney}
-                  compare={compare}
-                  higherIsBetter={false}
-                />
-                <TotalCell
-                  current={data.totals.payroll_ratio}
-                  previous={data.previous_period?.totals.payroll_ratio ?? null}
-                  format={fmtPct}
-                  compare={compare}
-                  higherIsBetter={false}
-                />
-                <TotalCell
-                  current={data.totals.revenue_per_hour_cents}
-                  previous={data.previous_period?.totals.revenue_per_hour_cents ?? null}
-                  format={fmtMoney}
-                  compare={compare}
-                  higherIsBetter
-                />
-              </TableRow>
-            </TableBody>
-          </Table>
-        </div>
-      </TooltipProvider>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <SummaryCard
+          title="CA HT"
+          value={fmtMoney(data.totals.revenue_actual_cents)}
+          hint="Ventes réelles sur la période visible"
+          variation={compare ? variationProps(data.totals.revenue_actual_cents, data.previous_period?.totals.revenue_actual_cents ?? null, true) : null}
+        />
+        <SummaryCard
+          title="Heures travaillées"
+          value={fmtHours(data.totals.worked_hours)}
+          hint="Total d'heures planifiées ou pointées"
+          variation={compare ? variationProps(data.totals.worked_hours, data.previous_period?.totals.worked_hours ?? null, false) : null}
+        />
+        <SummaryCard
+          title="Productivité réelle"
+          value={fmtEurosPerHour(data.totals.revenue_per_hour_cents)}
+          hint={`Objectif ${PLANNING_PRODUCTIVITY_TARGET_EUR_PER_HOUR}€/h`}
+          target={productivityTargetBadge(data.totals.revenue_per_hour_cents)}
+          variation={compare ? variationProps(data.totals.revenue_per_hour_cents, data.previous_period?.totals.revenue_per_hour_cents ?? null, true) : null}
+        />
+        <SummaryCard
+          title="Coût shifts / ventes"
+          value={fmtPct(data.totals.payroll_ratio)}
+          hint={`Objectif max ${PLANNING_PAYROLL_RATIO_TARGET_PERCENT}%`}
+          target={payrollTargetBadge(data.totals.payroll_ratio)}
+          variation={compare ? variationProps(data.totals.payroll_ratio, data.previous_period?.totals.payroll_ratio ?? null, false) : null}
+        />
+      </div>
     </div>
   );
 }
 
-function PeriodRow({
-  p,
-  editing,
-  draftValue,
-  onDraftChange,
-}: {
-  p: PerformancePeriod;
-  editing: boolean;
-  draftValue: string;
-  onDraftChange: (date: string, value: string) => void;
-}) {
-  const editableRow = editing && p.period_start === p.period_end;
-
-  return (
-    <TableRow>
-      <TableCell className="font-medium">{p.label}</TableCell>
-      <TableCell className="text-right">{moneyOrDash(p.revenue_actual_cents)}</TableCell>
-      <TableCell className="text-right">
-        {editableRow ? (
-          <Input
-            type="number"
-            min="0"
-            step="0.01"
-            value={draftValue}
-            onChange={(e) => onDraftChange(p.period_start, e.target.value)}
-            className="ml-auto h-8 w-28 text-right"
-          />
-        ) : (
-          moneyOrDash(p.revenue_forecast_cents)
-        )}
-      </TableCell>
-      <TableCell className="text-right">{fmtHours(p.worked_hours)}</TableCell>
-      <TableCell className="text-right">{p.headcount}</TableCell>
-      <TableCell className="text-right">{fmtMoney(p.payroll_cost_loaded_cents)}</TableCell>
-      <TableCell className="text-right">{pctOrDash(p.payroll_ratio)}</TableCell>
-      <TableCell className="text-right">{moneyOrDash(p.revenue_per_hour_cents)}</TableCell>
-    </TableRow>
-  );
-}
-
-function TotalCell({
-  current,
-  previous,
-  format,
+export function PerformanceGridHeaderRows({
+  open,
+  dates,
+  data,
+  isLoading = false,
+  error = null,
   compare,
-  higherIsBetter,
 }: {
-  current: number | null;
-  previous: number | null;
-  format: (v: number | null) => string;
+  open: boolean;
+  dates: Date[];
+  data?: PerformanceResponse;
+  isLoading?: boolean;
+  error?: Error | null;
   compare: boolean;
-  higherIsBetter?: boolean;
+}) {
+  if (!open) return null;
+
+  const periodsByDate = buildPeriodMap(data?.periods ?? []);
+  const previousPeriods = data?.previous_period?.periods ?? [];
+
+  return (
+    <Fragment>
+      <HeaderLabelCell>
+        <div className="text-sm font-semibold text-foreground">Ratios journaliers</div>
+      </HeaderLabelCell>
+      {dates.map((date) => (
+        <HeaderValueCell key={`title:${toIsoDay(date)}`} muted />
+      ))}
+
+      {renderMetricRow({
+        dates,
+        label: "Ventes réelles",
+        sublabel: "CA HT",
+        renderValue: (period) => fmtMoney(period?.revenue_actual_cents ?? null),
+      })}
+      {renderMetricRow({
+        dates,
+        label: "Heures travaillées",
+        renderValue: (period) => fmtHours(period?.worked_hours ?? null),
+      })}
+      {renderMetricRow({
+        dates,
+        label: "Productivité réelle",
+        sublabel: `Min : ${PLANNING_PRODUCTIVITY_TARGET_EUR_PER_HOUR}€/h`,
+        renderValue: (period) => fmtEurosPerHour(period?.revenue_per_hour_cents ?? null),
+        renderBadge: (period) => productivityTargetBadge(period?.revenue_per_hour_cents ?? null),
+      })}
+      {renderMetricRow({
+        dates,
+        label: "Coût shifts / ventes",
+        sublabel: `Max : ${PLANNING_PAYROLL_RATIO_TARGET_PERCENT}%`,
+        renderValue: (period) => fmtPct(period?.payroll_ratio ?? null),
+        renderBadge: (period) => payrollTargetBadge(period?.payroll_ratio ?? null),
+      })}
+
+      {data?.warnings.members_without_rate ? (
+        <>
+          <HeaderLabelCell className="bg-amber-50 text-amber-900">
+            <div className="text-[11px] font-medium">Alerte masse salariale</div>
+            <div className="text-[10px]">
+              {data.warnings.members_without_rate} membre{data.warnings.members_without_rate > 1 ? "s" : ""} sans taux horaire exclus.
+            </div>
+          </HeaderLabelCell>
+          {dates.map((date) => (
+            <HeaderValueCell key={`warn:${toIsoDay(date)}`} muted className="bg-amber-50/60" />
+          ))}
+        </>
+      ) : null}
+
+      {isLoading ? (
+        <>
+          <HeaderLabelCell>
+            <Skeleton className="h-4 w-24" />
+          </HeaderLabelCell>
+          {dates.map((date) => (
+            <HeaderValueCell key={`loading:${toIsoDay(date)}`}>
+              <Skeleton className="h-4 w-12" />
+            </HeaderValueCell>
+          ))}
+        </>
+      ) : null}
+
+      {error ? (
+        <>
+          <HeaderLabelCell className="bg-destructive/5 text-destructive">
+            <div className="text-[11px] font-medium">Erreur de calcul</div>
+            <div className="text-[10px]">{error.message}</div>
+          </HeaderLabelCell>
+          {dates.map((date) => (
+            <HeaderValueCell key={`error:${toIsoDay(date)}`} muted className="bg-destructive/5" />
+          ))}
+        </>
+      ) : null}
+    </Fragment>
+  );
+
+  function renderMetricRow({
+    dates,
+    label,
+    sublabel,
+    renderValue,
+    renderBadge,
+  }: {
+    dates: Date[];
+    label: string;
+    sublabel?: string;
+    renderValue: (period: PerformancePeriod | null) => string;
+    renderBadge?: (period: PerformancePeriod | null) => TargetBadge | null;
+  }) {
+    return (
+      <Fragment key={label}>
+        <HeaderLabelCell>
+          <div className="text-[11px] font-medium text-foreground">{label}</div>
+          {sublabel && <div className="text-[10px] text-sky-700">{sublabel}</div>}
+        </HeaderLabelCell>
+        {dates.map((date, index) => {
+          const iso = toIsoDay(date);
+          const period = periodsByDate.get(iso) ?? null;
+          const previousPeriod = compare ? previousPeriods[index] ?? null : null;
+          const badge = renderBadge?.(period) ?? null;
+          return (
+            <HeaderValueCell key={`${label}:${iso}`} highlighted={false}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold text-foreground">{renderValue(period)}</span>
+                <div className="flex items-center gap-2">
+                  {compare ? (
+                    <VariationBadge
+                      {...variationProps(
+                        period?.revenue_actual_cents ?? null,
+                        previousPeriod?.revenue_actual_cents ?? null,
+                        true,
+                      )}
+                      compact
+                    />
+                  ) : null}
+                  {badge && <TargetPill badge={badge} compact />}
+                </div>
+              </div>
+            </HeaderValueCell>
+          );
+        })}
+      </Fragment>
+    );
+  }
+}
+
+function SummaryCard({
+  title,
+  value,
+  hint,
+  target,
+  variation,
+}: {
+  title: string;
+  value: string;
+  hint: string;
+  target?: TargetBadge | null;
+  variation?: VariationProps | null;
 }) {
   return (
-    <TableCell className="text-right">
-      <div className="flex items-center justify-end gap-2">
-        <span>{format(current)}</span>
-        {compare && <Variation current={current} previous={previous} higherIsBetter={higherIsBetter} />}
+    <div className="rounded-xl border bg-card/80 p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
+          <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
+        </div>
+        {variation && <VariationBadge {...variation} />}
       </div>
-    </TableCell>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {target && <TargetPill badge={target} />}
+        <span className="text-xs text-muted-foreground">{hint}</span>
+      </div>
+    </div>
   );
 }
 
-function Variation({
-  current,
-  previous,
-  higherIsBetter = true,
+function HeaderLabelCell({
+  children,
+  className,
 }: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn(
+      "sticky left-0 z-20 flex min-h-[56px] flex-col justify-center border-b border-r bg-card px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]",
+      className,
+    )}>
+      {children}
+    </div>
+  );
+}
+
+function HeaderValueCell({
+  children,
+  muted = false,
+  highlighted = false,
+  className,
+}: {
+  children?: React.ReactNode;
+  muted?: boolean;
+  highlighted?: boolean;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex min-h-[56px] items-center border-b border-r px-2.5 py-2",
+        muted && "bg-muted/20",
+        highlighted && "bg-primary/5",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface TargetBadge {
+  label: string;
+  tone: "good" | "warn" | "neutral";
+}
+
+interface VariationProps {
   current: number | null;
   previous: number | null;
   higherIsBetter?: boolean;
-}) {
-  if (current == null || previous == null || previous === 0) {
-    return <span className="text-[10px] text-muted-foreground">—</span>;
-  }
-  const delta = (current - previous) / Math.abs(previous);
-  const up = delta > 0;
-  const flat = Math.abs(delta) < 0.001;
-  const good = flat ? false : up === higherIsBetter;
+}
+
+function TargetPill({ badge, compact = false }: { badge: TargetBadge; compact?: boolean }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-medium",
+        "inline-flex items-center rounded-full px-2 py-0.5 font-medium",
+        compact ? "text-[10px]" : "text-[11px]",
+        badge.tone === "good"
+          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
+          : badge.tone === "warn"
+            ? "border border-amber-200 bg-amber-50 text-amber-700"
+            : "border border-muted bg-muted text-muted-foreground",
+      )}
+    >
+      {badge.label}
+    </span>
+  );
+}
+
+function VariationBadge({
+  current,
+  previous,
+  higherIsBetter = true,
+  compact = false,
+}: VariationProps & { compact?: boolean }) {
+  if (current == null || previous == null || previous === 0) {
+    return <span className={cn("text-muted-foreground", compact ? "text-[10px]" : "text-xs")}>—</span>;
+  }
+
+  const delta = (current - previous) / Math.abs(previous);
+  const flat = Math.abs(delta) < 0.001;
+  const up = delta > 0;
+  const good = flat ? false : up === higherIsBetter;
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium",
+        compact ? "text-[10px]" : "text-xs",
         flat
           ? "bg-muted text-muted-foreground"
           : good
@@ -448,64 +426,63 @@ function Variation({
   );
 }
 
-// ─── Formatters ──────────────────────────────────────────────────────────────
+function productivityTargetBadge(value: number | null): TargetBadge | null {
+  if (value == null) return { label: "Sans CA", tone: "neutral" };
+  return value >= PLANNING_PRODUCTIVITY_TARGET_CENTS_PER_HOUR
+    ? { label: "Objectif atteint", tone: "good" }
+    : { label: `Sous ${PLANNING_PRODUCTIVITY_TARGET_EUR_PER_HOUR}€/h`, tone: "warn" };
+}
+
+function payrollTargetBadge(value: number | null): TargetBadge | null {
+  if (value == null) return { label: "Sans CA", tone: "neutral" };
+  return value <= PLANNING_PAYROLL_RATIO_TARGET
+    ? { label: "Dans la cible", tone: "good" }
+    : { label: `Au-dessus de ${PLANNING_PAYROLL_RATIO_TARGET_PERCENT}%`, tone: "warn" };
+}
+
+function buildPeriodMap(periods: PerformancePeriod[]): Map<string, PerformancePeriod> {
+  const map = new Map<string, PerformancePeriod>();
+  for (const period of periods) {
+    if (period.period_start === period.period_end) {
+      map.set(period.period_start, period);
+    }
+  }
+  return map;
+}
+
+function variationProps(
+  current: number | null,
+  previous: number | null,
+  higherIsBetter = true,
+): VariationProps {
+  return { current, previous, higherIsBetter };
+}
+
+function toIsoDay(date: Date): string {
+  return format(date, "yyyy-MM-dd");
+}
 
 function fmtMoney(cents: number | null): string {
   if (cents == null) return "—";
-  return new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR", maximumFractionDigits: 0 })
-    .format(cents / 100);
-}
-function fmtHours(h: number | null): string {
-  if (h == null) return "—";
-  return `${h.toFixed(2)} h`;
-}
-function fmtPct(r: number | null): string {
-  if (r == null) return "—";
-  return `${(r * 100).toFixed(1)}%`;
-}
-function moneyOrDash(cents: number | null) {
-  if (cents == null) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
-            — <Info className="h-3 w-3" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Données manquantes pour cette période.</TooltipContent>
-      </Tooltip>
-    );
-  }
-  return fmtMoney(cents);
-}
-function pctOrDash(r: number | null) {
-  if (r == null) {
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
-            — <Info className="h-3 w-3" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>CA indisponible pour cette période.</TooltipContent>
-      </Tooltip>
-    );
-  }
-  return fmtPct(r);
-}
-function granularityLabel(g: PerformanceGranularity) {
-  return g === "day" ? "jour par jour" : g === "week" ? "semaine par semaine" : "mois par mois";
+  return new Intl.NumberFormat("fr-FR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
 }
 
-function buildDraftForecasts(periods: PerformancePeriod[]): Record<string, string> {
-  return periods.reduce<Record<string, string>>((acc, period) => {
-    if (period.period_start !== period.period_end) return acc;
-    acc[period.period_start] = centsToEuroInput(period.revenue_forecast_cents);
-    return acc;
-  }, {});
+function fmtHours(hours: number | null): string {
+  if (hours == null) return "—";
+  const rounded = Math.round(hours * 100) / 100;
+  return `${rounded.toFixed(2).replace(/\.00$/, "")} h`;
 }
 
-function centsToEuroInput(cents: number | null): string {
-  if (cents == null) return "";
-  return (cents / 100).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+function fmtPct(ratio: number | null): string {
+  if (ratio == null) return "—";
+  return `${(ratio * 100).toFixed(1)}%`;
+}
+
+function fmtEurosPerHour(centsPerHour: number | null): string {
+  if (centsPerHour == null) return "—";
+  return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(centsPerHour / 100)}€/h`;
 }

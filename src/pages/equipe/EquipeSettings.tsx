@@ -157,6 +157,7 @@ interface WorkRulesForm {
   night_shift_multiplier: number;
   holiday_multiplier: number;
   allow_override_warnings: boolean;
+  planning_sms_notifications_enabled: boolean;
 }
 
 function toWorkRulesForm(s: PlanningSettings): WorkRulesForm {
@@ -169,7 +170,15 @@ function toWorkRulesForm(s: PlanningSettings): WorkRulesForm {
     night_shift_multiplier: s.night_shift_multiplier,
     holiday_multiplier: s.holiday_multiplier,
     allow_override_warnings: s.allow_override_warnings,
+    planning_sms_notifications_enabled: !!s.planning_sms_notifications_enabled,
   };
+}
+
+function getPlanningSmsNotificationsDescription(settings: PlanningSettings): string | null {
+  if (settings.planning_sms_notifications_enabled_description) {
+    return settings.planning_sms_notifications_enabled_description;
+  }
+  return null;
 }
 
 function WorkRulesCard({ settings }: { settings: PlanningSettings }) {
@@ -181,6 +190,10 @@ function WorkRulesCard({ settings }: { settings: PlanningSettings }) {
   }, [settings]);
 
   const initial = useMemo(() => toWorkRulesForm(settings), [settings]);
+  const smsNotificationsDescription = useMemo(
+    () => getPlanningSmsNotificationsDescription(settings),
+    [settings],
+  );
   const diff = useMemo<PlanningSettingsUpdateRequest>(() => {
     const patch: PlanningSettingsUpdateRequest = {};
     (Object.keys(form) as Array<keyof WorkRulesForm>).forEach((k) => {
@@ -307,6 +320,23 @@ function WorkRulesCard({ settings }: { settings: PlanningSettings }) {
             id="allow_override_warnings"
             checked={form.allow_override_warnings}
             onCheckedChange={(v) => setForm({ ...form, allow_override_warnings: v })}
+          />
+        </div>
+        <div className="col-span-full flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
+          <div>
+            <Label htmlFor="planning_sms_notifications_enabled" className="text-sm font-medium">
+              Notifications SMS
+            </Label>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {smsNotificationsDescription ?? "Active l'envoi de notifications SMS lors de la publication du planning."}
+            </p>
+          </div>
+          <Switch
+            id="planning_sms_notifications_enabled"
+            checked={form.planning_sms_notifications_enabled}
+            onCheckedChange={(v) =>
+              setForm({ ...form, planning_sms_notifications_enabled: v })
+            }
           />
         </div>
       </SettingsFieldsGrid>

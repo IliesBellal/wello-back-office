@@ -22,6 +22,9 @@ export type AttendanceSource = "pointage" | "planning";
 /** Shift swap approval mode (planning settings). */
 export type ShiftSwapApprovalMode = "manager_required" | "target_employee_required";
 
+/** Notification mode used when publishing a planning week. */
+export type PlanningPublishNotificationMode = "all" | "changes_only" | "none";
+
 // ============= Planning settings =============
 
 /** `GET /planning/settings` -> `data.settings`. */
@@ -38,6 +41,8 @@ export interface PlanningSettings {
   allow_override_warnings: boolean;
   attendance_source: AttendanceSource;
   shift_swap_approval_mode: ShiftSwapApprovalMode;
+  planning_sms_notifications_enabled?: boolean;
+  planning_sms_notifications_enabled_description?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -54,6 +59,7 @@ export interface PlanningSettingsUpdateRequest {
   allow_override_warnings?: boolean;
   attendance_source?: AttendanceSource;
   shift_swap_approval_mode?: ShiftSwapApprovalMode;
+  planning_sms_notifications_enabled?: boolean;
 }
 
 // ============= Positions =============

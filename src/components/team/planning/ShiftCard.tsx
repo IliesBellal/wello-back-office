@@ -78,7 +78,7 @@ export function ShiftCard({
         "group relative w-full text-left rounded-md border px-2 py-1.5 shadow-sm transition-shadow hover:shadow",
         selectable ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         "text-foreground",
-        compact && "px-1.5 py-1",
+        compact && "px-1 py-1",
         selected && "ring-2 ring-primary ring-offset-1",
       )}
     >
@@ -93,20 +93,39 @@ export function ShiftCard({
           {selected && <Check className="h-3 w-3" />}
         </span>
       )}
-      <div className="flex items-start justify-between gap-1.5">
-        <div className="flex min-w-0 items-center gap-1.5">
-          <span
-            className="inline-block h-2 w-2 shrink-0 rounded-full"
-            style={{ backgroundColor: baseColor }}
-          />
-          <span className="truncate text-xs font-medium">
-            {fmtTime(shift.start_time)} – {fmtTime(shift.end_time)}
+      {compact ? (
+        <div className="flex min-w-0 flex-col items-start gap-0.5">
+          <div className="flex w-full items-start justify-between gap-1">
+            <span className="truncate text-[10px] font-semibold leading-none tabular-nums text-foreground/90">
+              {fmtTime(shift.start_time)}
+            </span>
+            {shift.notes && (
+              <MessageSquareText className="h-3 w-3 shrink-0 opacity-70" aria-label="Notes" />
+            )}
+          </div>
+          <span className="truncate text-[10px] font-semibold leading-none tabular-nums text-foreground/90">
+            {fmtTime(shift.end_time)}
           </span>
+          <div className="w-full truncate text-[10px] leading-tight opacity-80">
+            {shift.title || shift.position || "Shift"}
+          </div>
         </div>
-        {shift.notes && (
-          <MessageSquareText className="h-3 w-3 shrink-0 opacity-70" aria-label="Notes" />
-        )}
-      </div>
+      ) : (
+        <div className="flex items-start justify-between gap-1.5">
+          <div className="flex min-w-0 items-center gap-1.5">
+            <span
+              className="inline-block h-2 w-2 shrink-0 rounded-full"
+              style={{ backgroundColor: baseColor }}
+            />
+            <span className="truncate text-xs font-medium">
+              {fmtTime(shift.start_time)} – {fmtTime(shift.end_time)}
+            </span>
+          </div>
+          {shift.notes && (
+            <MessageSquareText className="h-3 w-3 shrink-0 opacity-70" aria-label="Notes" />
+          )}
+        </div>
+      )}
       {!compact && (
         <div className="mt-0.5 truncate text-[11px] opacity-80">
           {shift.title || shift.position || "Shift"}

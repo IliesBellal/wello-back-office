@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from "react";
+import { Fragment, useMemo, type ReactNode } from "react";
 import { useDndContext, useDroppable } from "@dnd-kit/core";
 import { addDays, format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -17,12 +17,13 @@ import type {
 
 import { ShiftCard } from "./ShiftCard";
 import { RowActionsMenu } from "./RowActionsMenu";
-import type { PlanningViewMode } from "./PlanningHeader";
+import type { PlanningDensity, PlanningViewMode } from "./PlanningToolbar";
 
 interface PlanningGridProps {
   viewMode: PlanningViewMode;
   range: { from: Date; to: Date };
   week: PlanningWeek;
+  headerRows?: ReactNode;
   employees: Employee[];
   shifts: PlanningShift[];
   holidays: PlanningHoliday[];
@@ -52,6 +53,8 @@ interface PlanningGridProps {
   selectionMode?: boolean;
   /** Set des ids de shifts sélectionnés en mode sélection. */
   selectedShiftIds?: ReadonlySet<string>;
+  /** Densité d'affichage : hauteur mini des cellules et largeur des colonnes. */
+  density?: PlanningDensity;
 }
 
 function isoDay(d: Date): string {
@@ -61,6 +64,15 @@ function isoDay(d: Date): string {
 function formatProratedQuota(hours: number): string {
   const rounded = Math.round(hours * 10) / 10;
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+export function getPlanningGridTemplateColumns(
+  density: PlanningDensity = "comfortable",
+  dayCount: number,
+): string {
+  return density === "compact"
+    ? `180px repeat(${dayCount}, minmax(84px, 1fr))`
+    : `220px repeat(${dayCount}, minmax(140px, 1fr))`;
 }
 
 // ─── Empty droppable cell ───────────────────────────────────────────────────
@@ -79,6 +91,7 @@ function GridCell({
   selectedShiftIds,
   className,
   isOnLeave,
+  density = "comfortable",
 }: {
   /** Sentinelle `UNASSIGNED_KEY` pour la ligne "Non assigné". */
   employeeId: string;
@@ -94,6 +107,7 @@ function GridCell({
   selectedShiftIds?: ReadonlySet<string>;
   className?: string;
   isOnLeave?: boolean;
+  density?: PlanningDensity;
 }) {
   const { active } = useDndContext();
   const { setNodeRef: setMoveRef, isOver: isMoveOver } = useDroppable({
@@ -108,7 +122,8 @@ function GridCell({
   return (
     <div
       className={cn(
-        "relative min-h-[88px] border-b border-r p-1.5 transition-colors",
+        "relative border-b border-r transition-colors",
+        density === "compact" ? "min-h-[60px] p-1" : "min-h-[88px] p-1.5",
         className,
         isHoliday && "bg-amber-50/60",
         isWeekend && !isHoliday && "bg-muted/30",
@@ -166,6 +181,7 @@ function GridCell({
             shift={s}
             color={colorFromIndex(s, colorIndex)}
             onClick={() => onShiftClick(s)}
+            compact={density === "compact"}
             selectable={selectionMode}
             selected={selectedShiftIds?.has(s.id) ?? false}
           />
@@ -193,6 +209,7 @@ export function PlanningGrid({
   viewMode,
   range,
   week,
+  headerRows,
   employees,
   shifts,
   holidays,
@@ -203,6 +220,7 @@ export function PlanningGrid({
   onBulkAssignRow,
   selectionMode,
   selectedShiftIds,
+  density = "comfortable",
 }: PlanningGridProps) {
   // Build columns from range
   const columns = useMemo(() => {
@@ -284,16 +302,18 @@ export function PlanningGrid({
   const colorIndex = useMemo(() => buildPositionColorIndex(positions), [positions]);
   const visibleDays = displayColumns.length;
 
-  const colTemplate = `220px repeat(${displayColumns.length}, minmax(140px, 1fr))`;
+  const colTemplate = getPlanningGridTemplateColumns(density, displayColumns.length);
 
   return (
-    <div className="relative overflow-x-auto rounded-md border bg-card">
-      <div
-        className="grid w-max min-w-full text-xs font-medium text-muted-foreground"
-        style={{ gridTemplateColumns: colTemplate }}
-      >
+    <div className="relative flex max-h-full min-h-0 flex-col overflow-hidden rounded-md border bg-card">
+      <div className="min-h-0 flex-1 overflow-auto">
+        <div
+          className="grid w-max min-w-full text-xs font-medium text-muted-foreground"
+          style={{ gridTemplateColumns: colTemplate }}
+        >
+        {headerRows}
         {/* ── Header row ────────────────────────────────────────────── */}
-        <div className="sticky left-0 z-30 border-b border-r bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
+        <div className="sticky left-0 top-0 z-40 border-b border-r bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
           Employé
         </div>
         {displayColumns.map((d) => {
@@ -304,9 +324,11 @@ export function PlanningGrid({
             <div
               key={iso}
               className={cn(
-                "border-b border-r bg-muted/40 px-2 py-2 text-center",
-                today && "bg-primary/5 text-primary",
-                holiday && "bg-amber-50/60 text-amber-900",
+                // Fond opaque obligatoire : la rangée reste sticky au-dessus
+                // des cartes qui défilent dessous.
+                "sticky top-0 z-30 border-b border-r bg-muted px-2 py-2 text-center",
+                today && "text-primary shadow-[inset_0_-2px_0_hsl(var(--primary))]",
+                holiday && "bg-amber-50 text-amber-900",
               )}
             >
               <div className="capitalize">{format(d, "EEE", { locale: fr })}</div>
@@ -381,6 +403,7 @@ export function PlanningGrid({
                       selectionMode={selectionMode}
                       selectedShiftIds={selectedShiftIds}
                       isOnLeave={isOnLeave}
+                      density={density}
                     />
                   );
                 })}
@@ -436,10 +459,12 @@ export function PlanningGrid({
               selectionMode={selectionMode}
               selectedShiftIds={selectedShiftIds}
               isOnLeave={false}
+              density={density}
               className="border-t-2 bg-muted/20"
             />
           );
         })}
+        </div>
       </div>
     </div>
   );

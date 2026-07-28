@@ -6,15 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { Thermometer, Droplets, User, Calendar, MapPin, Camera, MessageCircle, ShieldAlert } from 'lucide-react';
+import { Thermometer, Droplets, User, Calendar, MapPin, Camera, MessageCircle, ShieldAlert, ScanSearch } from 'lucide-react';
 import {
   HaccpActivity,
   TemperatureSession,
   HaccpCleaningSession,
   getTemperatureSession,
   getHaccpCleaningSession,
+  HaccpTraceabilityRecord,
+  getTraceabilityRecord,
 } from '@/services/haccpService';
 import { useToast } from '@/hooks/use-toast';
+import { PhotoGallery } from '@/components/shared/PhotoGallery';
 
 interface HaccpActivityDetailSheetProps {
   activity: HaccpActivity | null;
@@ -427,6 +430,97 @@ function CleaningSessionDetail({ sessionId }: { sessionId: string }) {
   );
 }
 
+// ── Traceability Record Detail ─────────────────────────────────────────────
+
+function TraceabilityRecordDetail({ recordId }: { recordId: string }) {
+  const [record, setRecord] = useState<HaccpTraceabilityRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!recordId) return;
+    setLoading(true);
+    setRecord(null);
+
+    getTraceabilityRecord(recordId)
+      .then(setRecord)
+      .catch(() =>
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger la fiche de traçabilité.',
+          variant: 'destructive',
+        })
+      )
+      .finally(() => setLoading(false));
+  }, [recordId, toast]);
+
+  if (loading) {
+    return (
+      <div className="space-y-3 mt-4">
+        {[1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-12 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!record) return null;
+
+  return (
+    <div className="space-y-5 mt-4">
+      <Card className="bg-white border-slate-200 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-slate-800">Informations du contrôle</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <Calendar className="h-3.5 w-3.5" />
+                <span>Effectué le</span>
+              </div>
+              <p className="font-medium text-slate-900">{formatDateTime(record.performed_at)}</p>
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <User className="h-3.5 w-3.5" />
+                <span>Opérateur</span>
+              </div>
+              <p className="font-medium text-slate-900">{record.performed_by?.name || '—'}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 space-y-1">
+            <div className="flex items-center gap-1.5 text-slate-500">
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span>Commentaire</span>
+            </div>
+            <p className="text-sm text-slate-900">{record.comment || 'Aucun commentaire'}</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-white border-slate-200 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold text-slate-800">Photos ({record.photos.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PhotoGallery
+            photos={record.photos.map((photo) => ({
+              id: photo.id,
+              url: photo.photo_url,
+              label: photo.label,
+              caption: photo.caption,
+              alt: photo.label,
+            }))}
+            emptyLabel="Aucune photo enregistrée"
+          />
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 // ── Main Sheet ───────────────────────────────────────────────────────────────
 
 export function HaccpActivityDetailSheet({
@@ -436,6 +530,7 @@ export function HaccpActivityDetailSheet({
 }: HaccpActivityDetailSheetProps) {
   const isTemperature = activity?.type === 'temperatures';
   const isCleaning = activity?.type === 'cleanings';
+  const isTraceability = activity?.type === 'traceability';
 
   const sessionId =
     isTemperature && activity
@@ -447,10 +542,17 @@ export function HaccpActivityDetailSheet({
       ? String(activity.metadata?.session_id ?? activity.id)
       : '';
 
+  const recordId =
+    isTraceability && activity
+      ? String(activity.metadata?.record_id ?? activity.id)
+      : '';
+
   const sheetTitle = isTemperature
     ? 'Détail — Session de températures'
     : isCleaning
     ? 'Détail — Session de nettoyage'
+    : isTraceability
+    ? 'Détail — Traçabilité'
     : 'Détail activité';
 
   return (
@@ -460,6 +562,7 @@ export function HaccpActivityDetailSheet({
           <DialogTitle className="flex items-center gap-2">
             {isTemperature && <Thermometer className="h-5 w-5 text-blue-500" />}
             {isCleaning && <Droplets className="h-5 w-5 text-cyan-500" />}
+            {isTraceability && <ScanSearch className="h-5 w-5 text-amber-500" />}
             {sheetTitle}
           </DialogTitle>
         </DialogHeader>
@@ -472,7 +575,11 @@ export function HaccpActivityDetailSheet({
             <CleaningSessionDetail key={cleaningSessionId} sessionId={cleaningSessionId} />
           )}
 
-          {!isTemperature && !isCleaning && (
+          {isTraceability && recordId && (
+            <TraceabilityRecordDetail key={recordId} recordId={recordId} />
+          )}
+
+          {!isTemperature && !isCleaning && !isTraceability && (
             <Card className="mt-4 bg-white border-slate-200 shadow-sm">
               <CardContent className="pt-6">
                 <p className="text-sm text-slate-500">

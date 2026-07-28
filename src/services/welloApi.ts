@@ -48,6 +48,7 @@ import type {
   PlanningWeekCreateRequest,
   PlanningWeekUpdateRequest,
   PlanningShift,
+  PlanningPublishNotificationMode,
   PlanningShiftCreateRequest,
   PlanningShiftUpdateRequest,
   PlanningTimeEntry,
@@ -444,11 +445,12 @@ export const planningWeeksApi = {
   },
 
   /** POST /planning/weeks/{id}/publish */
-  publishWeek(id: string): Promise<PlanningWeek> {
+  publishWeek(id: string, notificationMode?: PlanningPublishNotificationMode): Promise<PlanningWeek> {
     const path = `/planning/weeks/${id}/publish`;
-    logAPI("POST", path);
+    const payload = notificationMode ? { notification_mode: notificationMode } : undefined;
+    logAPI("POST", path, payload);
     return apiClient
-      .post<WelloApiResponse<ApiEnvelopeData>>(path)
+      .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
       .then((resp) => unwrap<{ week: PlanningWeek } & Record<string, unknown>>(resp).week);
   },
 

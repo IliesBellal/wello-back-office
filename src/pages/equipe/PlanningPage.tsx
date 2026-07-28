@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -36,31 +36,44 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 import { usePermissions } from "@/hooks/usePermissions";
+import { cn } from "@/lib/utils";
 import { qk } from "@/lib/queryKeys";
 import {
   holidaysApi,
   planningEmployeesApi,
   planningLeaveApi,
   planningPositionsApi,
+  planningSettingsApi,
   planningShiftsApi,
   planningWeeksApi,
 } from "@/services/welloApi";
-import type { PlanningLeaveRequest, PlanningShift, PlanningWeek } from "@/types/planning";
+import type {
+  PlanningLeaveRequest,
+  PlanningPublishNotificationMode,
+  PlanningShift,
+  PlanningWeek,
+} from "@/types/planning";
 
-import { PlanningHeader, type PlanningViewMode } from "@/components/team/planning/PlanningHeader";
-import { PlanningDateToolbar } from "@/components/team/planning/PlanningDateToolbar";
+import {
+  PlanningToolbar,
+  type PlanningDensity,
+  type PlanningViewMode,
+} from "@/components/team/planning/PlanningToolbar";
 import { PlanningGrid } from "@/components/team/planning/PlanningGrid";
 import { ShiftSheet, type ShiftSheetMode } from "@/components/team/planning/ShiftSheet";
 import { PositionsModal } from "@/components/team/planning/PositionsModal";
+import { CreateEmployeeDialog } from "@/components/team/planning/CreateEmployeeDialog";
 import { ShiftTemplatesDialog } from "@/components/team/planning/ShiftTemplatesDialog";
 import { WeekTemplatesDialog } from "@/components/team/planning/WeekTemplatesDialog";
 import { HolidaysModal } from "@/components/team/planning/HolidaysModal";
 import { PlanningSettingsModal } from "@/components/team/planning/PlanningSettingsModal";
-import { PerformanceSheet } from "@/components/team/planning/PerformanceSheet";
+import { PerformanceGridHeaderRows, PerformanceSheet } from "@/components/team/planning/PerformanceSheet";
 import { BulkAssignDialog } from "@/components/team/planning/BulkAssignDialog";
 import { WeekTemplateService } from "@/services/weekTemplateService";
+import { PerformanceService } from "@/services/performanceService";
 import { fromKey } from "@/lib/planningUnassigned";
 import {
   partitionForBulkAssign,
@@ -69,6 +82,8 @@ import {
 import { getHttpErrorStatus, getPlanningShiftMutationMessage } from "@/lib/planningApiErrors";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
+
+const DENSITY_STORAGE_KEY = "wello.planning.density";
 
 function isoDay(d: Date): string {
   return format(d, "yyyy-MM-dd");
@@ -107,6 +122,23 @@ function isPlanningWeekAlreadyExistsConflict(error: unknown): boolean {
   }
 
   return false;
+}
+
+function getFullscreenShortcutTip(): string {
+  if (typeof navigator === "undefined") {
+    return "Appuyez sur F11 pour afficher votre navigateur en plein écran.";
+  }
+
+  const platform = `${navigator.platform ?? ""} ${navigator.userAgent ?? ""}`;
+  const isMac = /mac/i.test(platform);
+
+  return isMac
+    ? "Appuyez sur Ctrl + Cmd + F pour afficher votre navigateur en plein écran."
+    : "Appuyez sur F11 pour afficher votre navigateur en plein écran.";
+}
+
+function getDefaultNotificationMode(week: PlanningWeek): PlanningPublishNotificationMode {
+  return week.published_at ? "changes_only" : "all";
 }
 
 /** Find or auto-create the week containing `date`. */
@@ -162,11 +194,13 @@ function PlanningPageContent() {
   } | null>(null);
 
   const [positionsOpen, setPositionsOpen] = useState(false);
+  const [employeeCreateOpen, setEmployeeCreateOpen] = useState(false);
   const [shiftTemplatesOpen, setShiftTemplatesOpen] = useState(false);
   const [weekTemplatesOpen, setWeekTemplatesOpen] = useState(false);
   const [holidaysOpen, setHolidaysOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [performanceOpen, setPerformanceOpen] = useState(false);
+  const [performanceCompare, setPerformanceCompare] = useState(false);
 
   // Bulk-assign (menu "3 points" sur une ligne).
   // `sourceEmployeeId === null` ⇒ ligne "Non assigné".
@@ -187,15 +221,79 @@ function PlanningPageContent() {
 
   // Confirmation publication de semaine.
   const [confirmPublishOpen, setConfirmPublishOpen] = useState(false);
+  const [publishNotificationMode, setPublishNotificationMode] =
+    useState<PlanningPublishNotificationMode>("changes_only");
 
   // Sauvegarde de la semaine courante en tant que modèle de semaine type.
   const [saveAsTemplateOpen, setSaveAsTemplateOpen] = useState(false);
   const [saveAsTemplateLabel, setSaveAsTemplateLabel] = useState("");
   const [saveAsTemplateSubmitting, setSaveAsTemplateSubmitting] = useState(false);
 
+  // Confort d'affichage : plein écran (overlay au-dessus de la sidebar) et
+  // densité de la grille (persistée localement).
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [density, setDensity] = useState<PlanningDensity>(() =>
+    localStorage.getItem(DENSITY_STORAGE_KEY) === "compact" ? "compact" : "comfortable",
+  );
+
+  const handleToggleDensity = () => {
+    setDensity((d) => {
+      const next: PlanningDensity = d === "compact" ? "comfortable" : "compact";
+      localStorage.setItem(DENSITY_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  const handleToggleFullscreen = () => {
+    setIsFullscreen((current) => {
+      const next = !current;
+      if (next) {
+        toast.info("Astuce plein écran", {
+          description: getFullscreenShortcutTip(),
+          duration: 6000,
+        });
+      }
+      return next;
+    });
+  };
+
+  // Échap quitte le plein écran — sauf quand une modale/sheet est ouverte :
+  // Radix ferme déjà l'overlay avec Échap, sans ce garde-fou le même appui
+  // sortirait aussi du plein écran.
+  const overlayOpen =
+    sheetMode !== null ||
+    positionsOpen ||
+    employeeCreateOpen ||
+    shiftTemplatesOpen ||
+    weekTemplatesOpen ||
+    holidaysOpen ||
+    settingsOpen ||
+    bulkSource !== null ||
+    confirmPublishOpen ||
+    confirmDeleteOpen ||
+    saveAsTemplateOpen;
+
+  useEffect(() => {
+    if (!isFullscreen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !overlayOpen) setIsFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isFullscreen, overlayOpen]);
+
   // ── Visible range ────────────────────────────────────────────────────────
   const range = useMemo(() => visibleRange(viewMode, anchorDate), [viewMode, anchorDate]);
   const rangeKey = useMemo(() => `${isoDay(range.from)}_${isoDay(range.to)}`, [range]);
+  const visibleDates = useMemo(() => {
+    const out: Date[] = [];
+    let current = range.from;
+    while (current <= range.to) {
+      out.push(current);
+      current = addDays(current, 1);
+    }
+    return out;
+  }, [range]);
   const weekForAnchorQueryKey = useMemo(
     () => ["planning", "weeks", "for-anchor", isoDay(anchorDate)] as const,
     [anchorDate],
@@ -205,6 +303,11 @@ function PlanningPageContent() {
   const weeksQuery = useQuery({
     queryKey: qk.planningWeeks.all,
     queryFn: () => planningWeeksApi.list(),
+  });
+
+  const planningSettingsQuery = useQuery({
+    queryKey: qk.planningSettings.all,
+    queryFn: () => planningSettingsApi.get(),
   });
 
   // Resolve "current" week for the anchor date (auto-create if missing)
@@ -256,6 +359,32 @@ function PlanningPageContent() {
     queryFn: () => planningLeaveApi.list({ status: "approved", page_size: 500 }),
   });
 
+  const performanceQuery = useQuery({
+    queryKey: ["planning", "performance", isoDay(range.from), isoDay(range.to), "day", performanceCompare],
+    queryFn: () =>
+      PerformanceService.getForRange({
+        from: isoDay(range.from),
+        to: isoDay(range.to),
+        granularity: "day",
+        compare: performanceCompare ? "previous" : undefined,
+      }),
+    enabled: performanceOpen,
+  });
+
+  const invalidatePlanningGridQueries = () => {
+    if (currentWeek) {
+      qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(currentWeek.id) });
+    }
+    qc.invalidateQueries({ queryKey: qk.planningShifts.range(isoDay(range.from), isoDay(range.to)) });
+    qc.invalidateQueries({ queryKey: qk.planningWeeks.all });
+    if (performanceOpen) {
+      qc.invalidateQueries({
+        queryKey: ["planning", "performance", isoDay(range.from), isoDay(range.to), "day", performanceCompare],
+        exact: true,
+      });
+    }
+  };
+
   // ── Mutations ────────────────────────────────────────────────────────────
   const createShift = useMutation({
     mutationFn: (payload: Parameters<typeof planningWeeksApi.createShift>[1]) => {
@@ -264,7 +393,7 @@ function PlanningPageContent() {
     },
     onSuccess: () => {
       toast.success("Shift créé");
-      if (currentWeek) qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(currentWeek.id) });
+      invalidatePlanningGridQueries();
     },
     onError: (err: Error) =>
       toast.error(getPlanningShiftMutationMessage(err, err.message ?? "Erreur lors de la création")),
@@ -275,7 +404,7 @@ function PlanningPageContent() {
       planningShiftsApi.update(id, payload),
     onSuccess: () => {
       toast.success("Shift mis à jour");
-      if (currentWeek) qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(currentWeek.id) });
+      invalidatePlanningGridQueries();
     },
     onError: (err: Error) =>
       toast.error(getPlanningShiftMutationMessage(err, err.message ?? "Erreur lors de la mise à jour")),
@@ -285,7 +414,7 @@ function PlanningPageContent() {
     mutationFn: (id: string) => planningShiftsApi.delete(id),
     onSuccess: () => {
       toast.success("Shift supprimé");
-      if (currentWeek) qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(currentWeek.id) });
+      invalidatePlanningGridQueries();
     },
     onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la suppression"),
   });
@@ -315,7 +444,13 @@ function PlanningPageContent() {
   });
 
   const publishWeekMutation = useMutation({
-    mutationFn: (weekId: string) => planningWeeksApi.publishWeek(weekId),
+    mutationFn: ({
+      weekId,
+      notificationMode,
+    }: {
+      weekId: string;
+      notificationMode: PlanningPublishNotificationMode;
+    }) => planningWeeksApi.publishWeek(weekId, notificationMode),
     onSuccess: (updatedWeek) => {
       // Immediate update for the badge
       qc.setQueryData(weekForAnchorQueryKey, updatedWeek);
@@ -353,6 +488,7 @@ function PlanningPageContent() {
 
   const handlePublishWeek = () => {
     if (!currentWeek) return;
+    setPublishNotificationMode(getDefaultNotificationMode(currentWeek));
     setConfirmPublishOpen(true);
   };
 
@@ -520,14 +656,6 @@ function PlanningPageContent() {
     return s;
   }, [approvedLeaves]);
 
-  const invalidatePlanningGridQueries = () => {
-    if (currentWeek) {
-      qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(currentWeek.id) });
-    }
-    qc.invalidateQueries({ queryKey: qk.planningShifts.range(isoDay(range.from), isoDay(range.to)) });
-    qc.invalidateQueries({ queryKey: qk.planningWeeks.all });
-  };
-
   const warnIfApprovedLeave = (employeeId: string | null, isoDate: string) => {
     if (!employeeId) return;
     const onLeave = approvedLeaves.some(
@@ -594,29 +722,58 @@ function PlanningPageContent() {
   const employees = employeesQuery.data?.items ?? [];
   const holidays = holidaysQuery.data ?? [];
   const positions = positionsQuery.data ?? [];
+  const smsNotificationsEnabled =
+    planningSettingsQuery.data?.planning_sms_notifications_enabled ?? false;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
-      <PageContainer
-        header={
-          <PlanningHeader
-            viewMode={viewMode}
-            onChangeView={setViewMode}
-            onCreate={handleCreateClick}
-            onOpenPositions={() => setPositionsOpen(true)}
-            onOpenShiftTemplates={() => setShiftTemplatesOpen(true)}
-            onOpenWeekTemplates={() => setWeekTemplatesOpen(true)}
-            onOpenHolidays={() => setHolidaysOpen(true)}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenPerformance={() => setPerformanceOpen(true)}
-            onEnterSelectionMode={() => {
-              setSelectionMode(true);
-              setSelectedShiftIds(new Set());
-            }}
-          />
-        }
-      >
+      {/* En plein écran, la page passe en overlay fixe au-dessus de la sidebar. */}
+      <div className={cn("h-full", isFullscreen && "fixed inset-0 z-50 bg-background")}>
+        <PageContainer
+          variant="workspace"
+          header={
+            <PlanningToolbar
+              viewMode={viewMode}
+              onChangeView={setViewMode}
+              anchorDate={anchorDate}
+              currentWeek={currentWeek}
+              onPrev={handlePrev}
+              onNext={handleNext}
+              onToday={handleToday}
+              onPickDate={(d) => setAnchorDate(d)}
+              onCreate={handleCreateClick}
+              onPublishWeek={handlePublishWeek}
+              onUnpublishWeek={handleUnpublishWeek}
+              publishPending={publishWeekMutation.isPending}
+              unpublishPending={unpublishWeekMutation.isPending}
+              onOpenPositions={() => setPositionsOpen(true)}
+              onCreateEmployee={() => setEmployeeCreateOpen(true)}
+              onOpenShiftTemplates={() => setShiftTemplatesOpen(true)}
+              onOpenWeekTemplates={() => setWeekTemplatesOpen(true)}
+              onOpenHolidays={() => setHolidaysOpen(true)}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenPerformance={() => setPerformanceOpen((open) => !open)}
+              onEnterSelectionMode={() => {
+                setSelectionMode(true);
+                setSelectedShiftIds(new Set());
+              }}
+              onSaveAsWeekTemplate={() => {
+                setSaveAsTemplateLabel(
+                  currentWeek
+                    ? `Modèle — ${format(new Date(currentWeek.start_date + "T00:00:00"), "d MMM yyyy", { locale: fr })}`
+                    : "",
+                );
+                setSaveAsTemplateOpen(true);
+              }}
+              saveDisabled={shifts.length === 0 || saveAsTemplateSubmitting}
+              density={density}
+              onToggleDensity={handleToggleDensity}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={handleToggleFullscreen}
+            />
+          }
+        >
         {loading ? (
           <div className="space-y-2">
             <Skeleton className="h-10 w-full" />
@@ -635,30 +792,8 @@ function PlanningPageContent() {
           </div>
         ) : (
           <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
-            <PlanningDateToolbar
-              anchorDate={anchorDate}
-              viewMode={viewMode}
-              currentWeek={currentWeek}
-              onPrev={handlePrev}
-              onNext={handleNext}
-              onToday={handleToday}
-              onPickDate={(d) => setAnchorDate(d)}
-              onPublishWeek={handlePublishWeek}
-              onUnpublishWeek={handleUnpublishWeek}
-              publishPending={publishWeekMutation.isPending}
-              unpublishPending={unpublishWeekMutation.isPending}
-              onSaveAsWeekTemplate={() => {
-                setSaveAsTemplateLabel(
-                  currentWeek
-                    ? `Mod\u00e8le \u2014 ${format(new Date(currentWeek.start_date + "T00:00:00"), "d MMM yyyy", { locale: fr })}`
-                    : "",
-                );
-                setSaveAsTemplateOpen(true);
-              }}
-              saveDisabled={shifts.length === 0 || saveAsTemplateSubmitting}
-            />
             {selectionMode && (
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+              <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
                 <div className="text-sm font-medium text-foreground">
                   Supprimer des shifts —{" "}
                   <span className="text-muted-foreground">
@@ -688,25 +823,52 @@ function PlanningPageContent() {
                 </div>
               </div>
             )}
-            <PlanningGrid
-              key={rangeKey}
-              viewMode={viewMode}
-              range={range}
-              week={currentWeek}
-              employees={employees}
-              shifts={shifts}
-              holidays={holidays}
-              approvedLeaveLookup={approvedLeaveLookup}
-              positions={positions}
-              onShiftClick={handleShiftClick}
-              onEmptyCellClick={handleEmptyCellClick}
-              onBulkAssignRow={handleBulkAssignRow}
-              selectionMode={selectionMode}
-              selectedShiftIds={selectedShiftIds}
-            />
+            {/* La grille scrolle en interne (sticky headers) dans la hauteur restante. */}
+            <div className="min-h-0 flex-1">
+              <PerformanceSheet
+                open={performanceOpen}
+                onOpenChange={setPerformanceOpen}
+                from={isoDay(range.from)}
+                to={isoDay(range.to)}
+                compare={performanceCompare}
+                onCompareChange={setPerformanceCompare}
+                data={performanceQuery.data}
+                isLoading={performanceQuery.isLoading}
+                error={(performanceQuery.error as Error | null) ?? null}
+              />
+
+              <PlanningGrid
+                key={rangeKey}
+                viewMode={viewMode}
+                range={range}
+                week={currentWeek}
+                headerRows={
+                  <PerformanceGridHeaderRows
+                    open={performanceOpen}
+                    dates={visibleDates}
+                    data={performanceQuery.data}
+                    isLoading={performanceQuery.isLoading}
+                    error={(performanceQuery.error as Error | null) ?? null}
+                    compare={performanceCompare}
+                  />
+                }
+                employees={employees}
+                shifts={shifts}
+                holidays={holidays}
+                approvedLeaveLookup={approvedLeaveLookup}
+                positions={positions}
+                onShiftClick={handleShiftClick}
+                onEmptyCellClick={handleEmptyCellClick}
+                onBulkAssignRow={handleBulkAssignRow}
+                selectionMode={selectionMode}
+                selectedShiftIds={selectedShiftIds}
+                density={density}
+              />
+            </div>
           </DndContext>
         )}
-      </PageContainer>
+        </PageContainer>
+      </div>
 
       <ShiftSheet
         open={sheetMode !== null}
@@ -737,6 +899,7 @@ function PlanningPageContent() {
       />
 
       <PositionsModal open={positionsOpen} onOpenChange={setPositionsOpen} />
+      <CreateEmployeeDialog open={employeeCreateOpen} onOpenChange={setEmployeeCreateOpen} />
       <ShiftTemplatesDialog open={shiftTemplatesOpen} onOpenChange={setShiftTemplatesOpen} />
       <WeekTemplatesDialog
         open={weekTemplatesOpen}
@@ -752,15 +915,6 @@ function PlanningPageContent() {
         to={isoDay(range.to)}
       />
       <PlanningSettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
-      <PerformanceSheet
-        open={performanceOpen}
-        onOpenChange={setPerformanceOpen}
-        from={isoDay(range.from)}
-        to={isoDay(range.to)}
-        granularity={viewMode === "month" ? "week" : "day"}
-        forecastEditable={viewMode === "week"}
-      />
-
       <BulkAssignDialog
         open={bulkSource !== null}
         onOpenChange={(open) => {
@@ -787,6 +941,56 @@ function PlanningPageContent() {
               Les employés pourront la consulter.
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          <div className="space-y-3">
+            <Label className="text-xs font-semibold uppercase text-muted-foreground">
+              Mode de notification
+            </Label>
+            <RadioGroup
+              value={publishNotificationMode}
+              onValueChange={(value) =>
+                setPublishNotificationMode(value as PlanningPublishNotificationMode)
+              }
+              className="space-y-1.5"
+            >
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border p-2.5 hover:bg-muted/50">
+                <RadioGroupItem value="all" className="mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="text-sm font-medium">Notifier tout le monde</div>
+                  <p className="text-xs text-muted-foreground">
+                    Envoi vers tous les employés concernés par la semaine publiée.
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border p-2.5 hover:bg-muted/50">
+                <RadioGroupItem value="changes_only" className="mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="text-sm font-medium">Notifier uniquement les changements</div>
+                  <p className="text-xs text-muted-foreground">
+                    N'envoie des notifications qu'aux employés impactés par des modifications.
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-md border p-2.5 hover:bg-muted/50">
+                <RadioGroupItem value="none" className="mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="text-sm font-medium">Ne notifier personne</div>
+                  <p className="text-xs text-muted-foreground">
+                    Publie la semaine sans envoyer de notification.
+                  </p>
+                </div>
+              </label>
+            </RadioGroup>
+
+            {!smsNotificationsEnabled && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                Les notifications SMS sont désactivées dans les paramètres planning. Seules les notifications email peuvent être envoyées.
+              </p>
+            )}
+          </div>
+
           <AlertDialogFooter>
             <AlertDialogCancel disabled={publishWeekMutation.isPending}>Annuler</AlertDialogCancel>
             <AlertDialogAction
@@ -794,7 +998,10 @@ function PlanningPageContent() {
               onClick={async (e) => {
                 e.preventDefault();
                 if (!currentWeek) return;
-                await publishWeekMutation.mutateAsync(currentWeek.id);
+                await publishWeekMutation.mutateAsync({
+                  weekId: currentWeek.id,
+                  notificationMode: publishNotificationMode,
+                });
                 setConfirmPublishOpen(false);
               }}
             >
@@ -841,9 +1048,7 @@ function PlanningPageContent() {
                       toast.error(msg);
                     }
                   }
-                  if (currentWeek) {
-                    qc.invalidateQueries({ queryKey: qk.planningWeeks.shifts(currentWeek.id) });
-                  }
+                  invalidatePlanningGridQueries();
                   if (okCount > 0 && errCount === 0) {
                     toast.success(`${okCount} shift${okCount > 1 ? "s supprimés" : " supprimé"}.`);
                   } else if (okCount > 0) {
