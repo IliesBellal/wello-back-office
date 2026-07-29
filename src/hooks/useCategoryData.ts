@@ -30,6 +30,7 @@ export const useCategoryData = () => {
         order: cat.order || 0,
         categ_order: cat.categ_order || cat.order || 0,
         bg_color: cat.bg_color,
+        image_url: cat.image_url,
         available: cat.available ?? cat.availability,
         products: cat.products || []
       }));
@@ -78,6 +79,7 @@ export const useCategoryData = () => {
         order: nextOrder,
         categ_order: nextOrder,
         bg_color: undefined,
+        image_url: undefined,
         available: true,
         products: []
       };
@@ -124,12 +126,49 @@ export const useCategoryData = () => {
     }
   };
 
+  const uploadCategoryImage = async (categoryId: string, file: File) => {
+    try {
+      const result = await menuService.uploadProductCategoryImage(categoryId, file);
+      setMenuData(prev => ({
+        ...prev,
+        products_types: prev.products_types.map(c =>
+          c.category_id === categoryId
+            ? { ...c, image_url: result.image_url }
+            : c
+        )
+      }));
+      return result;
+    } catch (error) {
+      console.error('Error uploading category image:', error);
+      throw error;
+    }
+  };
+
+  const deleteCategoryImage = async (categoryId: string) => {
+    try {
+      await menuService.deleteProductCategoryImage(categoryId);
+      setMenuData(prev => ({
+        ...prev,
+        products_types: prev.products_types.map(c =>
+          c.category_id === categoryId
+            ? { ...c, image_url: undefined }
+            : c
+        )
+      }));
+    } catch (error) {
+      console.error('Error deleting category image:', error);
+      throw error;
+    }
+  };
+
   return {
     menuData,
     loading,
     createProductCategory,
     updateCategory,
     deleteCategory,
+    uploadCategoryImage,
+    deleteCategoryImage,
     refreshCategoryData: loadData
   };
 };

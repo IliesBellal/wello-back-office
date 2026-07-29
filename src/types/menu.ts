@@ -253,6 +253,7 @@ export interface Category {
   order: number;
   categ_order?: number;  // Sort order for categories
   bg_color?: string;
+  image_url?: string;
   availability?: boolean;  // Availability status for the category
   available?: boolean;     // From new API format
   products: Product[];
