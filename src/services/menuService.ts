@@ -1161,7 +1161,7 @@ export const menuService = {
       async () => {
         // Real upload: use FormData and fetch directly (bypassing JSON serialization)
         const formData = new FormData();
-        formData.append('image', file);
+        formData.append('photo', file);
 
         const token = getStoredAuthToken();
 
