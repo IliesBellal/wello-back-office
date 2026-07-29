@@ -38,6 +38,7 @@ import type {
   Employee,
   EmployeeCreateRequest,
   EmployeeUpdateRequest,
+  EmployeeDisplayOrderRequest,
   EmployeeListFilters,
   EmployeeUserLinkRequest,
   EmployeeDocument,
@@ -595,6 +596,16 @@ export const planningEmployeesApi = {
     logAPI("DELETE", path);
     return apiClient
       .delete<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => { unwrap(resp); });
+  },
+
+  /** PATCH /planning/employees/display-order */
+  updateDisplayOrder(employeeIds: string[]): Promise<void> {
+    const payload: EmployeeDisplayOrderRequest = { employee_ids: employeeIds };
+    const path = `/planning/employees/display-order`;
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
       .then((resp) => { unwrap(resp); });
   },
 };

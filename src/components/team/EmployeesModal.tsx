@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { DndContext, type DragEndEvent, closestCenter } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 
 import {
   Dialog,
@@ -15,10 +18,11 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { ArrowLeft, Link2, Search, Unlink } from "lucide-react";
+import { ArrowLeft, GripVertical, Link2, Search, Unlink } from "lucide-react";
 
 import { planningEmployeesApi, usersApi } from "@/services/welloApi";
 import { qk } from "@/lib/queryKeys";
+import { cn } from "@/lib/utils";
 import type { Employee } from "@/types/planning";
 import type { LinkableUser } from "@/types/adminUsers";
 
@@ -29,7 +33,7 @@ interface EmployeesModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-// ─── Debounce helper ────────────────────────────────────────────────────────
+// ─── Debounce helper ──────────────────────────────────────────────────────────
 
 function useDebounced(value: string, delayMs: number): string {
   const [debounced, setDebounced] = useState(value);
@@ -38,6 +42,78 @@ function useDebounced(value: string, delayMs: number): string {
     return () => clearTimeout(t);
   }, [value, delayMs]);
   return debounced;
+}
+
+function SortableEmployeeRow({
+  employee,
+  onSelect,
+  dragDisabled,
+}: {
+  employee: Employee;
+  onSelect: (employee: Employee) => void;
+  dragDisabled?: boolean;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: employee.id,
+    disabled: dragDisabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.55 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "rounded-md border bg-card px-3 py-2.5 transition-colors",
+        isDragging && "bg-muted shadow-sm",
+      )}
+    >
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          disabled={dragDisabled}
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-40"
+          title="Glissez pour réorganiser"
+          aria-label="Glisser pour réorganiser l'ordre"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onSelect(employee)}
+          className="flex min-w-0 flex-1 items-start justify-between gap-2 text-left"
+        >
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium">
+              {employee.first_name} {employee.last_name}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">
+              {employee.position || "Aucun poste"}
+            </p>
+          </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              "shrink-0 text-xs",
+              employee.user_id
+                ? "bg-green-100 text-green-800 border-green-200"
+                : "bg-orange-100 text-orange-800 border-orange-200",
+            )}
+          >
+            {employee.user_id ? "Lié" : "Non lié"}
+          </Badge>
+        </button>
+      </div>
+    </div>
+  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -79,13 +155,46 @@ function EmployeesList({
   onSelect: (e: Employee) => void;
 }) {
   const debounced = useDebounced(search, 250);
+  const queryClient = useQueryClient();
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
   const { data, isLoading } = useQuery({
     queryKey: qk.planningEmployees.list({ search: debounced, page_size: 100 }),
     queryFn: () => planningEmployeesApi.list({ search: debounced, page_size: 100 }),
   });
 
-  const employees = data?.items ?? [];
+  useEffect(() => {
+    setEmployees(data?.items ?? []);
+  }, [data?.items]);
+
+  const reorderMutation = useMutation({
+    mutationFn: (employeeIds: string[]) => planningEmployeesApi.updateDisplayOrder(employeeIds),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: qk.planningEmployees.all });
+    },
+  });
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || reorderMutation.isPending) return;
+
+    const oldIndex = employees.findIndex((employee) => employee.id === active.id);
+    const newIndex = employees.findIndex((employee) => employee.id === over.id);
+
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const previousEmployees = employees;
+    const reorderedEmployees = arrayMove(employees, oldIndex, newIndex);
+
+    setEmployees(reorderedEmployees);
+
+    try {
+      await reorderMutation.mutateAsync(reorderedEmployees.map((employee) => employee.id));
+    } catch (err) {
+      setEmployees(previousEmployees);
+      toast.error(err instanceof Error ? err.message : "Erreur lors du réordonnancement");
+    }
+  };
 
   return (
     <>
@@ -116,35 +225,18 @@ function EmployeesList({
         ) : employees.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">Aucune fiche employé trouvée.</p>
         ) : (
-          employees.map((emp) => (
-            <button
-              key={emp.id}
-              type="button"
-              onClick={() => onSelect(emp)}
-              className="w-full text-left rounded-md border bg-card px-3 py-2.5 hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {emp.first_name} {emp.last_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {emp.position || "Aucun poste"}
-                  </p>
-                </div>
-                <Badge
-                  variant="outline"
-                  className={
-                    emp.user_id
-                      ? "text-xs bg-green-100 text-green-800 border-green-200 shrink-0"
-                      : "text-xs bg-orange-100 text-orange-800 border-orange-200 shrink-0"
-                  }
-                >
-                  {emp.user_id ? "Lié" : "Non lié"}
-                </Badge>
-              </div>
-            </button>
-          ))
+          <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={employees.map((emp) => emp.id)} strategy={verticalListSortingStrategy}>
+              {employees.map((emp) => (
+                <SortableEmployeeRow
+                  key={emp.id}
+                  employee={emp}
+                  onSelect={onSelect}
+                  dragDisabled={reorderMutation.isPending}
+                />
+              ))}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
     </>

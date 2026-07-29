@@ -176,6 +176,11 @@ export interface EmployeeCreateRequest {
 
 export type EmployeeUpdateRequest = Partial<EmployeeCreateRequest>;
 
+/** Body of the bulk employee display-order endpoint. */
+export interface EmployeeDisplayOrderRequest {
+  employee_ids: string[];
+}
+
 /** Query params accepted by `GET /planning/employees`. */
 export interface EmployeeListFilters {
   search?: string;
