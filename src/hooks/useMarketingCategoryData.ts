@@ -31,6 +31,7 @@ export const useMarketingCategoryData = () => {
         order: cat.order || cat.categ_order || 0,
         categ_order: cat.categ_order || cat.order || 0,
         bg_color: cat.bg_color,
+        image_url: cat.image_url,
         available: cat.available ?? true,
         products: cat.products || [], // Marketing categories don't have nested products
         product_count: cat.product_count ?? 0,
@@ -69,6 +70,7 @@ export const useMarketingCategoryData = () => {
         order: nextOrder,
         categ_order: nextOrder,
         bg_color: undefined,
+        image_url: undefined,
         available: true,
         products: []
       };
@@ -115,12 +117,49 @@ export const useMarketingCategoryData = () => {
     }
   };
 
+  const uploadMarketingCategoryImage = async (categoryId: string, file: File) => {
+    try {
+      const result = await menuService.uploadMarketingCategoryImage(categoryId, file);
+      setMenuData(prev => ({
+        ...prev,
+        products_types: prev.products_types.map(c =>
+          c.category_id === categoryId
+            ? { ...c, image_url: result.image_url }
+            : c
+        )
+      }));
+      return result;
+    } catch (error) {
+      console.error('Error uploading marketing category image:', error);
+      throw error;
+    }
+  };
+
+  const deleteMarketingCategoryImage = async (categoryId: string) => {
+    try {
+      await menuService.deleteMarketingCategoryImage(categoryId);
+      setMenuData(prev => ({
+        ...prev,
+        products_types: prev.products_types.map(c =>
+          c.category_id === categoryId
+            ? { ...c, image_url: undefined }
+            : c
+        )
+      }));
+    } catch (error) {
+      console.error('Error deleting marketing category image:', error);
+      throw error;
+    }
+  };
+
   return {
     menuData,
     loading,
     createMarketingCategory,
     updateMarketingCategory,
     deleteMarketingCategory,
+    uploadMarketingCategoryImage,
+    deleteMarketingCategoryImage,
     refreshMarketingCategoryData: loadData
   };
 };

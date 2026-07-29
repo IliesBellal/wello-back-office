@@ -7,6 +7,9 @@ interface MarketingCategoryApiItem {
   name: string;
   display_order?: number;
   available?: boolean;
+  image_url?: string;
+  product_count?: number;
+  product_ids?: string[];
 }
 
 // ============= Mock Data =============
@@ -474,6 +477,7 @@ export const menuService = {
           name: cat.name,
           order: cat.display_order ?? 0,
           categ_order: cat.display_order ?? 0,
+          image_url: cat.image_url,
           available: cat.available ?? true,
           products: [], // Marketing categories don't have nested products
           product_count: cat.product_count ?? 0,
@@ -1358,6 +1362,61 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.delete<void>(`/menu/marketing-categories/${categoryId}`)
+    );
+  },
+
+  async uploadMarketingCategoryImage(categoryId: string, file: File): Promise<{ image_url: string }> {
+    logAPI('PUT', `/menu/marketing-categories/${categoryId}/image`, { fileName: file.name, fileSize: file.size });
+
+    return withMock(
+      async () => {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return { image_url: `https://storage.welloresto.fr/merchants/2/marketing_categories/mock_${Date.now()}.jpg` };
+      },
+      async () => {
+        const formData = new FormData();
+        formData.append('photo', file);
+
+        const token = getStoredAuthToken();
+
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/marketing-categories/${categoryId}/image`, {
+          method: 'PUT',
+          headers,
+          body: formData
+        });
+
+        if (!response.ok) {
+          let errorMessage = 'Upload failed';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorMessage;
+          } catch {
+            // ignore
+          }
+          throw new Error(errorMessage);
+        }
+
+        const data = await response.json() as WelloApiResponse<{ image_url?: string; photo_url?: string }>;
+        const imageUrl = data.data?.image_url || data.data?.photo_url;
+        if (!imageUrl) {
+          throw new Error('Image URL not returned by API');
+        }
+
+        return { image_url: imageUrl };
+      }
+    );
+  },
+
+  async deleteMarketingCategoryImage(categoryId: string): Promise<void> {
+    logAPI('DELETE', `/menu/marketing-categories/${categoryId}/image`);
+    return withMock(
+      () => undefined,
+      () => apiClient.delete<void>(`/menu/marketing-categories/${categoryId}/image`)
     );
   },
 

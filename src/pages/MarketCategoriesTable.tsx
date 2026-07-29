@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useMarketingCategoryData } from '@/hooks/useMarketingCategoryData';
 import { Category } from '@/types/menu';
-import { Plus, Pencil, Trash2, GripVertical, LinkIcon } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, LinkIcon, ImageIcon, Upload, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import {
@@ -43,6 +43,10 @@ interface SortableCategoryRowProps {
   onEdit: (category: Category) => void;
   onDelete: (categoryId: string) => void;
   onBulkAssign: (category: Category) => void;
+  onImageUpload: (categoryId: string) => void;
+  onImageDelete: (categoryId: string) => void;
+  isImageUploading: boolean;
+  canDeleteImage: boolean;
 }
 
 const SortableCategoryRow = ({
@@ -51,6 +55,10 @@ const SortableCategoryRow = ({
   onEdit,
   onDelete,
   onBulkAssign,
+  onImageUpload,
+  onImageDelete,
+  isImageUploading,
+  canDeleteImage,
 }: SortableCategoryRowProps) => {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.category_id,
@@ -75,6 +83,41 @@ const SortableCategoryRow = ({
         </div>
       </TableCell>
       <TableCell className="font-medium">{category.category_name || category.category}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <div className="h-12 w-12 rounded-md border border-border bg-muted/30 overflow-hidden flex items-center justify-center">
+            {category.image_url ? (
+              <img
+                src={category.image_url}
+                alt={category.category_name || category.category}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <ImageIcon className="w-4 h-4 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onImageUpload(category.category_id)}
+              disabled={isImageUploading}
+              title={category.image_url ? 'Remplacer l\'image' : 'Ajouter une image'}
+            >
+              {isImageUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onImageDelete(category.category_id)}
+              disabled={!canDeleteImage || isImageUploading}
+              title="Supprimer l'image"
+            >
+              <Trash2 className="w-4 h-4 text-destructive" />
+            </Button>
+          </div>
+        </div>
+      </TableCell>
       <TableCell className="text-sm text-muted-foreground">
         {category.categ_order ?? category.order ?? 0}
       </TableCell>
@@ -83,30 +126,30 @@ const SortableCategoryRow = ({
       </TableCell>
       <TableCell className="text-right">
         <div className="flex items-center justify-end gap-1">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onBulkAssign(category)}
-          title="Assigner des produits"
-        >
-          <LinkIcon className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onEdit(category)}
-          title="Éditer la catégorie"
-        >
-          <Pencil className="w-4 h-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(category.category_id)}
-          title="Supprimer la catégorie"
-        >
-          <Trash2 className="w-4 h-4 text-destructive" />
-        </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onBulkAssign(category)}
+            title="Assigner des produits"
+          >
+            <LinkIcon className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(category)}
+            title="Éditer la catégorie"
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(category.category_id)}
+            title="Supprimer la catégorie"
+          >
+            <Trash2 className="w-4 h-4 text-destructive" />
+          </Button>
         </div>
       </TableCell>
     </TableRow>
@@ -114,7 +157,15 @@ const SortableCategoryRow = ({
 };
 
 export default function MarketCategoriesTable() {
-  const { menuData, loading, createMarketingCategory, updateMarketingCategory, deleteMarketingCategory } = useMarketingCategoryData();
+  const {
+    menuData,
+    loading,
+    createMarketingCategory,
+    updateMarketingCategory,
+    deleteMarketingCategory,
+    uploadMarketingCategoryImage,
+    deleteMarketingCategoryImage,
+  } = useMarketingCategoryData();
   const [categories, setCategories] = useState<Category[]>([]);
   const [newCategoryName, setNewCategoryName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -123,12 +174,13 @@ export default function MarketCategoriesTable() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [bulkAssignOpen, setBulkAssignOpen] = useState(false);
   const [selectedCategoryForBulk, setSelectedCategoryForBulk] = useState<Category | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [imageUploadingCategoryId, setImageUploadingCategoryId] = useState<string | null>(null);
   const saveOrderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const { toast } = useToast();
 
   useEffect(() => {
@@ -175,15 +227,15 @@ export default function MarketCategoriesTable() {
 
     try {
       await updateMarketingCategory(categoryId, editingName);
-      
+
       // Update order if changed
       const updatedCategory = categories.find(c => c.category_id === categoryId);
       if (updatedCategory && editingOrder !== (updatedCategory.categ_order ?? updatedCategory.order ?? 0)) {
-        const newCategories = categories.map(c => 
+        const newCategories = categories.map(c =>
           c.category_id === categoryId ? { ...c, categ_order: editingOrder } : c
         );
         setCategories(newCategories);
-        
+
         // Debounce save
         if (saveOrderTimeoutRef.current) {
           clearTimeout(saveOrderTimeoutRef.current);
@@ -192,7 +244,7 @@ export default function MarketCategoriesTable() {
           debouncedSaveOrder(newCategories);
         }, 500);
       }
-      
+
       setEditingId(null);
       setEditingName('');
       setEditingOrder(0);
@@ -262,6 +314,72 @@ export default function MarketCategoriesTable() {
       });
     } finally {
       setIsAssigning(false);
+    }
+  };
+
+  const handleImageUploadClick = (categoryId: string) => {
+    fileInputRefs.current[categoryId]?.click();
+  };
+
+  const handleImageFileChange = async (categoryId: string, file: File | null) => {
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Format invalide',
+        description: 'Veuillez sélectionner un fichier JPG, PNG ou WebP.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      toast({
+        title: 'Fichier trop volumineux',
+        description: `La taille maximale autorisée est de 5 Mo. Votre fichier fait ${(file.size / 1024 / 1024).toFixed(2)} Mo.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setImageUploadingCategoryId(categoryId);
+    try {
+      await uploadMarketingCategoryImage(categoryId, file);
+      toast({
+        title: 'Succès',
+        description: 'Image de catégorie mise à jour.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible d\'uploader l\'image.',
+        variant: 'destructive',
+      });
+    } finally {
+      if (fileInputRefs.current[categoryId]) {
+        fileInputRefs.current[categoryId]!.value = '';
+      }
+      setImageUploadingCategoryId(null);
+    }
+  };
+
+  const handleImageDelete = async (categoryId: string) => {
+    setImageUploadingCategoryId(categoryId);
+    try {
+      await deleteMarketingCategoryImage(categoryId);
+      toast({
+        title: 'Succès',
+        description: 'Image de catégorie supprimée.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: error instanceof Error ? error.message : 'Impossible de supprimer l\'image.',
+        variant: 'destructive',
+      });
+    } finally {
+      setImageUploadingCategoryId(null);
     }
   };
 
@@ -337,6 +455,7 @@ export default function MarketCategoriesTable() {
                 <TableRow>
                   <TableHead className="w-10"></TableHead>
                   <TableHead>Nom</TableHead>
+                  <TableHead className="w-64">Image</TableHead>
                   <TableHead className="w-20">Ordre</TableHead>
                   <TableHead className="text-center">Produits</TableHead>
                   <TableHead className="w-32 text-right">Actions</TableHead>
@@ -345,7 +464,7 @@ export default function MarketCategoriesTable() {
               <TableBody>
                 {categories.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       Aucune catégorie. Créez-en une pour commencer.
                     </TableCell>
                   </TableRow>
@@ -354,7 +473,7 @@ export default function MarketCategoriesTable() {
                     <SortableContext items={categories.map((c) => c.category_id)} strategy={verticalListSortingStrategy}>
                       {categories.map((category) => {
                         const productCount = category.product_count ?? 0;
-                        
+
                         return editingId === category.category_id ? (
                           <TableRow key={category.category_id}>
                             <TableCell></TableCell>
@@ -372,6 +491,7 @@ export default function MarketCategoriesTable() {
                                 autoFocus
                               />
                             </TableCell>
+                            <TableCell></TableCell>
                             <TableCell>
                               <Input
                                 type="number"
@@ -411,6 +531,10 @@ export default function MarketCategoriesTable() {
                             onEdit={handleEdit}
                             onDelete={handleDelete}
                             onBulkAssign={handleBulkAssign}
+                            onImageUpload={handleImageUploadClick}
+                            onImageDelete={handleImageDelete}
+                            isImageUploading={imageUploadingCategoryId === category.category_id}
+                            canDeleteImage={Boolean(category.image_url)}
                           />
                         );
                       })}
@@ -419,6 +543,19 @@ export default function MarketCategoriesTable() {
                 )}
               </TableBody>
             </Table>
+            {categories.map((category) => (
+              <input
+                key={`image-input-${category.category_id}`}
+                ref={(element) => {
+                  fileInputRefs.current[category.category_id] = element;
+                }}
+                type="file"
+                accept=".jpg,.jpeg,.png,.webp"
+                className="hidden"
+                onChange={(event) => handleImageFileChange(category.category_id, event.target.files?.[0] || null)}
+                disabled={imageUploadingCategoryId === category.category_id}
+              />
+            ))}
           </div>
         </div>
         </div>
