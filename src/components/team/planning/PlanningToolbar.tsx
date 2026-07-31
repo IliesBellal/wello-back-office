@@ -18,6 +18,7 @@ import {
   Settings,
   Trash2,
   UserPlus,
+  IdCard,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -64,6 +65,7 @@ interface PlanningToolbarProps {
   // Menu secondaire
   onOpenPositions: () => void;
   onCreateEmployee: () => void;
+  onOpenEmployees: () => void;
   onOpenHolidays: () => void;
   onOpenSettings: () => void;
   onOpenPerformance: () => void;
@@ -150,6 +152,7 @@ export function PlanningToolbar({
   unpublishPending,
   onOpenPositions,
   onCreateEmployee,
+  onOpenEmployees,
   onOpenHolidays,
   onOpenSettings,
   onOpenPerformance,
@@ -338,6 +341,10 @@ export function PlanningToolbar({
             <DropdownMenuItem onClick={onCreateEmployee}>
               <UserPlus className="mr-2 h-4 w-4" />
               Créer une fiche employé
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onOpenEmployees}>
+              <IdCard className="mr-2 h-4 w-4" />
+              Fiches employés
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onOpenShiftTemplates}>
               <Layout className="mr-2 h-4 w-4" />

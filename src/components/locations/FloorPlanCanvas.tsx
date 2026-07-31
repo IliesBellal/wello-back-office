@@ -7,6 +7,9 @@ import { AreaShape } from './AreaShape';
 import { DrawingLayer } from './DrawingLayer';
 import type { Location, Obstacle, Area, AreaPoint } from '@/services/locationsService';
 
+// Marge minimale (px) entre le canvas et les bords de son conteneur.
+const CANVAS_PADDING = 48;
+
 interface FloorPlanCanvasProps {
   locations: Location[];
   obstacles: Obstacle[];
@@ -72,8 +75,12 @@ export function FloorPlanCanvas({
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // Utiliser le minimum pour garder le ratio 1:1 (carré responsive)
-  const canvasSize = Math.min(containerSize.width, containerSize.height);
+  // Utiliser le minimum pour garder le ratio 1:1 (carré responsive), avec une
+  // marge de respiration autour du canvas sur l'axe contraignant.
+  const canvasSize = Math.max(
+    0,
+    Math.min(containerSize.width, containerSize.height) - CANVAS_PADDING * 2
+  );
   const scaleRatio = canvasSize / 1000; // Pixels per virtual unit
 
   const handleStageClick = (e: any) => {
@@ -109,7 +116,7 @@ export function FloorPlanCanvas({
   return (
     <div
       ref={containerRef}
-      className="flex-1 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden flex items-center justify-center"
+      className="h-full w-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 overflow-hidden flex items-center justify-center"
       style={{ minHeight: '400px' }}
     >
       {isLoading ? (

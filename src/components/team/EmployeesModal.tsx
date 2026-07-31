@@ -14,23 +14,59 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { ArrowLeft, GripVertical, Link2, Search, Unlink } from "lucide-react";
+import { ArrowLeft, GripVertical, Link2, Search, Unlink, Save, AlertCircle } from "lucide-react";
 
-import { planningEmployeesApi, usersApi } from "@/services/welloApi";
+import { planningEmployeesApi, planningPositionsApi, planningRefsApi, usersApi } from "@/services/welloApi";
 import { qk } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 import type { Employee } from "@/types/planning";
 import type { LinkableUser } from "@/types/adminUsers";
+import { EmployeeHrFieldsCards } from "@/components/team/EmployeeHrFieldsCards";
+import {
+  EMPTY_HR_FORM,
+  centsToEuroInput,
+  emptyToNull,
+  hrFormToPatch,
+  numToInput,
+  validateEmployeeHrForm,
+  type EmployeeHrForm,
+} from "@/components/team/employeeHrFields";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface EmployeesModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When provided, the modal opens directly on this employee's detail (skipping the roster list). */
+  initialEmployee?: Employee | null;
+}
+
+function employeeToForm(e: Employee): EmployeeHrForm {
+  return {
+    position_id: e.position_id ?? "",
+    job_title: e.job_title ?? "",
+    role: e.role ?? "",
+    contract_type_code: e.contract_type_code ?? "",
+    contract_start_date: e.contract_start_date ? e.contract_start_date.slice(0, 10) : "",
+    contract_end_date: e.contract_end_date ? e.contract_end_date.slice(0, 10) : "",
+    probation_end_date: e.probation_end_date ? e.probation_end_date.slice(0, 10) : "",
+    last_medical_checkup_date: e.last_medical_checkup_date ? e.last_medical_checkup_date.slice(0, 10) : "",
+    contract_hours: numToInput(e.contract_hours),
+    max_weekly_hours: numToInput(e.max_weekly_hours),
+    required_rest_days: numToInput(e.required_rest_days),
+    sunday_premium: !!e.sunday_premium,
+    night_premium: !!e.night_premium,
+    employer_charges_pct: numToInput(e.employer_charges_pct),
+    hourly_rate_eur: centsToEuroInput(e.hourly_rate),
+    gross_monthly_salary_eur: centsToEuroInput(e.gross_monthly_salary),
+    transport_cost_eur: centsToEuroInput(e.transport_cost),
+    hr_comment: e.hr_comment ?? "",
+  };
 }
 
 // ─── Debounce helper ──────────────────────────────────────────────────────────
@@ -118,23 +154,23 @@ function SortableEmployeeRow({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function EmployeesModal({ open, onOpenChange }: EmployeesModalProps) {
+export function EmployeesModal({ open, onOpenChange, initialEmployee = null }: EmployeesModalProps) {
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<Employee | null>(null);
 
-  // Reset local state each time the modal opens.
+  // Reset local state each time the modal opens (or jump straight to `initialEmployee` if provided).
   useEffect(() => {
     if (open) {
       setSearch("");
-      setSelected(null);
+      setSelected(initialEmployee);
     }
-  }, [open]);
+  }, [open, initialEmployee]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         {selected ? (
-          <EmployeeDetail employee={selected} onBack={() => setSelected(null)} />
+          <EmployeeDetail employee={selected} onBack={() => setSelected(null)} onUpdated={setSelected} />
         ) : (
           <EmployeesList search={search} onSearchChange={setSearch} onSelect={setSelected} />
         )}
@@ -243,12 +279,45 @@ function EmployeesList({
   );
 }
 
-// ─── Detail view (fiche employé minimale) ─────────────────────────────────────
+// ─── Detail view (fiche employé complète, éditable) ───────────────────────────
 
-function EmployeeDetail({ employee, onBack }: { employee: Employee; onBack: () => void }) {
+function EmployeeDetail({
+  employee,
+  onBack,
+  onUpdated,
+}: {
+  employee: Employee;
+  onBack: () => void;
+  onUpdated: (employee: Employee) => void;
+}) {
   const queryClient = useQueryClient();
   const [linkOpen, setLinkOpen] = useState(false);
   const [unlinkOpen, setUnlinkOpen] = useState(false);
+
+  const [firstName, setFirstName] = useState(employee.first_name);
+  const [lastName, setLastName] = useState(employee.last_name);
+  const [email, setEmail] = useState(employee.email ?? "");
+  const [phone, setPhone] = useState(employee.phone ?? "");
+  const [hrForm, setHrForm] = useState<EmployeeHrForm>(() => employeeToForm(employee));
+
+  // Re-seed local state whenever we switch to a different (or freshly-saved) employee.
+  useEffect(() => {
+    setFirstName(employee.first_name);
+    setLastName(employee.last_name);
+    setEmail(employee.email ?? "");
+    setPhone(employee.phone ?? "");
+    setHrForm(employeeToForm(employee));
+  }, [employee]);
+
+  const { data: positions = [] } = useQuery({
+    queryKey: qk.planningPositions.all,
+    queryFn: () => planningPositionsApi.list(),
+  });
+
+  const { data: contractTypes = [] } = useQuery({
+    queryKey: qk.planningRefs.contractTypes,
+    queryFn: () => planningRefsApi.contractTypes(),
+  });
 
   const { data: linkedUser } = useQuery({
     queryKey: employee.user_id ? qk.users.detail(employee.user_id) : (["users", "detail", "none"] as const),
@@ -256,12 +325,49 @@ function EmployeeDetail({ employee, onBack }: { employee: Employee; onBack: () =
     enabled: !!employee.user_id,
   });
 
+  const set = <K extends keyof EmployeeHrForm>(key: K, value: EmployeeHrForm[K]) => {
+    setHrForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const errors: string[] = [];
+  if (!firstName.trim()) errors.push("Le prénom est obligatoire.");
+  if (!lastName.trim()) errors.push("Le nom est obligatoire.");
+  errors.push(...validateEmployeeHrForm(hrForm));
+  const hasErrors = errors.length > 0;
+
+  const invalidateLinkedUserQueries = () => {
+    if (!employee.user_id) return;
+    queryClient.invalidateQueries({ queryKey: qk.users.member(employee.user_id) });
+    queryClient.invalidateQueries({ queryKey: qk.users.detail(employee.user_id) });
+    queryClient.invalidateQueries({ queryKey: qk.users.all });
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      planningEmployeesApi.update(employee.id, {
+        first_name: firstName.trim(),
+        last_name: lastName.trim(),
+        email: emptyToNull(email.trim()),
+        phone: emptyToNull(phone.trim()),
+        ...hrFormToPatch(hrForm),
+      }),
+    onSuccess: (updated) => {
+      toast.success("Fiche employé enregistrée");
+      queryClient.invalidateQueries({ queryKey: qk.planningEmployees.all });
+      invalidateLinkedUserQueries();
+      onUpdated(updated);
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de l'enregistrement");
+    },
+  });
+
   const unlinkMutation = useMutation({
     mutationFn: () => planningEmployeesApi.deleteUserLink(employee.id),
     onSuccess: () => {
       toast.success("Compte délié de la fiche employé");
       queryClient.invalidateQueries({ queryKey: qk.planningEmployees.all });
-      queryClient.invalidateQueries({ queryKey: qk.users.all });
+      invalidateLinkedUserQueries();
       onBack();
     },
     onError: (err) => {
@@ -283,15 +389,25 @@ function EmployeeDetail({ employee, onBack }: { employee: Employee; onBack: () =
         <DialogDescription>{employee.position || "Aucun poste"}</DialogDescription>
       </DialogHeader>
 
-      <div className="mt-2 space-y-4">
-        {(employee.email || employee.phone) && (
-          <Card>
-            <CardContent className="p-3 space-y-1 text-sm">
-              {employee.email && <p>{employee.email}</p>}
-              {employee.phone && <p className="text-muted-foreground">{employee.phone}</p>}
-            </CardContent>
-          </Card>
-        )}
+      <div className="mt-2 space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-emp-fn" className="text-xs">Prénom *</Label>
+            <Input id="edit-emp-fn" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-emp-ln" className="text-xs">Nom *</Label>
+            <Input id="edit-emp-ln" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-emp-email" className="text-xs">Email</Label>
+            <Input id="edit-emp-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="edit-emp-phone" className="text-xs">Téléphone</Label>
+            <Input id="edit-emp-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          </div>
+        </div>
 
         {employee.user_id ? (
           <Card>
@@ -315,11 +431,37 @@ function EmployeeDetail({ employee, onBack }: { employee: Employee; onBack: () =
         ) : linkOpen ? (
           <LinkAccountPanel employeeId={employee.id} onDone={onBack} onCancel={() => setLinkOpen(false)} />
         ) : (
-          <Button size="sm" onClick={() => setLinkOpen(true)}>
+          <Button size="sm" variant="outline" onClick={() => setLinkOpen(true)}>
             <Link2 className="h-4 w-4 mr-2" />
             Lier un compte utilisateur
           </Button>
         )}
+
+        <EmployeeHrFieldsCards form={hrForm} set={set} positions={positions} contractTypes={contractTypes} />
+
+        {hasErrors && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm space-y-1">
+            {errors.map((err, i) => (
+              <div key={i} className="flex items-start gap-2 text-destructive">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>{err}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="flex justify-end pt-4 border-t border-border">
+          <Button onClick={() => saveMutation.mutate()} disabled={hasErrors || saveMutation.isPending}>
+            {saveMutation.isPending ? (
+              "Enregistrement…"
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Enregistrer
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       <ConfirmDialog

@@ -1,4 +1,4 @@
-import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
+import { apiClient, withMock, logAPI, WelloApiResponse, API_BASE_URL } from "@/services/apiClient";
 import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
 import { getStoredAuthToken } from "@/types/auth";
 
@@ -609,6 +609,25 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.patch<void>(`/menu/products/${productId}/availability`, { status: status.toString() })
+    );
+  },
+
+  async updateProductAllergens(productId: string, allergenIds: string[]): Promise<void> {
+    const payload = { allergen_ids: allergenIds };
+    logAPI('PUT', `/menu/products/${productId}/allergens`, payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.put<void>(`/menu/products/${productId}/allergens`, payload)
+    );
+  },
+
+  // Remplace la liste complète des groupes d'attributs (options/suppléments) assignés à un produit.
+  async updateProductAttributes(productId: string, attributeIds: string[]): Promise<void> {
+    const payload = { configuration: attributeIds };
+    logAPI('PATCH', `/menu/products/${productId}/attributes`, payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/products/${productId}/attributes`, payload)
     );
   },
 
@@ -1283,6 +1302,36 @@ export const menuService = {
     return withMock(
       () => [...mockAllergens],
       () => apiClient.get<WelloApiResponse<Allergen[]>>('/allergens').then(res => res.data)
+    );
+  },
+
+  async downloadAllergensPoster(): Promise<void> {
+    logAPI('GET', '/menu/products/allergens/poster.pdf');
+    return withMock(
+      () => {
+        const link = document.createElement('a');
+        link.href = '/mock-allergenes-poster.pdf';
+        link.download = 'poster-allergenes.pdf';
+        link.click();
+      },
+      async () => {
+        const response = await fetch(`${API_BASE_URL}/menu/products/allergens/poster.pdf`, {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${getStoredAuthToken() || ''}`,
+          },
+        });
+
+        if (!response.ok) throw new Error('Export failed');
+
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'poster-allergenes.pdf';
+        link.click();
+        window.URL.revokeObjectURL(url);
+      }
     );
   },
 

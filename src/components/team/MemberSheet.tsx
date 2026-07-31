@@ -122,6 +122,7 @@ export function MemberSheet({ member, open, onOpenChange, onUpdated }: MemberShe
   const isMemberAdmin = detail?.admin ?? member?.admin ?? false;
   const initials = memberInitials(firstName, lastName);
   const userId = member?.user_id ?? null;
+  const employeeId = detail?.employee_id ?? null;
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -196,11 +197,11 @@ export function MemberSheet({ member, open, onOpenChange, onUpdated }: MemberShe
             </TabsContent>
 
             <TabsContent value="contract" className="mt-4 flex-1 min-h-0 overflow-y-auto">
-              <ContractTab userId={userId} isActive={activeTab === "contract"} />
+              <ContractTab userId={userId} employeeId={employeeId} isActive={activeTab === "contract"} />
             </TabsContent>
 
             <TabsContent value="documents" className="mt-4 flex-1 min-h-0 overflow-y-auto">
-              <DocumentsTab userId={userId} />
+              <DocumentsTab employeeId={employeeId} onGoToContract={() => setActiveTab("contract")} />
             </TabsContent>
 
             {isAdmin && (

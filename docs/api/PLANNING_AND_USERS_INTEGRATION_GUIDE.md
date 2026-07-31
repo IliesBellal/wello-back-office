@@ -450,8 +450,8 @@ Champs supportés :
 - `contract_hours`
 - `max_weekly_hours`
 - `required_rest_days`
-- `sunday_premium`
-- `night_premium`
+- `sunday_premium` (bool — éligibilité de l'employé à la majoration dimanche, cf. `planning_settings.sunday_multiplier`)
+- `night_premium` (bool — éligibilité de l'employé à la majoration nuit, cf. `planning_settings.night_shift_multiplier`)
 - `hourly_rate`
 - `gross_monthly_salary`
 - `employer_charges_pct`
@@ -823,6 +823,7 @@ Champs renvoyés :
 - `night_shift_end`
 - `night_shift_multiplier`
 - `holiday_multiplier`
+- `sunday_multiplier`
 - `allow_override_warnings`
 - `attendance_source`
 - `shift_swap_approval_mode`

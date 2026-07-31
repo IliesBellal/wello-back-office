@@ -63,8 +63,10 @@ export interface MerchantUserPlanning {
   contract_hours?: number | null;
   max_weekly_hours?: number | null;
   required_rest_days?: number | null;
-  sunday_premium?: number | null;
-  night_premium?: number | null;
+  /** Éligibilité à la majoration dimanche (le taux vient de `PlanningSettings.sunday_multiplier`). */
+  sunday_premium?: boolean;
+  /** Éligibilité à la majoration nuit (le taux vient de `PlanningSettings.night_shift_multiplier`). */
+  night_premium?: boolean;
   hourly_rate?: number | null;
   gross_monthly_salary?: number | null;
   employer_charges_pct?: number | null;
@@ -175,8 +177,8 @@ export interface MerchantUserPlanningUpsertRequest {
   contract_hours?: number | null;
   max_weekly_hours?: number | null;
   required_rest_days?: number | null;
-  sunday_premium?: number | null;
-  night_premium?: number | null;
+  sunday_premium?: boolean;
+  night_premium?: boolean;
   hourly_rate?: number | null;
   gross_monthly_salary?: number | null;
   employer_charges_pct?: number | null;

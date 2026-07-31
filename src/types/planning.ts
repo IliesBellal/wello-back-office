@@ -22,6 +22,14 @@ export type AttendanceSource = "pointage" | "planning";
 /** Shift swap approval mode (planning settings). */
 export type ShiftSwapApprovalMode = "manager_required" | "target_employee_required";
 
+/**
+ * How night/Sunday premiums combine when they overlap on the same worked hour.
+ * - `additive` : rates stack (e.g. +25% night + 50% Sunday = +75%).
+ * - `highest`  : single max rate wins — legal default absent a convention clause.
+ * - `fixed`    : `night_sunday_combined_multiplier` applies instead of either rate.
+ */
+export type PremiumCumulationMode = "additive" | "highest" | "fixed";
+
 /** Notification mode used when publishing a planning week. */
 export type PlanningPublishNotificationMode = "all" | "changes_only" | "none";
 
@@ -38,6 +46,11 @@ export interface PlanningSettings {
   night_shift_end: string;
   night_shift_multiplier: number;
   holiday_multiplier: number;
+  sunday_multiplier: number;
+  /** How night/Sunday premiums combine when they overlap. Default `highest`. */
+  premium_cumulation_mode: PremiumCumulationMode;
+  /** Only meaningful when `premium_cumulation_mode = "fixed"`. */
+  night_sunday_combined_multiplier?: number | null;
   allow_override_warnings: boolean;
   attendance_source: AttendanceSource;
   shift_swap_approval_mode: ShiftSwapApprovalMode;
@@ -56,6 +69,9 @@ export interface PlanningSettingsUpdateRequest {
   night_shift_end?: string;
   night_shift_multiplier?: number;
   holiday_multiplier?: number;
+  sunday_multiplier?: number;
+  premium_cumulation_mode?: PremiumCumulationMode;
+  night_sunday_combined_multiplier?: number | null;
   allow_override_warnings?: boolean;
   attendance_source?: AttendanceSource;
   shift_swap_approval_mode?: ShiftSwapApprovalMode;
@@ -125,8 +141,10 @@ export interface Employee {
   contract_hours?: number | null;
   max_weekly_hours?: number | null;
   required_rest_days?: number | null;
-  sunday_premium?: number | null;
-  night_premium?: number | null;
+  /** Éligibilité à la majoration dimanche (le taux vient de `PlanningSettings.sunday_multiplier`). */
+  sunday_premium: boolean;
+  /** Éligibilité à la majoration nuit (le taux vient de `PlanningSettings.night_shift_multiplier`). */
+  night_premium: boolean;
   hourly_rate?: number | null;
   gross_monthly_salary?: number | null;
   employer_charges_pct?: number | null;
@@ -160,8 +178,8 @@ export interface EmployeeCreateRequest {
   contract_hours?: number | null;
   max_weekly_hours?: number | null;
   required_rest_days?: number | null;
-  sunday_premium?: number | null;
-  night_premium?: number | null;
+  sunday_premium?: boolean;
+  night_premium?: boolean;
   hourly_rate?: number | null;
   gross_monthly_salary?: number | null;
   employer_charges_pct?: number | null;
@@ -696,6 +714,33 @@ export interface PlanningShiftSwapRequestFilters {
   status?: ShiftSwapStatus;
   page?: number;
   page_size?: number;
+}
+
+// ============= Day comments (note du jour, back-office only) =============
+
+/**
+ * `GET /planning/day-comments` -> `data.day_comments[]`.
+ * `PUT /planning/day-comments/{date}` -> `data.day_comment`.
+ *
+ * Une note de jour = un texte libre par (établissement, jour calendaire),
+ * indépendant des `PlanningWeek`/`PlanningShift`. Éditable/supprimable
+ * uniquement côté back-office ; le POS ne fait que l'exposer (voir
+ * `day_comments` dans la réponse `GET /planning/me/team-week`).
+ */
+export interface PlanningDayComment {
+  id: string;
+  merchant_id: string;
+  comment_date: string;
+  comment: string;
+  created_by?: string | null;
+  updated_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Body of `PUT /planning/day-comments/{date}`. Un commentaire vide est rejeté par l'API — utiliser DELETE pour effacer. */
+export interface PlanningDayCommentUpsertRequest {
+  comment: string;
 }
 
 // ============= POS Holidays (rendu en fond de colonne planning) =============

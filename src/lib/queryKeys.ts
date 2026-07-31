@@ -16,6 +16,7 @@ export const qk = {
     list: (filters?: MerchantUserListFilters) => ["users", "list", filters ?? {}] as const,
     detail: (id: string) => ["users", "detail", id] as const,
     rights: (id: string) => ["users", "rights", id] as const,
+    member: (id: string) => ["users", "member", id] as const,
     linkableSearch: (search: string) => ["users", "linkable-search", search] as const,
   },
 
@@ -61,6 +62,12 @@ export const qk = {
   planningHolidays: {
     all: ["planning", "holidays"] as const,
     range: (from: string, to: string) => ["planning", "holidays", from, to] as const,
+  },
+
+  // ─── Planning – Day Comments ──────────────────────────────
+  planningDayComments: {
+    all: ["planning", "day-comments"] as const,
+    range: (from: string, to: string) => ["planning", "day-comments", from, to] as const,
   },
 
   // ─── Planning – Employees ─────────────────────────────────

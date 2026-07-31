@@ -2,12 +2,12 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Tile } from '@/components/shared/Tile';
+import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
-import { DatePicker } from '@/components/ui/date-picker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Download,
@@ -24,6 +24,7 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { toUTCDateString } from '@/utils/apiDate';
 import { useToast } from '@/hooks/use-toast';
 import {
   HaccpActivity,
@@ -170,33 +171,6 @@ const getActivitySummary = (activity: HaccpActivity): string => {
 };
 
 const getCorrectiveActionsSummary = (activity: HaccpActivity): string | null => {
-  if (activity.type === 'traceability') {
-    const photosCount = toFiniteNumber(activity.metadata?.photos_count);
-    const hasComment = activity.metadata?.has_comment === true;
-
-    if (!photosCount && !hasComment) {
-      return null;
-    }
-
-    return (
-      <div className="space-y-1">
-        <div>{summary}</div>
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          {photosCount && photosCount > 0 && (
-            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">
-              {photosCount} photo{photosCount > 1 ? 's' : ''}
-            </Badge>
-          )}
-          {hasComment && (
-            <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-50">
-              Commentaire
-            </Badge>
-          )}
-        </div>
-      </div>
-    );
-  }
-
   if (activity.type !== 'temperatures') {
     return null;
   }
@@ -218,8 +192,47 @@ const getCorrectiveActionsSummary = (activity: HaccpActivity): string | null => 
   return null;
 };
 
+const getTraceabilityMetadataSummary = (activity: HaccpActivity): React.ReactNode | null => {
+  if (activity.type !== 'traceability') {
+    return null;
+  }
+
+  const photosCount = toFiniteNumber(activity.metadata?.photos_count);
+  const hasComment = activity.metadata?.has_comment === true;
+
+  if (!photosCount && !hasComment) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+      {photosCount && photosCount > 0 && (
+        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">
+          {photosCount} photo{photosCount > 1 ? 's' : ''}
+        </Badge>
+      )}
+      {hasComment && (
+        <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-50">
+          Commentaire
+        </Badge>
+      )}
+    </div>
+  );
+};
+
 const getActivityDetails = (activity: HaccpActivity): React.ReactNode => {
   const summary = getActivitySummary(activity);
+  const traceabilityMetadataSummary = getTraceabilityMetadataSummary(activity);
+
+  if (traceabilityMetadataSummary) {
+    return (
+      <div className="space-y-1">
+        <div>{summary}</div>
+        {traceabilityMetadataSummary}
+      </div>
+    );
+  }
+
   const correctiveActionsSummary = getCorrectiveActionsSummary(activity);
 
   if (!correctiveActionsSummary) {
@@ -243,7 +256,10 @@ const getActivityDetails = (activity: HaccpActivity): React.ReactNode => {
 };
 
 export const Activity = () => {
-  const [selectedDate, setSelectedDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'));
+  const [selectedRange, setSelectedRange] = useState<{ from: Date; to: Date }>(() => {
+    const today = new Date();
+    return { from: today, to: today };
+  });
   const [typeFilter, setTypeFilter] = useState<HaccpActivityTypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<HaccpActivityStatusFilter>('all');
   const [page, setPage] = useState(1);
@@ -269,14 +285,15 @@ export const Activity = () => {
 
   useEffect(() => {
     setPage(1);
-  }, [selectedDate, typeFilter, statusFilter]);
+  }, [selectedRange, typeFilter, statusFilter]);
 
   useEffect(() => {
     const loadActivity = async () => {
       setLoading(true);
       try {
         const response = await getHaccpActivities({
-          date: selectedDate,
+          from: toUTCDateString(selectedRange.from),
+          to: toUTCDateString(selectedRange.to),
           page,
           pageSize: 20,
           type: typeFilter,
@@ -296,7 +313,7 @@ export const Activity = () => {
     };
 
     loadActivity();
-  }, [selectedDate, page, typeFilter, statusFilter, toast]);
+  }, [selectedRange, page, typeFilter, statusFilter, toast]);
 
   const stats = useMemo(() => {
     const done = records.filter((record) => record.status === 'done').length;
@@ -367,7 +384,10 @@ export const Activity = () => {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="w-full">
-                <DatePicker value={selectedDate} onDateChange={(value) => setSelectedDate(value || selectedDate)} />
+                <AdvancedDatePicker
+                  value={selectedRange}
+                  onChange={setSelectedRange}
+                />
               </div>
               <div className="w-full">
                 <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as HaccpActivityTypeFilter)}>

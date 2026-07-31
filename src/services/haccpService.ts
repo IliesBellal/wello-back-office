@@ -45,7 +45,9 @@ export interface HaccpActivity {
 }
 
 export interface HaccpActivitiesFilters {
-  date: string;
+  date?: string;
+  from?: string;
+  to?: string;
 }
 
 export interface HaccpActivitiesPagination {
@@ -67,13 +69,26 @@ interface HaccpActivitiesResponse {
   data: HaccpActivitiesPayload;
 }
 
-interface GetHaccpActivitiesParams {
-  date: string;
+interface GetHaccpActivitiesBaseParams {
   page?: number;
   pageSize?: number;
   type?: HaccpActivityTypeFilter;
   status?: HaccpActivityStatusFilter;
 }
+
+interface GetHaccpActivitiesDateParams extends GetHaccpActivitiesBaseParams {
+  date: string;
+  from?: never;
+  to?: never;
+}
+
+interface GetHaccpActivitiesRangeParams extends GetHaccpActivitiesBaseParams {
+  from: string;
+  to: string;
+  date?: never;
+}
+
+type GetHaccpActivitiesParams = GetHaccpActivitiesDateParams | GetHaccpActivitiesRangeParams;
 
 const mockActivities: HaccpActivity[] = [
   {
@@ -164,14 +179,20 @@ const mockActivities: HaccpActivity[] = [
 ];
 
 const buildMockPayload = (
-  date: string,
+  filters: HaccpActivitiesFilters,
   page: number,
   pageSize: number,
   type: HaccpActivityTypeFilter,
   status: HaccpActivityStatusFilter
 ): HaccpActivitiesPayload => {
+  const rangeStart = filters.from ?? filters.date;
+  const rangeEnd = filters.to ?? filters.date;
+
   const filtered = mockActivities.filter((activity) => {
-    const matchesDate = activity.performed_at.startsWith(date);
+    const performedDay = activity.performed_at.slice(0, 10);
+    const matchesDate = rangeStart && rangeEnd
+      ? performedDay >= rangeStart && performedDay <= rangeEnd
+      : true;
     const matchesType = type === 'all' ? true : activity.type === type;
     const matchesStatus = status === 'all' ? true : activity.status === status;
     return matchesDate && matchesType && matchesStatus;
@@ -185,7 +206,7 @@ const buildMockPayload = (
 
   return {
     activities: filtered.slice(start, end),
-    filters: { date },
+    filters,
     pagination: {
       page: safePage,
       page_size: pageSize,
@@ -305,6 +326,7 @@ export const getTemperatureSession = async (sessionId: string): Promise<Temperat
 export interface HaccpTraceabilityPhoto {
   id: string;
   photo_url: string;
+  position?: number;
   label?: string | null;
   caption?: string | null;
 }
@@ -322,8 +344,27 @@ interface HaccpTraceabilityRecordResponse {
   id: string;
   data: {
     status: string;
-    traceability_record: HaccpTraceabilityRecord;
+    traceability_record?: HaccpTraceabilityRecordApi;
+    record?: HaccpTraceabilityRecordApi;
   };
+}
+
+interface HaccpTraceabilityRecordApi {
+  id: string;
+  merchant_id: string;
+  performed_at?: string;
+  performed_by?: HaccpActivityPerformer;
+  comment?: string | null;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+  photos?: Array<{
+    id: string;
+    photo_url: string;
+    position?: number;
+    label?: string | null;
+    caption?: string | null;
+  }>;
 }
 
 const mockTraceabilityRecord: HaccpTraceabilityRecord = {
@@ -363,6 +404,26 @@ const cloneTraceabilityRecord = (record: HaccpTraceabilityRecord): HaccpTraceabi
   photos: record.photos.map((photo) => ({ ...photo })),
 });
 
+const normalizeTraceabilityRecord = (record: HaccpTraceabilityRecordApi): HaccpTraceabilityRecord => ({
+  id: record.id,
+  merchant_id: record.merchant_id,
+  performed_at: record.performed_at ?? record.created_at ?? record.updated_at ?? new Date().toISOString(),
+  performed_by: record.performed_by ?? {
+    id: String(record.created_by ?? ''),
+    name: String(record.created_by ?? '—'),
+  },
+  comment: record.comment ?? null,
+  photos: Array.isArray(record.photos)
+    ? record.photos.map((photo) => ({
+        id: photo.id,
+        photo_url: photo.photo_url,
+        position: photo.position,
+        label: photo.label ?? null,
+        caption: photo.caption ?? null,
+      }))
+    : [],
+});
+
 export const getTraceabilityRecord = async (recordId: string): Promise<HaccpTraceabilityRecord> => {
   const endpoint = `/haccp/traceability/${recordId}`;
   logAPI('GET', endpoint);
@@ -371,7 +432,13 @@ export const getTraceabilityRecord = async (recordId: string): Promise<HaccpTrac
     () => cloneTraceabilityRecord({ ...mockTraceabilityRecord, id: recordId }),
     async () => {
       const response = await apiClient.get<HaccpTraceabilityRecordResponse>(endpoint);
-      return response.data.traceability_record;
+      const apiRecord = response.data.traceability_record ?? response.data.record;
+
+      if (!apiRecord) {
+        throw new Error('Traceability record payload is missing');
+      }
+
+      return normalizeTraceabilityRecord(apiRecord);
     }
   );
 };
@@ -1073,18 +1140,29 @@ export const getHaccpActivities = async (
 ): Promise<HaccpActivitiesPayload> => {
   const endpoint = '/haccp/activities';
   const {
-    date,
     page = 1,
     pageSize = 20,
     type = 'all',
     status = 'all',
   } = params;
 
+  const filters: HaccpActivitiesFilters = 'date' in params
+    ? { date: params.date }
+    : { from: params.from, to: params.to };
+
   const queryParams = new URLSearchParams({
-    date,
     page: String(page),
     page_size: String(pageSize),
   });
+
+  if (filters.date) {
+    queryParams.set('date', filters.date);
+  }
+
+  if (filters.from && filters.to) {
+    queryParams.set('from', filters.from);
+    queryParams.set('to', filters.to);
+  }
 
   if (type !== 'all') {
     queryParams.set('type', type);
@@ -1095,7 +1173,7 @@ export const getHaccpActivities = async (
   }
 
   logAPI('GET', endpoint, {
-    date,
+    ...filters,
     page,
     page_size: pageSize,
     type,
@@ -1103,7 +1181,7 @@ export const getHaccpActivities = async (
   });
 
   return withMock(
-    () => buildMockPayload(date, page, pageSize, type, status),
+    () => buildMockPayload(filters, page, pageSize, type, status),
     async () => {
       const response = await apiClient.get<HaccpActivitiesResponse>(`${endpoint}?${queryParams.toString()}`);
       return response.data;

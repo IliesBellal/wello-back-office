@@ -1,4 +1,4 @@
-import { MoreVertical, UserPlus, ArrowRightLeft } from "lucide-react";
+import { MoreVertical, UserPlus, ArrowRightLeft, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -12,13 +12,14 @@ import { cn } from "@/lib/utils";
 /**
  * Menu "3 points" affiché au survol d'une ligne du planning.
  *
- * Pour l'instant, une seule action ("Assigner à…" / "Transférer vers…")
- * mais le `DropdownMenuContent` est prévu pour grandir : ajoute simplement
- * de nouveaux `<DropdownMenuItem>` ci-dessous (ex. "Appliquer une semaine
- * type à cette ligne", "Vider la ligne", etc.).
+ * "Modifier l'employé" (ligne employé uniquement) + assignation en masse
+ * ("Assigner à…" / "Transférer vers…"). Le `DropdownMenuContent` est prévu
+ * pour grandir : ajoute simplement de nouveaux `<DropdownMenuItem>`
+ * ci-dessous (ex. "Appliquer une semaine type à cette ligne", "Vider la
+ * ligne", etc.).
  *
- * Le libellé est **contextuel** : verbe différent selon `variant`,
- * même mécanique côté handler.
+ * Le libellé de l'action d'assignation est **contextuel** : verbe différent
+ * selon `variant`, même mécanique côté handler.
  */
 export type RowActionsMenuVariant = "employee" | "unassigned";
 
@@ -27,9 +28,11 @@ interface RowActionsMenuProps {
   /** Désactivé si la ligne ne contient aucun shift sur la semaine visible. */
   disabled?: boolean;
   onBulkAssign: () => void;
+  /** Ouvre la fiche employé complète en édition. Absent/ignoré pour la ligne "Non assigné". */
+  onEditEmployee?: () => void;
 }
 
-export function RowActionsMenu({ variant, disabled, onBulkAssign }: RowActionsMenuProps) {
+export function RowActionsMenu({ variant, disabled, onBulkAssign, onEditEmployee }: RowActionsMenuProps) {
   const isUnassignedRow = variant === "unassigned";
   const label = isUnassignedRow ? "Assigner à…" : "Transférer vers…";
   const Icon = isUnassignedRow ? UserPlus : ArrowRightLeft;
@@ -54,6 +57,17 @@ export function RowActionsMenu({ variant, disabled, onBulkAssign }: RowActionsMe
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-48 bg-popover">
+        {!isUnassignedRow && onEditEmployee && (
+          <DropdownMenuItem
+            onSelect={(e) => {
+              e.preventDefault?.();
+              onEditEmployee();
+            }}
+          >
+            <Pencil className="mr-2 h-3.5 w-3.5" />
+            Modifier l'employé
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem
           onSelect={(e) => {
             // onSelect ferme déjà le menu Radix — pas besoin de preventDefault.

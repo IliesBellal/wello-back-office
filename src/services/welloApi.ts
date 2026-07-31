@@ -67,6 +67,8 @@ import type {
   PlanningShiftSwapRequestFilters,
   PlanningHoliday,
   PlanningHolidayOverridePatchRequest,
+  PlanningDayComment,
+  PlanningDayCommentUpsertRequest,
   SystemRef,
 } from "@/types/planning";
 
@@ -394,6 +396,40 @@ export const holidaysApi = {
     return apiClient
       .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
       .then((resp) => unwrap<{ holiday: PlanningHoliday } & Record<string, unknown>>(resp).holiday);
+  },
+};
+
+// ============================================================
+// Planning – Day Comments  /planning/day-comments
+// ============================================================
+
+export const planningDayCommentsApi = {
+  /** GET /planning/day-comments?start_date=...&end_date=... */
+  list(startDate: string, endDate: string): Promise<PlanningDayComment[]> {
+    const params = new URLSearchParams({ start_date: startDate, end_date: endDate });
+    const path = `/planning/day-comments?${params.toString()}`;
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<PlanningDayComment>(resp, "day_comments").items);
+  },
+
+  /** PUT /planning/day-comments/{date} — crée ou remplace le commentaire de ce jour. */
+  upsert(date: string, payload: PlanningDayCommentUpsertRequest): Promise<PlanningDayComment> {
+    const path = `/planning/day-comments/${date}`;
+    logAPI("PUT", path, payload);
+    return apiClient
+      .put<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ day_comment: PlanningDayComment } & Record<string, unknown>>(resp).day_comment);
+  },
+
+  /** DELETE /planning/day-comments/{date} */
+  delete(date: string): Promise<void> {
+    const path = `/planning/day-comments/${date}`;
+    logAPI("DELETE", path);
+    return apiClient
+      .delete<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => { unwrap(resp); });
   },
 };
 

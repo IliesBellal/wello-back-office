@@ -73,6 +73,34 @@ export interface PerformancePeriod {
 
   /** worked_hours − planned_hours (can be negative). Decimal hours. */
   hours_delta: number;
+
+  /** Hours breakdown by night/Sunday/holiday classification. */
+  premium_breakdown: PremiumBreakdown;
+  /** Extra payroll cost (cents) attributable to night/Sunday premiums —
+   *  loaded cost minus what the same hours would cost at straight time.
+   *  0 when no premium applies. Never reflects holiday hours (informational
+   *  only, not yet factored into payroll_cost_loaded_cents). */
+  premium_cost_extra_cents: number;
+}
+
+/**
+ * Split of `worked_hours` (or `planned_hours` fallback) by time-of-day/
+ * day-of-week classification. Informational — independent of employee
+ * eligibility for the premium (an employee not eligible for the night
+ * premium still has `night_hours` counted here; it just doesn't add to
+ * `premium_cost_extra_cents`).
+ *
+ * `night_sunday_hours` is the subset that is BOTH night and Sunday:
+ *   normal_hours + night_hours + sunday_hours + night_sunday_hours = worked_hours (or planned_hours fallback).
+ * `holiday_hours` is a separate, possibly-overlapping counter (not yet
+ * factored into payroll cost — see docs/PLANNING_DECISIONS.md on the API repo).
+ */
+export interface PremiumBreakdown {
+  normal_hours: number;
+  night_hours: number;
+  sunday_hours: number;
+  night_sunday_hours: number;
+  holiday_hours: number;
 }
 
 /**

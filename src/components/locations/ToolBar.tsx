@@ -2,6 +2,9 @@ import { Button } from '@/components/ui/button';
 import { Circle, Square, BrickWall, GlassWater, MoveUpRight, DoorOpen, Hexagon } from 'lucide-react';
 import type { Location, ObstacleType } from '@/services/locationsService';
 
+// Masqué temporairement à la demande produit — repasser à true pour réafficher.
+const SHOW_OBSTACLES_AND_ZONES = false;
+
 interface ToolBarProps {
   selectedFloorId: string | null;
   onAddTable: (shape: Location['shape']) => Promise<void>;
@@ -99,84 +102,88 @@ export function ToolBar({
         <p className="text-xs text-muted-foreground">Sélectionnez un étage pour ajouter une table</p>
       )}
 
-      <div className="border-t border-border pt-3" />
+      {SHOW_OBSTACLES_AND_ZONES && (
+        <>
+          <div className="border-t border-border pt-3" />
 
-      <h3 className="text-sm font-semibold text-foreground">Obstacles</h3>
-      <div
-        className={`flex gap-2 flex-wrap ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
-      >
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isDisabled}
-          onClick={() => handleAddObstacle('wall')}
-          className="flex-col h-auto py-2 gap-1"
-          title="Mur (120×15)"
-        >
-          <BrickWall className="w-4 h-4" />
-          <span className="text-xs">Mur</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isDisabled}
-          onClick={() => handleAddObstacle('bar')}
-          className="flex-col h-auto py-2 gap-1"
-          title="Bar (200×50)"
-        >
-          <GlassWater className="w-4 h-4" />
-          <span className="text-xs">Bar</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isDisabled}
-          onClick={() => handleAddObstacle('stairs')}
-          className="flex-col h-auto py-2 gap-1"
-          title="Escaliers (80×80)"
-        >
-          <MoveUpRight className="w-4 h-4" />
-          <span className="text-xs">Escaliers</span>
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={isDisabled}
-          onClick={() => handleAddObstacle('door')}
-          className="flex-col h-auto py-2 gap-1"
-          title="Porte (80×12)"
-        >
-          <DoorOpen className="w-4 h-4" />
-          <span className="text-xs">Porte</span>
-        </Button>
-      </div>
-
-      <div className="border-t border-border pt-3" />
-
-      <h3 className="text-sm font-semibold text-foreground">Zones</h3>
-      <div className="flex gap-2 flex-wrap items-center">
-        <Button
-          variant={isDrawingArea ? 'default' : 'outline'}
-          size="sm"
-          disabled={isDisabled}
-          onClick={handleZoneClick}
-          className={`gap-2 ${isDrawingArea ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
-          title="Dessiner une zone"
-        >
-          <Hexagon className="w-4 h-4" />
-          {isDrawingArea ? 'Terminer' : 'Zone'}
-        </Button>
-        {isDrawingArea && (
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={onCancelDrawArea}
-            className="gap-2"
+          <h3 className="text-sm font-semibold text-foreground">Obstacles</h3>
+          <div
+            className={`flex gap-2 flex-wrap ${isDisabled ? 'opacity-50 pointer-events-none' : ''}`}
           >
-            Annuler
-          </Button>
-        )}
-      </div>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isDisabled}
+              onClick={() => handleAddObstacle('wall')}
+              className="flex-col h-auto py-2 gap-1"
+              title="Mur (120×15)"
+            >
+              <BrickWall className="w-4 h-4" />
+              <span className="text-xs">Mur</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isDisabled}
+              onClick={() => handleAddObstacle('bar')}
+              className="flex-col h-auto py-2 gap-1"
+              title="Bar (200×50)"
+            >
+              <GlassWater className="w-4 h-4" />
+              <span className="text-xs">Bar</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isDisabled}
+              onClick={() => handleAddObstacle('stairs')}
+              className="flex-col h-auto py-2 gap-1"
+              title="Escaliers (80×80)"
+            >
+              <MoveUpRight className="w-4 h-4" />
+              <span className="text-xs">Escaliers</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={isDisabled}
+              onClick={() => handleAddObstacle('door')}
+              className="flex-col h-auto py-2 gap-1"
+              title="Porte (80×12)"
+            >
+              <DoorOpen className="w-4 h-4" />
+              <span className="text-xs">Porte</span>
+            </Button>
+          </div>
+
+          <div className="border-t border-border pt-3" />
+
+          <h3 className="text-sm font-semibold text-foreground">Zones</h3>
+          <div className="flex gap-2 flex-wrap items-center">
+            <Button
+              variant={isDrawingArea ? 'default' : 'outline'}
+              size="sm"
+              disabled={isDisabled}
+              onClick={handleZoneClick}
+              className={`gap-2 ${isDrawingArea ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
+              title="Dessiner une zone"
+            >
+              <Hexagon className="w-4 h-4" />
+              {isDrawingArea ? 'Terminer' : 'Zone'}
+            </Button>
+            {isDrawingArea && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={onCancelDrawArea}
+                className="gap-2"
+              >
+                Annuler
+              </Button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

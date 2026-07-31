@@ -14,9 +14,9 @@ interface TableShapeProps {
 }
 
 const STATUS_STYLES = {
-  available: { fill: '#F1F5F9', stroke: '#CBD5E1', strokeWidth: 1.5, chair: '#94A3B8' },
-  reserved: { fill: '#EFF6FF', stroke: '#3B82F6', strokeWidth: 2, chair: '#93C5FD' },
-  occupied: { fill: '#FEF2F2', stroke: '#EF4444', strokeWidth: 2, chair: '#FCA5A5' }
+  available: { fill: '#F1F5F9', stroke: '#CBD5E1', strokeWidth: 1.5 },
+  reserved: { fill: '#EFF6FF', stroke: '#3B82F6', strokeWidth: 2 },
+  occupied: { fill: '#FEF2F2', stroke: '#EF4444', strokeWidth: 2 }
 } as const;
 
 const SELECTED_STROKE = '#6366F1';
@@ -58,12 +58,12 @@ export function TableShape({
   const tableFill = statusStyle.fill;
   const tableStroke = isSelected ? SELECTED_STROKE : statusStyle.stroke;
   const strokeWidth = isSelected ? SELECTED_STROKE_WIDTH : statusStyle.strokeWidth;
-  const chairColor = statusStyle.chair;
 
-  const gap = 6 * scaleRatio;
   const chairRadius = Math.max(4, 6 * scaleRatio);
+  const chairSize = chairRadius * 2;
+  const chairCornerRadius = 2 * scaleRatio;
   const chairPositions = location.seats
-    ? getChairPositions(location.shape, widthPx, heightPx, location.seats, gap, chairRadius)
+    ? getChairPositions(location.shape, widthPx, heightPx, location.seats)
     : [];
 
   const activeAttributeKeys = location.attributes
@@ -104,13 +104,13 @@ export function TableShape({
 
   const handleMouseEnter = () => {
     if (groupRef.current?.getStage()) {
-      groupRef.current.getStage().container.style.cursor = isSelected ? 'grab' : 'pointer';
+      groupRef.current.getStage().container().style.cursor = isSelected ? 'grab' : 'pointer';
     }
   };
 
   const handleMouseLeave = () => {
     if (groupRef.current?.getStage()) {
-      groupRef.current.getStage().container.style.cursor = 'default';
+      groupRef.current.getStage().container().style.cursor = 'default';
     }
   };
 
@@ -160,7 +160,17 @@ export function TableShape({
     >
       {/* Chairs drawn first so they sit behind the table body */}
       {chairPositions.map((pos, i) => (
-        <Circle key={i} x={pos.x} y={pos.y} radius={chairRadius} fill={chairColor} />
+        <Rect
+          key={i}
+          x={pos.x - chairSize / 2}
+          y={pos.y - chairSize / 2}
+          width={chairSize}
+          height={chairSize}
+          cornerRadius={chairCornerRadius}
+          fill={tableFill}
+          stroke={tableStroke}
+          strokeWidth={strokeWidth}
+        />
       ))}
 
       {renderTableBody()}

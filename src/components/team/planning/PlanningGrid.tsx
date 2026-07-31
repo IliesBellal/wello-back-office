@@ -2,14 +2,16 @@ import { Fragment, useMemo, type ReactNode } from "react";
 import { useDndContext, useDroppable } from "@dnd-kit/core";
 import { addDays, format, isToday } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Copy, MoveRight, Palmtree, Plus, UserX } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, MessageSquareText, MoveRight, Palmtree, Plus, UserPlus, UserX } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { UNASSIGNED_KEY, toKey } from "@/lib/planningUnassigned";
 import { buildPositionColorIndex, colorFromIndex } from "@/lib/planningShiftColor";
 import type {
   Employee,
   EmployeePosition,
+  PlanningDayComment,
   PlanningHoliday,
   PlanningShift,
   PlanningWeek,
@@ -17,6 +19,7 @@ import type {
 
 import { ShiftCard } from "./ShiftCard";
 import { RowActionsMenu } from "./RowActionsMenu";
+import { DayCommentCell } from "./DayCommentCell";
 import type { PlanningDensity, PlanningViewMode } from "./PlanningToolbar";
 
 interface PlanningGridProps {
@@ -27,6 +30,12 @@ interface PlanningGridProps {
   employees: Employee[];
   shifts: PlanningShift[];
   holidays: PlanningHoliday[];
+  /** Commentaires de jour (back-office only) affichés dans l'en-tête de colonne. */
+  dayComments?: PlanningDayComment[];
+  /** Crée ou remplace le commentaire d'un jour (`PUT /planning/day-comments/{date}`). */
+  onSaveDayComment?: (dateIso: string, comment: string) => Promise<void>;
+  /** Supprime le commentaire d'un jour. */
+  onDeleteDayComment?: (dateIso: string) => Promise<void>;
   /** Set of `${employee_id}:${YYYY-MM-DD}` for approved leaves (inclusive ranges) */
   approvedLeaveLookup?: ReadonlySet<string>;
   /**
@@ -55,6 +64,17 @@ interface PlanningGridProps {
   selectedShiftIds?: ReadonlySet<string>;
   /** Densité d'affichage : hauteur mini des cellules et largeur des colonnes. */
   density?: PlanningDensity;
+  /** Ouvre la création de fiche employé. */
+  onCreateEmployee?: () => void;
+  /** Ouvre la fiche employé complète en édition (menu "3 points" d'une ligne). */
+  onEditEmployee?: (employee: Employee) => void;
+  /**
+   * Contracte la colonne titre de gauche (nom + poste + heures d'un employé)
+   * en un chip compact (initiales, heures, 1re lettre du poste). Contrôlé
+   * par le parent pour survivre au remount de la grille (`key={rangeKey}`).
+   */
+  collapsed?: boolean;
+  onToggleCollapsed?: () => void;
 }
 
 function isoDay(d: Date): string {
@@ -66,13 +86,27 @@ function formatProratedQuota(hours: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
+/** Initiales "JD" à partir du prénom/nom (fallback "?" si vide). */
+function initialsOf(person: { first_name?: string | null; last_name?: string | null }): string {
+  const a = person.first_name?.trim()?.[0] ?? "";
+  const b = person.last_name?.trim()?.[0] ?? "";
+  return (a + b).toUpperCase() || "?";
+}
+
+/** Première lettre du poste (label), ou `null` si l'employé n'a pas de poste. */
+function positionLetterOf(position: string | null | undefined): string | null {
+  const trimmed = position?.trim();
+  return trimmed ? trimmed[0]!.toUpperCase() : null;
+}
+
 export function getPlanningGridTemplateColumns(
   density: PlanningDensity = "comfortable",
   dayCount: number,
+  collapsed = false,
 ): string {
-  return density === "compact"
-    ? `180px repeat(${dayCount}, minmax(84px, 1fr))`
-    : `220px repeat(${dayCount}, minmax(140px, 1fr))`;
+  const dayColumn = density === "compact" ? "minmax(84px, 1fr)" : "minmax(140px, 1fr)";
+  const labelColumn = collapsed ? "72px" : density === "compact" ? "180px" : "220px";
+  return `${labelColumn} repeat(${dayCount}, ${dayColumn})`;
 }
 
 // ─── Empty droppable cell ───────────────────────────────────────────────────
@@ -213,6 +247,9 @@ export function PlanningGrid({
   employees,
   shifts,
   holidays,
+  dayComments,
+  onSaveDayComment,
+  onDeleteDayComment,
   approvedLeaveLookup,
   positions,
   onShiftClick,
@@ -221,6 +258,10 @@ export function PlanningGrid({
   selectionMode,
   selectedShiftIds,
   density = "comfortable",
+  onCreateEmployee,
+  onEditEmployee,
+  collapsed = false,
+  onToggleCollapsed,
 }: PlanningGridProps) {
   // Build columns from range
   const columns = useMemo(() => {
@@ -239,6 +280,12 @@ export function PlanningGrid({
     for (const h of holidays) if (!h.disabled) m.set(h.date, h);
     return m;
   }, [holidays]);
+
+  const dayCommentByDate = useMemo(() => {
+    const m = new Map<string, PlanningDayComment>();
+    for (const c of dayComments ?? []) m.set(c.comment_date, c);
+    return m;
+  }, [dayComments]);
 
   const shiftsByCell = useMemo(() => {
     const m = new Map<string, PlanningShift[]>();
@@ -302,7 +349,7 @@ export function PlanningGrid({
   const colorIndex = useMemo(() => buildPositionColorIndex(positions), [positions]);
   const visibleDays = displayColumns.length;
 
-  const colTemplate = getPlanningGridTemplateColumns(density, displayColumns.length);
+  const colTemplate = getPlanningGridTemplateColumns(density, displayColumns.length, collapsed);
 
   return (
     <div className="relative flex max-h-full min-h-0 flex-col overflow-hidden rounded-md border bg-card">
@@ -313,8 +360,43 @@ export function PlanningGrid({
         >
         {headerRows}
         {/* ── Header row ────────────────────────────────────────────── */}
-        <div className="sticky left-0 top-0 z-40 border-b border-r bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
-          Employé
+        <div
+          className={cn(
+            "sticky left-0 top-0 z-40 border-b border-r bg-muted shadow-[1px_0_0_hsl(var(--border))]",
+            collapsed ? "px-1 py-2" : "px-3 py-2",
+          )}
+        >
+          <div className={cn("flex items-center gap-1", collapsed ? "justify-center" : "justify-between gap-2")}>
+            {!collapsed && <span>Employé</span>}
+            <div className="flex items-center gap-1">
+              {!collapsed && onCreateEmployee ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6"
+                  onClick={onCreateEmployee}
+                  aria-label="Créer une fiche employé"
+                  title="Créer une fiche employé"
+                >
+                  <UserPlus className="h-3.5 w-3.5" />
+                </Button>
+              ) : null}
+              {onToggleCollapsed ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className="h-6 w-6 shrink-0"
+                  onClick={onToggleCollapsed}
+                  aria-label={collapsed ? "Étendre la colonne employé" : "Contracter la colonne employé"}
+                  title={collapsed ? "Étendre la colonne" : "Contracter la colonne"}
+                >
+                  {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+                </Button>
+              ) : null}
+            </div>
+          </div>
         </div>
         {displayColumns.map((d) => {
           const iso = isoDay(d);
@@ -340,6 +422,36 @@ export function PlanningGrid({
           );
         })}
 
+        {/* ── Day comments row (toujours visible, avant le premier employé) ── */}
+        {onSaveDayComment && onDeleteDayComment && (
+          <>
+            <div
+              className={cn(
+                "sticky left-0 z-20 flex items-center border-b border-r bg-muted/60 shadow-[1px_0_0_hsl(var(--border))]",
+                collapsed ? "justify-center px-1 py-2" : "gap-1.5 px-3 py-2",
+              )}
+              title="Commentaire visible par l'équipe pour ce jour"
+            >
+              <MessageSquareText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              {!collapsed && (
+                <span className="truncate text-xs font-medium text-muted-foreground">Commentaire</span>
+              )}
+            </div>
+            {displayColumns.map((d) => {
+              const iso = isoDay(d);
+              return (
+                <DayCommentCell
+                  key={iso}
+                  dateIso={iso}
+                  comment={dayCommentByDate.get(iso) ?? null}
+                  onSave={onSaveDayComment}
+                  onDelete={onDeleteDayComment}
+                />
+              );
+            })}
+          </>
+        )}
+
         {/* ── Employee rows ────────────────────────────────────────── */}
         {employees.length === 0 ? (
           <div className="p-12 text-center text-sm text-muted-foreground" style={{ gridColumn: "1 / -1" }}>
@@ -354,32 +466,63 @@ export function PlanningGrid({
                 ? formatProratedQuota((contract * visibleDays) / 7)
                 : null;
             const rowCount = shiftsCountByRow.get(emp.id) ?? 0;
+            const positionLetter = positionLetterOf(emp.position);
+            const positionColor = colorFromIndex(
+              { position_id: emp.position_id, position: emp.position },
+              colorIndex,
+            );
             return (
               <Fragment key={`row:${emp.id}`}>
                 <div
-                  className="group/row sticky left-0 z-20 flex items-start gap-1 border-b border-r bg-card px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]"
+                  className={cn(
+                    "group/row sticky left-0 z-20 flex border-b border-r bg-card shadow-[1px_0_0_hsl(var(--border))]",
+                    collapsed ? "items-center justify-center px-1 py-2" : "items-start gap-1 px-3 py-2",
+                  )}
                 >
-                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-                    <div className="truncate text-sm font-medium text-foreground">
-                      {emp.first_name} {emp.last_name}
+                  {collapsed ? (
+                    <div
+                      className="flex flex-col items-center gap-1"
+                      title={`${emp.first_name} ${emp.last_name}${emp.position ? ` — ${emp.position}` : ""}`}
+                    >
+                      <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-foreground">
+                        {initialsOf(emp)}
+                        {positionLetter && (
+                          <span
+                            className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold text-white ring-2 ring-card"
+                            style={{ backgroundColor: positionColor }}
+                          >
+                            {positionLetter}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[10px] font-medium text-muted-foreground">{hours.toFixed(1)}h</div>
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {emp.position ?? "—"}
-                    </div>
-                    <div className="mt-1 text-[11px] text-muted-foreground">
-                      {hours.toFixed(1)}h
-                      {contract !== null
-                        ? ` / ${viewMode === "month" ? proratedQuota : String(contract)}h`
-                        : ""}
-                    </div>
-                  </div>
-                  <RowActionsMenu
-                    variant="employee"
-                    disabled={rowCount === 0}
-                    onBulkAssign={() =>
-                      onBulkAssignRow(emp.id, `${emp.first_name} ${emp.last_name}`, rowCount)
-                    }
-                  />
+                  ) : (
+                    <>
+                      <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                        <div className="truncate text-sm font-medium text-foreground">
+                          {emp.first_name} {emp.last_name}
+                        </div>
+                        <div className="truncate text-xs text-muted-foreground">
+                          {emp.position ?? "—"}
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {hours.toFixed(1)}h
+                          {contract !== null
+                            ? ` / ${viewMode === "month" ? proratedQuota : String(contract)}h`
+                            : ""}
+                        </div>
+                      </div>
+                      <RowActionsMenu
+                        variant="employee"
+                        disabled={rowCount === 0}
+                        onBulkAssign={() =>
+                          onBulkAssignRow(emp.id, `${emp.first_name} ${emp.last_name}`, rowCount)
+                        }
+                        onEditEmployee={onEditEmployee ? () => onEditEmployee(emp) : undefined}
+                      />
+                    </>
+                  )}
                 </div>
                 {displayColumns.map((d) => {
                   const iso = isoDay(d);
@@ -413,30 +556,46 @@ export function PlanningGrid({
         )}
 
         {/* ── Unassigned row (always visible, even when empty) ────── */}
-        <div className="group/row sticky left-0 z-20 flex items-start gap-1 border-b border-r border-t-2 bg-muted px-3 py-2 shadow-[1px_0_0_hsl(var(--border))]">
-          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
-            <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-              <UserX className="h-3.5 w-3.5 text-muted-foreground" />
-              Non assigné
+        <div
+          className={cn(
+            "group/row sticky left-0 z-20 flex border-b border-r border-t-2 bg-muted shadow-[1px_0_0_hsl(var(--border))]",
+            collapsed ? "items-center justify-center px-1 py-2" : "items-start gap-1 px-3 py-2",
+          )}
+        >
+          {collapsed ? (
+            <div className="flex flex-col items-center gap-1" title="Non assigné">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-background">
+                <UserX className="h-3.5 w-3.5 text-muted-foreground" />
+              </div>
+              <div className="text-[10px] font-medium text-muted-foreground">{unassignedHours.toFixed(1)}h</div>
             </div>
-            <div className="truncate text-xs text-muted-foreground">
-              Besoins à pourvoir
-            </div>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              {unassignedHours.toFixed(1)}h
-            </div>
-          </div>
-          <RowActionsMenu
-            variant="unassigned"
-            disabled={(shiftsCountByRow.get(UNASSIGNED_KEY) ?? 0) === 0}
-            onBulkAssign={() =>
-              onBulkAssignRow(
-                null,
-                "Non assigné",
-                shiftsCountByRow.get(UNASSIGNED_KEY) ?? 0,
-              )
-            }
-          />
+          ) : (
+            <>
+              <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5">
+                <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <UserX className="h-3.5 w-3.5 text-muted-foreground" />
+                  Non assigné
+                </div>
+                <div className="truncate text-xs text-muted-foreground">
+                  Besoins à pourvoir
+                </div>
+                <div className="mt-1 text-[11px] text-muted-foreground">
+                  {unassignedHours.toFixed(1)}h
+                </div>
+              </div>
+              <RowActionsMenu
+                variant="unassigned"
+                disabled={(shiftsCountByRow.get(UNASSIGNED_KEY) ?? 0) === 0}
+                onBulkAssign={() =>
+                  onBulkAssignRow(
+                    null,
+                    "Non assigné",
+                    shiftsCountByRow.get(UNASSIGNED_KEY) ?? 0,
+                  )
+                }
+              />
+            </>
+          )}
         </div>
         {displayColumns.map((d) => {
           const iso = isoDay(d);

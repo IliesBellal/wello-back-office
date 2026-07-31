@@ -43,6 +43,7 @@ import { cn } from "@/lib/utils";
 import { qk } from "@/lib/queryKeys";
 import {
   holidaysApi,
+  planningDayCommentsApi,
   planningEmployeesApi,
   planningLeaveApi,
   planningPositionsApi,
@@ -51,6 +52,7 @@ import {
   planningWeeksApi,
 } from "@/services/welloApi";
 import type {
+  Employee,
   PlanningLeaveRequest,
   PlanningPublishNotificationMode,
   PlanningShift,
@@ -66,6 +68,7 @@ import { PlanningGrid } from "@/components/team/planning/PlanningGrid";
 import { ShiftSheet, type ShiftSheetMode } from "@/components/team/planning/ShiftSheet";
 import { PositionsModal } from "@/components/team/planning/PositionsModal";
 import { CreateEmployeeDialog } from "@/components/team/planning/CreateEmployeeDialog";
+import { EmployeesModal } from "@/components/team/EmployeesModal";
 import { ShiftTemplatesDialog } from "@/components/team/planning/ShiftTemplatesDialog";
 import { WeekTemplatesDialog } from "@/components/team/planning/WeekTemplatesDialog";
 import { HolidaysModal } from "@/components/team/planning/HolidaysModal";
@@ -84,6 +87,7 @@ import { getHttpErrorStatus, getPlanningShiftMutationMessage } from "@/lib/plann
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 const DENSITY_STORAGE_KEY = "wello.planning.density";
+const EMPLOYEE_COLUMN_COLLAPSED_STORAGE_KEY = "wello.planning.employeeColumnCollapsed";
 
 function isoDay(d: Date): string {
   return format(d, "yyyy-MM-dd");
@@ -195,6 +199,8 @@ function PlanningPageContent() {
 
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [employeeCreateOpen, setEmployeeCreateOpen] = useState(false);
+  const [employeesOpen, setEmployeesOpen] = useState(false);
+  const [editEmployee, setEditEmployee] = useState<Employee | null>(null);
   const [shiftTemplatesOpen, setShiftTemplatesOpen] = useState(false);
   const [weekTemplatesOpen, setWeekTemplatesOpen] = useState(false);
   const [holidaysOpen, setHolidaysOpen] = useState(false);
@@ -240,6 +246,22 @@ function PlanningPageContent() {
     setDensity((d) => {
       const next: PlanningDensity = d === "compact" ? "comfortable" : "compact";
       localStorage.setItem(DENSITY_STORAGE_KEY, next);
+      return next;
+    });
+  };
+
+  // Contraction de la colonne titre (nom/poste/heures des employés) en un
+  // chip compact (initiales, heures, 1re lettre du poste). Lifté ici (plutôt
+  // que local à PlanningGrid) car la grille remonte via `key={rangeKey}` à
+  // chaque changement de plage — un state local y serait réinitialisé.
+  const [employeeColumnCollapsed, setEmployeeColumnCollapsed] = useState<boolean>(
+    () => localStorage.getItem(EMPLOYEE_COLUMN_COLLAPSED_STORAGE_KEY) === "1",
+  );
+
+  const handleToggleEmployeeColumnCollapsed = () => {
+    setEmployeeColumnCollapsed((collapsed) => {
+      const next = !collapsed;
+      localStorage.setItem(EMPLOYEE_COLUMN_COLLAPSED_STORAGE_KEY, next ? "1" : "0");
       return next;
     });
   };
@@ -352,6 +374,11 @@ function PlanningPageContent() {
   const holidaysQuery = useQuery({
     queryKey: qk.planningHolidays.range(isoDay(range.from), isoDay(range.to)),
     queryFn: () => holidaysApi.list({ start_date: isoDay(range.from), end_date: isoDay(range.to) }),
+  });
+
+  const dayCommentsQuery = useQuery({
+    queryKey: qk.planningDayComments.range(isoDay(range.from), isoDay(range.to)),
+    queryFn: () => planningDayCommentsApi.list(isoDay(range.from), isoDay(range.to)),
   });
 
   const approvedLeavesQuery = useQuery({
@@ -471,6 +498,27 @@ function PlanningPageContent() {
       toast.success("Semaine dépubliée");
     },
     onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la dépublication"),
+  });
+
+  const dayCommentsRangeKey = qk.planningDayComments.range(isoDay(range.from), isoDay(range.to));
+
+  const saveDayCommentMutation = useMutation({
+    mutationFn: ({ date, comment }: { date: string; comment: string }) =>
+      planningDayCommentsApi.upsert(date, { comment }),
+    onSuccess: () => {
+      toast.success("Commentaire enregistré");
+      qc.invalidateQueries({ queryKey: dayCommentsRangeKey });
+    },
+    onError: (err: Error) => toast.error(err.message ?? "Erreur lors de l'enregistrement du commentaire"),
+  });
+
+  const deleteDayCommentMutation = useMutation({
+    mutationFn: (date: string) => planningDayCommentsApi.delete(date),
+    onSuccess: () => {
+      toast.success("Commentaire supprimé");
+      qc.invalidateQueries({ queryKey: dayCommentsRangeKey });
+    },
+    onError: (err: Error) => toast.error(err.message ?? "Erreur lors de la suppression du commentaire"),
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -749,6 +797,7 @@ function PlanningPageContent() {
               unpublishPending={unpublishWeekMutation.isPending}
               onOpenPositions={() => setPositionsOpen(true)}
               onCreateEmployee={() => setEmployeeCreateOpen(true)}
+              onOpenEmployees={() => setEmployeesOpen(true)}
               onOpenShiftTemplates={() => setShiftTemplatesOpen(true)}
               onOpenWeekTemplates={() => setWeekTemplatesOpen(true)}
               onOpenHolidays={() => setHolidaysOpen(true)}
@@ -855,6 +904,13 @@ function PlanningPageContent() {
                 employees={employees}
                 shifts={shifts}
                 holidays={holidays}
+                dayComments={dayCommentsQuery.data ?? []}
+                onSaveDayComment={async (date, comment) => {
+                  await saveDayCommentMutation.mutateAsync({ date, comment });
+                }}
+                onDeleteDayComment={async (date) => {
+                  await deleteDayCommentMutation.mutateAsync(date);
+                }}
                 approvedLeaveLookup={approvedLeaveLookup}
                 positions={positions}
                 onShiftClick={handleShiftClick}
@@ -863,6 +919,10 @@ function PlanningPageContent() {
                 selectionMode={selectionMode}
                 selectedShiftIds={selectedShiftIds}
                 density={density}
+                onCreateEmployee={() => setEmployeeCreateOpen(true)}
+                onEditEmployee={setEditEmployee}
+                collapsed={employeeColumnCollapsed}
+                onToggleCollapsed={handleToggleEmployeeColumnCollapsed}
               />
             </div>
           </DndContext>
@@ -900,6 +960,16 @@ function PlanningPageContent() {
 
       <PositionsModal open={positionsOpen} onOpenChange={setPositionsOpen} />
       <CreateEmployeeDialog open={employeeCreateOpen} onOpenChange={setEmployeeCreateOpen} />
+      <EmployeesModal
+        open={employeesOpen || !!editEmployee}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEmployeesOpen(false);
+            setEditEmployee(null);
+          }
+        }}
+        initialEmployee={editEmployee}
+      />
       <ShiftTemplatesDialog open={shiftTemplatesOpen} onOpenChange={setShiftTemplatesOpen} />
       <WeekTemplatesDialog
         open={weekTemplatesOpen}

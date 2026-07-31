@@ -220,6 +220,7 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'equipe',
     title: 'Équipe',
     icon: UsersRound,
+    primaryNav: true,
     children: [
       {
         id: 'equipiers',
@@ -267,6 +268,7 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'accounting',
     title: 'Comptabilité',
     icon: Receipt,
+    primaryNav: true,
     children: [
       {
         id: 'cash-registers-history',
@@ -335,6 +337,7 @@ export const NAV_ITEMS: NavItem[] = [
     title: 'HACCP',
     icon: ShieldCheck,
     requiredModule: 'haccp',
+    primaryNav: true,
     children: [
       {
         id: 'haccp-activity',
@@ -399,7 +402,6 @@ export const NAV_ITEMS: NavItem[] = [
         href: '/settings/profile',
       },
     ],
-    primaryNav: true,
   },
 ];
 

@@ -38,7 +38,33 @@ import type {
   PerformancePeriod,
   PerformanceQuery,
   PerformanceResponse,
+  PremiumBreakdown,
 } from "@/types/performance";
+
+/** The mock has no per-employee night/Sunday classification source yet
+ *  (shifts/time-entries don't carry it here) — always zero, honestly
+ *  reflecting that this indicator isn't modeled client-side. Overwritten by
+ *  the real backend response once PERFORMANCE_FORCE_MOCK is off (default). */
+const EMPTY_PREMIUM_BREAKDOWN: PremiumBreakdown = {
+  normal_hours: 0,
+  night_hours: 0,
+  sunday_hours: 0,
+  night_sunday_hours: 0,
+  holiday_hours: 0,
+};
+
+function sumPremiumBreakdown(periods: Array<Pick<PerformancePeriod, "premium_breakdown">>): PremiumBreakdown {
+  return periods.reduce<PremiumBreakdown>(
+    (acc, p) => ({
+      normal_hours: acc.normal_hours + p.premium_breakdown.normal_hours,
+      night_hours: acc.night_hours + p.premium_breakdown.night_hours,
+      sunday_hours: acc.sunday_hours + p.premium_breakdown.sunday_hours,
+      night_sunday_hours: acc.night_sunday_hours + p.premium_breakdown.night_sunday_hours,
+      holiday_hours: acc.holiday_hours + p.premium_breakdown.holiday_hours,
+    }),
+    { ...EMPTY_PREMIUM_BREAKDOWN },
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pure helpers (exported for unit tests / reuse)
@@ -147,6 +173,7 @@ export function aggregateTotals(periods: PerformancePeriod[], from: string, to: 
   // backend MUST recompute headcount over distinct employees on [from, to].
   const headcount = periods.reduce((m, p) => Math.max(m, p.headcount), 0);
   const payrollCost = periods.reduce((s, p) => s + p.payroll_cost_loaded_cents, 0);
+  const premiumCostExtra = periods.reduce((s, p) => s + p.premium_cost_extra_cents, 0);
   return {
     period_start: from,
     period_end: to,
@@ -160,6 +187,8 @@ export function aggregateTotals(periods: PerformancePeriod[], from: string, to: 
     payroll_ratio: computeRatio(payrollCost, revenueActual),
     revenue_per_hour_cents: computeRevenuePerHour(revenueActual, workedHours),
     hours_delta: round2(workedHours - plannedHours),
+    premium_breakdown: sumPremiumBreakdown(periods),
+    premium_cost_extra_cents: premiumCostExtra,
   };
 }
 
@@ -446,6 +475,9 @@ function buildBlock(
       payroll_ratio: computeRatio(payroll.cents, revenueActual),
       revenue_per_hour_cents: computeRevenuePerHour(revenueActual, worked),
       hours_delta: round2(worked - planned),
+      // Mock has no night/Sunday classification source — see EMPTY_PREMIUM_BREAKDOWN.
+      premium_breakdown: { ...EMPTY_PREMIUM_BREAKDOWN, normal_hours: worked },
+      premium_cost_extra_cents: 0,
     });
   }
 

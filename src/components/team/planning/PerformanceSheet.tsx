@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import type { PerformancePeriod, PerformanceResponse } from "@/types/performance";
+import type { PerformancePeriod, PerformanceResponse, PremiumBreakdown } from "@/types/performance";
 
 import {
   PLANNING_PAYROLL_RATIO_TARGET,
@@ -112,9 +112,12 @@ function PerformanceSummaryContent({
   data: PerformanceResponse;
   compare: boolean;
 }) {
+  const productivityTarget = productivityTargetBadge(data.totals.revenue_per_hour_cents);
+  const payrollTarget = payrollTargetBadge(data.totals.payroll_ratio);
+
   return (
     <div className="mt-4 space-y-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <SummaryCard
           title="CA HT"
           value={fmtMoney(data.totals.revenue_actual_cents)}
@@ -131,15 +134,21 @@ function PerformanceSummaryContent({
           title="Productivité réelle"
           value={fmtEurosPerHour(data.totals.revenue_per_hour_cents)}
           hint={`Objectif ${PLANNING_PRODUCTIVITY_TARGET_EUR_PER_HOUR}€/h`}
-          target={productivityTargetBadge(data.totals.revenue_per_hour_cents)}
+          valueTone={productivityTarget?.tone ?? null}
           variation={compare ? variationProps(data.totals.revenue_per_hour_cents, data.previous_period?.totals.revenue_per_hour_cents ?? null, true) : null}
         />
         <SummaryCard
           title="Coût shifts / ventes"
           value={fmtPct(data.totals.payroll_ratio)}
           hint={`Objectif max ${PLANNING_PAYROLL_RATIO_TARGET_PERCENT}%`}
-          target={payrollTargetBadge(data.totals.payroll_ratio)}
+          valueTone={payrollTarget?.tone ?? null}
           variation={compare ? variationProps(data.totals.payroll_ratio, data.previous_period?.totals.payroll_ratio ?? null, false) : null}
+        />
+        <SummaryCard
+          title="Majorations"
+          value={fmtMoney(data.totals.premium_cost_extra_cents)}
+          hint={fmtPremiumHint(data.totals.premium_breakdown)}
+          variation={compare ? variationProps(data.totals.premium_cost_extra_cents, data.previous_period?.totals.premium_cost_extra_cents ?? null, false) : null}
         />
       </div>
     </div>
@@ -191,14 +200,20 @@ export function PerformanceGridHeaderRows({
         label: "Productivité réelle",
         sublabel: `Min : ${PLANNING_PRODUCTIVITY_TARGET_EUR_PER_HOUR}€/h`,
         renderValue: (period) => fmtEurosPerHour(period?.revenue_per_hour_cents ?? null),
-        renderBadge: (period) => productivityTargetBadge(period?.revenue_per_hour_cents ?? null),
+        renderValueTone: (period) => productivityTargetBadge(period?.revenue_per_hour_cents ?? null)?.tone ?? null,
       })}
       {renderMetricRow({
         dates,
         label: "Coût shifts / ventes",
         sublabel: `Max : ${PLANNING_PAYROLL_RATIO_TARGET_PERCENT}%`,
         renderValue: (period) => fmtPct(period?.payroll_ratio ?? null),
-        renderBadge: (period) => payrollTargetBadge(period?.payroll_ratio ?? null),
+        renderValueTone: (period) => payrollTargetBadge(period?.payroll_ratio ?? null)?.tone ?? null,
+      })}
+      {renderMetricRow({
+        dates,
+        label: "Majorations",
+        sublabel: "Nuit / dimanche",
+        renderValue: (period) => fmtMoney(period?.premium_cost_extra_cents ?? null),
       })}
 
       {data?.warnings.members_without_rate ? (
@@ -248,12 +263,14 @@ export function PerformanceGridHeaderRows({
     sublabel,
     renderValue,
     renderBadge,
+    renderValueTone,
   }: {
     dates: Date[];
     label: string;
     sublabel?: string;
     renderValue: (period: PerformancePeriod | null) => string;
     renderBadge?: (period: PerformancePeriod | null) => TargetBadge | null;
+    renderValueTone?: (period: PerformancePeriod | null) => TargetBadge["tone"] | null;
   }) {
     return (
       <Fragment key={label}>
@@ -266,10 +283,17 @@ export function PerformanceGridHeaderRows({
           const period = periodsByDate.get(iso) ?? null;
           const previousPeriod = compare ? previousPeriods[index] ?? null : null;
           const badge = renderBadge?.(period) ?? null;
+          const valueTone = renderValueTone?.(period) ?? null;
           return (
             <HeaderValueCell key={`${label}:${iso}`} highlighted={false}>
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold text-foreground">{renderValue(period)}</span>
+                {valueTone ? (
+                  <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold", valueToneClassName(valueTone))}>
+                    {renderValue(period)}
+                  </span>
+                ) : (
+                  <span className="font-semibold text-foreground">{renderValue(period)}</span>
+                )}
                 <div className="flex items-center gap-2">
                   {compare ? (
                     <VariationBadge
@@ -281,7 +305,7 @@ export function PerformanceGridHeaderRows({
                       compact
                     />
                   ) : null}
-                  {badge && <TargetPill badge={badge} compact />}
+                  {badge && !valueTone && <TargetPill badge={badge} compact />}
                 </div>
               </div>
             </HeaderValueCell>
@@ -297,12 +321,14 @@ function SummaryCard({
   value,
   hint,
   target,
+  valueTone,
   variation,
 }: {
   title: string;
   value: string;
   hint: string;
   target?: TargetBadge | null;
+  valueTone?: TargetBadge["tone"] | null;
   variation?: VariationProps | null;
 }) {
   return (
@@ -310,7 +336,15 @@ function SummaryCard({
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">{title}</div>
-          <div className="mt-1 text-2xl font-semibold text-foreground">{value}</div>
+          <div className="mt-1">
+            {valueTone ? (
+              <span className={cn("inline-flex items-center rounded-full border px-2.5 py-1 text-base font-semibold", valueToneClassName(valueTone))}>
+                {value}
+              </span>
+            ) : (
+              <span className="text-2xl font-semibold text-foreground">{value}</span>
+            )}
+          </div>
         </div>
         {variation && <VariationBadge {...variation} />}
       </div>
@@ -375,17 +409,24 @@ interface VariationProps {
   higherIsBetter?: boolean;
 }
 
+function valueToneClassName(tone: TargetBadge["tone"]): string {
+  if (tone === "good") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (tone === "warn") {
+    return "border-amber-200 bg-amber-50 text-amber-700";
+  }
+  return "border-muted bg-muted text-muted-foreground";
+}
+
 function TargetPill({ badge, compact = false }: { badge: TargetBadge; compact?: boolean }) {
   return (
     <span
       className={cn(
         "inline-flex items-center rounded-full px-2 py-0.5 font-medium",
         compact ? "text-[10px]" : "text-[11px]",
-        badge.tone === "good"
-          ? "border border-emerald-200 bg-emerald-50 text-emerald-700"
-          : badge.tone === "warn"
-            ? "border border-amber-200 bg-amber-50 text-amber-700"
-            : "border border-muted bg-muted text-muted-foreground",
+        "border",
+        valueToneClassName(badge.tone),
       )}
     >
       {badge.label}
@@ -485,4 +526,21 @@ function fmtPct(ratio: number | null): string {
 function fmtEurosPerHour(centsPerHour: number | null): string {
   if (centsPerHour == null) return "—";
   return `${new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 }).format(centsPerHour / 100)}€/h`;
+}
+
+/** Short hint listing only the non-zero premium buckets (hours), e.g.
+ *  "8h nuit · 3h dimanche". `night_sunday_hours` reads as its own bucket
+ *  (already excluded from night_hours/sunday_hours — see PremiumBreakdown). */
+function fmtPremiumHint(breakdown: PremiumBreakdown): string {
+  const parts: string[] = [];
+  if (breakdown.night_hours > 0) parts.push(`${fmtHoursShort(breakdown.night_hours)} nuit`);
+  if (breakdown.sunday_hours > 0) parts.push(`${fmtHoursShort(breakdown.sunday_hours)} dimanche`);
+  if (breakdown.night_sunday_hours > 0) parts.push(`${fmtHoursShort(breakdown.night_sunday_hours)} nuit+dimanche`);
+  if (parts.length === 0) return "Aucune heure majorée sur la période";
+  return parts.join(" · ");
+}
+
+function fmtHoursShort(hours: number): string {
+  const rounded = Math.round(hours * 10) / 10;
+  return `${rounded.toFixed(1).replace(/\.0$/, "")}h`;
 }

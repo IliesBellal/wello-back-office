@@ -448,6 +448,49 @@ export const useMenuData = () => {
     }
   };
 
+  // Merges already-persisted allergen assignments into local state (no API call, no refetch).
+  const applyProductsAllergens = (updates: Array<{ product_id: string; allergens: string[] }>) => {
+    if (updates.length === 0) return;
+    const updatesMap = new Map(updates.map(u => [u.product_id, u.allergens]));
+
+    setMenuData(prev => ({
+      ...prev,
+      products: prev.products?.map(p =>
+        updatesMap.has(p.product_id) ? { ...p, allergens: updatesMap.get(p.product_id) } : p
+      ),
+      products_types: prev.products_types.map(cat => ({
+        ...cat,
+        products: cat.products?.map(p =>
+          updatesMap.has(p.product_id) ? { ...p, allergens: updatesMap.get(p.product_id) } : p
+        )
+      }))
+    }));
+  };
+
+  // Merges already-persisted attribute (options/suppléments) assignments into local state (no API call, no refetch).
+  const applyProductsAttributes = (updates: Array<{ product_id: string; attribute_ids: string[] }>) => {
+    if (updates.length === 0) return;
+    const updatesMap = new Map(updates.map(u => [u.product_id, u.attribute_ids]));
+    const attributesById = new Map(attributes.map(a => [a.id, a]));
+
+    const applyToProduct = (p: Product): Product => {
+      if (!updatesMap.has(p.product_id)) return p;
+      const matchedAttributes = (updatesMap.get(p.product_id) || [])
+        .map(id => attributesById.get(id))
+        .filter((a): a is Attribute => !!a);
+      return { ...p, configuration: { attributes: matchedAttributes } };
+    };
+
+    setMenuData(prev => ({
+      ...prev,
+      products: prev.products?.map(applyToProduct),
+      products_types: prev.products_types.map(cat => ({
+        ...cat,
+        products: cat.products?.map(applyToProduct)
+      }))
+    }));
+  };
+
   return {
     menuData,
     units,
@@ -470,6 +513,8 @@ export const useMenuData = () => {
     deleteComponent,
     deleteCategory,
     deleteComponentCategory,
-    bulkUpdatePrices
+    bulkUpdatePrices,
+    applyProductsAllergens,
+    applyProductsAttributes
   };
 };

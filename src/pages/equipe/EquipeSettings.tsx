@@ -63,6 +63,7 @@ import type {
   AttendanceSource,
   PlanningSettings,
   PlanningSettingsUpdateRequest,
+  PremiumCumulationMode,
   ShiftSwapApprovalMode,
   SystemRef,
 } from "@/types/planning";
@@ -156,9 +157,30 @@ interface WorkRulesForm {
   night_shift_end: string;
   night_shift_multiplier: number;
   holiday_multiplier: number;
+  sunday_multiplier: number;
+  premium_cumulation_mode: PremiumCumulationMode;
+  night_sunday_combined_multiplier: number | null;
   allow_override_warnings: boolean;
   planning_sms_notifications_enabled: boolean;
 }
+
+const CUMULATION_OPTIONS: Array<{ value: PremiumCumulationMode; label: string; hint: string }> = [
+  {
+    value: "highest",
+    label: "Le plus élevé l'emporte",
+    hint: "Un seul taux appliqué : le maximum entre nuit et dimanche. Comportement légal par défaut en l'absence de clause conventionnelle contraire.",
+  },
+  {
+    value: "additive",
+    label: "Cumul additif",
+    hint: "Les taux s'additionnent quand ils coïncident (ex. +25 % nuit + 50 % dimanche = +75 %).",
+  },
+  {
+    value: "fixed",
+    label: "Taux combiné fixe",
+    hint: "Un taux unique remplace les deux quand ils coïncident (ex. convention prévoyant \"dimanche de nuit = +75 %\").",
+  },
+];
 
 function toWorkRulesForm(s: PlanningSettings): WorkRulesForm {
   return {
@@ -169,6 +191,9 @@ function toWorkRulesForm(s: PlanningSettings): WorkRulesForm {
     night_shift_end: s.night_shift_end,
     night_shift_multiplier: s.night_shift_multiplier,
     holiday_multiplier: s.holiday_multiplier,
+    sunday_multiplier: s.sunday_multiplier,
+    premium_cumulation_mode: s.premium_cumulation_mode,
+    night_sunday_combined_multiplier: s.night_sunday_combined_multiplier ?? null,
     allow_override_warnings: s.allow_override_warnings,
     planning_sms_notifications_enabled: !!s.planning_sms_notifications_enabled,
   };
@@ -306,6 +331,62 @@ function WorkRulesCard({ settings }: { settings: PlanningSettings }) {
               setForm({ ...form, holiday_multiplier: Number(e.target.value) })
             }
           />
+        </div>
+        <div>
+          <Label htmlFor="sunday_multiplier">Multiplicateur dimanche</Label>
+          <Input
+            id="sunday_multiplier"
+            type="number"
+            min={1}
+            step={0.05}
+            value={form.sunday_multiplier}
+            onChange={(e) =>
+              setForm({ ...form, sunday_multiplier: Number(e.target.value) })
+            }
+          />
+        </div>
+        <div className="col-span-full rounded-md border border-border bg-muted/30 p-3">
+          <Label htmlFor="premium_cumulation_mode">Cumul nuit / dimanche</Label>
+          <Select
+            value={form.premium_cumulation_mode}
+            onValueChange={(v) =>
+              setForm({ ...form, premium_cumulation_mode: v as PremiumCumulationMode })
+            }
+          >
+            <SelectTrigger id="premium_cumulation_mode" className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CUMULATION_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {CUMULATION_OPTIONS.find((o) => o.value === form.premium_cumulation_mode)?.hint}
+          </p>
+
+          {form.premium_cumulation_mode === "fixed" && (
+            <div className="mt-3 max-w-xs">
+              <Label htmlFor="night_sunday_combined_multiplier">Taux combiné nuit + dimanche</Label>
+              <Input
+                id="night_sunday_combined_multiplier"
+                type="number"
+                min={1}
+                step={0.05}
+                value={form.night_sunday_combined_multiplier ?? ""}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    night_sunday_combined_multiplier:
+                      e.target.value === "" ? null : Number(e.target.value),
+                  })
+                }
+              />
+            </div>
+          )}
         </div>
         <div className="col-span-full flex items-center justify-between rounded-md border border-border bg-muted/30 p-3">
           <div>
