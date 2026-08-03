@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -12,8 +13,28 @@ interface DateRangePickerProps {
 }
 
 export const DateRangePicker = ({ dateRange, onDateRangeChange }: DateRangePickerProps) => {
+  // On track manuellement le 1er clic : react-day-picker (mode="range" + onSelect)
+  // ne fait qu'étendre le "from"/"to" existant au lieu de repartir d'une nouvelle
+  // sélection, ce qui empêchait de choisir une période complètement différente.
+  const [firstClick, setFirstClick] = useState<Date | null>(null);
+
+  const handleDayClick = (day: Date | undefined) => {
+    if (!day) return;
+
+    if (firstClick === null) {
+      setFirstClick(day);
+      onDateRangeChange({ from: day, to: day });
+      return;
+    }
+
+    const start = firstClick < day ? firstClick : day;
+    const end = firstClick < day ? day : firstClick;
+    onDateRangeChange({ from: start, to: end });
+    setFirstClick(null);
+  };
+
   return (
-    <Popover>
+    <Popover onOpenChange={() => setFirstClick(null)}>
       <PopoverTrigger asChild>
         <Button variant="outline" className="justify-start text-left font-normal">
           <CalendarIcon className="mr-2 h-4 w-4" />
@@ -24,11 +45,7 @@ export const DateRangePicker = ({ dateRange, onDateRangeChange }: DateRangePicke
         <Calendar
           mode="range"
           selected={{ from: dateRange.from, to: dateRange.to }}
-          onSelect={(range) => {
-            if (range?.from && range?.to) {
-              onDateRangeChange({ from: range.from, to: range.to });
-            }
-          }}
+          onDayClick={handleDayClick}
           numberOfMonths={2}
           locale={fr}
           className="pointer-events-auto"

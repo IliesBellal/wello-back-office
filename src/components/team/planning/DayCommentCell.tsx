@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -52,11 +52,21 @@ export function DayCommentCell({ dateIso, comment, onSave, onDelete }: DayCommen
     }
   };
 
+  // Entrée valide le commentaire (comme un envoi de message) ; Maj+Entrée
+  // insère un retour à la ligne normalement.
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void handleSave();
+    }
+  };
+
   return (
     <div className="flex flex-col gap-1 border-b border-r bg-muted/30 p-1">
       <Textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}
+        onKeyDown={handleKeyDown}
         placeholder="—"
         maxLength={MAX_COMMENT_LENGTH}
         rows={2}

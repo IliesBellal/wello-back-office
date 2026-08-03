@@ -1,5 +1,5 @@
 import { useState, useEffect, type InputHTMLAttributes } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -393,6 +393,16 @@ const Login = () => {
                   )}
                 </span>
               </motion.button>
+            </motion.div>
+
+            {/* Password recovery */}
+            <motion.div variants={itemVariants} className="text-center">
+              <Link
+                to="/forgot-password"
+                className="text-sm text-slate-600 hover:text-blue-600 transition-colors"
+              >
+                Mot de passe oublié ?
+              </Link>
             </motion.div>
           </motion.form>
 

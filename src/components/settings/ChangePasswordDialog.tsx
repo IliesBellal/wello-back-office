@@ -12,10 +12,17 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
+import { apiClient } from "@/services/apiClient";
 
 interface ChangePasswordDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+/** Envelope of PATCH /users/reset-password — data.token is the rotated session token. */
+interface UpdatePasswordResponse {
+  id: string;
+  data: { status: string; token: string };
 }
 
 export const ChangePasswordDialog = ({ open, onOpenChange }: ChangePasswordDialogProps) => {
@@ -49,27 +56,21 @@ export const ChangePasswordDialog = ({ open, onOpenChange }: ChangePasswordDialo
     setIsLoading(true);
 
     try {
-      const res = await fetch('/users/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          old_password: currentPassword,
-          new_password: newPassword,
-        }),
+      // Goes through apiClient: absolute API base URL, PATCH (the route is
+      // `PATCH /users/reset-password`) and the Authorization header. The former
+      // raw `fetch('/users/reset-password', { method: 'POST' })` had all three
+      // wrong and could never succeed.
+      const responseJson = await apiClient.patch<UpdatePasswordResponse>('/users/reset-password', {
+        old_password: currentPassword,
+        new_password: newPassword,
       });
-
-      const responseJson = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        throw new Error(responseJson?.message || 'Échec de la mise à jour du mot de passe');
-      }
 
       // response wrapper: response.data.token contains the new token
       const newToken = responseJson?.data?.token;
 
-      // Update auth token in context if available
+      // Update auth token in context if available. The backend rotates the
+      // session token on every password change, so without this the current
+      // session would break on the next request.
       if (newToken && authData && setAuthData) {
         setAuthData({ ...authData, session: { ...authData.session, token: newToken } });
       }

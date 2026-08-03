@@ -12,6 +12,8 @@ import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import GlobalLoadingBar from "./components/GlobalLoadingBar";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import Menu from "./pages/Menu";
 import CategoriesTable from './pages/CategoriesTable';
@@ -66,6 +68,9 @@ const App = () => (
                 <Sonner />
                 <Routes>
               <Route path="/login" element={<Login />} />
+              {/* Public: the visitor has lost their password, so no ProtectedRoute. */}
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               
               {/* Menu Management */}

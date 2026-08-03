@@ -23,6 +23,26 @@ export const toUTCDateString = (value: Date | string): string => {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 };
 
+// Date de calendrier "nue", sans aucune conversion de fuseau. Réservée aux
+// endpoints dont la borne est interprétée côté API dans le fuseau de
+// l'établissement (export comptable) : y appliquer toUTCDateString reculerait
+// la période d'un jour pour tout fuseau à décalage positif.
+export const toLocalDateString = (value: Date | string): string => {
+  if (typeof value === 'string') {
+    const dateOnly = value.slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) {
+      throw new Error(`Invalid date value: ${value}`);
+    }
+    return dateOnly;
+  }
+
+  if (Number.isNaN(value.getTime())) {
+    throw new Error(`Invalid date value: ${String(value)}`);
+  }
+
+  return `${value.getFullYear()}-${pad2(value.getMonth() + 1)}-${pad2(value.getDate())}`;
+};
+
 export const toUTCDateTimeString = (value: Date | string): string => {
   const date = parseDateInput(value);
 

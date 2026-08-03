@@ -1,6 +1,18 @@
 import { apiClient, withMock, logAPI, requestWithCustomToken } from "@/services/apiClient";
 import { AuthResponse, LoginCredentials, RawAuthResponse, normalizeAuthResponse } from '@/types/auth';
 
+/** Envelope of POST /auth/forgot-password — deliberately carries no signal. */
+interface ForgotPasswordResponse {
+  id: string;
+  data: { status: string; message: string };
+}
+
+/** Envelope of POST /auth/reset-password. */
+interface ResetPasswordResponse {
+  id: string;
+  data: { status: string; message: string };
+}
+
 // ============= Mock Data =============
 const mockAuthResponse: AuthResponse = {
     id: "auth.login",
@@ -224,10 +236,57 @@ export const authService = {
 
   loginWithToken: async (customToken: string): Promise<AuthResponse> => {
     logAPI('POST', '/auth/login (with custom token)');
-    
+
     return withMock(
       () => normalizeAuthResponse(buildMockResponseForMerchant(customToken)),
       async () => normalizeAuthResponse(await requestWithCustomToken<RawAuthResponse>('/auth/login', customToken, { method: 'POST', body: {} }))
+    );
+  },
+
+  /**
+   * POST /auth/forgot-password — public, no token.
+   *
+   * Always resolves when the server is reachable: the backend answers 200
+   * whether or not the account exists, on purpose (anti account-enumeration).
+   * The UI must therefore show the same neutral message in every case, and
+   * must never claim "an email has been sent to you".
+   *
+   * `login` accepts a username or an email, like /auth/login.
+   */
+  forgotPassword: async (login: string): Promise<void> => {
+    logAPI('POST', '/auth/forgot-password');
+
+    return withMock(
+      () => undefined,
+      async () => {
+        await apiClient.post<ForgotPasswordResponse>(
+          '/auth/forgot-password',
+          { login },
+          { skipAuth: true },
+        );
+      },
+    );
+  },
+
+  /**
+   * POST /auth/reset-password — public, no token.
+   *
+   * Consumes the single-use link. A password rejected for being too short does
+   * NOT consume it, so the user can retry with the same link.
+   * All sessions are closed on success: the user has to sign in again.
+   */
+  resetPassword: async (token: string, newPassword: string): Promise<void> => {
+    logAPI('POST', '/auth/reset-password');
+
+    return withMock(
+      () => undefined,
+      async () => {
+        await apiClient.post<ResetPasswordResponse>(
+          '/auth/reset-password',
+          { token, new_password: newPassword },
+          { skipAuth: true },
+        );
+      },
     );
   },
 };

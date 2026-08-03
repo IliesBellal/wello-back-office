@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, API_BASE_URL } from "@/services/apiClient";
-import { toUTCDateString, toUTCDateTimeString } from '@/utils/apiDate';
+import { toLocalDateString, toUTCDateString, toUTCDateTimeString } from '@/utils/apiDate';
 
 // ============= Types =============
 export interface VATData {
@@ -147,11 +147,13 @@ export const financialReportsService = {
   },
 
   async exportGlobal(dateFrom: Date | string, dateTo: Date | string): Promise<ExportResponse> {
-    const dateFromUTC = toUTCDateString(dateFrom);
-    const dateToUTC = toUTCDateString(dateTo);
+    // Dates locales et non UTC : l'API les interprète dans le fuseau de
+    // l'établissement (1er jour 00:00:00 -> dernier jour 23:59:59 heure locale).
+    const dateFromLocal = toLocalDateString(dateFrom);
+    const dateToLocal = toLocalDateString(dateTo);
 
-    logAPI('POST', '/pos/accounting/export', { date_from: dateFromUTC, date_to: dateToUTC });
-    
+    logAPI('POST', '/pos/accounting/export', { date_from: dateFromLocal, date_to: dateToLocal });
+
     return withMock(
       () => ({
         status: '1',
@@ -159,7 +161,7 @@ export const financialReportsService = {
         download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_comptable.pdf'
       }),
       async () => {
-        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/accounting/export', { date_from: dateFromUTC, date_to: dateToUTC });
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/accounting/export', { date_from: dateFromLocal, date_to: dateToLocal });
         return response.data;
       }
     );
