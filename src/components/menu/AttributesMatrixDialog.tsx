@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { menuService } from '@/services/menuService';
@@ -58,6 +59,14 @@ const cellShade = (rowOdd: boolean, colOdd: boolean) => {
 };
 
 const headerShade = (colOdd: boolean) => (colOdd ? 'bg-muted/60' : 'bg-muted/40');
+
+const formatOptionPrice = (cents: number) => (cents / 100).toFixed(2);
+
+// Même formulation que l'onglet Options du sidesheet produit (ProductOptionsTab).
+const attributeSelectionLabel = (attribute: Attribute) =>
+  attribute.min === attribute.max && attribute.max === 1
+    ? 'Sélection unique obligatoire'
+    : `${attribute.min ?? 0} à ${attribute.max ?? 0} choix possibles`;
 
 export const AttributesMatrixDialog = ({
   open,
@@ -231,14 +240,37 @@ export const AttributesMatrixDialog = ({
                           headerShade(colOdd)
                         )}
                       >
-                        <div className="flex h-full items-end justify-start pl-2 pb-2">
-                          <span
-                            className="inline-block origin-bottom-left -rotate-45 whitespace-nowrap text-xs font-medium leading-none"
-                            title={label}
-                          >
-                            {label}
-                          </span>
-                        </div>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex h-full w-full items-end justify-start pl-2 pb-2 cursor-default">
+                              <span className="inline-block origin-bottom-left -rotate-45 whitespace-nowrap text-xs font-medium leading-none">
+                                {label}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs p-3">
+                            <p className="text-sm font-semibold">{attribute.title}</p>
+                            <p className="text-xs text-muted-foreground">{attribute.name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {attributeSelectionLabel(attribute)}
+                            </p>
+                            {attribute.options.length > 0 && (
+                              <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+                                {attribute.options.map((option) => (
+                                  <div
+                                    key={option.id}
+                                    className="flex justify-between items-center gap-3 p-2 rounded-md bg-muted/50"
+                                  >
+                                    <span className="text-xs">{option.title}</span>
+                                    <span className="text-xs font-medium text-primary whitespace-nowrap">
+                                      {option.price > 0 ? `+${formatOptionPrice(option.price)} €` : 'Gratuit'}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
                       </TableHead>
                     );
                   })}
