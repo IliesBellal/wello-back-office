@@ -122,6 +122,7 @@ export interface Attribute {
   options: AttributeOption[] | AttributeOptionDetail[];
   product_id?: string;
   order_item_id?: string;
+  product_count?: number;  // Number of products using this attribute group
 }
 
 export interface ProductComposition {

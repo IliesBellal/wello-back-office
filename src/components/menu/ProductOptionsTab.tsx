@@ -62,6 +62,9 @@ export const ProductOptionsTab = ({
                 .map((attr) => (
                   <SelectItem key={attr.id} value={attr.id}>
                     {attr.name}
+                    <span className="text-muted-foreground">
+                      {' '}({attr.product_count ?? 0} produit{(attr.product_count ?? 0) !== 1 ? 's' : ''})
+                    </span>
                   </SelectItem>
                 ))}
             </SelectContent>

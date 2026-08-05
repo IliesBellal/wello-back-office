@@ -133,30 +133,32 @@ const mockComponentCategories: ComponentCategory[] = [
 ];
 
 const mockAttributes: Attribute[] = [
-  { 
+  {
     id: "attr_1",
     name: "pizza_size",
-    title: "Taille Pizza", 
-    type: "CHECK", 
-    min: 1, 
+    title: "Taille Pizza",
+    type: "CHECK",
+    min: 1,
     max: 1,
     options: [
       { id: "opt_1", title: "Junior", price: 0 },
       { id: "opt_2", title: "Senior", price: 200 },
       { id: "opt_3", title: "Mega", price: 500 }
-    ]
+    ],
+    product_count: 4
   },
-  { 
+  {
     id: "attr_2",
     name: "supplements",
-    title: "Suppléments", 
-    type: "CHECK", 
-    min: 0, 
+    title: "Suppléments",
+    type: "CHECK",
+    min: 0,
     max: 5,
     options: [
       { id: "opt_4", title: "Olive", price: 50 },
       { id: "opt_5", title: "Oeuf", price: 100 }
-    ]
+    ],
+    product_count: 2
   }
 ];
 
