@@ -467,6 +467,25 @@ export const useMenuData = () => {
     }));
   };
 
+  // Merges already-persisted tag assignments into local state (no API call, no refetch).
+  const applyProductsTags = (updates: Array<{ product_id: string; tags: string[] }>) => {
+    if (updates.length === 0) return;
+    const updatesMap = new Map(updates.map(u => [u.product_id, u.tags]));
+
+    setMenuData(prev => ({
+      ...prev,
+      products: prev.products?.map(p =>
+        updatesMap.has(p.product_id) ? { ...p, tags: updatesMap.get(p.product_id) } : p
+      ),
+      products_types: prev.products_types.map(cat => ({
+        ...cat,
+        products: cat.products?.map(p =>
+          updatesMap.has(p.product_id) ? { ...p, tags: updatesMap.get(p.product_id) } : p
+        )
+      }))
+    }));
+  };
+
   // Merges already-persisted attribute (options/suppléments) assignments into local state (no API call, no refetch).
   const applyProductsAttributes = (updates: Array<{ product_id: string; attribute_ids: string[] }>) => {
     if (updates.length === 0) return;
@@ -515,6 +534,7 @@ export const useMenuData = () => {
     deleteComponentCategory,
     bulkUpdatePrices,
     applyProductsAllergens,
-    applyProductsAttributes
+    applyProductsAttributes,
+    applyProductsTags
   };
 };

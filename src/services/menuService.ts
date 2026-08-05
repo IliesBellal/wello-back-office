@@ -623,6 +623,16 @@ export const menuService = {
     );
   },
 
+  // Remplace la liste complète des tags assignés à un produit.
+  async updateProductTags(productId: string, tagIds: string[]): Promise<void> {
+    const payload = { tag_ids: tagIds };
+    logAPI('PUT', `/menu/products/${productId}/tags`, payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.put<void>(`/menu/products/${productId}/tags`, payload)
+    );
+  },
+
   // Remplace la liste complète des groupes d'attributs (options/suppléments) assignés à un produit.
   async updateProductAttributes(productId: string, attributeIds: string[]): Promise<void> {
     const payload = { configuration: attributeIds };

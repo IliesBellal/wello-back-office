@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Plus, Globe, Grid3x3, Search, ShieldAlert, ListChecks } from 'lucide-react';
+import { MoreVertical, Plus, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { useProductCreateSheet } from '@/contexts/ProductCreateSheetContext';
 import { useOrganizeModal } from '@/contexts/OrganizeModalContext';
@@ -16,6 +16,7 @@ import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
 import { OrganizeModal } from '@/components/menu/OrganizeModal';
 import { AllergensMatrixDialog } from '@/components/menu/AllergensMatrixDialog';
 import { AttributesMatrixDialog } from '@/components/menu/AttributesMatrixDialog';
+import { TagsMatrixDialog } from '@/components/menu/TagsMatrixDialog';
 import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
 import { ProductCreateSheet } from '@/components/menu/ProductCreateSheet';
 import { Product } from '@/types/menu';
@@ -63,13 +64,15 @@ export default function Menu() {
     deleteProduct,
     createProduct,
     applyProductsAllergens,
-    applyProductsAttributes
+    applyProductsAttributes,
+    applyProductsTags
   } = useMenuData();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [externalMenusOpen, setExternalMenusOpen] = useState(false);
   const [allergensModalOpen, setAllergensModalOpen] = useState(false);
   const [attributesModalOpen, setAttributesModalOpen] = useState(false);
+  const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const { isOpen: productCreateOpen, setIsOpen: setProductCreateOpen } = useProductCreateSheet();
   const { isOpen: organizeModalOpen, setIsOpen: setOrganizeModalOpen } = useOrganizeModal();
   const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
@@ -235,6 +238,10 @@ export default function Menu() {
                       <ListChecks className="w-4 h-4 mr-2" />
                       Gérer les options et suppléments
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setTagsModalOpen(true)}>
+                      <TagsIcon className="w-4 h-4 mr-2" />
+                      Gérer les tags
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -348,6 +355,14 @@ export default function Menu() {
           attributes={attributes}
           categories={menuData?.products_types || []}
           onProductsUpdated={applyProductsAttributes}
+        />
+
+        <TagsMatrixDialog
+          open={tagsModalOpen}
+          onOpenChange={setTagsModalOpen}
+          products={menuData?.products || []}
+          tags={tags}
+          onProductsUpdated={applyProductsTags}
         />
 
         <ProductCreateSheet
