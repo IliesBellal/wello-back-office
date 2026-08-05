@@ -14,34 +14,34 @@ interface MarketingCategoryApiItem {
 
 // ============= Mock Data =============
 const mockTvaRates: TvaRateGroup[] = [
-  { 
-    id: 59, 
-    name: "Sur place", 
+  {
+    id: 59,
+    name: "Sur place",
     delivery_type: "IN",
     rates: [
-      { id: 5, value: 10, label: "TVA 10%" }, 
-      { id: 6, value: 20, label: "TVA 20%" }
-    ] 
+      { id: 5, value: 10, label: "TVA 10%", description: "Boissons non alcoolisées, plats à consommer sur place" },
+      { id: 6, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiserie" }
+    ]
   },
-  { 
-    id: 60, 
-    name: "À livrer", 
+  {
+    id: 60,
+    name: "À livrer",
     delivery_type: "DELIVERY",
     rates: [
-      { id: 8, value: 5.5, label: "TVA 5.5%" }, 
-      { id: 7, value: 10, label: "TVA 10%" },
-      { id: 9, value: 20, label: "TVA 20%" }
-    ] 
+      { id: 8, value: 5.5, label: "TVA 5.5%", description: "Produits alimentaires standards" },
+      { id: 7, value: 10, label: "TVA 10%", description: "Boissons non alcoolisées" },
+      { id: 9, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiserie" }
+    ]
   },
-  { 
-    id: 61, 
-    name: "À emporter", 
+  {
+    id: 61,
+    name: "À emporter",
     delivery_type: "TAKE_AWAY",
     rates: [
-      { id: 1, value: 5.5, label: "TVA 5.5%" }, 
-      { id: 2, value: 10, label: "TVA 10%" },
-      { id: 3, value: 20, label: "TVA 20%" }
-    ] 
+      { id: 1, value: 5.5, label: "TVA 5.5%", description: "Produits alimentaires standards" },
+      { id: 2, value: 10, label: "TVA 10%", description: "Boissons non alcoolisées" },
+      { id: 3, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiserie" }
+    ]
   }
 ];
 

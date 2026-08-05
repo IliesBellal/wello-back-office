@@ -229,13 +229,20 @@ export function ProductCreateSheet({
                               <Select onValueChange={field.onChange} value={field.value?.toString()}>
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Sélectionner" />
+                                    <SelectValue placeholder="Sélectionner">
+                                      {surPlace.find(rate => rate.id.toString() === field.value?.toString())?.label}
+                                    </SelectValue>
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                   {surPlace.map((rate) => (
                                     <SelectItem key={rate.id} value={rate.id.toString()}>
-                                      {rate.label}
+                                      <div className="flex flex-col">
+                                        <span>{rate.label}</span>
+                                        {rate.description && (
+                                          <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                        )}
+                                      </div>
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -274,13 +281,20 @@ export function ProductCreateSheet({
                               <Select onValueChange={field.onChange} value={field.value?.toString()}>
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Sélectionner" />
+                                    <SelectValue placeholder="Sélectionner">
+                                      {emporter.find(rate => rate.id.toString() === field.value?.toString())?.label}
+                                    </SelectValue>
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                   {emporter.map((rate) => (
                                     <SelectItem key={rate.id} value={rate.id.toString()}>
-                                      {rate.label}
+                                      <div className="flex flex-col">
+                                        <span>{rate.label}</span>
+                                        {rate.description && (
+                                          <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                        )}
+                                      </div>
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -319,13 +333,20 @@ export function ProductCreateSheet({
                               <Select onValueChange={field.onChange} value={field.value?.toString()}>
                                 <FormControl>
                                   <SelectTrigger>
-                                    <SelectValue placeholder="Sélectionner" />
+                                    <SelectValue placeholder="Sélectionner">
+                                      {livraison.find(rate => rate.id.toString() === field.value?.toString())?.label}
+                                    </SelectValue>
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
                                   {livraison.map((rate) => (
                                     <SelectItem key={rate.id} value={rate.id.toString()}>
-                                      {rate.label}
+                                      <div className="flex flex-col">
+                                        <span>{rate.label}</span>
+                                        {rate.description && (
+                                          <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                        )}
+                                      </div>
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -482,13 +503,20 @@ export function ProductCreateSheet({
                       <Select onValueChange={field.onChange} value={field.value?.toString()}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner" />
+                            <SelectValue placeholder="Sélectionner">
+                              {surPlace.find(rate => rate.id.toString() === field.value?.toString())?.label}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {surPlace.map((rate) => (
                             <SelectItem key={rate.id} value={rate.id.toString()}>
-                              {rate.label}
+                              <div className="flex flex-col">
+                                <span>{rate.label}</span>
+                                {rate.description && (
+                                  <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                )}
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -527,13 +555,20 @@ export function ProductCreateSheet({
                       <Select onValueChange={field.onChange} value={field.value?.toString()}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner" />
+                            <SelectValue placeholder="Sélectionner">
+                              {emporter.find(rate => rate.id.toString() === field.value?.toString())?.label}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {emporter.map((rate) => (
                             <SelectItem key={rate.id} value={rate.id.toString()}>
-                              {rate.label}
+                              <div className="flex flex-col">
+                                <span>{rate.label}</span>
+                                {rate.description && (
+                                  <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                )}
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -572,13 +607,20 @@ export function ProductCreateSheet({
                       <Select onValueChange={field.onChange} value={field.value?.toString()}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Sélectionner" />
+                            <SelectValue placeholder="Sélectionner">
+                              {livraison.find(rate => rate.id.toString() === field.value?.toString())?.label}
+                            </SelectValue>
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {livraison.map((rate) => (
                             <SelectItem key={rate.id} value={rate.id.toString()}>
-                              {rate.label}
+                              <div className="flex flex-col">
+                                <span>{rate.label}</span>
+                                {rate.description && (
+                                  <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                )}
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectContent>

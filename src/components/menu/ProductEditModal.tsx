@@ -177,12 +177,19 @@ export const ProductEditModal = ({
                   })}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {getTvaRatesByType('sur place').find(rate => rate.id.toString() === formData.tva_ids?.on_site?.toString())?.label}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {getTvaRatesByType('sur place').map((rate) => (
                       <SelectItem key={rate.id} value={rate.id.toString()}>
-                        {rate.label}
+                        <div className="flex flex-col">
+                          <span>{rate.label}</span>
+                          {rate.description && (
+                            <span className="text-xs text-muted-foreground">{rate.description}</span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -199,12 +206,19 @@ export const ProductEditModal = ({
                   })}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {getTvaRatesByType('emporter').find(rate => rate.id.toString() === formData.tva_ids?.takeaway?.toString())?.label}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {getTvaRatesByType('emporter').map((rate) => (
                       <SelectItem key={rate.id} value={rate.id.toString()}>
-                        {rate.label}
+                        <div className="flex flex-col">
+                          <span>{rate.label}</span>
+                          {rate.description && (
+                            <span className="text-xs text-muted-foreground">{rate.description}</span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -221,12 +235,19 @@ export const ProductEditModal = ({
                   })}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {getTvaRatesByType('livraison').find(rate => rate.id.toString() === formData.tva_ids?.delivery?.toString())?.label}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {getTvaRatesByType('livraison').map((rate) => (
                       <SelectItem key={rate.id} value={rate.id.toString()}>
-                        {rate.label}
+                        <div className="flex flex-col">
+                          <span>{rate.label}</span>
+                          {rate.description && (
+                            <span className="text-xs text-muted-foreground">{rate.description}</span>
+                          )}
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>

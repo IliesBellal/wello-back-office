@@ -60,10 +60,15 @@ export const ProductOptionsTab = ({
               {availableAttributes
                 .filter(attr => !productAttributes.some(pa => pa.attribute_id === attr.id))
                 .map((attr) => (
-                  <SelectItem key={attr.id} value={attr.id}>
-                    {attr.name}
-                    <span className="text-muted-foreground">
-                      {' '}({attr.product_count ?? 0} produit{(attr.product_count ?? 0) !== 1 ? 's' : ''})
+                  <SelectItem key={attr.id} value={attr.id} className="pr-16">
+                    {/* max-w explicite : SelectContent grandit pour s'ajuster à son contenu,
+                        donc sans largeur bornée ici "truncate" n'a rien à couper contre. */}
+                    <span className="block max-w-[220px] truncate">{attr.name}</span>
+                    {/* Absolute + relative sur la ligne (comme la coche de sélection) : le
+                        texte de l'item ne s'étire pas sur toute la largeur en flexbox,
+                        donc ml-auto/justify-between n'aurait pas poussé ceci à droite. */}
+                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      {attr.product_count ?? 0} produit{(attr.product_count ?? 0) !== 1 ? 's' : ''}
                     </span>
                   </SelectItem>
                 ))}

@@ -2,6 +2,7 @@ export interface TvaRate {
   id: number;
   value: number;
   label: string;
+  description?: string;
 }
 
 export interface TvaRateGroup {
