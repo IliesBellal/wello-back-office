@@ -8,6 +8,7 @@ import {
 import { getStoredAuthToken } from '@/types/auth';
 import type {
   ImportCommitBlocker,
+  ImportManualProductPayload,
   ImportCommitResponse,
   ImportDecisions,
   ImportPreviewResult,
@@ -71,6 +72,23 @@ export const menuImportService = {
     const response = await apiClient.post<WelloApiResponse<ImportPreviewResult>>(
       '/menu/import/preview',
       formData,
+    );
+
+    return response.data;
+  },
+
+  /**
+   * Prévisualise une saisie de masse.
+   *
+   * Même endpoint que le fichier, même pipeline ensuite : seule l'entrée
+   * change. `provider` n'est pas envoyé — l'API retient « manual » par défaut.
+   */
+  async previewFromManual(products: ImportManualProductPayload[]): Promise<ImportPreviewResult> {
+    logAPI('POST', '/menu/import/preview', { products: products.length });
+
+    const response = await apiClient.post<WelloApiResponse<ImportPreviewResult>>(
+      '/menu/import/preview',
+      { products },
     );
 
     return response.data;

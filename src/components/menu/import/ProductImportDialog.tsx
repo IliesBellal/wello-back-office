@@ -14,7 +14,7 @@ import { useProductImport } from '@/hooks/useProductImport';
 
 import { ImportDoneStep } from './ImportDoneStep';
 import { ImportDoorPicker } from './ImportDoorPicker';
-import { ImportManualStub } from './ImportManualStub';
+import { ImportManualStep } from './ImportManualStep';
 import { ImportReviewStep } from './ImportReviewStep';
 import { ImportProviderStep } from './ImportProviderStep';
 
@@ -27,6 +27,11 @@ interface ProductImportDialogProps {
    * c'est à l'appelant de relancer son chargement.
    */
   onImported?: () => void;
+  /**
+   * Catégories du menu, proposées en autocomplétion à la saisie manuelle.
+   * Évite de créer une catégorie jumelle sur une faute de frappe.
+   */
+  existingCategories?: string[];
 }
 
 const STEP_TITLES: Record<string, { title: string; description: string }> = {
@@ -46,9 +51,9 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
     title: 'Import terminé',
     description: 'Voici ce qui a été ajouté à votre menu.',
   },
-  'manual-stub': {
-    title: 'Saisie manuelle',
-    description: 'Cette porte arrive bientôt.',
+  manual: {
+    title: 'Saisir mes produits',
+    description: 'Une ligne par produit — rien n’est enregistré avant vérification.',
   },
 };
 
@@ -62,7 +67,12 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
  * déjà utilisé pour les surfaces denses, et bascule en plein écran sur mobile
  * comme le fait `ProductCreateSheet`.
  */
-export const ProductImportDialog = ({ open, onOpenChange, onImported }: ProductImportDialogProps) => {
+export const ProductImportDialog = ({
+  open,
+  onOpenChange,
+  onImported,
+  existingCategories,
+}: ProductImportDialogProps) => {
   const isMobile = useIsMobile();
   const wizard = useProductImport();
   const {
@@ -126,14 +136,14 @@ export const ProductImportDialog = ({ open, onOpenChange, onImported }: ProductI
           />
         ) : null;
 
-      case 'manual-stub':
-        return <ImportManualStub onBack={back} />;
+      case 'manual':
+        return <ImportManualStep wizard={wizard} existingCategories={existingCategories} />;
 
       default:
         return (
           <ImportDoorPicker
             onChooseProvider={() => goToDoor('provider')}
-            onChooseManual={() => goToDoor('manual-stub')}
+            onChooseManual={() => goToDoor('manual')}
             onDownloadTemplate={() => downloadTemplate()}
             isDownloadingTemplate={isDownloadingTemplate}
           />

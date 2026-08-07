@@ -231,3 +231,28 @@ export const tvaChannelLabel = (channel: number): string =>
 
 /** Clé du mapping de TVA, au format produit par `TvaRateKey.MarshalText` côté API. */
 export const tvaMappingKey = (rate: number, channel: number): string => `${rate}:${channel}`;
+
+// ─── Saisie de masse ────────────────────────────────────────
+
+/**
+ * Une ligne de la porte JSON de `POST /menu/import/preview`
+ * (internal/modules/menu/import_models.go).
+ *
+ * Prix en **centimes**, comme `CreateProductPayload` : c'est le back-office qui
+ * convertit. Taux de TVA en **pourcentage**, `null` quand rien n'est saisi —
+ * une absence de taux réclame une décision, un taux nul désactive le canal.
+ * `category` est un **nom**, pas un identifiant : la prévisualisation
+ * réutilisera la catégorie existante du même nom, ou la créera.
+ */
+export interface ImportManualProductPayload {
+  name: string;
+  description: string;
+  category: string;
+  price: number;
+  price_take_away: number;
+  price_delivery: number;
+  tva_in: number | null;
+  tva_take_away: number | null;
+  tva_delivery: number | null;
+  tags: string[];
+}

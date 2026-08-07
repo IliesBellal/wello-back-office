@@ -1,6 +1,5 @@
 import { ChevronRight, Download, FileSpreadsheet, Keyboard, Loader2 } from 'lucide-react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
@@ -68,21 +67,19 @@ export const ImportDoorPicker = ({
     </Card>
 
     <Card className="flex flex-col gap-4 p-6">
-      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted">
-        <Keyboard className="h-5 w-5 text-muted-foreground" />
+      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
+        <Keyboard className="h-5 w-5 text-primary" />
       </div>
       <div className="flex-1 space-y-1">
-        <div className="flex items-center gap-2">
-          <h3 className="font-semibold">Je saisis mes produits à la main</h3>
-          <Badge variant="secondary">Bientôt</Badge>
-        </div>
+        <h3 className="font-semibold">Je saisis mes produits à la main</h3>
         <p className="text-sm text-muted-foreground">
-          Un formulaire pour saisir plusieurs produits d’affilée, sans passer par un fichier.
-          En cours de développement.
+          Remplissez un tableau, une ligne par produit, sans passer par un fichier. Pratique pour
+          une dizaine de produits ou pour compléter une carte existante.
         </p>
       </div>
       <Button variant="outline" className="w-full" onClick={onChooseManual}>
-        En savoir plus
+        Saisir mes produits
+        <ChevronRight className="ml-2 h-4 w-4" />
       </Button>
     </Card>
   </div>
