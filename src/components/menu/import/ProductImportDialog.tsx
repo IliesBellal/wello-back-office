@@ -12,14 +12,21 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useProductImport } from '@/hooks/useProductImport';
 
+import { ImportDoneStep } from './ImportDoneStep';
 import { ImportDoorPicker } from './ImportDoorPicker';
 import { ImportManualStub } from './ImportManualStub';
-import { ImportPreviewSummary } from './ImportPreviewSummary';
+import { ImportReviewStep } from './ImportReviewStep';
 import { ImportProviderStep } from './ImportProviderStep';
 
 interface ProductImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Appelé après un import réussi, pour que la page rafraîchisse sa liste.
+   * Le menu n'est pas sur react-query — pas d'invalidation de cache possible,
+   * c'est à l'appelant de relancer son chargement.
+   */
+  onImported?: () => void;
 }
 
 const STEP_TITLES: Record<string, { title: string; description: string }> = {
@@ -32,8 +39,12 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
     description: 'Indiquez d’où vient le fichier, puis envoyez-le.',
   },
   preview: {
-    title: 'Ce que contient votre fichier',
-    description: 'Vérifiez avant d’enregistrer.',
+    title: 'Vérifier avant d’enregistrer',
+    description: 'Rien n’est enregistré tant que vous n’avez pas validé.',
+  },
+  done: {
+    title: 'Import terminé',
+    description: 'Voici ce qui a été ajouté à votre menu.',
   },
   'manual-stub': {
     title: 'Saisie manuelle',
@@ -51,8 +62,9 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
  * déjà utilisé pour les surfaces denses, et bascule en plein écran sur mobile
  * comme le fait `ProductCreateSheet`.
  */
-export const ProductImportDialog = ({ open, onOpenChange }: ProductImportDialogProps) => {
+export const ProductImportDialog = ({ open, onOpenChange, onImported }: ProductImportDialogProps) => {
   const isMobile = useIsMobile();
+  const wizard = useProductImport();
   const {
     state,
     isUploading,
@@ -64,13 +76,23 @@ export const ProductImportDialog = ({ open, onOpenChange }: ProductImportDialogP
     setFile,
     submitFile,
     downloadTemplate,
-  } = useProductImport();
+  } = wizard;
 
   // Repartir de zéro à chaque ouverture : réutiliser une prévisualisation
   // d'une session précédente exposerait un jeton peut-être expiré.
   useEffect(() => {
     if (!open) reset();
   }, [open, reset]);
+
+  // Le menu vient d'être modifié en base : prévenir la page pour qu'elle
+  // recharge, sans attendre la fermeture — l'utilisateur peut enchaîner sur un
+  // second fichier et doit voir un état à jour derrière lui.
+  const importedProductCount = state.result?.summary.products.created;
+  useEffect(() => {
+    if (importedProductCount !== undefined) {
+      onImported?.();
+    }
+  }, [importedProductCount, onImported]);
 
   const heading = STEP_TITLES[state.step] ?? STEP_TITLES.choose;
 
@@ -93,7 +115,16 @@ export const ProductImportDialog = ({ open, onOpenChange }: ProductImportDialogP
       case 'preview':
         // L'étape n'est atteignable qu'avec un résultat en main ; la garde
         // n'est là que pour satisfaire le typage.
-        return state.preview ? <ImportPreviewSummary preview={state.preview} onBack={back} /> : null;
+        return state.preview ? <ImportReviewStep preview={state.preview} wizard={wizard} /> : null;
+
+      case 'done':
+        return state.result ? (
+          <ImportDoneStep
+            result={state.result}
+            onClose={() => onOpenChange(false)}
+            onImportAnother={back}
+          />
+        ) : null;
 
       case 'manual-stub':
         return <ImportManualStub onBack={back} />;

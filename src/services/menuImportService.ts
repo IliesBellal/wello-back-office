@@ -6,7 +6,13 @@ import {
   type WelloApiResponse,
 } from '@/services/apiClient';
 import { getStoredAuthToken } from '@/types/auth';
-import type { ImportPreviewResult, ImportProviderSlug } from '@/types/import';
+import type {
+  ImportCommitBlocker,
+  ImportCommitResponse,
+  ImportDecisions,
+  ImportPreviewResult,
+  ImportProviderSlug,
+} from '@/types/import';
 
 /** Taille acceptée par l'API (internal/modules/menu/import_models.go). */
 export const MAX_IMPORT_FILE_SIZE = 5 * 1024 * 1024;
@@ -65,6 +71,23 @@ export const menuImportService = {
     const response = await apiClient.post<WelloApiResponse<ImportPreviewResult>>(
       '/menu/import/preview',
       formData,
+    );
+
+    return response.data;
+  },
+
+  /**
+   * Matérialise un lot précédemment prévisualisé.
+   *
+   * Seul appel de la chaîne d'import qui écrit. Un lot incomplet repart en 422
+   * avec la liste des blocages, sans qu'une ligne ait été insérée.
+   */
+  async commitImport(token: string, decisions: ImportDecisions): Promise<ImportCommitResponse> {
+    logAPI('POST', '/menu/import/commit', { token });
+
+    const response = await apiClient.post<WelloApiResponse<ImportCommitResponse>>(
+      '/menu/import/commit',
+      { token, decisions },
     );
 
     return response.data;
@@ -168,4 +191,54 @@ export const describeImportError = (error: unknown): string => {
   }
 
   return apiError.message || "L'import a échoué. Réessayez dans un instant.";
+};
+
+// ─── Erreurs du commit ──────────────────────────────────────
+
+/** Le jeton de prévisualisation a expiré, ou a déjà servi. */
+export const isPreviewExpiredError = (error: unknown): boolean => {
+  const apiError = readImportApiError(error);
+  return apiError?.status === 410;
+};
+
+/**
+ * Blocages d'un 422. Vide pour toute autre erreur : l'appelant les rend au plus
+ * près de l'entité concernée plutôt qu'en message global.
+ */
+export const readCommitBlockers = (error: unknown): ImportCommitBlocker[] => {
+  if (!isApiHttpError(error) || error.status !== 422) return [];
+
+  const body = error.responseBody;
+  if (typeof body !== 'object' || body === null) return [];
+
+  const data = (body as { data?: unknown }).data;
+  if (typeof data !== 'object' || data === null) return [];
+
+  const blockers = (data as { blockers?: unknown }).blockers;
+  if (!Array.isArray(blockers)) return [];
+
+  return blockers.filter(
+    (blocker): blocker is ImportCommitBlocker =>
+      typeof blocker === 'object' &&
+      blocker !== null &&
+      typeof (blocker as ImportCommitBlocker).code === 'string' &&
+      typeof (blocker as ImportCommitBlocker).message === 'string',
+  );
+};
+
+/** Message affiché en tête quand le commit échoue. */
+export const describeCommitError = (error: unknown): string => {
+  const apiError = readImportApiError(error);
+
+  if (apiError?.status === 410) {
+    return 'Cette vérification a expiré ou a déjà été validée. Renvoyez le fichier pour repartir d’une prévisualisation à jour.';
+  }
+  if (apiError?.code === 'import_not_committable') {
+    return 'Il reste des choix à faire avant de pouvoir enregistrer.';
+  }
+  if (apiError?.code === 'missing_preview_token') {
+    return 'La prévisualisation a été perdue. Renvoyez le fichier.';
+  }
+
+  return describeImportError(error);
 };

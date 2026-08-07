@@ -10,6 +10,14 @@ import type { MerchantUserListFilters } from "@/types/adminUsers";
 import type { EmployeeListFilters, PlanningLeaveRequestFilters, PlanningShiftSwapRequestFilters } from "@/types/planning";
 
 export const qk = {
+  // ─── Menu – Taux de TVA ───────────────────────────────────
+  // Référentiel global (`GET /pos/tva_rates`), stable et partagé : c'est la
+  // seule lecture du menu passée sur react-query, le reste vit encore dans
+  // useMenuData.
+  menuTvaRates: {
+    all: ["menu", "tva-rates"] as const,
+  },
+
   // ─── Users ────────────────────────────────────────────────
   users: {
     all: ["users"] as const,

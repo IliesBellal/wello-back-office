@@ -512,6 +512,10 @@ export const useMenuData = () => {
 
   return {
     menuData,
+    // Rechargement complet, exposé pour les flux qui écrivent hors de ce hook
+    // — l'import de produits en masse notamment. Le menu n'étant pas sur
+    // react-query, il n'y a pas d'invalidation de cache possible.
+    loadData,
     units,
     components,
     componentCategories,

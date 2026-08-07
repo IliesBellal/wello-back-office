@@ -171,3 +171,63 @@ export interface ImportPreviewResult {
   warnings: ImportPreviewWarning[];
   decisions: ImportDecisions;
 }
+
+// ─── Commit ─────────────────────────────────────────────────
+
+/** Codes de blocage renvoyés en 422 par `POST /menu/import/commit`. */
+export const IMPORT_BLOCKER_CODES = {
+  needsCategory: 'product_needs_category',
+  tvaUnresolved: 'tva_rate_unresolved',
+  collisionUnresolved: 'product_name_collision_unresolved',
+  invalidTvaMapping: 'invalid_tva_mapping',
+  invalidCategoryDecision: 'invalid_category_decision',
+} as const;
+
+export interface ImportCommitBlocker {
+  code: string;
+  /** Identifiant externe de l'entité fautive, ou `"<taux>:<canal>"` pour la TVA. */
+  ref?: string;
+  message: string;
+}
+
+export interface ImportCommitCounts {
+  created: number;
+  reused: number;
+  skipped: number;
+}
+
+export interface ImportCommitSummary {
+  categories: ImportCommitCounts;
+  tags: ImportCommitCounts;
+  attributes: ImportCommitCounts;
+  products: ImportCommitCounts;
+  options_created: number;
+}
+
+export interface ImportCommitEntity {
+  external_id: string;
+  wello_id?: string;
+  action: 'created' | 'reused' | 'skipped';
+}
+
+export interface ImportCommitResponse {
+  provider: string;
+  summary: ImportCommitSummary;
+  categories: ImportCommitEntity[];
+  tags: ImportCommitEntity[];
+  attributes: ImportCommitEntity[];
+  products: ImportCommitEntity[];
+}
+
+/** Canaux de vente, aux valeurs de `tva_categories.delivery_type`. */
+export const TVA_CHANNELS = [
+  { value: 0, label: 'Sur place' },
+  { value: 3, label: 'À emporter' },
+  { value: 1, label: 'En livraison' },
+] as const;
+
+export const tvaChannelLabel = (channel: number): string =>
+  TVA_CHANNELS.find((entry) => entry.value === channel)?.label ?? String(channel);
+
+/** Clé du mapping de TVA, au format produit par `TvaRateKey.MarshalText` côté API. */
+export const tvaMappingKey = (rate: number, channel: number): string => `${rate}:${channel}`;
