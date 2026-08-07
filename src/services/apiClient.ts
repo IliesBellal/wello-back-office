@@ -207,7 +207,15 @@ const handleNetworkError = () => {
   });
 };
 
-type ApiHttpError = Error & {
+/**
+ * Erreur HTTP enrichie du statut et du corps de réponse déjà parsé.
+ *
+ * Exportée avec son garde `isApiHttpError` : les appelants qui veulent réagir
+ * à un code d'erreur métier précis (et non au seul message) ont besoin des
+ * deux. Sans l'export, chacun redéclarerait son propre garde, qui dériverait
+ * le jour où ce type évoluera.
+ */
+export type ApiHttpError = Error & {
   status: number;
   responseBody?: unknown;
   responseText?: string;
@@ -286,7 +294,7 @@ const createApiHttpError = (
   return error;
 };
 
-const isApiHttpError = (error: unknown): error is ApiHttpError => {
+export const isApiHttpError = (error: unknown): error is ApiHttpError => {
   return error instanceof Error && typeof (error as Partial<ApiHttpError>).status === "number";
 };
 
