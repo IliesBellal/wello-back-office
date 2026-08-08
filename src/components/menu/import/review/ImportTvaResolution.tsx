@@ -20,6 +20,8 @@ import {
 import type { TvaRateGroup } from '@/types/menu';
 import { tvaChannelLabel, tvaMappingKey, type ImportPreviewResult } from '@/types/import';
 
+import { IMPORT_FIELD_CLASS } from '../fieldStyles';
+
 interface ImportTvaResolutionProps {
   preview: ImportPreviewResult;
   tvaMapping: Record<string, number>;
@@ -118,7 +120,7 @@ export const ImportTvaResolution = ({
                         disabled={disabled || loadingRates}
                         onValueChange={(value) => onChange(entry.rate, entry.channel, Number(value))}
                       >
-                        <SelectTrigger className="h-9">
+                        <SelectTrigger className={`h-9 ${IMPORT_FIELD_CLASS}`}>
                           <SelectValue
                             placeholder={loadingRates ? 'Chargement…' : 'Choisir une TVA'}
                           />

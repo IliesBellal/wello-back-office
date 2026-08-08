@@ -78,9 +78,10 @@ export const ImportManualStep = ({ wizard, existingCategories = [] }: ImportManu
       </datalist>
 
       <p className="text-sm text-muted-foreground">
-        Une ligne par produit. Les prix sont en euros (9,50) et les TVA en pourcentage (10).
-        Appuyez sur <kbd className="rounded border px-1 text-xs">Entrée</kbd> depuis la dernière
-        ligne pour en ajouter une.
+        Un produit par ligne, chacun sur deux niveaux : le nom au-dessus de sa description, et le
+        prix au-dessus de sa TVA pour chaque canal de vente. Les prix sont en euros (9,50), les TVA
+        en pourcentage (10). Appuyez sur <kbd className="rounded border px-1 text-xs">Entrée</kbd>
+        depuis le dernier produit pour en ajouter un.
       </p>
 
       {state.error && (
@@ -95,16 +96,22 @@ export const ImportManualStep = ({ wizard, existingCategories = [] }: ImportManu
           <TableHeader>
             <TableRow className="bg-muted/40">
               <TableHead className="w-10 text-center">#</TableHead>
-              <TableHead className="min-w-[190px]">Nom *</TableHead>
-              <TableHead className="min-w-[200px]">Description</TableHead>
-              <TableHead className="min-w-[150px]">Catégorie *</TableHead>
-              <TableHead className="min-w-[110px] text-right">Prix sur place</TableHead>
-              <TableHead className="min-w-[110px] text-right">Prix emporté</TableHead>
-              <TableHead className="min-w-[110px] text-right">Prix livraison</TableHead>
-              <TableHead className="min-w-[95px] text-right">TVA place</TableHead>
-              <TableHead className="min-w-[95px] text-right">TVA emporté</TableHead>
-              <TableHead className="min-w-[95px] text-right">TVA livraison</TableHead>
-              <TableHead className="min-w-[160px]">Tags</TableHead>
+              <TableHead className="min-w-[260px]">
+                Nom * <span className="font-normal text-muted-foreground">et description</span>
+              </TableHead>
+              <TableHead className="min-w-[170px]">Catégorie *</TableHead>
+              <TableHead className="min-w-[130px]">
+                Sur place
+                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA</span>
+              </TableHead>
+              <TableHead className="min-w-[130px]">
+                À emporter
+                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA</span>
+              </TableHead>
+              <TableHead className="min-w-[130px]">
+                En livraison
+                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA</span>
+              </TableHead>
               <TableHead className="w-20" />
             </TableRow>
           </TableHeader>

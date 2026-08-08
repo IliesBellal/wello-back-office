@@ -32,8 +32,6 @@ export interface ManualRow {
   tvaIn: string;
   tvaTakeAway: string;
   tvaDelivery: string;
-  /** Tags séparés par des virgules. */
-  tags: string;
 }
 
 export type ManualRowField = Exclude<keyof ManualRow, 'id'>;
@@ -53,14 +51,13 @@ export const createManualRow = (seed: Partial<Omit<ManualRow, 'id'>> = {}): Manu
     tvaIn: '',
     tvaTakeAway: '',
     tvaDelivery: '',
-    tags: '',
     ...seed,
   };
 };
 
 /**
  * Duplique une ligne en gardant ce qui se répète d'un produit à l'autre —
- * catégorie, TVA, tags — et en vidant ce qui lui est propre. C'est le geste
+ * catégorie, prix, TVA — et en vidant ce qui lui est propre. C'est le geste
  * qu'on fait pour saisir douze pizzas à la suite.
  */
 export const duplicateManualRow = (row: ManualRow): ManualRow =>
@@ -72,7 +69,6 @@ export const duplicateManualRow = (row: ManualRow): ManualRow =>
     tvaIn: row.tvaIn,
     tvaTakeAway: row.tvaTakeAway,
     tvaDelivery: row.tvaDelivery,
-    tags: row.tags,
   });
 
 /**
@@ -89,8 +85,7 @@ export const isManualRowBlank = (row: ManualRow): boolean =>
   !row.priceDelivery.trim() &&
   !row.tvaIn.trim() &&
   !row.tvaTakeAway.trim() &&
-  !row.tvaDelivery.trim() &&
-  !row.tags.trim();
+  !row.tvaDelivery.trim();
 
 /** Erreurs de saisie, par identifiant de ligne puis par champ. */
 export type ManualRowErrors = Map<string, Partial<Record<ManualRowField, string>>>;
@@ -176,12 +171,6 @@ export const validateManualRows = (rows: ManualRow[]): ManualValidation => {
   };
 };
 
-const splitTags = (value: string): string[] =>
-  value
-    .split(',')
-    .map((tag) => tag.trim())
-    .filter(Boolean);
-
 /**
  * Construit le payload envoyé à la prévisualisation.
  *
@@ -205,7 +194,10 @@ export const buildManualPayload = (rows: ManualRow[]): ImportManualProductPayloa
     tva_in: parseDecimalInput(row.tvaIn) ?? null,
     tva_take_away: parseDecimalInput(row.tvaTakeAway) ?? null,
     tva_delivery: parseDecimalInput(row.tvaDelivery) ?? null,
-    tags: splitTags(row.tags),
+    // Les tags ne sont pas saisis ici : ils ne sont pas nécessaires à la
+    // création d'un produit, et une colonne de plus alourdissait la grille
+    // pour rien. Ils s'ajoutent ensuite depuis la fiche produit.
+    tags: [],
   }));
 
 /** Catégories déjà saisies dans la grille, pour l'autocomplétion. */
