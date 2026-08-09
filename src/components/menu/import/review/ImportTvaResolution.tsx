@@ -30,7 +30,7 @@ interface ImportTvaResolutionProps {
   loadingRates: boolean;
   blockersByRef: Map<string, string[]>;
   disabled: boolean;
-  onChange: (rate: number, channel: number, tvaId: number) => void;
+  onChange: (rate: number, channel: string, tvaId: number) => void;
 }
 
 /**
@@ -54,9 +54,10 @@ export const ImportTvaResolution = ({
     return <p className="text-sm text-muted-foreground">Aucun taux de TVA dans ce fichier.</p>;
   }
 
-  // delivery_type vaut '0' (sur place), '3' (emporté) ou '1' (livraison).
-  const ratesForChannel = (channel: number) =>
-    tvaGroups.find((group) => String(group.delivery_type) === String(channel))?.rates ?? [];
+  // delivery_type vaut 'IN', 'TAKE_AWAY' ou 'DELIVERY' — les mêmes chaînes des
+  // deux côtés, aucune traduction n'est nécessaire.
+  const ratesForChannel = (channel: string) =>
+    tvaGroups.find((group) => group.delivery_type === channel)?.rates ?? [];
 
   return (
     <div className="space-y-3">
@@ -82,12 +83,15 @@ export const ImportTvaResolution = ({
           <TableBody>
             {preview.tva_rates.map((entry) => {
               const key = tvaMappingKey(entry.rate, entry.channel);
+              // Présence de la clé et non valeur vraie : tva_categories
+              // contient des identifiants 0 et -1.
+              const isResolved = key in tvaMapping;
               const resolvedId = tvaMapping[key];
               const errors = blockersByRef.get(key);
               const options = ratesForChannel(entry.channel);
 
               return (
-                <TableRow key={key} className={errors || !resolvedId ? 'bg-destructive/5' : ''}>
+                <TableRow key={key} className={errors || !isResolved ? 'bg-destructive/5' : ''}>
                   <TableCell className="font-medium tabular-nums">
                     {entry.rate} %
                     {entry.rate === 0 && (
@@ -109,7 +113,7 @@ export const ImportTvaResolution = ({
                   </TableCell>
 
                   <TableCell>
-                    {resolvedId ? (
+                    {isResolved ? (
                       <span className="text-sm text-muted-foreground">
                         {options.find((rate) => Number(rate.id) === resolvedId)?.label ??
                           `TVA n° ${resolvedId}`}
@@ -139,7 +143,7 @@ export const ImportTvaResolution = ({
                         {message}
                       </p>
                     ))}
-                    {!resolvedId && !errors && options.length === 0 && !loadingRates && (
+                    {!isResolved && !errors && options.length === 0 && !loadingRates && (
                       <p className="mt-0.5 text-xs text-destructive">
                         Aucune TVA configurée pour ce canal — créez-la dans les réglages de caisse.
                       </p>

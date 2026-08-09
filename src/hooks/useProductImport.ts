@@ -248,7 +248,7 @@ export const useProductImport = () => {
   );
 
   const setTvaId = useCallback(
-    (rate: number, channel: number, tvaId: number) => {
+    (rate: number, channel: string, tvaId: number) => {
       patchDecisions((current) => ({
         ...current,
         tva_mapping: { ...current.tva_mapping, [tvaMappingKey(rate, channel)]: tvaId },

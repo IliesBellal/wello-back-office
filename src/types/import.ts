@@ -65,10 +65,18 @@ export interface ImportPreviewSummary {
   unresolved_tva_rates: number;
 }
 
+/**
+ * Canal de vente, tel que stocké dans `tva_categories.delivery_type`.
+ *
+ * Le commentaire SQL de la colonne annonce des valeurs numériques
+ * (« 0 => in, 1 => delivery, 3 => take away ») : il est faux, les données
+ * portent ces trois chaînes. C'est aussi ce que compare `ProductCreateSheet`.
+ */
+export type ImportTvaChannel = 'IN' | 'TAKE_AWAY' | 'DELIVERY';
+
 export interface ImportPreviewTvaRate {
   rate: number;
-  /** delivery_type tel que stocké : 0 sur place, 1 livraison, 3 emporté. */
-  channel: number;
+  channel: ImportTvaChannel;
   channel_label: string;
   tva_id: number;
   resolved: boolean;
@@ -219,18 +227,21 @@ export interface ImportCommitResponse {
   products: ImportCommitEntity[];
 }
 
-/** Canaux de vente, aux valeurs de `tva_categories.delivery_type`. */
-export const TVA_CHANNELS = [
-  { value: 0, label: 'Sur place' },
-  { value: 3, label: 'À emporter' },
-  { value: 1, label: 'En livraison' },
-] as const;
+/** Canaux de vente, dans l'ordre d'affichage. */
+export const TVA_CHANNELS: { value: ImportTvaChannel; label: string }[] = [
+  { value: 'IN', label: 'Sur place' },
+  { value: 'TAKE_AWAY', label: 'À emporter' },
+  { value: 'DELIVERY', label: 'En livraison' },
+];
 
-export const tvaChannelLabel = (channel: number): string =>
-  TVA_CHANNELS.find((entry) => entry.value === channel)?.label ?? String(channel);
+export const tvaChannelLabel = (channel: string): string =>
+  TVA_CHANNELS.find((entry) => entry.value === channel)?.label ?? channel;
 
-/** Clé du mapping de TVA, au format produit par `TvaRateKey.MarshalText` côté API. */
-export const tvaMappingKey = (rate: number, channel: number): string => `${rate}:${channel}`;
+/**
+ * Clé du mapping de TVA, au format produit par `TvaRateKey.MarshalText` côté
+ * API : `"<taux>:<canal>"`, par exemple `"5.5:DELIVERY"`.
+ */
+export const tvaMappingKey = (rate: number, channel: string): string => `${rate}:${channel}`;
 
 // ─── Saisie de masse ────────────────────────────────────────
 

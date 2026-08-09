@@ -132,7 +132,11 @@ export const unresolvedTvaRates = (
   preview: ImportPreviewResult,
   decisions: ImportDecisions,
 ): ImportPreviewTvaRate[] =>
-  preview.tva_rates.filter((rate) => !decisions.tva_mapping[tvaMappingKey(rate.rate, rate.channel)]);
+  // Présence de la clé, et non valeur vraie : tva_categories contient des
+  // identifiants 0 et -1, qu'un test booléen ferait passer pour non résolus.
+  preview.tva_rates.filter(
+    (rate) => !(tvaMappingKey(rate.rate, rate.channel) in decisions.tva_mapping),
+  );
 
 /** Collisions de nom sans arbitrage explicite. */
 export const unresolvedCollisions = (
