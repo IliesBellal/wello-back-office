@@ -8,6 +8,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
@@ -28,6 +29,15 @@ interface ProductsTableProps {
   updatingProductId?: string | null;
   expandedGroups?: Record<string, boolean>;
   onToggleGroup?: (productId: string) => void;
+  /**
+   * Sélection pour l'édition de groupe. Absente, la colonne de cases n'est pas
+   * rendue du tout — le tableau reste utilisable en lecture seule.
+   * Seuls les produits racines sont sélectionnables : les sous-produits suivent
+   * leur groupe côté API (statut, suppression, catégorie).
+   */
+  selectedIds?: Set<string>;
+  onToggleSelect?: (productId: string) => void;
+  onToggleSelectAll?: () => void;
 }
 
 const SortIcon = ({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) => {
@@ -87,7 +97,20 @@ export const ProductsTable = ({
   updatingProductId = null,
   expandedGroups = {},
   onToggleGroup,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
 }: ProductsTableProps) => {
+  const selectable = !!selectedIds && !!onToggleSelect;
+  const selectedCount = products.reduce(
+    (count, product) => count + (selectedIds?.has(product.product_id) ? 1 : 0),
+    0
+  );
+  // Tri-état sur l'en-tête : coché si toutes les lignes visibles le sont,
+  // indéterminé dès qu'une partie seulement l'est.
+  const headerChecked: boolean | 'indeterminate' =
+    selectedCount === 0 ? false : selectedCount === products.length ? true : 'indeterminate';
+
   if (products.length === 0) {
     return (
       <div className="text-center py-12 text-muted-foreground">
@@ -112,8 +135,21 @@ export const ProductsTable = ({
       rows.push(
         <TableRow
           key={mainRowKey}
-          className={`${isSubProduct ? 'bg-muted/30' : ''} hover:bg-muted/50 transition-colors`}
+          className={`${isSubProduct ? 'bg-muted/30' : ''} ${
+            selectedIds?.has(product.product_id) ? 'bg-primary/5' : ''
+          } hover:bg-muted/50 transition-colors`}
         >
+          {/* Sélection pour l'édition de groupe */}
+          {selectable && (
+            <TableCell className="w-10">
+              <Checkbox
+                checked={selectedIds.has(product.product_id)}
+                onCheckedChange={() => onToggleSelect(product.product_id)}
+                aria-label={`Sélectionner ${product.name}`}
+              />
+            </TableCell>
+          )}
+
           {/* Chevron (dans la première colonne Image) */}
           <TableCell className="w-12">
             {product.is_product_group ? (
@@ -250,10 +286,13 @@ export const ProductsTable = ({
       );
 
       // Sub-products rows if group is expanded
+      // (ces lignes supplémentaires sont comptées par countProductRows — cf. productRows.ts)
       if (product.is_product_group && isExpanded && product.sub_products && product.sub_products.length > 0) {
         product.sub_products.forEach((subProduct) => {
+          // L'API renvoie product_id ; id n'existe que dans l'ancien format
+          const subProductId = subProduct.product_id || subProduct.id || '';
           const subProductData: Product = {
-            product_id: subProduct.id,
+            product_id: subProductId,
             name: subProduct.name,
             price: subProduct.price,
             is_product_group: false,
@@ -266,9 +305,12 @@ export const ProductsTable = ({
 
           rows.push(
             <TableRow
-              key={`sub-${subProduct.id}`}
+              key={`sub-${subProductId}`}
               className="bg-muted/30 border-l-2 border-muted-foreground/20 hover:bg-muted/50 transition-colors"
             >
+              {/* Pas de case : un sous-produit suit son groupe */}
+              {selectable && <TableCell className="w-10"></TableCell>}
+
               {/* Chevron cell - empty for sub-products */}
               <TableCell className="w-12"></TableCell>
 
@@ -330,6 +372,15 @@ export const ProductsTable = ({
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">
+            {selectable && (
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={headerChecked}
+                  onCheckedChange={() => onToggleSelectAll?.()}
+                  aria-label="Tout sélectionner"
+                />
+              </TableHead>
+            )}
             <TableHead className="w-12"></TableHead>
             <TableHead
               onClick={() => onSort?.('name')}

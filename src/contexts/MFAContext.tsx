@@ -9,14 +9,16 @@ interface MFAProviderProps {
 
 export function MFAProvider({ children }: MFAProviderProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [recipient, setRecipient] = useState<string | undefined>(undefined);
   const [resolver, setResolver] = useState<{
     resolve: () => void;
     reject: (error: Error) => void;
   } | null>(null);
 
-  const showMFAModal = useCallback((): Promise<void> => {
+  const showMFAModal = useCallback((recipientArg?: string): Promise<void> => {
     return new Promise((resolve, reject) => {
       setResolver({ resolve, reject });
+      setRecipient(recipientArg);
       setIsModalOpen(true);
     });
   }, []);
@@ -50,6 +52,7 @@ export function MFAProvider({ children }: MFAProviderProps) {
         isOpen={isModalOpen}
         onSuccess={handleSuccess}
         onCancel={handleCancel}
+        recipient={recipient}
       />
     </MFAContext.Provider>
   );

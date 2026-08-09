@@ -3,6 +3,14 @@ import { menuService } from '@/services/menuService';
 import { Component, ComponentCategory, UnitOfMeasure, ComponentCreatePayload } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
+/** Tri par ordre d'affichage, avec le nom comme départage stable. */
+const sortByOrder = (categories: ComponentCategory[]): ComponentCategory[] =>
+  [...categories].sort((a, b) => {
+    const diff = (a.order ?? 0) - (b.order ?? 0);
+    if (diff !== 0) return diff;
+    return (a.category_name || a.category || '').localeCompare(b.category_name || b.category || '');
+  });
+
 /**
  * Hook spécialisé pour la page Components
  * Charge uniquement: getComponents() et getUnitsOfMeasure()
@@ -32,7 +40,7 @@ export const useComponentsData = () => {
       const { components: flattenedComponents, categories: componentCategoriesFromApi } = componentsData;
 
       setComponents(flattenedComponents);
-      setComponentCategories(componentCategoriesFromApi);
+      setComponentCategories(sortByOrder(componentCategoriesFromApi));
       setUnits(unitsData);
     } catch (error) {
       console.error('Error loading components data:', error);
@@ -75,14 +83,55 @@ export const useComponentsData = () => {
       category_id: result.id,
       category_name: name,
       category: name,
+      // Nouvelle catégorie en fin de liste tant que l'ordre n'a pas été enregistré
+      order: componentCategories.length + 1,
       components: []
     };
     setComponentCategories(prev => [...prev, newCategory]);
     return { category_id: result.id };
   };
 
-  const deleteComponentCategory = async (categoryId: string): Promise<void> => {
-    await menuService.deleteComponentCategory(categoryId);
+  const updateComponentCategory = async (categoryId: string, name: string): Promise<void> => {
+    await menuService.updateComponentCategory(categoryId, name);
+    setComponentCategories(prev =>
+      prev.map(c => (c.category_id === categoryId ? { ...c, category_name: name, category: name } : c))
+    );
+  };
+
+  const updateComponentCategoriesOrder = async (orderedIds: string[]): Promise<void> => {
+    await menuService.updateComponentCategoriesDisplayOrder(orderedIds);
+    setComponentCategories(prev =>
+      sortByOrder(
+        prev.map(c => {
+          const index = orderedIds.indexOf(c.category_id);
+          return index === -1 ? c : { ...c, order: index + 1 };
+        })
+      )
+    );
+  };
+
+  /**
+   * Supprime une catégorie.
+   * - `reassign` : les ingrédients basculent sur `reassignTo`
+   * - `purge`    : les ingrédients sont supprimés avec la catégorie
+   * L'état local reflète l'effet côté serveur pour éviter d'afficher des
+   * ingrédients rattachés à une catégorie qui n'existe plus.
+   */
+  const deleteComponentCategory = async (
+    categoryId: string,
+    options?: { mode: 'reassign'; reassignTo: string } | { mode: 'purge' }
+  ): Promise<void> => {
+    await menuService.deleteComponentCategory(categoryId, options);
+
+    if (options?.mode === 'reassign') {
+      const target = options.reassignTo;
+      setComponents(prev =>
+        prev.map(c => (c.category_id === categoryId ? { ...c, category_id: target } : c))
+      );
+    } else {
+      setComponents(prev => prev.filter(c => c.category_id !== categoryId));
+    }
+
     setComponentCategories(prev => prev.filter(c => c.category_id !== categoryId));
   };
 
@@ -94,6 +143,8 @@ export const useComponentsData = () => {
     createComponent,
     createComponentCategory,
     updateComponent,
+    updateComponentCategory,
+    updateComponentCategoriesOrder,
     deleteComponent,
     deleteComponentCategory,
   };

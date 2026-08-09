@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Component, UnitOfMeasure } from '@/types/menu';
+import { Component, ComponentCategory, UnitOfMeasure } from '@/types/menu';
 import {
   Sheet,
   SheetContent,
@@ -47,6 +47,8 @@ interface IngredientDetailSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   units: UnitOfMeasure[];
+  /** Catégories disponibles pour reclasser l'ingrédient depuis la fiche. */
+  categories?: ComponentCategory[];
   onSave: (componentId: string, data: Partial<Component>) => Promise<void>;
   onDelete?: (componentId: string) => Promise<void>;
 }
@@ -125,9 +127,10 @@ const DetailViewActions = ({ onEdit, onDelete, hasDelete, compact = false }: Det
 interface ViewContentProps {
   displayedComponent: Component;
   units: UnitOfMeasure[];
+  categories: ComponentCategory[];
 }
 
-const ViewContent = ({ displayedComponent, units }: ViewContentProps) => (
+const ViewContent = ({ displayedComponent, units, categories }: ViewContentProps) => (
   <Tabs defaultValue="general" className="w-full">
     <TabsList className="grid w-full grid-cols-3">
       <TabsTrigger value="general">Général</TabsTrigger>
@@ -149,7 +152,11 @@ const ViewContent = ({ displayedComponent, units }: ViewContentProps) => (
           <CardTitle className="text-sm">Catégorie</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-lg font-semibold">{displayedComponent.category || '—'}</p>
+          <p className="text-lg font-semibold">
+            {categories.find(c => c.category_id === displayedComponent.category_id)?.category_name
+              || displayedComponent.category
+              || '—'}
+          </p>
         </CardContent>
       </Card>
       <Card>
@@ -263,6 +270,8 @@ interface EditContentProps {
   onConservationTypeChange: (value: string) => void;
   onStorageTempMinChange: (value: string) => void;
   onStorageTempMaxChange: (value: string) => void;
+  categories: ComponentCategory[];
+  onCategoryChange: (value: string) => void;
   onSave: () => Promise<void>;
   onCancel: () => void;
   isSaving: boolean;
@@ -285,6 +294,8 @@ const EditContent = ({
   onConservationTypeChange,
   onStorageTempMinChange,
   onStorageTempMaxChange,
+  categories,
+  onCategoryChange,
   onSave,
   onCancel,
   isSaving,
@@ -313,6 +324,24 @@ const EditContent = ({
             placeholder="ex: Tomate"
             className="border-slate-200 bg-slate-50 focus:bg-white"
           />
+
+          <Label htmlFor="ingredient-category" className="text-sm font-medium text-slate-700">
+            Catégorie
+          </Label>
+          <Select value={formData.category_id || ''} onValueChange={onCategoryChange}>
+            <SelectTrigger id="ingredient-category" className="border-slate-200 bg-slate-50 focus:bg-white">
+              <SelectValue placeholder="Choisir une catégorie" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories
+                .filter((category) => category.category_id && category.category_id.trim() !== '')
+                .map((category) => (
+                  <SelectItem key={category.category_id} value={category.category_id}>
+                    {category.category_name || category.category}
+                  </SelectItem>
+                ))}
+            </SelectContent>
+          </Select>
         </CardContent>
       </Card>
     </TabsContent>
@@ -521,6 +550,7 @@ const EditContent = ({
 
 const buildFormData = (component: Component): IngredientFormData => ({
   name: component.name || '',
+  category_id: component.category_id || '',
   purchase_cost: component.purchase_cost || 0,
   purchase_unit_id: (component.purchase_unit_of_measure_id ?? component.purchase_unit_id)?.toString() || '',
   price: component.price || 0,
@@ -540,6 +570,7 @@ export const IngredientDetailSheet = ({
   open,
   onOpenChange,
   units,
+  categories = [],
   onSave,
   onDelete,
 }: IngredientDetailSheetProps) => {
@@ -553,6 +584,7 @@ export const IngredientDetailSheet = ({
 
   const [formData, setFormData] = useState<IngredientFormData>({
     name: '',
+    category_id: '',
     purchase_cost: 0,
     purchase_unit_id: '',
     price: 0,
@@ -680,6 +712,10 @@ export const IngredientDetailSheet = ({
     setFormData(prev => ({ ...prev, name: value }));
   }, []);
 
+  const handleCategoryChange = useCallback((value: string) => {
+    setFormData(prev => ({ ...prev, category_id: value }));
+  }, []);
+
   const handlePurchaseCostChange = useCallback((displayValue: string) => {
     setPriceDisplayValues(prev => ({ ...prev, purchase_cost: displayValue }));
     setFormData(prev => ({
@@ -771,6 +807,8 @@ export const IngredientDetailSheet = ({
           onConservationTypeChange={handleConservationTypeChange}
           onStorageTempMinChange={handleStorageTempMinChange}
           onStorageTempMaxChange={handleStorageTempMaxChange}
+          categories={categories}
+          onCategoryChange={handleCategoryChange}
           onSave={handleSave}
           onCancel={handleCancel}
           isSaving={isSaving}
@@ -779,6 +817,7 @@ export const IngredientDetailSheet = ({
         <ViewContent
           displayedComponent={displayedComponent}
           units={units}
+          categories={categories}
         />
       );
     },
@@ -790,8 +829,10 @@ export const IngredientDetailSheet = ({
       purchaseCostQtyDisplayValue,
       units,
       compatiblePurchaseUnits,
+      categories,
       isSaving,
       handleNameChange,
+      handleCategoryChange,
       handlePurchaseCostChange,
       handlePurchaseCostBlur,
       handlePurchaseUnitChange,

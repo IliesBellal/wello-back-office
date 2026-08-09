@@ -142,6 +142,12 @@ export const NAV_ITEMS: NavItem[] = [
         href: '/menu/components',
       },
       {
+        id: 'ingredient-categories',
+        title: "Catégories d'ingrédients",
+        icon: Folder,
+        href: '/menu/components/categories',
+      },
+      {
         id: 'price-grid',
         title: 'Grille de prix',
         icon: DollarSign,

@@ -341,6 +341,8 @@ export interface OrderHistoryResponse {
   page: number;
   per_page: number;
   total_pages?: number;
+  total_revenue: number;
+  avg_basket: number;
 }
 
 type OrderHistoryApiResponse = WelloApiResponse<{
@@ -350,6 +352,8 @@ type OrderHistoryApiResponse = WelloApiResponse<{
     total_pages?: number;
     current_page?: number;
     limit?: number;
+    total_revenue?: number;
+    avg_basket?: number;
   };
 }>;
 
@@ -1359,6 +1363,8 @@ class AnalyticsService {
         const totalCount = filteredMockOrders.length;
         const startIndex = (page - 1) * limit;
         const paginatedOrders = filteredMockOrders.slice(startIndex, startIndex + limit);
+        const totalRevenue = filteredMockOrders.reduce((sum, o) => sum + o.total, 0);
+        const avgBasket = totalCount > 0 ? totalRevenue / totalCount : 0;
 
         return {
           orders: paginatedOrders,
@@ -1366,6 +1372,8 @@ class AnalyticsService {
           page,
           per_page: limit,
           total_pages: Math.max(1, Math.ceil(Math.max(totalCount, 1) / limit)),
+          total_revenue: totalRevenue,
+          avg_basket: avgBasket,
         };
       },
       async () => {
@@ -1376,6 +1384,10 @@ class AnalyticsService {
         const totalCount = metadata?.total_items ?? orders.length;
         const totalPages = metadata?.total_pages ?? (perPage > 0 ? Math.ceil(totalCount / perPage) : 1);
         const currentPage = metadata?.current_page ?? page;
+        const totalRevenue = (metadata?.total_revenue ?? 0) / 100;
+        const avgBasket = metadata?.avg_basket !== undefined
+          ? metadata.avg_basket / 100
+          : (totalCount > 0 ? totalRevenue / totalCount : 0);
 
         return {
           orders,
@@ -1383,6 +1395,8 @@ class AnalyticsService {
           page: currentPage,
           per_page: perPage,
           total_pages: totalPages,
+          total_revenue: totalRevenue,
+          avg_basket: avgBasket,
         };
       },
       {

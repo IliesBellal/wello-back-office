@@ -73,7 +73,7 @@ export interface ProductImportState {
 const initialState: ProductImportState = {
   step: 'choose',
   door: null,
-  provider: 'zelty',
+  provider: 'wello-generic',
   file: null,
   manualRows: [createManualRow()],
   preview: null,

@@ -1,6 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer, ConfirmDialog } from '@/components/shared';
+import { DuplicateNameDialog } from '@/components/shared/DuplicateNameDialog';
+import { useDuplicateNameConfirm } from '@/hooks/useDuplicateNameConfirm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PriceInput } from '@/components/shared/PriceInput';
@@ -30,7 +32,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Plus, Trash2, Edit, ChevronLeft, Settings2, GripVertical, ImagePlus, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit, ChevronLeft, Settings2, GripVertical, ImagePlus, Loader2, Search } from 'lucide-react';
 import { useAttributesData } from '@/hooks/useAttributesData';
 import { Attribute, AttributeOption } from '@/types/menu';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -409,7 +411,26 @@ interface FormViewProps {
 }
 
 function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormViewProps) {
-  const { components, units } = useAttributesData();
+  const { components, units, componentCategories } = useAttributesData();
+
+  const categoryNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    componentCategories.forEach(cat => {
+      map.set(cat.category_id, cat.category_name || cat.category || '');
+    });
+    return map;
+  }, [componentCategories]);
+
+  const getComponentCategoryName = (comp: { category_id?: string; category?: string }) =>
+    (comp.category_id && categoryNameById.get(comp.category_id)) || comp.category || '';
+
+  const sortedComponentCategories = useMemo(
+    () => [...componentCategories].sort((a, b) =>
+      (a.category_name || a.category || '').localeCompare(b.category_name || b.category || '')
+    ),
+    [componentCategories]
+  );
+
   const [formData, setFormData] = useState<Partial<Attribute>>(
     initial
       ? { ...initial, options: (initial.options || []).map(o => ({ ...o })) }
@@ -492,6 +513,24 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
 
   const [showBatchSelector, setShowBatchSelector] = useState(false);
   const [selectedComponents, setSelectedComponents] = useState<Set<string>>(new Set());
+  const [batchSearchQuery, setBatchSearchQuery] = useState('');
+  const [batchCategoryFilter, setBatchCategoryFilter] = useState('all');
+
+  const closeBatchSelector = () => {
+    setShowBatchSelector(false);
+    setSelectedComponents(new Set());
+    setBatchSearchQuery('');
+    setBatchCategoryFilter('all');
+  };
+
+  const filteredBatchComponents = useMemo(() => {
+    const query = batchSearchQuery.trim().toLowerCase();
+    return components.filter(comp => {
+      const matchesSearch = !query || comp.name.toLowerCase().includes(query);
+      const matchesCategory = batchCategoryFilter === 'all' || comp.category_id === batchCategoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [components, batchSearchQuery, batchCategoryFilter]);
 
   const handleBatchSelectComponents = () => {
     if (selectedComponents.size === 0) return;
@@ -513,8 +552,7 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
       options: [...(prev.options || []), ...newOptions],
     }));
 
-    setSelectedComponents(new Set());
-    setShowBatchSelector(false);
+    closeBatchSelector();
   };
 
   const isEditing = !!initial;
@@ -663,7 +701,7 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
           </div>
 
           {/* Batch Ingredient Selector Dialog */}
-          <Dialog open={showBatchSelector} onOpenChange={setShowBatchSelector}>
+          <Dialog open={showBatchSelector} onOpenChange={open => { if (!open) closeBatchSelector(); else setShowBatchSelector(true); }}>
             <DialogContent className="max-w-md">
               <DialogHeader>
                 <DialogTitle>Sélectionner des ingrédients</DialogTitle>
@@ -671,32 +709,64 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
                   Sélectionnez les ingrédients à ajouter comme options. Le nom de l'ingrédient sera utilisé comme nom de l'option.
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-3 max-h-[400px] overflow-y-auto">
-                {components.map(comp => (
-                  <label key={comp.component_id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={selectedComponents.has(comp.component_id)}
-                      onChange={e => {
-                        const newSelected = new Set(selectedComponents);
-                        if (e.target.checked) {
-                          newSelected.add(comp.component_id);
-                        } else {
-                          newSelected.delete(comp.component_id);
-                        }
-                        setSelectedComponents(newSelected);
-                      }}
-                      className="w-4 h-4 rounded"
+              <div className="space-y-3">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      value={batchSearchQuery}
+                      onChange={e => setBatchSearchQuery(e.target.value)}
+                      placeholder="Rechercher un ingrédient…"
+                      className="pl-8 h-9"
                     />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{comp.name}</p>
-                      {comp.category && <p className="text-xs text-muted-foreground truncate">{comp.category}</p>}
-                    </div>
-                  </label>
-                ))}
+                  </div>
+                  <Select value={batchCategoryFilter} onValueChange={setBatchCategoryFilter}>
+                    <SelectTrigger className="w-[160px] h-9">
+                      <SelectValue placeholder="Catégorie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Toutes catégories</SelectItem>
+                      {sortedComponentCategories.map(cat => (
+                        <SelectItem key={cat.category_id} value={cat.category_id}>
+                          {cat.category_name || cat.category}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1 max-h-[350px] overflow-y-auto">
+                  {filteredBatchComponents.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">Aucun ingrédient trouvé</p>
+                  ) : (
+                    filteredBatchComponents.map(comp => (
+                      <label key={comp.component_id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-muted/50 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={selectedComponents.has(comp.component_id)}
+                          onChange={e => {
+                            const newSelected = new Set(selectedComponents);
+                            if (e.target.checked) {
+                              newSelected.add(comp.component_id);
+                            } else {
+                              newSelected.delete(comp.component_id);
+                            }
+                            setSelectedComponents(newSelected);
+                          }}
+                          className="w-4 h-4 rounded"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">{comp.name}</p>
+                          {getComponentCategoryName(comp) && (
+                            <p className="text-xs text-muted-foreground truncate">{getComponentCategoryName(comp)}</p>
+                          )}
+                        </div>
+                      </label>
+                    ))
+                  )}
+                </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setShowBatchSelector(false)}>
+                <Button variant="outline" onClick={closeBatchSelector}>
                   Annuler
                 </Button>
                 <Button
@@ -758,6 +828,7 @@ export default function AttributesPage() {
   const [view, setView] = useState<ViewMode>('list');
   const [deletingAttribute, setDeletingAttribute] = useState<Attribute | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const { runWithDuplicateConfirm, duplicateDialogProps } = useDuplicateNameConfirm();
 
   const handleDeleteAttribute = async () => {
     if (!deletingAttribute) return;
@@ -776,16 +847,29 @@ export default function AttributesPage() {
   };
 
   const handleSave = async (data: Partial<Attribute>) => {
-    if (view === 'new') {
-      await createAttribute(data);
-    } else if (typeof view === 'object') {
-      await updateAttributeData(view.editing.id, data);
+    // Requête figée : en cas de doublon de nom, la boîte de confirmation la
+    // rejoue à l'identique — c'est ce qu'attend la confirmation côté API.
+    const submitSave = async () => {
+      if (view === 'new') {
+        await createAttribute(data);
+      } else if (typeof view === 'object') {
+        await updateAttributeData(view.editing.id, data);
+      }
+      setView('list');
+    };
+
+    try {
+      await runWithDuplicateConfirm(submitSave);
+    } catch (error) {
+      // Autres erreurs : déjà signalées par le toast automatique d'apiClient —
+      // on garde le formulaire ouvert pour corriger et réessayer.
+      console.error('Error saving attribute:', error);
     }
-    setView('list');
   };
 
   return (
     <DashboardLayout>
+      <DuplicateNameDialog {...duplicateDialogProps} />
       <PageContainer
         header={
           <div>

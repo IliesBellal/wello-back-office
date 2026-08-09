@@ -109,7 +109,6 @@ export default function ScanNOrder() {
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [bannerPreview, setBannerPreview] = useState<string>('');
   const [activeTab, setActiveTab] = useState('appearance');
-  const accessUrl = 'https://app.scanorder.com';
   const [stripeBalance, setStripeBalance] = useState<{ available: number; pending: number } | null>(null);
   const [kpis, setKpis] = useState<{ revenue: number; orders: number; avg_basket: number } | null>(null);
   const [scanStatus, setScanStatus] = useState<IntegrationStatus | null>(null);
@@ -159,6 +158,10 @@ export default function ScanNOrder() {
     nextParams.delete('stripe');
     setSearchParams(nextParams, { replace: true });
   }, [searchParams, setSearchParams, toast]);
+
+  // Lien public de la boutique, fourni par GET /integrations/scannorder.
+  // `null` tant que le marchand n'a pas de QR code principal.
+  const accessUrl = scanStatus?.access_url || '';
 
   const closureDate = (() => {
     const closedUntil = scanStatus?.closed_until;
@@ -242,6 +245,7 @@ export default function ScanNOrder() {
   };
 
   const copyToClipboard = () => {
+    if (!accessUrl) return;
     navigator.clipboard.writeText(accessUrl);
     toast({
       title: 'Copié !',
@@ -250,6 +254,7 @@ export default function ScanNOrder() {
   };
 
   const openInNewTab = () => {
+    if (!accessUrl) return;
     window.open(accessUrl, '_blank');
   };
 
@@ -781,13 +786,14 @@ export default function ScanNOrder() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground mb-2">URL d'accès:</p>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <code className="px-3 py-2 bg-muted rounded text-sm font-mono text-foreground truncate">
-                    {accessUrl}
+                  <code className={`px-3 py-2 bg-muted rounded text-sm font-mono truncate ${accessUrl ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    {accessUrl || 'Indisponible'}
                   </code>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={copyToClipboard}
+                    disabled={!accessUrl}
                     title="Copier l'URL"
                     className="flex-shrink-0"
                   >
@@ -797,6 +803,7 @@ export default function ScanNOrder() {
                     variant="ghost"
                     size="icon"
                     onClick={openInNewTab}
+                    disabled={!accessUrl}
                     title="Ouvrir dans un nouvel onglet"
                     className="flex-shrink-0"
                   >

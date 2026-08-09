@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Product, TvaRateGroup, UnitOfMeasure, Component, Attribute, ProductAttribute, Category, Tag, Allergen } from '@/types/menu';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { Product, TvaRate, TvaRateGroup, UnitOfMeasure, Component, Attribute, ProductAttribute, Category, Tag, Allergen, ProductCreatePayload } from '@/types/menu';
 import {
   Sheet,
   SheetContent,
@@ -14,7 +14,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -41,6 +41,7 @@ import {
 import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
+import { ProductTagsTab } from './ProductTagsTab';
 import { CategorySelector } from '@/components/shared/CategorySelector';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
@@ -49,12 +50,21 @@ import { useProductData } from '@/hooks/useProductData';
 import { useObjectUrlPreview } from '@/hooks/useObjectUrlPreview';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
+import { cn } from '@/lib/utils';
+import { DuplicateNameDialog } from '@/components/shared/DuplicateNameDialog';
+import { useDuplicateNameConfirm } from '@/hooks/useDuplicateNameConfirm';
 
 interface SimpleProductSheetProps {
   /** Product ID to load - if provided, product data will be fetched automatically */
   productId?: string | null;
   /** Pre-loaded product data (optional, can be overridden by productId) */
   product?: Product | null;
+  /**
+   * Ouvre la fiche sur un produit qui n'existe pas encore : édition forcée,
+   * enregistrement via onCreate. Une fois le produit créé la fiche bascule
+   * d'elle-même sur le comportement habituel (consultation/modification).
+   */
+  createMode?: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   units: UnitOfMeasure[];
@@ -64,14 +74,103 @@ interface SimpleProductSheetProps {
   tags?: Tag[];
   allergens?: Allergen[];
   onSave: (productId: string, data: Partial<Product>) => Promise<void>;
+  /** Requis en mode création. Doit retourner le produit créé (pour son ID). */
+  onCreate?: (data: ProductCreatePayload) => Promise<Product>;
   onDelete?: (productId: string) => Promise<void>;
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   onTagCreated?: (newTag: { id: string; name: string }) => void;
+  /**
+   * Notifie une assignation de tags/allergènes déjà persistée depuis l'onglet
+   * Tags (enregistrement immédiat, sans passer par onSave) afin que le parent
+   * rafraîchisse son cache local sans refetch.
+   */
+  onTagsPersisted?: (productId: string, tagIds: string[]) => void;
+  onAllergensPersisted?: (productId: string, allergenIds: string[]) => void;
 }
+
+// Socle de lecture en création : la fiche est rendue avant qu'aucun produit
+// n'existe. Le mode édition étant forcé, seules les branches d'édition (qui
+// lisent formData) sont réellement affichées.
+const DRAFT_PRODUCT = { product_id: '', name: '' } as Product;
+
+/**
+ * Retrouve l'ID du taux correspondant à la valeur portée par le produit.
+ * L'API renvoie tantôt l'ID du taux, tantôt sa valeur (5.5, 10, 20) — on
+ * accepte les deux pour présélectionner le bon taux dans la liste.
+ */
+const resolveTvaRateId = (rates: TvaRate[], raw: number | string | undefined | null): string => {
+  if (raw === null || raw === undefined || raw === '') return '';
+  const normalized = typeof raw === 'string' ? Number.parseFloat(raw) : raw;
+  if (!Number.isFinite(normalized)) return '';
+
+  const byId = rates.find((rate) => rate.id === normalized);
+  if (byId) return byId.id.toString();
+
+  const byValue = rates.find((rate) => rate.value === normalized);
+  return byValue ? byValue.id.toString() : '';
+};
+
+/**
+ * Compteur de champs requis manquants sur un onglet. La saisie s'étale sur cinq
+ * onglets : sans ce repère, un champ oublié reste invisible depuis l'onglet
+ * courant.
+ */
+const TabErrorBadge = ({ count }: { count: number }) => {
+  if (count === 0) return null;
+  return (
+    <span
+      className="ml-1.5 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold leading-none text-destructive-foreground"
+      aria-label={`${count} champ${count > 1 ? 's' : ''} requis manquant${count > 1 ? 's' : ''}`}
+    >
+      {count}
+    </span>
+  );
+};
+
+/** Message d'aide sous un champ requis resté vide. */
+const RequiredFieldHint = ({ show, children }: { show: boolean; children: React.ReactNode }) => {
+  if (!show) return null;
+  return <p className="mt-1 text-xs font-medium text-destructive">{children}</p>;
+};
+
+const INVALID_FIELD_CLASS = 'border-destructive focus-visible:ring-destructive';
+
+const TvaRateSelect = ({
+  rates,
+  value,
+  onValueChange,
+  invalid = false,
+}: {
+  rates: TvaRate[];
+  value: string;
+  onValueChange: (value: string) => void;
+  invalid?: boolean;
+}) => (
+  <Select value={value} onValueChange={onValueChange}>
+    <SelectTrigger className={cn('mt-1 h-9 text-sm', invalid && INVALID_FIELD_CLASS)}>
+      <SelectValue placeholder="Sélectionner">
+        {rates.find((rate) => rate.id.toString() === value)?.label}
+      </SelectValue>
+    </SelectTrigger>
+    <SelectContent>
+      {rates.map((rate) => (
+        <SelectItem key={rate.id} value={rate.id.toString()}>
+          <div className="flex flex-col">
+            <span>{rate.label}</span>
+            {rate.description && (
+              <span className="text-xs text-muted-foreground">{rate.description}</span>
+            )}
+          </div>
+        </SelectItem>
+      ))}
+    </SelectContent>
+  </Select>
+);
 
 export const SimpleProductSheet = ({
   productId,
   product: initialProduct = null,
+  createMode = false,
   open,
   onOpenChange,
   units,
@@ -81,23 +180,28 @@ export const SimpleProductSheet = ({
   tags,
   allergens,
   onSave,
+  onCreate,
   onDelete,
   onCreateCategory,
-  onTagCreated
+  onTagCreated,
+  onTagsPersisted,
+  onAllergensPersisted
 }: SimpleProductSheetProps) => {
   // Load product data if productId is provided
   const { product: loadedProduct, loading } = useProductData(productId || null, open);
-  
+
   // Declare all state hooks FIRST before using them
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [displayedProduct, setDisplayedProduct] = useState<Product | null>(null);
+  const [createdProduct, setCreatedProduct] = useState<Product | null>(null);
+  const [activeTab, setActiveTab] = useState('general');
+  const [hasAttemptedCreate, setHasAttemptedCreate] = useState(false);
+  const [tvaSelection, setTvaSelection] = useState({ in: '', takeAway: '', delivery: '' });
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [newTagName, setNewTagName] = useState('');
-  const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  
+
   // Price display values to prevent focus loss during input
   const [priceDisplayValues, setPriceDisplayValues] = useState<{
     price: string;
@@ -111,17 +215,28 @@ export const SimpleProductSheet = ({
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
+  const { runWithDuplicateConfirm, duplicateDialogProps } = useDuplicateNameConfirm();
   const isMobile = useIsMobile();
   const { statuses } = useIntegrationStatus();
   const imagePreviewUrl = useObjectUrlPreview(selectedImageFile);
   
-  // Use loaded product if available, otherwise use initial product prop
-  const baseProduct = loadedProduct || initialProduct;
+  // Use loaded product if available, otherwise use initial product prop.
+  // createdProduct prend le relais dès que la création a abouti : la fiche
+  // reste ouverte et se comporte alors comme une fiche produit normale.
+  const baseProduct = loadedProduct || initialProduct || createdProduct;
+  // La création n'est active que tant qu'aucun produit n'existe.
+  const isCreateMode = createMode && !baseProduct;
   // Use displayedProduct for rendering (updated after save), fallback to baseProduct
-  const product = displayedProduct || baseProduct;
-  
+  const product = displayedProduct || baseProduct || (isCreateMode ? DRAFT_PRODUCT : null);
+
   // Load sheet-specific data (TVA rates, tags, allergens, units)
   const { tvaRates, tags: loadedTags, allergens: loadedAllergens, units: loadedUnits } = useProductEditData(open);
+
+  const findTvaRates = (deliveryType: string) =>
+    tvaRates.find((group) => group.delivery_type === deliveryType)?.rates || [];
+  const onSiteRates = findTvaRates('IN');
+  const takeAwayRates = findTvaRates('TAKE_AWAY');
+  const deliveryRates = findTvaRates('DELIVERY');
   
   // Use loaded data or props (props take priority for backward compatibility)
   const tagsData = tags || loadedTags;
@@ -253,12 +368,69 @@ export const SimpleProductSheet = ({
   };
 
   useEffect(() => {
+    // En création il n'y a pas de produit source : ce reset écraserait le
+    // brouillon en cours de saisie et annulerait l'édition forcée.
+    if (isCreateMode) return;
     if (product) {
       setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
       setSelectedImageFile(null);
     }
-  }, [product]);
+  }, [product, isCreateMode]);
+
+  // Ouverture en création : repartir d'un brouillon vierge. Sans ça la fiche
+  // rouvrirait sur la saisie précédente — ou sur le produit créé juste avant,
+  // puisqu'elle reste ouverte après une création réussie.
+  useEffect(() => {
+    if (!createMode || !open) return;
+    setCreatedProduct(null);
+    setDisplayedProduct(null);
+    setIsEditMode(true);
+    setActiveTab('general');
+    setHasAttemptedCreate(false);
+    setFormData({
+      name: '',
+      description: '',
+      price: 0,
+      price_take_away: 0,
+      price_delivery: 0,
+      category_id: '',
+      status: 'available',
+      available_in: true,
+      available_take_away: true,
+      available_delivery: true,
+      is_available_on_sno: true,
+      components: [],
+      attributes: [],
+      tags: [],
+      allergens: [],
+      // Explicites, pas undefined : les colonnes sync_* valent TRUE par défaut
+      // en base, un produit créé sans y toucher ressortirait actif sur les
+      // plateformes alors que les interrupteurs sont affichés éteints.
+      integrations: {
+        uber_eats: { enabled: false },
+        deliveroo: { enabled: false },
+      },
+    });
+    setPriceDisplayValues({ price: '', price_take_away: '', price_delivery: '' });
+    setTvaSelection({ in: '', takeAway: '', delivery: '' });
+    setSelectedImageFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, [createMode, open]);
+
+  // Les taux de TVA arrivent de façon asynchrone : on présélectionne le taux
+  // du produit dès que la liste est disponible.
+  useEffect(() => {
+    if (isCreateMode || !baseProduct || tvaRates.length === 0) return;
+    setTvaSelection({
+      in: resolveTvaRateId(onSiteRates, baseProduct.tva_rate_in ?? baseProduct.tva_ids?.on_site),
+      takeAway: resolveTvaRateId(takeAwayRates, baseProduct.tva_rate_take_away ?? baseProduct.tva_ids?.takeaway),
+      delivery: resolveTvaRateId(deliveryRates, baseProduct.tva_rate_delivery ?? baseProduct.tva_ids?.delivery),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseProduct, tvaRates, isCreateMode]);
 
   const handleSave = async () => {
     if (!product) return;
@@ -272,8 +444,24 @@ export const SimpleProductSheet = ({
       }
 
       // Build payload - keep all formData fields but ensure IDs-only arrays for specific fields
-      const payloadData = { ...formData } as Partial<Product>;
-      
+      const payloadData = { ...formData } as Partial<Product> & {
+        tva_in_id?: string;
+        tva_take_away_id?: string;
+        tva_delivery_id?: string;
+      };
+
+      // La TVA est modifiable depuis la fiche : on ne l'envoie que si un taux
+      // est sélectionné, l'API laissant le taux en place quand le champ est absent.
+      if (tvaSelection.in) {
+        payloadData.tva_in_id = tvaSelection.in;
+      }
+      if (tvaSelection.takeAway) {
+        payloadData.tva_take_away_id = tvaSelection.takeAway;
+      }
+      if (tvaSelection.delivery) {
+        payloadData.tva_delivery_id = tvaSelection.delivery;
+      }
+
       // Ensure configuration only contains attribute IDs (strings)
       if (formData.attributes && formData.attributes.length > 0) {
         payloadData.configuration = formData.attributes.map(attr => attr.attribute_id);
@@ -306,13 +494,33 @@ export const SimpleProductSheet = ({
 
       // Save all product data
       await onSave(product.product_id, payloadData);
-      
+
+      // L'affichage en consultation lit les taux (tva_rate_*), alors que le
+      // payload porte les identifiants : sans cette conversion la fiche
+      // continuait d'afficher l'ancienne TVA jusqu'à sa réouverture.
+      const savedTvaRates: Partial<Product> = {};
+      const applySavedRate = (
+        field: 'tva_rate_in' | 'tva_rate_take_away' | 'tva_rate_delivery',
+        rates: TvaRate[],
+        selectedId: string,
+      ) => {
+        if (!selectedId) return;
+        const rate = rates.find((r) => r.id.toString() === selectedId);
+        if (rate) {
+          savedTvaRates[field] = rate.value;
+        }
+      };
+      applySavedRate('tva_rate_in', onSiteRates, tvaSelection.in);
+      applySavedRate('tva_rate_take_away', takeAwayRates, tvaSelection.takeAway);
+      applySavedRate('tva_rate_delivery', deliveryRates, tvaSelection.delivery);
+
       // Update displayedProduct with saved data to show changes immediately in header
       setDisplayedProduct({
         ...product,
-        ...payloadData
+        ...payloadData,
+        ...savedTvaRates
       } as Product);
-      
+
       // Clear image state after successful save
       setSelectedImageFile(null);
 
@@ -339,41 +547,169 @@ export const SimpleProductSheet = ({
     }
   };
 
-  const handleCreateTag = async () => {
-    if (!newTagName.trim()) {
+  // Champs exigés par la création côté API, dans l'ordre des onglets. Le toast
+  // dit ce qui manque, le badge sur l'onglet dit où — la saisie s'étalant sur
+  // cinq onglets, un champ oublié serait sinon invisible depuis l'onglet courant.
+  const missingCreateFields = useMemo(() => {
+    const missing: { tab: string; message: string }[] = [];
+    if (!formData.name?.trim()) {
+      missing.push({ tab: 'general', message: 'Le nom du produit est requis.' });
+    }
+    if (!formData.category_id) {
+      missing.push({ tab: 'general', message: 'La catégorie est requise.' });
+    }
+    if (!tvaSelection.in) {
+      missing.push({ tab: 'price', message: 'La TVA sur place est requise.' });
+    }
+    if (!tvaSelection.takeAway) {
+      missing.push({ tab: 'price', message: 'La TVA à emporter est requise.' });
+    }
+    if (!tvaSelection.delivery) {
+      missing.push({ tab: 'price', message: 'La TVA livraison est requise.' });
+    }
+    return missing;
+  }, [formData.name, formData.category_id, tvaSelection]);
+
+  // Les badges n'apparaissent qu'après une première tentative : les afficher
+  // dès l'ouverture reviendrait à signaler en rouge un formulaire encore vierge.
+  const missingFieldsByTab = useMemo(() => {
+    if (!isCreateMode || !hasAttemptedCreate) return {} as Record<string, number>;
+    return missingCreateFields.reduce<Record<string, number>>((acc, field) => {
+      acc[field.tab] = (acc[field.tab] || 0) + 1;
+      return acc;
+    }, {});
+  }, [isCreateMode, hasAttemptedCreate, missingCreateFields]);
+
+  // Le badge d'onglet indique où chercher, ces drapeaux marquent le champ exact.
+  const showFieldErrors = isCreateMode && hasAttemptedCreate;
+  const invalidName = showFieldErrors && !formData.name?.trim();
+  const invalidCategory = showFieldErrors && !formData.category_id;
+  const invalidTvaIn = showFieldErrors && !tvaSelection.in;
+  const invalidTvaTakeAway = showFieldErrors && !tvaSelection.takeAway;
+  const invalidTvaDelivery = showFieldErrors && !tvaSelection.delivery;
+
+  const handleCreate = async () => {
+    setHasAttemptedCreate(true);
+    if (missingCreateFields.length > 0) {
+      const [first] = missingCreateFields;
+      setActiveTab(first.tab);
       toast({
-        title: "Erreur",
-        description: "Veuillez entrer un nom pour le tag.",
-        variant: "destructive"
+        title: 'Champs manquants',
+        description: missingCreateFields.length > 1
+          ? `${first.message} (${missingCreateFields.length} champs requis à compléter)`
+          : first.message,
+        variant: 'destructive'
       });
       return;
     }
+    if (!onCreate) return;
 
-    setIsCreatingTag(true);
-    try {
-      const newTag = await menuService.createTag(newTagName);
-      setNewTagName('');
-      toast({
-        title: "Succès",
-        description: "Le tag a été créé avec succès."
+    // Requête figée : en cas de doublon de nom, la boîte de dialogue la rejoue
+    // à l'identique — c'est ce que la confirmation côté API attend.
+    const submitCreation = async () => {
+      // Un seul appel : l'API persiste le produit et ses associations dans la
+      // même transaction, donc pas de produit incomplet en cas d'échec.
+      const created = await onCreate({
+        name: formData.name!.trim(),
+        description: formData.description || '',
+        price: formData.price || 0,
+        price_take_away: formData.price_take_away || 0,
+        price_delivery: formData.price_delivery || 0,
+        category_id: formData.category_id!,
+        tva_in_id: tvaSelection.in,
+        tva_take_away_id: tvaSelection.takeAway,
+        tva_delivery_id: tvaSelection.delivery,
+        available_in: formData.available_in ?? true,
+        available_take_away: formData.available_take_away ?? true,
+        available_delivery: formData.available_delivery ?? true,
+        is_product_group: false,
+        bg_color: formData.bg_color,
+        production_color: formData.production_color || undefined,
+        status: typeof formData.status === 'string' ? formData.status : undefined,
+        is_available_on_sno: formData.is_available_on_sno,
+        configuration: (formData.attributes || []).map((attr) => attr.attribute_id),
+        components: formData.components || [],
+        tags: (formData.tags || []).filter((tag): tag is string => typeof tag === 'string'),
+        allergens: (formData.allergens || []).filter((allergen): allergen is string => typeof allergen === 'string'),
+        // Toujours transmis : c'est l'absence du champ qui laisse les colonnes
+        // sync_* à leur défaut TRUE côté API.
+        integrations: {
+          uber_eats: { enabled: false, ...formData.integrations?.uber_eats },
+          deliveroo: { enabled: false, ...formData.integrations?.deliveroo },
+        },
       });
-      // Update parent's tags list
-      if (onTagCreated) {
-        onTagCreated(newTag);
+
+      // La photo passe par un endpoint multipart distinct : elle ne peut être
+      // envoyée qu'une fois le produit créé et son ID connu.
+      let imageUrl = created.image_url;
+      if (selectedImageFile) {
+        const result = await menuService.uploadProductImage(created.product_id, selectedImageFile);
+        imageUrl = result.photo_url;
+        setSelectedImageFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
       }
+
+      // La fiche reste ouverte et bascule sur le produit créé.
+      setCreatedProduct({ ...created, image_url: imageUrl });
+    };
+
+    setIsUploadingImage(true);
+    try {
+      // Un doublon de nom ouvre la boîte de confirmation au lieu d'échouer ; le
+      // formulaire reste tel quel, prêt à être rejoué ou corrigé.
+      await runWithDuplicateConfirm(submitCreation);
     } catch (error) {
-      console.error('Error creating tag:', error);
-      toast({
-        title: "Erreur",
-        description: error instanceof Error ? error.message : "Impossible de créer le tag.",
-        variant: "destructive"
-      });
+      // Autre erreur : apiClient a déjà affiché le message correspondant.
+      console.error('Create failed:', error);
     } finally {
-      setIsCreatingTag(false);
+      setIsUploadingImage(false);
     }
   };
 
+  // L'onglet Tags écrit directement via les endpoints dédiés : on réaligne le
+  // produit affiché sur ce qui est persisté, sinon « Annuler » restaurerait un
+  // formData bâti sur des tags périmés et masquerait une modification pourtant
+  // enregistrée.
+  const applyPersistedSelection = (patch: Pick<Product, 'tags'> | Pick<Product, 'allergens'>) => {
+    setDisplayedProduct(prev => {
+      const base = prev || baseProduct;
+      return base ? ({ ...base, ...patch } as Product) : prev;
+    });
+  };
+
+  const handleTagsPersisted = (tagIds: string[]) => {
+    applyPersistedSelection({ tags: tagIds });
+    if (baseProduct) onTagsPersisted?.(baseProduct.product_id, tagIds);
+  };
+
+  const handleAllergensPersisted = (allergenIds: string[]) => {
+    applyPersistedSelection({ allergens: allergenIds });
+    if (baseProduct) onAllergensPersisted?.(baseProduct.product_id, allergenIds);
+  };
+
+  const tagsTabProps = {
+    tags: tagsData ?? [],
+    allergens: allergensData ?? [],
+    selectedTagIds: (formData.tags || []).filter((t): t is string => typeof t === 'string'),
+    selectedAllergenIds: (formData.allergens || []).filter((a): a is string => typeof a === 'string'),
+    onTagsChange: (tagIds: string[]) => setFormData(prev => ({ ...prev, tags: tagIds })),
+    onAllergensChange: (allergenIds: string[]) =>
+      setFormData(prev => ({ ...prev, allergens: allergenIds })),
+    productId: isCreateMode ? null : baseProduct?.product_id ?? null,
+    onTagsPersisted: handleTagsPersisted,
+    onAllergensPersisted: handleAllergensPersisted,
+    onTagCreated,
+  };
+
   const handleCancel = () => {
+    // En création rien n'est encore enregistré : annuler revient à fermer la
+    // fiche (il n'y a aucun état antérieur sur lequel revenir).
+    if (isCreateMode) {
+      onOpenChange(false);
+      return;
+    }
     if (product) {
       setFormData(buildFormDataFromProduct(product));
       setIsEditMode(false);
@@ -479,7 +815,7 @@ export const SimpleProductSheet = ({
                 <X className="h-5 w-5" />
               </Button>
               <h2 className="text-sm font-semibold flex-1 min-w-0 text-center truncate">
-                {loading ? <Skeleton className="h-4 w-32" /> : (isEditMode ? (formData.name || 'Produit') : (product?.name || 'Produit'))}
+                {loading ? <Skeleton className="h-4 w-32" /> : (isCreateMode ? (formData.name || 'Nouveau produit') : (isEditMode ? (formData.name || 'Produit') : (product?.name || 'Produit')))}
               </h2>
               {!loading && !isEditMode && (
                 <div className="flex gap-1">
@@ -516,13 +852,13 @@ export const SimpleProductSheet = ({
                   <X className="w-3 h-3 mr-1" />
                   Annuler
                 </Button>
-                <Button 
+                <Button
                   className="flex-1 h-8 text-xs bg-gradient-primary"
-                  onClick={handleSave}
+                  onClick={isCreateMode ? handleCreate : handleSave}
                   disabled={isUploadingImage}
                 >
                   <Save className="w-3 h-3 mr-1" />
-                  Enregistrer
+                  {isCreateMode ? 'Créer le produit' : 'Enregistrer'}
                 </Button>
               </div>
             )}
@@ -540,12 +876,18 @@ export const SimpleProductSheet = ({
               </div>
             ) : product ? (
               // Loaded content
-              <Tabs defaultValue="general" className="w-full flex flex-col">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
                 {/* Onglets scrollables horizontalement sur mobile */}
                 <ScrollArea className="w-full mb-4 border-b -mx-4 px-4">
                   <TabsList className="flex justify-start gap-1 p-0 border-0 h-auto bg-transparent w-max">
-                    <TabsTrigger value="general" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Général</TabsTrigger>
-                    <TabsTrigger value="price" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Tarifs</TabsTrigger>
+                    <TabsTrigger value="general" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">
+                      Général
+                      <TabErrorBadge count={missingFieldsByTab.general || 0} />
+                    </TabsTrigger>
+                    <TabsTrigger value="price" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">
+                      Tarifs
+                      <TabErrorBadge count={missingFieldsByTab.price || 0} />
+                    </TabsTrigger>
                     <TabsTrigger value="composition" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Composition</TabsTrigger>
                     <TabsTrigger value="options" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Options</TabsTrigger>
                     <TabsTrigger value="tags" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Tags</TabsTrigger>
@@ -658,8 +1000,9 @@ export const SimpleProductSheet = ({
                           value={formData.name || ''}
                           onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                           placeholder="ex. Pizza Margherita"
-                          className="mt-1 text-sm"
+                          className={cn('mt-1 text-sm', invalidName && INVALID_FIELD_CLASS)}
                         />
+                        <RequiredFieldHint show={invalidName}>Le nom du produit est requis.</RequiredFieldHint>
                       </div>
 
                       {/* Description */}
@@ -682,7 +1025,9 @@ export const SimpleProductSheet = ({
                           value={formData.category_id || ''}
                           onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId, category: categoryId })}
                           onCreateCategory={onCreateCategory}
+                          className={cn('mt-1', invalidCategory && INVALID_FIELD_CLASS)}
                         />
+                        <RequiredFieldHint show={invalidCategory}>La catégorie est requise.</RequiredFieldHint>
                       </div>
 
                       {/* Status */}
@@ -779,6 +1124,16 @@ export const SimpleProductSheet = ({
                               placeholder="0,00"
                               className="mt-1 h-8 text-xs"
                             /></div>
+                            <div>
+                              <Label>TVA</Label>
+                              <TvaRateSelect
+                                rates={onSiteRates}
+                                value={tvaSelection.in}
+                                onValueChange={(value) => setTvaSelection((prev) => ({ ...prev, in: value }))}
+                                invalid={invalidTvaIn}
+                              />
+                              <RequiredFieldHint show={invalidTvaIn}>La TVA sur place est requise.</RequiredFieldHint>
+                            </div>
                             <div className="flex items-center justify-between">
                               <Label>Disponible</Label>
                               <Switch checked={formData.available_in || false} onCheckedChange={(checked) => setFormData({ ...formData, available_in: checked })} />
@@ -821,6 +1176,16 @@ export const SimpleProductSheet = ({
                               placeholder="0,00"
                               className="mt-1 h-8 text-xs"
                             /></div>
+                            <div>
+                              <Label>TVA</Label>
+                              <TvaRateSelect
+                                rates={takeAwayRates}
+                                value={tvaSelection.takeAway}
+                                onValueChange={(value) => setTvaSelection((prev) => ({ ...prev, takeAway: value }))}
+                                invalid={invalidTvaTakeAway}
+                              />
+                              <RequiredFieldHint show={invalidTvaTakeAway}>La TVA à emporter est requise.</RequiredFieldHint>
+                            </div>
                             <div className="flex items-center justify-between">
                               <Label>Disponible</Label>
                               <Switch checked={formData.available_take_away || false} onCheckedChange={(checked) => setFormData({ ...formData, available_take_away: checked })} />
@@ -863,6 +1228,16 @@ export const SimpleProductSheet = ({
                               placeholder="0,00"
                               className="mt-1 h-8 text-xs"
                             /></div>
+                            <div>
+                              <Label>TVA</Label>
+                              <TvaRateSelect
+                                rates={deliveryRates}
+                                value={tvaSelection.delivery}
+                                onValueChange={(value) => setTvaSelection((prev) => ({ ...prev, delivery: value }))}
+                                invalid={invalidTvaDelivery}
+                              />
+                              <RequiredFieldHint show={invalidTvaDelivery}>La TVA livraison est requise.</RequiredFieldHint>
+                            </div>
                             <div className="flex items-center justify-between">
                               <Label>Disponible</Label>
                               <Switch checked={formData.available_delivery || false} onCheckedChange={(checked) => setFormData({ ...formData, available_delivery: checked })} />
@@ -1008,60 +1383,8 @@ export const SimpleProductSheet = ({
                   />
                 </TabsContent>
 
-                <TabsContent value="tags" className="space-y-3 mt-0">
-                  {/* Allergens */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-sm">Allergènes</h3>
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                      {(allergensData ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Aucun allergène</p>
-                      ) : (
-                        (allergensData ?? []).map((allergen) => (
-                          <div key={allergen.allergen_id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50">
-                            {isEditMode ? (
-                              <input type="checkbox" id={`allergen-${allergen.allergen_id}`} checked={formData.allergens?.includes(allergen.allergen_id) || false} onChange={(e) => { const newAllergens = e.target.checked ? [...(formData.allergens || []), allergen.allergen_id] : (formData.allergens || []).filter(a => a !== allergen.allergen_id); setFormData({ ...formData, allergens: newAllergens }); }} className="rounded cursor-pointer" />
-                            ) : (
-                              <input type="checkbox" id={`allergen-${allergen.allergen_id}`} checked={formData.allergens?.includes(allergen.allergen_id) || false} disabled className="rounded" />
-                            )}
-                            <label htmlFor={`allergen-${allergen.allergen_id}`} className="text-xs cursor-pointer flex-1">
-                              {allergen.icon && <span>{allergen.icon}</span>} {allergen.name}
-                            </label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Tags */}
-                  <div className="space-y-2">
-                    <h3 className="font-semibold text-sm">Tags</h3>
-                    {isEditMode && (
-                      <div className="flex gap-2 pb-2 border-b">
-                        <Input placeholder="Nouveau tag" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleCreateTag(); }} disabled={isCreatingTag} className="text-xs h-8" />
-                        <Button onClick={handleCreateTag} disabled={isCreatingTag || !newTagName.trim()} size="sm" variant="outline" className="px-2">
-                          {isCreatingTag ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                        </Button>
-                      </div>
-                    )}
-                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                      {(tagsData ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-2 text-center">Aucun tag</p>
-                      ) : (
-                        (tagsData ?? []).map((tag) => (
-                          <div key={tag.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50">
-                            {isEditMode ? (
-                              <input type="checkbox" id={`tag-${tag.id}`} checked={formData.tags?.includes(tag.id) || false} onChange={(e) => { const newTags = e.target.checked ? [...(formData.tags || []), tag.id] : (formData.tags || []).filter(t => t !== tag.id); setFormData({ ...formData, tags: newTags }); }} className="rounded cursor-pointer" />
-                            ) : (
-                              <input type="checkbox" id={`tag-${tag.id}`} checked={formData.tags?.includes(tag.id) || false} disabled className="rounded" />
-                            )}
-                            <label htmlFor={`tag-${tag.id}`} className="text-xs cursor-pointer flex-1">
-                              <Badge variant="outline" className="text-xs">{tag.name}</Badge>
-                            </label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                <TabsContent value="tags" className="mt-0">
+                  <ProductTagsTab {...tagsTabProps} compact />
                 </TabsContent>
               </Tabs>
             ) : (
@@ -1071,6 +1394,8 @@ export const SimpleProductSheet = ({
             )}
 
           </div>
+
+          <DuplicateNameDialog {...duplicateDialogProps} />
 
           {/* Delete Product Dialog */}
           <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -1107,7 +1432,7 @@ export const SimpleProductSheet = ({
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <h2 className="text-lg font-bold text-foreground truncate">
-                      {isEditMode ? (formData.name || 'Produit') : (product?.name || 'Produit')}
+                      {isCreateMode ? (formData.name || 'Nouveau produit') : (isEditMode ? (formData.name || 'Produit') : (product?.name || 'Produit'))}
                     </h2>
                     <p className="text-sm text-muted-foreground mt-1">
                       {categories.find(
@@ -1173,7 +1498,7 @@ export const SimpleProductSheet = ({
                 </div>
 
                 {/* Cost Info */}
-                {product?.cost_price && (
+                {!isCreateMode && product?.cost_price && (
                   <div className="mt-3 p-2 bg-muted/50 rounded-md border border-muted-foreground/10">
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-xs">
@@ -1204,13 +1529,13 @@ export const SimpleProductSheet = ({
                 <X className="w-4 h-4 mr-2" />
                 Annuler
               </Button>
-              <Button 
+              <Button
                 className="flex-1 bg-gradient-primary"
-                onClick={handleSave}
+                onClick={isCreateMode ? handleCreate : handleSave}
                 disabled={isUploadingImage}
               >
                 <Save className="w-4 h-4 mr-2" />
-                Enregistrer
+                {isCreateMode ? 'Créer le produit' : 'Enregistrer'}
               </Button>
             </div>
           )}
@@ -1228,12 +1553,18 @@ export const SimpleProductSheet = ({
           </div>
         ) : product ? (
           // Loaded content
-          <Tabs defaultValue="general" className="w-full flex flex-col">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
             {/* Onglets scrollables horizontalement sur mobile */}
             <ScrollArea className="w-full mb-6 border-b">
               <TabsList className={`w-full md:grid md:grid-cols-5 sticky top-0 bg-white ${isMobile ? 'flex justify-start gap-1 p-0 border-0 h-auto' : 'grid-cols-5'}`}>
-                <TabsTrigger value="general" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Général</TabsTrigger>
-                <TabsTrigger value="price" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Tarifs</TabsTrigger>
+                <TabsTrigger value="general" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>
+                  Général
+                  <TabErrorBadge count={missingFieldsByTab.general || 0} />
+                </TabsTrigger>
+                <TabsTrigger value="price" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>
+                  Tarifs
+                  <TabErrorBadge count={missingFieldsByTab.price || 0} />
+                </TabsTrigger>
                 <TabsTrigger value="composition" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Composition</TabsTrigger>
                 <TabsTrigger value="options" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Options</TabsTrigger>
                 <TabsTrigger value="tags" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Tags</TabsTrigger>
@@ -1351,8 +1682,9 @@ export const SimpleProductSheet = ({
                               value={formData.name || ''}
                               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                               placeholder="ex. Pizza Margherita"
-                              className="mt-1"
+                              className={cn('mt-1', invalidName && INVALID_FIELD_CLASS)}
                             />
+                            <RequiredFieldHint show={invalidName}>Le nom du produit est requis.</RequiredFieldHint>
                           </div>
                           <div>
                             <Label>Description</Label>
@@ -1390,7 +1722,9 @@ export const SimpleProductSheet = ({
                             value={formData.category_id || formData.category || ''}
                             onValueChange={(categoryId) => setFormData({ ...formData, category_id: categoryId, category: categoryId })}
                             onCreateCategory={onCreateCategory}
+                            className={cn('mt-1', invalidCategory && INVALID_FIELD_CLASS)}
                           />
+                          <RequiredFieldHint show={invalidCategory}>La catégorie est requise.</RequiredFieldHint>
                         </div>
                         <div>
                           <Label>Statut</Label>
@@ -1501,7 +1835,13 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <Label className="text-xs">Taux TVA</Label>
-                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{onSiteTvaLabel}</p>
+                            <TvaRateSelect
+                              rates={onSiteRates}
+                              value={tvaSelection.in}
+                              onValueChange={(value) => setTvaSelection((prev) => ({ ...prev, in: value }))}
+                              invalid={invalidTvaIn}
+                            />
+                            <RequiredFieldHint show={invalidTvaIn}>Requise.</RequiredFieldHint>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t">
                             <Label className="text-xs">Disponible</Label>
@@ -1566,7 +1906,13 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <Label className="text-xs">Taux TVA</Label>
-                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{takeawayTvaLabel}</p>
+                            <TvaRateSelect
+                              rates={takeAwayRates}
+                              value={tvaSelection.takeAway}
+                              onValueChange={(value) => setTvaSelection((prev) => ({ ...prev, takeAway: value }))}
+                              invalid={invalidTvaTakeAway}
+                            />
+                            <RequiredFieldHint show={invalidTvaTakeAway}>Requise.</RequiredFieldHint>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t">
                             <Label className="text-xs">Disponible</Label>
@@ -1631,7 +1977,13 @@ export const SimpleProductSheet = ({
                           </div>
                           <div>
                             <Label className="text-xs">Taux TVA</Label>
-                            <p className="mt-2 px-3 py-2 text-sm font-semibold bg-muted rounded text-foreground">{deliveryTvaLabel}</p>
+                            <TvaRateSelect
+                              rates={deliveryRates}
+                              value={tvaSelection.delivery}
+                              onValueChange={(value) => setTvaSelection((prev) => ({ ...prev, delivery: value }))}
+                              invalid={invalidTvaDelivery}
+                            />
+                            <RequiredFieldHint show={invalidTvaDelivery}>Requise.</RequiredFieldHint>
                           </div>
                           <div className="flex items-center justify-between pt-2 border-t">
                             <Label className="text-xs">Disponible</Label>
@@ -1826,147 +2178,18 @@ export const SimpleProductSheet = ({
             />
           </TabsContent>
 
-            <TabsContent value="tags" className="space-y-5 mt-0">
-              <div className="grid grid-cols-2 gap-5">
-                {/* Allergens */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Allergènes</CardTitle>
-                    <CardDescription>{(allergensData ?? []).length} disponibles</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 max-h-[350px] overflow-y-auto">
-                      {(allergensData ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-4 text-center">Aucun allergène</p>
-                      ) : (
-                        (allergensData ?? []).map((allergen) => (
-                          <div key={allergen.allergen_id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 transition-colors">
-                            {isEditMode ? (
-                              <input
-                                type="checkbox"
-                                id={`allergen-${allergen.allergen_id}`}
-                                checked={formData.allergens?.includes(allergen.allergen_id) || false}
-                                onChange={(e) => {
-                                  const newAllergens = e.target.checked
-                                    ? [...(formData.allergens || []), allergen.allergen_id]
-                                    : (formData.allergens || []).filter(a => a !== allergen.allergen_id);
-                                  setFormData({ ...formData, allergens: newAllergens });
-                                }}
-                                className="rounded cursor-pointer"
-                              />
-                            ) : (
-                              <input
-                                type="checkbox"
-                                id={`allergen-${allergen.allergen_id}`}
-                                checked={formData.allergens?.includes(allergen.allergen_id) || false}
-                                disabled
-                                className="rounded"
-                              />
-                            )}
-                            <label
-                              htmlFor={`allergen-${allergen.allergen_id}`}
-                              className="text-sm cursor-pointer flex-1 flex items-center gap-2"
-                            >
-                              {allergen.icon && <span>{allergen.icon}</span>}
-                              {allergen.name}
-                            </label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Tags */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-sm">Tags</CardTitle>
-                    <CardDescription>{(tagsData ?? []).length} disponibles</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Create Tag Form - Only in edit mode */}
-                    {isEditMode && (
-                      <div className="flex gap-2 pb-3 border-b">
-                        <Input
-                          placeholder="Nouveau tag"
-                          value={newTagName}
-                          onChange={(e) => setNewTagName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              handleCreateTag();
-                            }
-                          }}
-                          disabled={isCreatingTag}
-                          className="text-sm h-8"
-                        />
-                        <Button
-                          onClick={handleCreateTag}
-                          disabled={isCreatingTag || !newTagName.trim()}
-                          size="sm"
-                          variant="outline"
-                          className="px-2"
-                        >
-                          {isCreatingTag ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Plus className="w-3 h-3" />
-                          )}
-                        </Button>
-                      </div>
-                    )}
-
-                    {/* Tags List */}
-                    <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                      {(tagsData ?? []).length === 0 ? (
-                        <p className="text-xs text-muted-foreground py-4 text-center">Aucun tag</p>
-                      ) : (
-                        (tagsData ?? []).map((tag) => (
-                          <div key={tag.id} className="flex items-center gap-3 p-2 rounded hover:bg-muted/50 transition-colors">
-                            {isEditMode ? (
-                              <input
-                                type="checkbox"
-                                id={`tag-${tag.id}`}
-                                checked={formData.tags?.includes(tag.id) || false}
-                                onChange={(e) => {
-                                  const newTags = e.target.checked
-                                    ? [...(formData.tags || []), tag.id]
-                                    : (formData.tags || []).filter(t => t !== tag.id);
-                                  setFormData({ ...formData, tags: newTags });
-                                }}
-                                className="rounded cursor-pointer"
-                              />
-                            ) : (
-                              <input
-                                type="checkbox"
-                                id={`tag-${tag.id}`}
-                                checked={formData.tags?.includes(tag.id) || false}
-                                disabled
-                                className="rounded"
-                              />
-                            )}
-                            <label
-                              htmlFor={`tag-${tag.id}`}
-                              className="text-sm cursor-pointer flex-1"
-                            >
-                              <Badge variant="outline" className="text-xs">
-                                {tag.name}
-                              </Badge>
-                            </label>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-          </Tabs>
+          <TabsContent value="tags" className="mt-0">
+            <ProductTagsTab {...tagsTabProps} />
+          </TabsContent>
+        </Tabs>
         ) : (
           <div className="text-center py-12">
             <p className="text-muted-foreground">Impossible de charger le produit</p>
           </div>
         )}
         </div>
+
+        <DuplicateNameDialog {...duplicateDialogProps} />
 
         {/* Delete Product Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

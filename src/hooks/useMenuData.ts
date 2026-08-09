@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { Menu, Product, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory } from '@/types/menu';
+import { Menu, Product, ProductStatus, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory, Tag, ProductCreatePayload } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
@@ -9,6 +9,7 @@ export const useMenuData = () => {
   const [components, setComponents] = useState<Component[]>([]);
   const [componentCategories, setComponentCategories] = useState<ComponentCategory[]>([]);
   const [attributes, setAttributes] = useState<Attribute[]>([]);
+  const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -22,11 +23,14 @@ export const useMenuData = () => {
       setLoading(true);
       // ✅ CONSOLIDATED: Single API call to getMenuData()
       // Now returns categories with nested products directly
-      const [categoriesData, unitsData, componentsData, attributesData] = await Promise.all([
+      const [categoriesData, unitsData, componentsData, attributesData, tagsData] = await Promise.all([
         menuService.getMenuData(),  // Returns Category[] with nested products (replaces both getMenuData() and getProducts())
         menuService.getUnitsOfMeasure(),
         menuService.getComponents(),
-        menuService.getAttributes()
+        menuService.getAttributes(),
+        // Tag catalog: used to resolve tag IDs to names in the products table.
+        // Non-blocking — a tag fetch failure must not break the whole menu.
+        menuService.getTags().catch(() => [] as Tag[])
       ]);
 
       // Categories already come with nested products, no need to filter/remap
@@ -65,6 +69,7 @@ export const useMenuData = () => {
       setComponents(flattenedComponents);
       setComponentCategories(componentCategoriesFromApi);
       setAttributes(attributesData);
+      setTags(tagsData ?? []);
     } catch (error) {
       console.error('Erreur lors du chargement du menu:', error);
       toast({
@@ -141,22 +146,17 @@ export const useMenuData = () => {
     }
   };
 
+  // Errors (e.g. duplicate name) are intentionally left to propagate: the caller
+  // needs them to keep its form open, and apiClient's automatic toast already
+  // surfaces a specific message for them.
   const createAttribute = async (data: Partial<Attribute>) => {
-    try {
-      const newAttribute = await menuService.createAttribute(data);
-      setAttributes(prev => [...prev, newAttribute]);
-      toast({
-        title: "Succès",
-        description: "Attribut créé avec succès"
-      });
-      return newAttribute;
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer l'attribut",
-        variant: "destructive"
-      });
-    }
+    const newAttribute = await menuService.createAttribute(data);
+    setAttributes(prev => [...prev, newAttribute]);
+    toast({
+      title: "Succès",
+      description: "Attribut créé avec succès"
+    });
+    return newAttribute;
   };
 
   const updateAttributeData = async (attributeId: string, data: Partial<Attribute>) => {
@@ -252,48 +252,37 @@ export const useMenuData = () => {
     }
   };
 
-  const createProduct = async (data: Partial<Product>) => {
-    try {
-      const newProduct = await menuService.createProduct(data);
-      const productWithId = { ...newProduct, product_id: newProduct.product_id || newProduct.product_id };
-      setMenuData(prev => ({
-        ...prev,
-        products: [...(prev.products || []), productWithId],
-        products_types: prev.products_types.map(c => 
-          c.category_id === productWithId.category ? {
-            ...c,
-            products: [...(c.products || []), productWithId]
-          } : c
-        )
-      }));
-      toast({
-        title: "Succès",
-        description: "Produit créé avec succès"
-      });
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer le produit",
-        variant: "destructive"
-      });
-    }
+  // Retourne le produit créé : la fiche de création reste ouverte dessus et
+  // enchaîne (upload photo, passage en mode édition) — elle a besoin de l'ID.
+  // Les erreurs remontent telles quelles, notamment le conflit de nom en
+  // doublon dont apiClient affiche déjà le message de confirmation.
+  const createProduct = async (data: Partial<Product> | ProductCreatePayload): Promise<Product> => {
+    const newProduct = await menuService.createProduct(data);
+    const categoryId = newProduct.category_id || newProduct.category;
+    setMenuData(prev => ({
+      ...prev,
+      products: [...(prev.products || []), newProduct],
+      products_types: prev.products_types.map(c =>
+        c.category_id === categoryId ? {
+          ...c,
+          products: [...(c.products || []), newProduct]
+        } : c
+      )
+    }));
+    toast({
+      title: "Succès",
+      description: "Produit créé avec succès"
+    });
+    return newProduct;
   };
 
   const createComponent = async (data: { name: string; unit_id: string; price: number; category_id?: string; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }) => {
-    try {
-      const newComponent = await menuService.createComponent(data);
-      setComponents(prev => [...prev, newComponent]);
-      toast({
-        title: "Succès",
-        description: "Composant créé avec succès"
-      });
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de créer le composant",
-        variant: "destructive"
-      });
-    }
+    const newComponent = await menuService.createComponent(data);
+    setComponents(prev => [...prev, newComponent]);
+    toast({
+      title: "Succès",
+      description: "Composant créé avec succès"
+    });
   };
 
   const updateComponent = async (componentId: string, data: { name?: string; category_id?: string; unit_id?: string; price?: number; purchase_cost?: number; purchase_unit_id?: string; purchase_cost_qty?: number }) => {
@@ -448,6 +437,101 @@ export const useMenuData = () => {
     }
   };
 
+  // ===== Édition de groupe =====
+  // Chaque action tape un endpoint groupé puis reflète le résultat en local :
+  // le menu n'étant pas sur react-query, un refetch complet serait le seul
+  // autre moyen de rafraîchir le tableau.
+
+  // Applique une transformation aux produits ciblés, dans la liste à plat comme
+  // dans les produits imbriqués sous leur catégorie (les deux alimentent l'UI).
+  const patchProducts = (
+    productIds: string[],
+    patch: (product: Product) => Product
+  ) => {
+    const targeted = new Set(productIds);
+    const applyToProduct = (p: Product) => (targeted.has(p.product_id) ? patch(p) : p);
+
+    setMenuData(prev => ({
+      ...prev,
+      products: prev.products?.map(applyToProduct),
+      products_types: prev.products_types.map(cat => ({
+        ...cat,
+        products: cat.products?.map(applyToProduct)
+      }))
+    }));
+  };
+
+  const bulkDeleteProducts = async (productIds: string[]) => {
+    await menuService.bulkDeleteProducts(productIds);
+    // Les sous-produits sont désactivés côté API avec leur groupe : on les
+    // retire aussi du state, sinon ils resteraient affichés à la réouverture.
+    const deleted = new Set(productIds);
+    setMenuData(prev => {
+      const isDeleted = (p: Product) =>
+        deleted.has(p.product_id) || (p.by_product_of ? deleted.has(p.by_product_of) : false);
+      return {
+        ...prev,
+        products: prev.products?.filter(p => !isDeleted(p)),
+        products_types: prev.products_types.map(cat => ({
+          ...cat,
+          products: cat.products?.filter(p => !isDeleted(p)) || []
+        }))
+      };
+    });
+  };
+
+  const bulkSetProductsStatus = async (productIds: string[], status: ProductStatus) => {
+    await menuService.bulkUpdateProductsStatus(productIds, status);
+    patchProducts(productIds, p => ({ ...p, status, available: status === 'available' }));
+  };
+
+  const bulkSetProductsAttributes = async (productIds: string[], attributeIds: string[]) => {
+    await menuService.bulkUpdateProductsAttributes(productIds, attributeIds);
+    const attributesById = new Map(attributes.map(a => [a.id, a]));
+    const matched = attributeIds
+      .map(id => attributesById.get(id))
+      .filter((a): a is Attribute => !!a);
+    patchProducts(productIds, p => ({ ...p, configuration: { attributes: matched } }));
+  };
+
+  const bulkAssignProductsToCategory = async (productIds: string[], categoryId: string) => {
+    await menuService.bulkAssignProductsToCategory(productIds, categoryId);
+    // La catégorie caisse est un champ unique : les produits quittent leur
+    // catégorie précédente, il faut donc les déplacer dans products_types.
+    const moved = new Set(productIds);
+    setMenuData(prev => {
+      const movedProducts = (prev.products || [])
+        .filter(p => moved.has(p.product_id))
+        .map(p => ({ ...p, category_id: categoryId, category: categoryId }));
+
+      return {
+        ...prev,
+        products: prev.products?.map(p =>
+          moved.has(p.product_id) ? { ...p, category_id: categoryId, category: categoryId } : p
+        ),
+        products_types: prev.products_types.map(cat => {
+          const kept = (cat.products || []).filter(p => !moved.has(p.product_id));
+          return {
+            ...cat,
+            products: cat.category_id === categoryId ? [...kept, ...movedProducts] : kept
+          };
+        })
+      };
+    });
+  };
+
+  // Catégorie marketing : rattachement additif, la catégorie caisse du produit
+  // n'est pas touchée — rien à refléter dans menuData, qui ne la porte pas.
+  const bulkAssignProductsToMarketingCategory = async (productIds: string[], categoryId: string) => {
+    await menuService.bulkAssignProductsToMarketCategory(productIds, categoryId);
+  };
+
+  // Adds a tag created elsewhere (product sheet) to the local catalog so the products
+  // table can resolve its name right away, without a refetch.
+  const registerTag = (newTag: { id: string; name: string }) => {
+    setTags(prev => prev.some(t => t.id === newTag.id) ? prev : [...prev, newTag as Tag]);
+  };
+
   // Merges already-persisted allergen assignments into local state (no API call, no refetch).
   const applyProductsAllergens = (updates: Array<{ product_id: string; allergens: string[] }>) => {
     if (updates.length === 0) return;
@@ -520,8 +604,10 @@ export const useMenuData = () => {
     components,
     componentCategories,
     attributes,
+    tags,
     loading,
     updateProduct,
+    registerTag,
     createAttribute,
     updateAttributeData,
     deleteAttribute,
@@ -537,6 +623,11 @@ export const useMenuData = () => {
     deleteCategory,
     deleteComponentCategory,
     bulkUpdatePrices,
+    bulkDeleteProducts,
+    bulkSetProductsStatus,
+    bulkSetProductsAttributes,
+    bulkAssignProductsToCategory,
+    bulkAssignProductsToMarketingCategory,
     applyProductsAllergens,
     applyProductsAttributes,
     applyProductsTags

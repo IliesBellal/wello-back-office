@@ -28,6 +28,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { CategorySelector } from '@/components/shared/CategorySelector';
+import { DuplicateNameDialog } from '@/components/shared/DuplicateNameDialog';
+import { useDuplicateNameConfirm } from '@/hooks/useDuplicateNameConfirm';
 import { Category, UnitOfMeasure, ComponentCategory, ComponentCreatePayload } from '@/types/menu';
 
 const componentFormSchema = z.object({
@@ -56,6 +58,7 @@ export function ComponentCreateSheet({
   onCreateCategory,
 }: ComponentCreateSheetProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { runWithDuplicateConfirm, duplicateDialogProps } = useDuplicateNameConfirm();
 
   const form = useForm<ComponentFormValues>({
     resolver: zodResolver(componentFormSchema),
@@ -74,8 +77,9 @@ export function ComponentCreateSheet({
   };
 
   const onSubmit = async (data: ComponentFormValues) => {
-    setIsSubmitting(true);
-    try {
+    // Requête figée : en cas de doublon de nom, la boîte de confirmation la
+    // rejoue à l'identique — c'est ce qu'attend la confirmation côté API.
+    const submitCreation = async () => {
       await onCreateComponent({
         name: data.name,
         category_id: data.category_id,
@@ -84,6 +88,11 @@ export function ComponentCreateSheet({
       });
       form.reset();
       handleOpenChange(false);
+    };
+
+    setIsSubmitting(true);
+    try {
+      await runWithDuplicateConfirm(submitCreation);
     } catch (error) {
       console.error('Failed to create component:', error);
     } finally {
@@ -93,6 +102,7 @@ export function ComponentCreateSheet({
 
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
+      <DuplicateNameDialog {...duplicateDialogProps} />
       <SheetContent className="overflow-y-auto sm:max-w-[540px]">
         <SheetHeader>
           <SheetTitle>Ajouter un ingrédient</SheetTitle>

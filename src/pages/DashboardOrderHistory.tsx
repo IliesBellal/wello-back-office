@@ -627,6 +627,8 @@ export const DashboardOrderHistory = () => {
     page,
     per_page: limit,
     total_pages: 1,
+    total_revenue: 0,
+    avg_basket: 0,
   };
 
   const filteredOrders = resolvedOrderHistory.orders;
@@ -759,7 +761,7 @@ export const DashboardOrderHistory = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {filteredOrders.reduce((sum, o) => sum + o.total, 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                {resolvedOrderHistory.total_revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
               </div>
             </CardContent>
           </Card>
@@ -769,7 +771,7 @@ export const DashboardOrderHistory = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {(filteredOrders.length === 0 ? 0 : filteredOrders.reduce((sum, o) => sum + o.total, 0) / filteredOrders.length).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                {resolvedOrderHistory.avg_basket.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
               </div>
             </CardContent>
           </Card>

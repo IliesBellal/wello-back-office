@@ -23,6 +23,8 @@ interface CategorySelectorProps {
   onValueChange: (categoryId: string) => void;
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   placeholder?: string;
+  /** Classes appliquées au déclencheur (ex. bordure rouge d'un champ requis). */
+  className?: string;
 }
 
 export function CategorySelector({
@@ -30,7 +32,8 @@ export function CategorySelector({
   value,
   onValueChange,
   onCreateCategory,
-  placeholder = "Sélectionner une catégorie..."
+  placeholder = "Sélectionner une catégorie...",
+  className
 }: CategorySelectorProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -61,7 +64,7 @@ export function CategorySelector({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          className="w-full justify-between"
+          className={cn("w-full justify-between", className)}
           disabled={isCreating}
         >
           {selectedCategory ? selectedCategory.category_name : placeholder}

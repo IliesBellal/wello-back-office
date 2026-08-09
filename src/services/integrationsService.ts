@@ -17,6 +17,12 @@ export interface IntegrationStatus {
   kpis: IntegrationKPIs;
   last_sync: string | null;
   synced_items: number;
+  /**
+   * Lien public de la boutique ScanNOrder ({BASE_URL}/restaurant/{slug}).
+   * Renvoyé par GET/PATCH /integrations/scannorder. `null` si le marchand n'a
+   * pas de QR code principal ou si l'intégration n'est pas active.
+   */
+  access_url?: string | null;
   logo_url?: string | null;
   banner_url?: string | null;
   primary_color?: string | null;
@@ -75,6 +81,7 @@ const mockIntegrations: Record<string, IntegrationStatus> = {
     },
     last_sync: '2024-04-08T09:45:00Z',
     synced_items: 94,
+    access_url: 'https://scannorder.welloresto.fr/restaurant/le-bistrot',
   },
 };
 

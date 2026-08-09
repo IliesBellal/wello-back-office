@@ -135,11 +135,10 @@ interface ScanNOrderStatusProps {
   status: IntegrationStatus | null;
   loading: boolean;
   icon: React.ReactNode;
-  accessUrl?: string;
   path?: string;
 }
 
-const ScanNOrderOverview = ({ status, loading, icon, accessUrl = 'https://app.scanorder.com', path = '/integrations/scannorder' }: ScanNOrderStatusProps) => {
+const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scannorder' }: ScanNOrderStatusProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -159,6 +158,8 @@ const ScanNOrderOverview = ({ status, loading, icon, accessUrl = 'https://app.sc
   }
 
   const isActive = status.active;
+  // Lien public de la boutique, fourni par GET /integrations/scannorder.
+  const accessUrl = status.access_url || '';
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(accessUrl);
@@ -253,30 +254,32 @@ const ScanNOrderOverview = ({ status, loading, icon, accessUrl = 'https://app.sc
           </div>
 
           {/* Access URL */}
-          <div className="mt-4 pt-4 border-t">
-            <p className="text-sm text-muted-foreground mb-2">URL d'accès:</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 px-3 py-2 bg-muted rounded text-sm font-mono text-foreground truncate">
-                {accessUrl}
-              </code>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={copyToClipboard}
-                title="Copier l'URL"
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={openInNewTab}
-                title="Ouvrir dans un nouvel onglet"
-              >
-                <ExternalLink className="h-4 w-4" />
-              </Button>
+          {accessUrl && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm text-muted-foreground mb-2">URL d'accès:</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 px-3 py-2 bg-muted rounded text-sm font-mono text-foreground truncate">
+                  {accessUrl}
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={copyToClipboard}
+                  title="Copier l'URL"
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={openInNewTab}
+                  title="Ouvrir dans un nouvel onglet"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </CardContent>
       )}
     </Card>
@@ -396,7 +399,6 @@ export default function IntegrationsOverviewPage() {
               status={scanNOrderStatus}
               loading={loading}
               icon={<img src="/scannorder_logo.png" alt="ScanNOrder" className="h-10 w-10 object-cover rounded-xl shadow-md" />}
-              accessUrl="https://app.scanorder.com"
             />
           )}
         </div>

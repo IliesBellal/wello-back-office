@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse, API_BASE_URL } from "@/services/apiClient";
-import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
 import { getStoredAuthToken } from "@/types/auth";
 
 interface MarketingCategoryApiItem {
@@ -20,7 +20,7 @@ const mockTvaRates: TvaRateGroup[] = [
     delivery_type: "IN",
     rates: [
       { id: 5, value: 10, label: "TVA 10%", description: "Boissons non alcoolisées, plats à consommer sur place" },
-      { id: 6, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiserie" }
+      { id: 6, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiseriessssss" }
     ]
   },
   {
@@ -30,7 +30,7 @@ const mockTvaRates: TvaRateGroup[] = [
     rates: [
       { id: 8, value: 5.5, label: "TVA 5.5%", description: "Produits alimentaires standards" },
       { id: 7, value: 10, label: "TVA 10%", description: "Boissons non alcoolisées" },
-      { id: 9, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiserie" }
+      { id: 9, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiseriesss" }
     ]
   },
   {
@@ -40,7 +40,7 @@ const mockTvaRates: TvaRateGroup[] = [
     rates: [
       { id: 1, value: 5.5, label: "TVA 5.5%", description: "Produits alimentaires standards" },
       { id: 2, value: 10, label: "TVA 10%", description: "Boissons non alcoolisées" },
-      { id: 3, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiserie" }
+      { id: 3, value: 20, label: "TVA 20%", description: "Boissons alcoolisées, confiseriesssss" }
     ]
   }
 ];
@@ -722,11 +722,48 @@ export const menuService = {
     );
   },
 
-  async deleteComponentCategory(categoryId: string): Promise<void> {
-    logAPI('DELETE', `/menu/components/categories/${categoryId}`);
+  /**
+   * Supprime une catégorie d'ingrédients.
+   * - `reassign` déplace les ingrédients vers `reassignTo`
+   * - `purge` désactive les ingrédients avec la catégorie
+   * Une catégorie non vide sans mode est refusée par l'API (400) : sans ça les
+   * ingrédients restaient rattachés à une catégorie désactivée et disparaissaient
+   * de l'application.
+   */
+  async deleteComponentCategory(
+    categoryId: string,
+    options?: { mode: 'reassign'; reassignTo: string } | { mode: 'purge' }
+  ): Promise<void> {
+    const params = new URLSearchParams();
+    if (options) {
+      params.set('mode', options.mode);
+      if (options.mode === 'reassign') {
+        params.set('reassign_to', options.reassignTo);
+      }
+    }
+    const query = params.toString();
+    const path = `/menu/components/categories/${categoryId}${query ? `?${query}` : ''}`;
+    logAPI('DELETE', path);
     return withMock(
       () => undefined,
-      () => apiClient.delete<void>(`/menu/components/categories/${categoryId}`)
+      () => apiClient.delete<void>(path)
+    );
+  },
+
+  async updateComponentCategory(categoryId: string, name: string): Promise<void> {
+    logAPI('PATCH', `/menu/components/categories/${categoryId}`, { name });
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/components/categories/${categoryId}`, { name })
+    );
+  },
+
+  async updateComponentCategoriesDisplayOrder(categoryIds: string[]): Promise<void> {
+    const payload = { category_ids: categoryIds };
+    logAPI('PATCH', '/menu/components/categories/display-order', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/components/categories/display-order', payload)
     );
   },
 
@@ -1399,6 +1436,44 @@ export const menuService = {
         // Return the original update data so hook can apply it to local state
         return products;
       }
+    );
+  },
+
+  // ===== Édition de groupe (sélection multiple du tableau produits) =====
+  // Les trois appels ci-dessous sont de vrais endpoints groupés : un seul
+  // UPDATE côté API et une seule invalidation de cache, là où une boucle
+  // client aurait généré une requête par produit.
+
+  // `available` | `not_available` | `out_of_stock` | `removed_from_menu`
+  async bulkUpdateProductsStatus(productIds: string[], status: ProductStatus): Promise<void> {
+    const payload = { product_ids: productIds, status };
+    logAPI('PATCH', '/menu/products/bulk/status', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/products/bulk/status', payload)
+    );
+  },
+
+  // Suppression logique : le produit passe enabled = false et disparaît du
+  // back-office comme du menu. POST et non DELETE — le corps d'une requête
+  // DELETE n'est pas transmis de façon fiable par tous les intermédiaires.
+  async bulkDeleteProducts(productIds: string[]): Promise<void> {
+    const payload = { product_ids: productIds };
+    logAPI('POST', '/menu/products/bulk/delete', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.post<void>('/menu/products/bulk/delete', payload)
+    );
+  },
+
+  // Remplace la configuration complète des produits ciblés. Liste vide = retire
+  // toutes les options.
+  async bulkUpdateProductsAttributes(productIds: string[], attributeIds: string[]): Promise<void> {
+    const payload = { product_ids: productIds, configuration: attributeIds };
+    logAPI('PATCH', '/menu/products/bulk/attributes', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/products/bulk/attributes', payload)
     );
   },
 

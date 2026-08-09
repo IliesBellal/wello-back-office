@@ -8,6 +8,9 @@ interface UseOTPVerificationProps {
   mode: OTPMode;
   onSuccess?: () => void;
   token?: string; // Bearer token for MFA verification
+  // Masked recipient known upfront (e.g. mfa mode: the email was already sent
+  // as a side effect of login/the request that triggered mfa_required).
+  initialRecipient?: string;
 }
 
 interface VerifyResponse {
@@ -18,25 +21,35 @@ interface VerifyResponse {
 interface SendVerificationResponse {
   message?: string;
   status?: 'success' | 'error';
+  recipient?: string;
 }
 
 interface FallbackSMSResponse {
   status?: 'success' | 'error';
-  phone?: string;
+  recipient?: string;
   message?: string;
 }
 
-export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificationProps) {
+export function useOTPVerification({ mode, onSuccess, token, initialRecipient }: UseOTPVerificationProps) {
   const [code, setCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [isSendingSMS, setIsSendingSMS] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
-  const [maskedPhone, setMaskedPhone] = useState<string | null>(null);
-  
+  // Masked recipient currently displayed - starts from whatever the caller already
+  // knew, then gets replaced whenever a send/resend/SMS-fallback returns a fresh one
+  // (e.g. switching from the masked email to the masked phone on SMS fallback).
+  const [recipient, setRecipient] = useState<string | undefined>(initialRecipient);
+
   // Ref to prevent duplicate verification calls (React Strict Mode safety)
   const isVerifyingRef = useRef(false);
+
+  // OTPVerification stays mounted across MFA prompts (isOpen just toggles), so
+  // re-sync whenever the caller hands us a new recipient (e.g. a fresh mfa_required).
+  useEffect(() => {
+    setRecipient(initialRecipient);
+  }, [initialRecipient]);
 
   // Cooldown timer
   useEffect(() => {
@@ -115,6 +128,9 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
       if (responseData.status === 'success') {
         setCooldown(60);
         setCode(''); // Clear existing code
+        if (responseData.recipient) {
+          setRecipient(responseData.recipient);
+        }
         toast({
           title: options?.isInitialSend ? 'Code envoyé' : 'Code renvoyé',
           description: responseData.message || 'Un nouveau code a été envoyé.',
@@ -155,24 +171,25 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await apiClient.get<FallbackSMSResponse>('/auth/mfa/fallback-sms', { headers });
+      const response = await apiClient.get<WelloApiResponse<FallbackSMSResponse> | FallbackSMSResponse>('/auth/mfa/fallback-sms', { headers });
+      const responseData = 'data' in response ? response.data : response;
 
-      if (response.status === 'success') {
+      if (responseData.status === 'success') {
         setCooldown(60);
         setCode(''); // Clear existing code
-        if (response.phone) {
-          setMaskedPhone(response.phone);
+        if (responseData.recipient) {
+          setRecipient(responseData.recipient);
         }
         toast({
           title: 'SMS envoyé',
-          description: response.phone
-            ? `Un code a été envoyé au ${response.phone}`
+          description: responseData.recipient
+            ? `Un code a été envoyé au ${responseData.recipient}`
             : 'Un code a été envoyé par SMS.',
         });
       } else {
         toast({
           title: 'Échec de l\'envoi SMS',
-          description: response.message || 'Impossible d\'envoyer le SMS.',
+          description: responseData.message || 'Impossible d\'envoyer le SMS.',
           variant: 'destructive',
         });
       }
@@ -196,7 +213,7 @@ export function useOTPVerification({ mode, onSuccess, token }: UseOTPVerificatio
     isSendingSMS,
     error,
     cooldown,
-    maskedPhone,
+    recipient,
     handleComplete,
     resendCode,
     sendInitialCode,

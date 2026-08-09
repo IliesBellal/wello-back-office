@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 export const useAttributesData = () => {
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [components, setComponents] = useState<Component[]>([]);
+  const [componentCategories, setComponentCategories] = useState<ComponentCategory[]>([]);
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -30,10 +31,11 @@ export const useAttributesData = () => {
         menuService.getUnitsOfMeasure(),
       ]);
 
-      const { components: flattenedComponents } = componentsData;
+      const { components: flattenedComponents, categories } = componentsData;
 
       setAttributes(attributesData);
       setComponents(flattenedComponents);
+      setComponentCategories(categories);
       setUnits(unitsData);
     } catch (error) {
       console.error('Error loading attributes data:', error);
@@ -66,6 +68,7 @@ export const useAttributesData = () => {
   return {
     attributes,
     components,
+    componentCategories,
     units,
     loading,
     createAttribute,

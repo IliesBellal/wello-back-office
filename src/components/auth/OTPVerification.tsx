@@ -26,6 +26,9 @@ interface OTPVerificationProps {
   onSuccess: () => void;
   onCancel: () => void;
   token?: string; // Bearer token for MFA verification
+  // Masked recipient known upfront (mfa mode: the code was already sent before
+  // this modal opened, so there's no send-verification call to fetch it from).
+  recipient?: string;
 }
 
 const MODE_CONFIG = {
@@ -52,10 +55,11 @@ export function OTPVerification({
   onSuccess,
   onCancel,
   token,
+  recipient,
 }: OTPVerificationProps) {
   const [isMobile, setIsMobile] = useState(false);
   const hasAutoSentForCurrentOpenRef = useRef(false);
-  
+
   const {
     code,
     setCode,
@@ -64,12 +68,12 @@ export function OTPVerification({
     isSendingSMS,
     error,
     cooldown,
-    maskedPhone,
+    recipient: currentRecipient,
     handleComplete,
     resendCode,
     sendInitialCode,
     sendSMSFallback,
-  } = useOTPVerification({ mode, onSuccess, token });
+  } = useOTPVerification({ mode, onSuccess, token, initialRecipient: recipient });
 
   const config = MODE_CONFIG[mode];
   const Icon = config.icon;
@@ -116,6 +120,13 @@ export function OTPVerification({
   // ═══ Content Component (shared between Dialog and Drawer) ═══
   const content = (
     <div className="space-y-6 py-4">
+      {/* Recipient (masked) */}
+      {currentRecipient && (
+        <p className="text-sm text-muted-foreground text-center -mt-2">
+          Destinataire : <strong className="font-semibold text-foreground">&quot;{currentRecipient}&quot;</strong>
+        </p>
+      )}
+
       {/* OTP Input */}
       <div className="space-y-2">
         <OTPInput
@@ -187,11 +198,6 @@ export function OTPVerification({
               'Envoyer par SMS'
             )}
           </Button>
-          {maskedPhone && (
-            <p className="text-xs text-muted-foreground animate-in fade-in">
-              SMS envoyé au {maskedPhone}
-            </p>
-          )}
         </div>
       )}
 

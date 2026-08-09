@@ -47,7 +47,7 @@ d'étape sont autonomes, seul `ProductImportDialog` change.
 | **« Je pars d'un modèle vierge »** | Télécharge le modèle, puis explique le trajet : le remplir, revenir par la première porte |
 | **« Je saisis mes produits à la main »** | Stub identifié (`Bientôt`), écran explicatif, aucun code de la phase 9 |
 
-`wello-generic` figure dans le select sous le libellé **« Modèle Wello rempli »** : un modèle complété se
+`wello-generic` figure dans le select sous le libellé **« Modèle Wello Resto rempli »** : un modèle complété se
 ré-importe exactement comme un export tiers, c'est le même endpoint et seul le parser diffère. Sans cette
 entrée, la deuxième porte serait un cul-de-sac.
 

@@ -27,11 +27,22 @@ export interface WelloApiResponse<T> {
 }
 
 // ============= MFA Interceptor =============
-type MFAHandler = () => Promise<void>;
+type MFAHandler = (recipient?: string) => Promise<void>;
 let mfaHandler: MFAHandler | null = null;
 
 export const registerMFAHandler = (handler: MFAHandler) => {
   mfaHandler = handler;
+};
+
+// Handlers normally send { status, message, error, recipient } at the top level
+// of the response body, but some error paths nest it under a `data` envelope
+// instead - check both so this doesn't depend on which shape a given endpoint uses.
+const unwrapErrorData = (errorData?: Record<string, unknown>): Record<string, unknown> | undefined => {
+  if (!errorData) return undefined;
+  if (errorData.data && typeof errorData.data === "object") {
+    return errorData.data as Record<string, unknown>;
+  }
+  return errorData;
 };
 
 // ============= Loading State Management =============
@@ -147,7 +158,34 @@ const clearAuthAndRedirect = () => {
 };
 
 // ============= Error Handlers =============
-const handleApiError = (status: number, message?: string) => {
+// Backend "status" codes (see internal/models/responses_models.go) that map to a
+// duplicate-name conflict, with their French translation for the toast shown here.
+const DUPLICATE_NAME_MESSAGES: Record<string, { title: string; description: string }> = {
+  product_name_already_exists: {
+    title: "Nom déjà utilisé",
+    description: "Un produit porte déjà ce nom. Merci d'en choisir un autre.",
+  },
+  component_name_already_exists: {
+    title: "Nom déjà utilisé",
+    description: "Un ingrédient porte déjà ce nom. Merci d'en choisir un autre.",
+  },
+  attribute_name_already_exists: {
+    title: "Nom déjà utilisé",
+    description: "Un attribut de configuration porte déjà ce nom. Merci d'en choisir un autre.",
+  },
+};
+
+// Variantes "avec confirmation par nouvel essai" (Redis actif côté API).
+// Volontairement sans toast : elles sont présentées par une boîte de dialogue
+// qui propose de rejouer la requête telle quelle (cf. useDuplicateNameConfirm).
+// Un toast en plus ferait doublon avec elle et brouillerait le choix offert.
+const DUPLICATE_NAME_RETRY_CODES = new Set([
+  "product_name_already_exists_with_retry",
+  "component_name_already_exists_with_retry",
+  "attribute_name_already_exists_with_retry",
+]);
+
+const handleApiError = (status: number, message?: string, errorCode?: string) => {
   switch (status) {
     case 400:
       toast({
@@ -178,6 +216,18 @@ const handleApiError = (status: number, message?: string) => {
         variant: "destructive",
       });
       break;
+    case 409: {
+      if (errorCode && DUPLICATE_NAME_RETRY_CODES.has(errorCode)) {
+        break;
+      }
+      const duplicate = errorCode ? DUPLICATE_NAME_MESSAGES[errorCode] : undefined;
+      toast({
+        title: duplicate?.title || "Conflit",
+        description: duplicate?.description || message || "Cette action entre en conflit avec une ressource existante.",
+        variant: "destructive",
+      });
+      break;
+    }
     case 500:
     case 502:
     case 503:
@@ -353,11 +403,12 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
           : undefined;
 
       // Handle MFA requirement (401 with status: "mfa_required")
-      if (response.status === 401 && errorData?.status === 'mfa_required' && mfaHandler) {
+      const mfaBody = unwrapErrorData(errorData);
+      if (response.status === 401 && mfaBody?.status === 'mfa_required' && mfaHandler) {
         endRequestLog(logContext, response.status, 'MFA Required - Opening verification modal', true);
         try {
           // Wait for MFA completion
-          await mfaHandler();
+          await mfaHandler(typeof mfaBody.recipient === 'string' ? mfaBody.recipient : undefined);
           // Retry the original request
           decrementLoading(); // Decrease before retry
           return await request<T>(endpoint, options);
@@ -369,7 +420,7 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
       }
 
       endRequestLog(logContext, response.status, errorBody ?? errorBodyText ?? errorMessage, true);
-      handleApiError(response.status, errorMessage);
+      handleApiError(response.status, errorMessage, typeof errorData?.status === "string" ? errorData.status : undefined);
       throw createApiHttpError(response.status, errorMessage, errorBody, errorBodyText);
     }
 
@@ -425,11 +476,12 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
           : undefined;
 
       // Handle MFA requirement (401 with status: "mfa_required")
-      if (response.status === 401 && errorData?.status === 'mfa_required' && mfaHandler) {
+      const mfaBody = unwrapErrorData(errorData);
+      if (response.status === 401 && mfaBody?.status === 'mfa_required' && mfaHandler) {
         endRequestLog(logContext, response.status, 'MFA Required - Opening verification modal', true);
         try {
           // Wait for MFA completion
-          await mfaHandler();
+          await mfaHandler(typeof mfaBody.recipient === 'string' ? mfaBody.recipient : undefined);
           // Retry the original request
           decrementLoading(); // Decrease before retry
           return await requestWithCustomToken<T>(endpoint, customToken, options);
@@ -441,7 +493,7 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
       }
 
       endRequestLog(logContext, response.status, errorBody ?? errorBodyText ?? errorMessage, true);
-      handleApiError(response.status, errorMessage);
+      handleApiError(response.status, errorMessage, typeof errorData?.status === "string" ? errorData.status : undefined);
       throw createApiHttpError(response.status, errorMessage, errorBody, errorBodyText);
     }
 

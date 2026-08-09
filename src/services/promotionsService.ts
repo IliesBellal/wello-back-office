@@ -178,13 +178,16 @@ function transformPromotionForAPI(promo: Omit<Promotion, 'id'> | Partial<Omit<Pr
   if (promo.end_date !== undefined) {
     payload.valid_to = promo.end_date ? toUTCDateString(promo.end_date) : null;
   }
-  if (promo.min_order_value !== undefined) payload.min_order_value = promo.min_order_value || null;
+  // `??` (not `||`) matters here: 0 is a legitimate "no minimum" value and
+  // must not be coerced to null, which the discounts table rejects
+  // (min_order_value is NOT NULL DEFAULT 0 — an explicit null bypasses the default).
+  if (promo.min_order_value !== undefined) payload.min_order_value = promo.min_order_value ?? null;
   if (promo.min_order_unit !== undefined) payload.min_order_unit = promo.min_order_unit || null;
-  
+
   // Optional max discount fields (if they exist in Promotion type)
   const promoRecord = promo as Record<string, unknown>;
   if (promoRecord.max_discount_value !== undefined) {
-    payload.max_discount_value = promoRecord.max_discount_value || null;
+    payload.max_discount_value = promoRecord.max_discount_value ?? null;
   }
   if (promoRecord.max_discount_unit !== undefined) {
     payload.max_discount_unit = promoRecord.max_discount_unit || null;

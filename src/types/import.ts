@@ -21,21 +21,21 @@ export interface ImportProviderOption {
 
 /**
  * Providers proposés à l'import. `wello-generic` y figure parce qu'un modèle
- * Wello rempli se ré-importe exactement comme un export tiers : c'est le même
+ * Modèle Wello Resto rempli se ré-importe exactement comme un export tiers : c'est le même
  * endpoint, seul le parser diffère.
  */
 export const IMPORT_PROVIDERS: ImportProviderOption[] = [
+  {
+    slug: 'wello-generic',
+    label: 'Modèle Wello Resto rempli',
+    description: 'Le modèle vierge téléchargé ici, une fois complété',
+    hasTemplate: true,
+  },
   {
     slug: 'zelty',
     label: 'Zelty',
     description: "Export de menu au format Excel produit par Zelty",
     hasTemplate: false,
-  },
-  {
-    slug: 'wello-generic',
-    label: 'Modèle Wello rempli',
-    description: 'Le modèle vierge téléchargé ici, une fois complété',
-    hasTemplate: true,
   },
 ];
 

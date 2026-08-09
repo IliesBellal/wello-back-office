@@ -48,7 +48,7 @@ export const ImportDoorPicker = ({
         <h3 className="font-semibold">Je pars d’un modèle vierge</h3>
         <p className="text-sm text-muted-foreground">
           Téléchargez notre fichier Excel, remplissez-le tranquillement, puis revenez
-          l’importer par la première porte en choisissant « Modèle Wello rempli ».
+          l’importer par la première porte en choisissant « Modèle Wello Resto rempli ».
         </p>
       </div>
       <Button variant="outline" className="w-full" onClick={onDownloadTemplate} disabled={isDownloadingTemplate}>

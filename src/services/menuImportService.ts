@@ -52,6 +52,44 @@ const readImportApiError = (error: unknown): ImportApiError | null => {
   };
 };
 
+// ─── Normalisation de la prévisualisation ───────────────────
+
+/**
+ * Recolle les collections absentes de la réponse.
+ *
+ * L'API est en Go : une slice ou une map nil se sérialise en `null`, pas en
+ * `[]` / `{}`. Un export dont toutes les catégories viennent de libellés
+ * renvoie donc `"categories": null`, un produit sans libellé
+ * `"tag_external_ids": null` — et tout le code en aval, qui traite la
+ * prévisualisation comme une structure complète, casse sur un `.map`.
+ * La frontière est le bon endroit pour rendre le contrat vrai : les types
+ * annoncent des tableaux, on en fournit.
+ */
+const asArray = <T>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
+
+const asRecord = <T>(value: Record<string, T> | null | undefined): Record<string, T> =>
+  value && typeof value === 'object' ? value : {};
+
+const normalizePreview = (preview: ImportPreviewResult): ImportPreviewResult => ({
+  ...preview,
+  tva_rates: asArray(preview.tva_rates),
+  categories: asArray(preview.categories),
+  tags: asArray(preview.tags),
+  attributes: asArray(preview.attributes),
+  warnings: asArray(preview.warnings),
+  products: asArray(preview.products).map((product) => ({
+    ...product,
+    tag_external_ids: asArray(product.tag_external_ids),
+    dropped_label_external_ids: asArray(product.dropped_label_external_ids),
+  })),
+  decisions: {
+    tag_classification: asRecord(preview.decisions?.tag_classification),
+    category_per_product: asRecord(preview.decisions?.category_per_product),
+    tva_mapping: asRecord(preview.decisions?.tva_mapping),
+    name_collisions: asRecord(preview.decisions?.name_collisions),
+  },
+});
+
 export const menuImportService = {
   /**
    * Prévisualise un fichier d'import. N'écrit rien : l'API rend un jeton et un
@@ -74,7 +112,7 @@ export const menuImportService = {
       formData,
     );
 
-    return response.data;
+    return normalizePreview(response.data);
   },
 
   /**
@@ -91,7 +129,7 @@ export const menuImportService = {
       { products },
     );
 
-    return response.data;
+    return normalizePreview(response.data);
   },
 
   /**

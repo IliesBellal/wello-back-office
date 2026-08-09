@@ -39,6 +39,7 @@ export interface AuthSessionData {
   merchant_id: string;
   mfa_status?: AuthMFAStatus;
   mfa_type?: string;
+  mfa_recipient?: string; // Masked email/phone the pending MFA code was sent to
   merchants: AuthSessionMerchant[];
 }
 

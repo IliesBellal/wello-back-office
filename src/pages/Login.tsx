@@ -434,6 +434,7 @@ const Login = () => {
         onSuccess={handleMFASuccess}
         onCancel={handleMFACancel}
         token={pendingAuthData?.session.token}
+        recipient={pendingAuthData?.session.mfa_recipient}
       />
     </div>
   );

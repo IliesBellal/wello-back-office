@@ -184,6 +184,22 @@ export interface Tag {
   product_count?: number;
 }
 
+/**
+ * Statuts de vente canoniques de la colonne `products.status`.
+ *
+ * `Product.status` reste typé `string | number` : l'API renvoie encore des
+ * valeurs héritées ('1', '0'). Ce type ne contraint que les écritures, pour
+ * lesquelles l'API n'accepte que ces quatre valeurs.
+ *
+ * `removed_from_menu` sort le produit du menu POS/SNO mais le laisse visible
+ * dans le back-office ; `not_available` le garde au menu, marqué indisponible.
+ */
+export type ProductStatus =
+  | 'available'
+  | 'not_available'
+  | 'out_of_stock'
+  | 'removed_from_menu';
+
 export interface Product {
   product_id: string;
   category_id?: string;
@@ -301,6 +317,19 @@ export interface ProductCreatePayload {
   available_take_away: boolean;
   available_delivery: boolean;
   is_product_group: boolean;
+
+  // Champs facultatifs : la fiche de création expose les mêmes onglets que
+  // l'édition, l'API les persiste dans la même transaction que le produit.
+  // Un échec sur l'un d'eux annule la création — pas de produit à moitié créé.
+  bg_color?: string;
+  production_color?: string;
+  status?: string;
+  is_available_on_sno?: boolean;
+  configuration?: string[];          // IDs de groupes d'attributs
+  components?: ProductComposition[]; // Composition
+  tags?: string[];                   // IDs de tags
+  allergens?: string[];              // IDs d'allergènes
+  integrations?: ProductIntegrations;
 }
 
 export interface Menu {

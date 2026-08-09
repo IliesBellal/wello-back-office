@@ -21,6 +21,7 @@ import MarketCategoriesTable from './pages/MarketCategoriesTable';
 import TagsTable from './pages/TagsTable';
 import PrintersTable from './pages/PrintersTable';
 import Components from './pages/Components';
+import ComponentCategoriesTable from './pages/ComponentCategoriesTable';
 import FinancialReports from './pages/FinancialReports';
 import Locations from './pages/Locations';
 import CashRegisterHistory from './pages/CashRegisterHistory';
@@ -79,6 +80,7 @@ const App = () => (
               <Route path="/menu/market-categories" element={<ProtectedRoute><MarketCategoriesTable /></ProtectedRoute>} />
               <Route path="/menu/tags" element={<ProtectedRoute><TagsTable /></ProtectedRoute>} />
               <Route path="/menu/components" element={<ProtectedRoute><Components /></ProtectedRoute>} />
+              <Route path="/menu/components/categories" element={<ProtectedRoute><ComponentCategoriesTable /></ProtectedRoute>} />
               <Route path="/menu/price-grid" element={<ProtectedRoute><PriceGrid /></ProtectedRoute>} />
               <Route path="/menu/attributes" element={<ProtectedRoute><AttributesPage /></ProtectedRoute>} />
               <Route path="/menu/promotions" element={<ProtectedRoute><PromotionsAvailabilities /></ProtectedRoute>} />

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { toUTCDateString } from '@/utils/apiDate';
+import { toLocalDateString } from '@/utils/apiDate';
 
 interface DatePickerProps {
   value?: string; // ISO date string (YYYY-MM-DD)
@@ -28,7 +28,11 @@ export function DatePicker({
 
   const handleDateSelect = (date: Date | undefined) => {
     if (date) {
-      const isoString = toUTCDateString(date);
+      // The Calendar hands back local midnight for the clicked cell, not a
+      // real UTC instant — toLocalDateString reads its local Y/M/D as-is,
+      // avoiding the day-before shift toUTCDateString would introduce for
+      // any positive-offset timezone (e.g. France in summer).
+      const isoString = toLocalDateString(date);
       onDateChange(isoString);
       setOpen(false);
     }
@@ -55,6 +59,7 @@ export function DatePicker({
           selected={selectedDate}
           onSelect={handleDateSelect}
           initialFocus
+          locale={fr}
         />
       </PopoverContent>
     </Popover>
