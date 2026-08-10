@@ -8,11 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { qk } from '@/lib/queryKeys';
-import { categoryOptions, indexBlockersByRef } from '@/lib/importDecisions';
+import { alreadyImportedProducts, categoryOptions, indexBlockersByRef } from '@/lib/importDecisions';
 import { menuService } from '@/services/menuService';
 import type { UseProductImport } from '@/hooks/useProductImport';
 import type { ImportPreviewResult } from '@/types/import';
 
+import { ImportAlreadyImported } from './review/ImportAlreadyImported';
 import { ImportMissingCategories } from './review/ImportMissingCategories';
 import { ImportNameCollisions } from './review/ImportNameCollisions';
 import { ImportTagClassification } from './review/ImportTagClassification';
@@ -87,6 +88,7 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
     () => preview.products.filter((product) => product.name_collision),
     [preview.products],
   );
+  const previouslyImported = useMemo(() => alreadyImportedProducts(preview), [preview]);
 
   if (!decisions || !precheck) return null;
 
@@ -100,7 +102,11 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
           value={precheck.materializableCount}
           hint={
             summary.products_already_imported > 0
-              ? `${summary.products_already_imported} déjà importés, ignorés`
+              ? `${summary.products_already_imported} déjà importés${
+                  summary.products_mapping_stale > 0
+                    ? `, dont ${summary.products_mapping_stale} supprimés depuis`
+                    : ''
+                }`
               : undefined
           }
         />
@@ -204,6 +210,23 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
           blockersByRef={blockersByRef}
           disabled={isCommitting}
           onChange={wizard.setCollisionResolution}
+        />
+      </Section>
+
+      <Separator />
+
+      <Section
+        title="Déjà importés"
+        description="Ces produits viennent d’un import précédent du même fichier."
+        count={previouslyImported.length}
+      >
+        <ImportAlreadyImported
+          products={previouslyImported}
+          resolutions={decisions.already_imported}
+          blockersByRef={blockersByRef}
+          disabled={isCommitting}
+          onChange={wizard.setReimportResolution}
+          onChangeAll={wizard.setAllReimportResolutions}
         />
       </Section>
 

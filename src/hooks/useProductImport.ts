@@ -29,6 +29,7 @@ import {
   type ImportPreviewResult,
   type ImportManualProductPayload,
   type ImportProviderSlug,
+  type ImportReimportResolution,
   type ImportTagClass,
 } from '@/types/import';
 
@@ -89,6 +90,7 @@ const emptyDecisions = (): ImportDecisions => ({
   category_per_product: {},
   tva_mapping: {},
   name_collisions: {},
+  already_imported: {},
 });
 
 export const useProductImport = () => {
@@ -257,6 +259,35 @@ export const useProductImport = () => {
     [patchDecisions],
   );
 
+  const setReimportResolution = useCallback(
+    (productExternalId: string, resolution: ImportReimportResolution) => {
+      patchDecisions((current) => ({
+        ...current,
+        already_imported: { ...current.already_imported, [productExternalId]: resolution },
+      }));
+    },
+    [patchDecisions],
+  );
+
+  /**
+   * Applique le même sort à tous les produits déjà importés.
+   *
+   * Le cas d'usage est un menu entier supprimé puis réimporté : personne ne va
+   * basculer cent quarante produits un par un.
+   */
+  const setAllReimportResolutions = useCallback(
+    (productExternalIds: string[], resolution: ImportReimportResolution) => {
+      patchDecisions((current) => {
+        const next = { ...current.already_imported };
+        for (const productId of productExternalIds) {
+          next[productId] = resolution;
+        }
+        return { ...current, already_imported: next };
+      });
+    },
+    [patchDecisions],
+  );
+
   const setCollisionResolution = useCallback(
     (productExternalId: string, resolution: ImportCollisionResolution) => {
       patchDecisions((current) => ({
@@ -404,6 +435,8 @@ export const useProductImport = () => {
     assignCategoryToAll,
     setTvaId,
     setCollisionResolution,
+    setReimportResolution,
+    setAllReimportResolutions,
     commit,
   };
 };

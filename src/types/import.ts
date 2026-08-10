@@ -46,6 +46,15 @@ export const TEMPLATE_PROVIDER: ImportProviderSlug = 'wello-generic';
 export type ImportEntityAction = 'create' | 'reuse_existing' | 'already_imported';
 export type ImportTagClass = 'category' | 'tag';
 export type ImportCollisionResolution = 'skip' | 'import_anyway';
+
+/**
+ * Sort d'un produit qu'un import précédent a déjà créé.
+ *
+ * La correspondance d'import survit à l'entité qu'elle désigne : supprimer un
+ * produit dans Wello ne la retire pas. Sans cet arbitrage, un menu supprimé
+ * puis réimporté donnait un commit sans effet.
+ */
+export type ImportReimportResolution = 'skip' | 'recreate';
 export type ImportCategorySource = 'explicit' | 'first_tag' | 'none';
 
 export interface ImportPreviewSummary {
@@ -54,6 +63,8 @@ export interface ImportPreviewSummary {
   products_removed_from_menu: number;
   products_needing_category: number;
   products_with_name_collision: number;
+  /** Déjà importés, mais le produit Wello correspondant n'existe plus. */
+  products_mapping_stale: number;
   categories_to_create: number;
   categories_reused: number;
   tags_to_create: number;
@@ -90,6 +101,7 @@ export interface ImportPreviewCategory {
   action: ImportEntityAction;
   existing_category_id?: string;
   product_count: number;
+  mapping_stale?: boolean;
 }
 
 export interface ImportPreviewTag {
@@ -101,6 +113,7 @@ export interface ImportPreviewTag {
   product_count: number;
   existing_tag_id?: string;
   existing_category_id?: string;
+  mapping_stale?: boolean;
 }
 
 export interface ImportPreviewChannel {
@@ -137,6 +150,9 @@ export interface ImportPreviewProduct {
   dropped_label_external_ids?: string[];
   channels: ImportPreviewChannels;
   name_collision?: ImportPreviewNameCollision;
+  /** Déjà importé, mais le produit Wello a disparu depuis. */
+  mapping_stale?: boolean;
+  reimport?: ImportReimportResolution;
 }
 
 export interface ImportPreviewAttribute {
@@ -146,6 +162,7 @@ export interface ImportPreviewAttribute {
   option_count: number;
   min_options: number;
   max_options: number;
+  mapping_stale?: boolean;
 }
 
 export interface ImportPreviewWarning {
@@ -164,6 +181,12 @@ export interface ImportDecisions {
   category_per_product: Record<string, string>;
   tva_mapping: Record<string, number>;
   name_collisions: Record<string, ImportCollisionResolution>;
+  /**
+   * Produits déjà importés : les ignorer (défaut) ou les recréer. Ne concerne
+   * que les produits — catégories, tags et groupes d'options dont la
+   * correspondance est périmée sont recréés d'office.
+   */
+  already_imported: Record<string, ImportReimportResolution>;
 }
 
 export interface ImportPreviewResult {

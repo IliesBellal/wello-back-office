@@ -17,6 +17,7 @@ import {
   type ImportPreviewProduct,
   type ImportPreviewResult,
   type ImportPreviewTvaRate,
+  type ImportReimportResolution,
 } from '@/types/import';
 
 export interface ImportCategoryOption {
@@ -69,14 +70,17 @@ export const categoryOptions = (
 };
 
 /**
- * Un produit déjà importé n'est pas recréé, et un homonyme tranché en
- * « ignorer » non plus : ni l'un ni l'autre n'a besoin d'être complété.
+ * Un produit déjà importé n'est pas recréé — sauf demande explicite — et un
+ * homonyme tranché en « ignorer » non plus : ni l'un ni l'autre n'a besoin
+ * d'être complété.
  */
 export const isMaterializable = (
   product: ImportPreviewProduct,
   decisions: ImportDecisions,
 ): boolean => {
-  if (product.action === 'already_imported') return false;
+  if (product.action === 'already_imported') {
+    return decisions.already_imported[product.external_id] === 'recreate';
+  }
 
   if (product.name_collision) {
     const resolution =
@@ -150,6 +154,14 @@ export const unresolvedCollisions = (
       !decisions.name_collisions[product.external_id],
   );
 
+/** Produits déjà importés, les périmés d'abord — ce sont ceux qu'on répare. */
+export const alreadyImportedProducts = (
+  preview: ImportPreviewResult,
+): ImportPreviewProduct[] =>
+  preview.products
+    .filter((product) => product.action === 'already_imported')
+    .sort((a, b) => Number(Boolean(b.mapping_stale)) - Number(Boolean(a.mapping_stale)));
+
 export interface ImportPrecheck {
   canCommit: boolean;
   needsCategory: ImportPreviewProduct[];
@@ -214,10 +226,16 @@ export const buildImportDecisions = (
   }
 
   const nameCollisions: Record<string, 'skip' | 'import_anyway'> = {};
+  const alreadyImported: Record<string, ImportReimportResolution> = {};
   for (const product of preview.products) {
-    if (!product.name_collision) continue;
-    nameCollisions[product.external_id] =
-      decisions.name_collisions[product.external_id] ?? product.name_collision.resolution;
+    if (product.name_collision) {
+      nameCollisions[product.external_id] =
+        decisions.name_collisions[product.external_id] ?? product.name_collision.resolution;
+    }
+    if (product.action === 'already_imported') {
+      alreadyImported[product.external_id] =
+        decisions.already_imported[product.external_id] ?? 'skip';
+    }
   }
 
   return {
@@ -225,6 +243,7 @@ export const buildImportDecisions = (
     category_per_product: categoryPerProduct,
     tva_mapping: { ...decisions.tva_mapping },
     name_collisions: nameCollisions,
+    already_imported: alreadyImported,
   };
 };
 
