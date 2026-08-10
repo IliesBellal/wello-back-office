@@ -36,10 +36,16 @@ interface ImportTvaResolutionProps {
 /**
  * Correspondance entre les taux du fichier et ceux configurés chez le marchand.
  *
- * La prévisualisation résout ce qu'elle peut ; il ne reste ici que les taux
- * absents du référentiel, pour lesquels il faut désigner une ligne de TVA — et
- * c'est bien par canal, un même taux ne portant pas le même identifiant sur
- * place et en livraison.
+ * La prévisualisation résout ce qu'elle peut. Quand un taux du fichier n'existe
+ * pas dans la caisse — 5,5 % sur place, alors qu'elle n'a que 10 % et 20 % —
+ * c'est ici qu'on désigne celui à appliquer à la place. Le remplacement change
+ * la TVA réellement facturée : le taux choisi est donc affiché en clair, et le
+ * taux d'origine rappelé à côté.
+ *
+ * Le choix reste ouvert même pour les taux déjà résolus : une caisse peut avoir
+ * plusieurs lignes au même taux (« produits conditionnés » et « consommation
+ * immédiate » à 10 %), et la ligne retenue par défaut n'est pas forcément celle
+ * qu'on veut. La seule contrainte est le canal.
  */
 export const ImportTvaResolution = ({
   preview,
@@ -77,7 +83,7 @@ export const ImportTvaResolution = ({
               <TableHead className="w-32">Taux</TableHead>
               <TableHead className="w-40">Canal</TableHead>
               <TableHead className="w-28 text-right">Produits</TableHead>
-              <TableHead className="min-w-[260px]">TVA correspondante</TableHead>
+              <TableHead className="min-w-[280px]">TVA à appliquer</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -89,6 +95,7 @@ export const ImportTvaResolution = ({
               const resolvedId = tvaMapping[key];
               const errors = blockersByRef.get(key);
               const options = ratesForChannel(entry.channel);
+              const chosen = options.find((rate) => Number(rate.id) === resolvedId);
 
               return (
                 <TableRow key={key} className={errors || !isResolved ? 'bg-destructive/5' : ''}>
@@ -113,41 +120,42 @@ export const ImportTvaResolution = ({
                   </TableCell>
 
                   <TableCell>
-                    {isResolved ? (
-                      <span className="text-sm text-muted-foreground">
-                        {options.find((rate) => Number(rate.id) === resolvedId)?.label ??
-                          `TVA n° ${resolvedId}`}
-                      </span>
-                    ) : (
-                      <Select
-                        value=""
-                        disabled={disabled || loadingRates}
-                        onValueChange={(value) => onChange(entry.rate, entry.channel, Number(value))}
-                      >
-                        <SelectTrigger className={`h-9 ${IMPORT_FIELD_CLASS}`}>
-                          <SelectValue
-                            placeholder={loadingRates ? 'Chargement…' : 'Choisir une TVA'}
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {options.map((rate) => (
-                            <SelectItem key={rate.id} value={String(rate.id)}>
-                              {rate.label} — {rate.value} %
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <Select
+                      value={isResolved ? String(resolvedId) : ''}
+                      disabled={disabled || loadingRates}
+                      onValueChange={(value) => onChange(entry.rate, entry.channel, Number(value))}
+                    >
+                      <SelectTrigger className={`h-9 ${IMPORT_FIELD_CLASS}`}>
+                        <SelectValue
+                          placeholder={loadingRates ? 'Chargement…' : 'Choisir le taux à appliquer'}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {options.map((rate) => (
+                          <SelectItem key={rate.id} value={String(rate.id)}>
+                            {rate.label} — {rate.value} %
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {chosen && chosen.value !== entry.rate && (
+                      <p className="mt-0.5 text-xs text-amber-700">
+                        Remplace le {entry.rate} % du fichier par du {chosen.value} %.
+                      </p>
+                    )}
+                    {!isResolved && !errors && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {options.length === 0
+                          ? 'Aucune TVA configurée pour ce canal — créez-la dans les réglages de caisse.'
+                          : 'Ce taux n’existe pas dans votre caisse : choisissez celui à appliquer.'}
+                      </p>
                     )}
                     {errors?.map((message, index) => (
                       <p key={index} className="mt-0.5 text-xs text-destructive">
                         {message}
                       </p>
                     ))}
-                    {!isResolved && !errors && options.length === 0 && !loadingRates && (
-                      <p className="mt-0.5 text-xs text-destructive">
-                        Aucune TVA configurée pour ce canal — créez-la dans les réglages de caisse.
-                      </p>
-                    )}
                   </TableCell>
                 </TableRow>
               );
