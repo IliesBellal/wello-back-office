@@ -21,6 +21,7 @@ import { AttributesMatrixDialog } from '@/components/menu/AttributesMatrixDialog
 import { TagsMatrixDialog } from '@/components/menu/TagsMatrixDialog';
 import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
 import { ProductImportDialog } from '@/components/menu/import/ProductImportDialog';
+import type { ImportDoor } from '@/hooks/useProductImport';
 import { CreateProductCategoryDialog } from '@/components/menu/CreateProductCategoryDialog';
 import { Product } from '@/types/menu';
 import { menuService } from '@/services/menuService';
@@ -88,6 +89,9 @@ export default function Menu() {
   const [attributesModalOpen, setAttributesModalOpen] = useState(false);
   const [tagsModalOpen, setTagsModalOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // Porte ouverte directement quand l'import est lancé depuis un raccourci
+  // (« Créer plusieurs produits ») plutôt que depuis l'écran de choix.
+  const [importInitialDoor, setImportInitialDoor] = useState<ImportDoor | undefined>(undefined);
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
   const { isOpen: productCreateOpen, setIsOpen: setProductCreateOpen } = useProductCreateSheet();
   const { isOpen: organizeModalOpen, setIsOpen: setOrganizeModalOpen } = useOrganizeModal();
@@ -294,11 +298,21 @@ export default function Menu() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-popover">
-                      <DropdownMenuItem onClick={() => toast.info('Création multiple - à implémenter')}>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setImportInitialDoor('manual');
+                          setImportOpen(true);
+                        }}
+                      >
                         <CopyPlus className="w-4 h-4 mr-2" />
                         Créer plusieurs produits
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => setImportOpen(true)}>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setImportInitialDoor(undefined);
+                          setImportOpen(true);
+                        }}
+                      >
                         <Upload className="w-4 h-4 mr-2" />
                         Importer des produits
                       </DropdownMenuItem>
@@ -542,6 +556,7 @@ export default function Menu() {
           existingCategories={(menuData?.products_types || []).map(
             (category) => category.category_name || category.category
           )}
+          initialDoor={importInitialDoor}
         />
 
         <CreateProductCategoryDialog

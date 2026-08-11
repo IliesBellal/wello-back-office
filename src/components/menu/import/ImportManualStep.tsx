@@ -38,23 +38,25 @@ interface ImportManualStepProps {
 export const ImportManualStep = ({ wizard, existingCategories = [] }: ImportManualStepProps) => {
   const { state, manualValidation, isSubmittingManual } = wizard;
   const categoryListId = useId();
-  const rateListId = useId();
 
-  // Les taux configurés chez le marchand : les proposer évite de saisir un
-  // taux qui n'existe pas, et donc un aller-retour « TVA non reconnue » dans
-  // l'écran suivant.
-  const { data: tvaGroups = [] } = useQuery({
+  // Les taux configurés chez le marchand, par canal : la grille ne doit
+  // proposer que ce qui existe réellement, comme le fait la fiche de
+  // création de produit — un taux tapé à la main qui n'existe pas chez le
+  // marchand ne serait pas toujours rattrapé par l'écran de vérification.
+  const { data: tvaGroups = [], isLoading: loadingRates } = useQuery({
     queryKey: qk.menuTvaRates.all,
     queryFn: () => menuService.getTvaRates(),
     staleTime: 5 * 60 * 1000,
   });
 
-  const rateSuggestions = useMemo(() => {
-    const values = new Set<number>();
-    for (const group of tvaGroups) {
-      for (const rate of group.rates) values.add(rate.value);
-    }
-    return [...values].sort((a, b) => a - b);
+  const ratesByChannel = useMemo(() => {
+    const forChannel = (channel: string) =>
+      tvaGroups.find((group) => group.delivery_type === channel)?.rates ?? [];
+    return {
+      in: forChannel('IN'),
+      takeAway: forChannel('TAKE_AWAY'),
+      delivery: forChannel('DELIVERY'),
+    };
   }, [tvaGroups]);
 
   const categorySuggestions = useMemo(
@@ -71,17 +73,13 @@ export const ImportManualStep = ({ wizard, existingCategories = [] }: ImportManu
           <option key={category} value={category} />
         ))}
       </datalist>
-      <datalist id={rateListId}>
-        {rateSuggestions.map((rate) => (
-          <option key={rate} value={String(rate).replace('.', ',')} />
-        ))}
-      </datalist>
 
       <p className="text-sm text-muted-foreground">
         Un produit par ligne, chacun sur deux niveaux : le nom au-dessus de sa description, et le
-        prix au-dessus de sa TVA pour chaque canal de vente. Les prix sont en euros (9,50), les TVA
-        en pourcentage (10). Appuyez sur <kbd className="rounded border px-1 text-xs">Entrée</kbd>
-        depuis le dernier produit pour en ajouter un.
+        prix au-dessus de sa TVA pour chaque canal de vente. Les prix sont en euros (9,50) ; la TVA
+        se choisit parmi les taux configurés dans votre caisse. Appuyez sur{' '}
+        <kbd className="rounded border px-1 text-xs">Entrée</kbd> depuis le dernier produit pour en
+        ajouter un.
       </p>
 
       {state.error && (
@@ -91,7 +89,7 @@ export const ImportManualStep = ({ wizard, existingCategories = [] }: ImportManu
         </Alert>
       )}
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="overflow-x-auto rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -102,15 +100,15 @@ export const ImportManualStep = ({ wizard, existingCategories = [] }: ImportManu
               <TableHead className="min-w-[170px]">Catégorie *</TableHead>
               <TableHead className="min-w-[130px]">
                 Sur place
-                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA</span>
+                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA *</span>
               </TableHead>
               <TableHead className="min-w-[130px]">
                 À emporter
-                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA</span>
+                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA *</span>
               </TableHead>
               <TableHead className="min-w-[130px]">
                 En livraison
-                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA</span>
+                <span className="block text-xs font-normal text-muted-foreground">prix puis TVA *</span>
               </TableHead>
               <TableHead className="w-20" />
             </TableRow>
@@ -125,7 +123,10 @@ export const ImportManualStep = ({ wizard, existingCategories = [] }: ImportManu
                 errors={manualValidation.errors.get(row.id)}
                 disabled={isSubmittingManual}
                 categoryListId={categoryListId}
-                rateListId={rateListId}
+                ratesIn={ratesByChannel.in}
+                ratesTakeAway={ratesByChannel.takeAway}
+                ratesDelivery={ratesByChannel.delivery}
+                loadingRates={loadingRates}
                 onChange={wizard.setManualCell}
                 onDuplicate={wizard.duplicateManualRow}
                 onRemove={wizard.removeManualRow}

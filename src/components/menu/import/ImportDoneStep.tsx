@@ -46,7 +46,7 @@ export const ImportDoneStep = ({ result, onClose, onImportAnother }: ImportDoneS
       </div>
     </div>
 
-    <div className="overflow-hidden rounded-lg border">
+    <div className="overflow-hidden rounded-lg border bg-card">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">

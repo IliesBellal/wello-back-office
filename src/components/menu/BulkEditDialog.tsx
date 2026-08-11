@@ -15,7 +15,17 @@ import { CategorySelector, ConfirmDialog } from '@/components/shared';
 import { ProductOptionsTab } from '@/components/menu/ProductOptionsTab';
 import { Attribute, Category, Product, ProductAttribute, ProductStatus } from '@/types/menu';
 import { menuService } from '@/services/menuService';
-import { Loader2, Trash2, CheckCircle2, XCircle, EyeOff, ListChecks, FolderInput, Megaphone } from 'lucide-react';
+import {
+  ArrowLeft,
+  Loader2,
+  Trash2,
+  CheckCircle2,
+  XCircle,
+  EyeOff,
+  ListChecks,
+  FolderInput,
+  Megaphone,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 type BulkAction =
@@ -102,6 +112,13 @@ const STATUS_BY_ACTION: Partial<Record<BulkAction, ProductStatus>> = {
   remove_from_menu: 'removed_from_menu',
 };
 
+/** Actions qui réclament un paramètre : elles gagnent un second écran plutôt qu'un tiroir sous la ligne. */
+const DETAIL_ACTIONS: BulkAction[] = ['set_attributes', 'assign_category', 'assign_marketing_category'];
+const needsDetailStep = (action: BulkAction | null): boolean =>
+  action !== null && DETAIL_ACTIONS.includes(action);
+
+type BulkEditStep = 'choose' | 'detail';
+
 export const BulkEditDialog = ({
   open,
   onOpenChange,
@@ -116,6 +133,7 @@ export const BulkEditDialog = ({
   onAssignMarketingCategory,
   onApplied,
 }: BulkEditDialogProps) => {
+  const [step, setStep] = useState<BulkEditStep>('choose');
   const [action, setAction] = useState<BulkAction | null>(null);
   const [selectedAttributes, setSelectedAttributes] = useState<ProductAttribute[]>([]);
   const [categoryId, setCategoryId] = useState('');
@@ -134,6 +152,7 @@ export const BulkEditDialog = ({
   // session précédente serait appliquée par erreur à d'autres produits.
   useEffect(() => {
     if (!open) return;
+    setStep('choose');
     setAction(null);
     setSelectedAttributes([]);
     setCategoryId('');
@@ -169,9 +188,11 @@ export const BulkEditDialog = ({
     return { category_id: created.id };
   };
 
-  // Une action n'est applicable que si son paramètre est renseigné.
-  const canApply = (() => {
+  // Sur l'écran de choix, il suffit d'avoir sélectionné une action — le
+  // paramètre, lui, n'est réclamé qu'au moment d'appliquer.
+  const canProceed = (() => {
     if (!action || productIds.length === 0) return false;
+    if (step === 'choose') return true;
     if (action === 'assign_category') return !!categoryId;
     if (action === 'assign_marketing_category') return !!marketingCategoryId;
     return true;
@@ -216,7 +237,11 @@ export const BulkEditDialog = ({
     }
   };
 
-  const handleApply = () => {
+  const handlePrimary = () => {
+    if (step === 'choose' && needsDetailStep(action)) {
+      setStep('detail');
+      return;
+    }
     if (action === 'delete') {
       setConfirmDeleteOpen(true);
       return;
@@ -224,7 +249,15 @@ export const BulkEditDialog = ({
     void runAction();
   };
 
+  const handleBack = () => setStep('choose');
+
   const count = selectedProducts.length;
+  const selectedActionMeta = ACTIONS.find((entry) => entry.value === action);
+  const primaryLabel = applying
+    ? 'Application…'
+    : step === 'choose' && needsDetailStep(action)
+      ? 'Continuer'
+      : 'Appliquer';
 
   return (
     <>
@@ -239,19 +272,21 @@ export const BulkEditDialog = ({
           </DialogHeader>
 
           <ScrollArea className="flex-1 -mx-6 px-6">
-            <RadioGroup
-              value={action ?? ''}
-              onValueChange={(value) => setAction(value as BulkAction)}
-              className="gap-1 py-1"
-            >
-              {ACTIONS.map(({ value, label, hint, icon: Icon, dangerous }) => {
-                const isSelected = action === value;
-                return (
-                  <div key={value}>
+            {step === 'choose' ? (
+              <RadioGroup
+                key="choose"
+                value={action ?? ''}
+                onValueChange={(value) => setAction(value as BulkAction)}
+                className="gap-1 py-1 duration-200 animate-in fade-in slide-in-from-left-2"
+              >
+                {ACTIONS.map(({ value, label, hint, icon: Icon, dangerous }) => {
+                  const isSelected = action === value;
+                  return (
                     <label
+                      key={value}
                       htmlFor={`bulk-action-${value}`}
                       className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
-                        isSelected ? 'border-primary bg-primary/5' : 'border-border hover:bg-muted/50'
+                        isSelected ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/50'
                       }`}
                     >
                       <RadioGroupItem
@@ -274,72 +309,83 @@ export const BulkEditDialog = ({
                         <p className="text-xs text-muted-foreground mt-1">{hint}</p>
                       </div>
                     </label>
-
-                    {/* Paramètre de l'action, déplié juste sous celle-ci */}
-                    {isSelected && value === 'set_attributes' && (
-                      <div className="mt-2 ml-8 mr-1 rounded-lg border border-border p-3">
-                        <ProductOptionsTab
-                          productAttributes={selectedAttributes}
-                          availableAttributes={attributes}
-                          onChange={setSelectedAttributes}
-                          disabled={applying}
-                        />
-                        {selectedAttributes.length === 0 && (
-                          <p className="text-xs text-muted-foreground mt-3">
-                            Aucun groupe sélectionné : appliquer retirera toutes les options des
-                            produits.
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {isSelected && value === 'assign_category' && (
-                      <div className="mt-2 ml-8 mr-1">
-                        <CategorySelector
-                          categories={categories}
-                          value={categoryId}
-                          onValueChange={setCategoryId}
-                          onCreateCategory={onCreateCategory}
-                          placeholder="Sélectionner une catégorie caisse…"
-                        />
-                      </div>
-                    )}
-
-                    {isSelected && value === 'assign_marketing_category' && (
-                      <div className="mt-2 ml-8 mr-1">
-                        {loadingMarketing ? (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Chargement des catégories marketing…
-                          </div>
-                        ) : (
-                          <CategorySelector
-                            categories={marketingCategories ?? []}
-                            value={marketingCategoryId}
-                            onValueChange={setMarketingCategoryId}
-                            onCreateCategory={handleCreateMarketingCategory}
-                            placeholder="Sélectionner une catégorie marketing…"
-                          />
-                        )}
-                      </div>
-                    )}
+                  );
+                })}
+              </RadioGroup>
+            ) : (
+              selectedActionMeta && (
+                <div key="detail" className="space-y-3 py-1 duration-200 animate-in fade-in slide-in-from-right-2">
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-3">
+                    <selectedActionMeta.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="text-sm font-medium">{selectedActionMeta.label}</span>
                   </div>
-                );
-              })}
-            </RadioGroup>
+
+                  {action === 'set_attributes' && (
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <ProductOptionsTab
+                        productAttributes={selectedAttributes}
+                        availableAttributes={attributes}
+                        onChange={setSelectedAttributes}
+                        disabled={applying}
+                      />
+                      {selectedAttributes.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-3">
+                          Aucun groupe sélectionné : appliquer retirera toutes les options des
+                          produits.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {action === 'assign_category' && (
+                    <CategorySelector
+                      categories={categories}
+                      value={categoryId}
+                      onValueChange={setCategoryId}
+                      onCreateCategory={onCreateCategory}
+                      placeholder="Sélectionner une catégorie caisse…"
+                    />
+                  )}
+
+                  {action === 'assign_marketing_category' && (
+                    loadingMarketing ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Chargement des catégories marketing…
+                      </div>
+                    ) : (
+                      <CategorySelector
+                        categories={marketingCategories ?? []}
+                        value={marketingCategoryId}
+                        onValueChange={setMarketingCategoryId}
+                        onCreateCategory={handleCreateMarketingCategory}
+                        placeholder="Sélectionner une catégorie marketing…"
+                      />
+                    )
+                  )}
+                </div>
+              )
+            )}
           </ScrollArea>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>
-              Annuler
-            </Button>
+            {step === 'detail' ? (
+              <Button variant="ghost" onClick={handleBack} disabled={applying}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Retour
+              </Button>
+            ) : (
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={applying}>
+                Annuler
+              </Button>
+            )}
             <Button
-              onClick={handleApply}
-              disabled={!canApply || applying}
+              onClick={handlePrimary}
+              disabled={!canProceed || applying}
               className={action === 'delete' ? 'bg-destructive hover:bg-destructive/90' : 'bg-gradient-primary'}
             >
               {applying && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              {applying ? 'Application…' : 'Appliquer'}
+              {primaryLabel}
             </Button>
           </DialogFooter>
         </DialogContent>

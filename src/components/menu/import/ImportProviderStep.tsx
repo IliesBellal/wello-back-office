@@ -108,7 +108,7 @@ export const ImportProviderStep = ({
     >
       {isDragging && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-lg bg-primary/5 backdrop-blur-[1px]">
-          <div className="flex flex-col items-center gap-2 rounded-lg bg-white px-6 py-4 shadow-lg">
+          <div className="flex flex-col items-center gap-2 rounded-lg bg-card px-6 py-4 shadow-lg">
             <Upload className="h-6 w-6 text-primary" />
             <p className="text-sm font-medium">Déposez votre fichier ici</p>
           </div>
@@ -153,7 +153,7 @@ export const ImportProviderStep = ({
         />
 
         {file ? (
-          <div className="flex items-center gap-3 rounded-md border border-border bg-white p-4">
+          <div className="flex items-center gap-3 rounded-md border border-border bg-card p-4">
             <FileSpreadsheet className="h-5 w-5 shrink-0 text-primary" />
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium">{file.name}</p>
@@ -175,7 +175,7 @@ export const ImportProviderStep = ({
             onClick={() => inputRef.current?.click()}
             disabled={isUploading}
             className={cn(
-              'flex w-full flex-col items-center gap-2 rounded-md border border-dashed border-border bg-white p-8 text-center transition-colors hover:border-primary hover:bg-muted/40 disabled:opacity-50',
+              'flex w-full flex-col items-center gap-2 rounded-md border border-dashed border-border bg-card p-8 text-center transition-colors hover:border-primary hover:bg-muted/40 disabled:opacity-50',
               isDragging && 'border-primary',
             )}
           >

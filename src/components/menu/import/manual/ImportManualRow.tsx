@@ -2,11 +2,17 @@ import { Copy, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
 import type { ManualRow, ManualRowField } from '@/lib/manualImport';
-
-import { IMPORT_FIELD_CLASS } from '../fieldStyles';
+import type { TvaRate } from '@/types/menu';
 
 interface ImportManualRowProps {
   row: ManualRow;
@@ -15,7 +21,11 @@ interface ImportManualRowProps {
   errors: Partial<Record<ManualRowField, string>> | undefined;
   disabled: boolean;
   categoryListId: string;
-  rateListId: string;
+  /** Taux configurés chez le marchand, par canal — restreint le choix à ce qui existe réellement. */
+  ratesIn: TvaRate[];
+  ratesTakeAway: TvaRate[];
+  ratesDelivery: TvaRate[];
+  loadingRates: boolean;
   onChange: (rowId: string, field: ManualRowField, value: string) => void;
   onDuplicate: (rowId: string) => void;
   onRemove: (rowId: string) => void;
@@ -43,7 +53,10 @@ export const ImportManualRow = ({
   errors,
   disabled,
   categoryListId,
-  rateListId,
+  ratesIn,
+  ratesTakeAway,
+  ratesDelivery,
+  loadingRates,
   onChange,
   onDuplicate,
   onRemove,
@@ -84,7 +97,6 @@ export const ImportManualRow = ({
             }}
             className={cn(
               'h-9',
-              IMPORT_FIELD_CLASS,
               options.align === 'right' && 'pr-7 text-right font-mono',
               error && 'border-destructive focus-visible:ring-destructive',
             )}
@@ -95,6 +107,43 @@ export const ImportManualRow = ({
             </span>
           )}
         </div>
+        {error && <p className="mt-0.5 px-1 text-xs text-destructive">{error}</p>}
+      </div>
+    );
+  };
+
+  /**
+   * Sélecteur de taux, verrouillé sur ce que la caisse a réellement configuré
+   * pour ce canal — le pendant de `field()`, mais pour la TVA. Un champ texte
+   * laissait taper un taux qui n'existe pas, ce que l'écran de vérification ne
+   * rattrape pas toujours proprement ; ne proposer que les taux du canal
+   * l'empêche à la source, comme le fait déjà la fiche de création de produit.
+   */
+  const tvaField = (name: ManualRowField, label: string, rates: TvaRate[]) => {
+    const error = errors?.[name];
+
+    return (
+      <div>
+        <Select
+          value={row[name]}
+          disabled={disabled || loadingRates}
+          onValueChange={(value) => onChange(row.id, name, value)}
+        >
+          <SelectTrigger
+            aria-label={`${label} — produit ${index + 1}`}
+            aria-invalid={Boolean(error)}
+            className={cn('h-9 text-xs', error && 'border-destructive focus-visible:ring-destructive')}
+          >
+            <SelectValue placeholder={loadingRates ? 'Chargement…' : 'TVA'} />
+          </SelectTrigger>
+          <SelectContent>
+            {rates.map((rate) => (
+              <SelectItem key={rate.id} value={String(rate.value)}>
+                {rate.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {error && <p className="mt-0.5 px-1 text-xs text-destructive">{error}</p>}
       </div>
     );
@@ -118,12 +167,7 @@ export const ImportManualRow = ({
 
       <TableCell className="space-y-1.5 p-2">
         {field('priceIn', 'Prix sur place', { placeholder: '9,50', align: 'right', prefix: '€' })}
-        {field('tvaIn', 'TVA sur place', {
-          placeholder: '10',
-          align: 'right',
-          prefix: '%',
-          listId: rateListId,
-        })}
+        {tvaField('tvaIn', 'TVA sur place', ratesIn)}
       </TableCell>
 
       <TableCell className="space-y-1.5 p-2">
@@ -132,12 +176,7 @@ export const ImportManualRow = ({
           align: 'right',
           prefix: '€',
         })}
-        {field('tvaTakeAway', 'TVA à emporter', {
-          placeholder: '10',
-          align: 'right',
-          prefix: '%',
-          listId: rateListId,
-        })}
+        {tvaField('tvaTakeAway', 'TVA à emporter', ratesTakeAway)}
       </TableCell>
 
       <TableCell className="space-y-1.5 p-2">
@@ -146,12 +185,7 @@ export const ImportManualRow = ({
           align: 'right',
           prefix: '€',
         })}
-        {field('tvaDelivery', 'TVA en livraison', {
-          placeholder: '10',
-          align: 'right',
-          prefix: '%',
-          listId: rateListId,
-        })}
+        {tvaField('tvaDelivery', 'TVA en livraison', ratesDelivery)}
       </TableCell>
 
       <TableCell className="p-2">

@@ -18,8 +18,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { ImportCategoryOption } from '@/lib/importDecisions';
-
-import { IMPORT_FIELD_CLASS } from '../fieldStyles';
 import type { ImportPreviewProduct } from '@/types/import';
 
 interface ImportMissingCategoriesProps {
@@ -77,7 +75,7 @@ export const ImportMissingCategories = ({
             Affecter la même catégorie aux {products.length} produit(s) sans catégorie
           </p>
           <Select value={bulkCategory} onValueChange={setBulkCategory} disabled={disabled}>
-            <SelectTrigger className={`h-9 ${IMPORT_FIELD_CLASS}`}>
+            <SelectTrigger className="h-9">
               <SelectValue placeholder="Choisir une catégorie" />
             </SelectTrigger>
             <SelectContent>
@@ -104,7 +102,7 @@ export const ImportMissingCategories = ({
         </Button>
       </div>
 
-      <div className="overflow-auto rounded-lg border">
+      <div className="overflow-auto rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -138,7 +136,7 @@ export const ImportMissingCategories = ({
                       disabled={disabled}
                       onValueChange={(value) => onAssign(product.external_id, value)}
                     >
-                      <SelectTrigger className={`h-9 ${IMPORT_FIELD_CLASS}`}>
+                      <SelectTrigger className="h-9">
                         <SelectValue placeholder="Choisir une catégorie" />
                       </SelectTrigger>
                       <SelectContent>

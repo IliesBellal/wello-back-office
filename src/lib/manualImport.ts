@@ -2,11 +2,20 @@
  * Saisie de masse : de la grille à l'écran vers le payload canonique.
  *
  * Miroir de `BuildManualImport` côté API (internal/modules/menu/importer/
- * manual.go) pour ce qu'il refuse — nom vide, nom dupliqué, taux négatif —
- * afin que l'utilisateur le voie sur la ligne fautive plutôt qu'en retour
- * d'appel. Le reste des validations (existence de la catégorie, résolution des
- * taux, collisions) appartient à la prévisualisation, exactement comme pour un
- * fichier.
+ * manual.go) pour ce qu'il refuse — nom vide, nom dupliqué — afin que
+ * l'utilisateur le voie sur la ligne fautive plutôt qu'en retour d'appel.
+ *
+ * La TVA est en plus rendue obligatoire ici, alors que l'API l'accepte vide :
+ * un taux absent (par opposition à un taux nul, qui désactive le canal) laisse
+ * le canal `Available` mais non résolu côté preview, sans jamais apparaître
+ * dans `tva_rates` — l'écran de vérification ne peut donc pas le rattraper, et
+ * le commit finit par le refuser sans qu'aucun champ ne pointe le problème. La
+ * grille ne doit produire que des lignes qui peuvent aboutir ; la fiche de
+ * création de produit impose la même règle.
+ *
+ * Le reste des validations (existence de la catégorie, résolution des taux
+ * saisis, collisions) appartient à la prévisualisation, exactement comme pour
+ * un fichier.
  *
  * Fonctions pures : elles ne lisent que les lignes saisies.
  */
@@ -137,29 +146,27 @@ export const validateManualRows = (rows: ManualRow[]): ManualValidation => {
       setError(row.id, 'category', 'Catégorie requise');
     }
 
-    const numericFields: [ManualRowField, string][] = [
+    const priceFields: [ManualRowField, string][] = [
       ['priceIn', row.priceIn],
       ['priceTakeAway', row.priceTakeAway],
       ['priceDelivery', row.priceDelivery],
-      ['tvaIn', row.tvaIn],
-      ['tvaTakeAway', row.tvaTakeAway],
-      ['tvaDelivery', row.tvaDelivery],
     ];
-    for (const [field, value] of numericFields) {
+    for (const [field, value] of priceFields) {
       if (!isNumericInput(value)) {
         setError(row.id, field, 'Nombre attendu');
       }
     }
 
-    const rates: [ManualRowField, string][] = [
+    // Choisi dans la liste des taux du marchand, jamais tapé : une valeur
+    // absente ne peut venir que d'un canal non renseigné.
+    const tvaFields: [ManualRowField, string][] = [
       ['tvaIn', row.tvaIn],
       ['tvaTakeAway', row.tvaTakeAway],
       ['tvaDelivery', row.tvaDelivery],
     ];
-    for (const [field, value] of rates) {
-      const rate = parseDecimalInput(value);
-      if (rate !== undefined && rate < 0) {
-        setError(row.id, field, 'Taux négatif');
+    for (const [field, value] of tvaFields) {
+      if (!value.trim()) {
+        setError(row.id, field, 'TVA requise');
       }
     }
   });

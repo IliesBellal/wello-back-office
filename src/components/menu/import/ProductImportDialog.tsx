@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useProductImport } from '@/hooks/useProductImport';
+import { useProductImport, type ImportDoor } from '@/hooks/useProductImport';
 
 import { ImportDoneStep } from './ImportDoneStep';
 import { ImportDoorPicker } from './ImportDoorPicker';
@@ -32,6 +32,12 @@ interface ProductImportDialogProps {
    * Évite de créer une catégorie jumelle sur une faute de frappe.
    */
   existingCategories?: string[];
+  /**
+   * Porte ouverte directement à l'ouverture, sans passer par l'écran de choix.
+   * Sert au raccourci « Créer plusieurs produits » du menu, qui mène tout de
+   * suite à la saisie manuelle plutôt qu'à reproposer les trois options.
+   */
+  initialDoor?: ImportDoor;
 }
 
 const STEP_TITLES: Record<string, { title: string; description: string }> = {
@@ -58,6 +64,19 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
 };
 
 /**
+ * Calibre de la modale par étape : les grilles denses (saisie manuelle,
+ * vérification) ont besoin de toute la largeur, les étapes plus légères
+ * (choix, dépôt de fichier, résumé final) n'ont pas à occuper le même espace.
+ */
+const STEP_DIALOG_CLASS: Record<string, string> = {
+  choose: 'max-w-4xl max-h-[85vh]',
+  provider: 'max-w-2xl max-h-[85vh]',
+  manual: 'max-w-7xl h-[90vh]',
+  preview: 'max-w-7xl h-[90vh]',
+  done: 'max-w-2xl max-h-[85vh]',
+};
+
+/**
  * Parcours d'import de produits.
  *
  * Modale large plutôt que page dédiée : le parcours part de la liste des
@@ -72,6 +91,7 @@ export const ProductImportDialog = ({
   onOpenChange,
   onImported,
   existingCategories,
+  initialDoor,
 }: ProductImportDialogProps) => {
   const isMobile = useIsMobile();
   const wizard = useProductImport();
@@ -89,10 +109,15 @@ export const ProductImportDialog = ({
   } = wizard;
 
   // Repartir de zéro à chaque ouverture : réutiliser une prévisualisation
-  // d'une session précédente exposerait un jeton peut-être expiré.
+  // d'une session précédente exposerait un jeton peut-être expiré. Une porte
+  // initiale saute directement l'écran de choix.
   useEffect(() => {
-    if (!open) reset();
-  }, [open, reset]);
+    if (!open) {
+      reset();
+      return;
+    }
+    if (initialDoor) goToDoor(initialDoor);
+  }, [open, initialDoor, reset, goToDoor]);
 
   // Le menu vient d'être modifié en base : prévenir la page pour qu'elle
   // recharge, sans attendre la fermeture — l'utilisateur peut enchaîner sur un
@@ -170,7 +195,9 @@ export const ProductImportDialog = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[90vh] max-w-7xl flex-col">
+      <DialogContent
+        className={`flex flex-col ${STEP_DIALOG_CLASS[state.step] ?? STEP_DIALOG_CLASS.choose}`}
+      >
         <DialogHeader>
           <DialogTitle>{heading.title}</DialogTitle>
           <DialogDescription>{heading.description}</DialogDescription>

@@ -41,7 +41,7 @@ export const ImportTagClassification = ({
   }
 
   return (
-    <div className="overflow-auto rounded-lg border">
+    <div className="overflow-auto rounded-lg border bg-card">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/40">
