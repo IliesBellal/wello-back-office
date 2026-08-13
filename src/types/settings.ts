@@ -36,6 +36,7 @@ export interface EstablishmentInfo {
   primary_color: string;
   text_color: string;
   is_open: boolean;
+  logo_url?: string;
 }
 
 export interface EstablishmentTimings {
@@ -105,6 +106,20 @@ export interface HourOfOperationPayload {
   last_booking_time?: string | null;
   valid_from: string;
   valid_to?: string | null;
+}
+
+export interface VacationPeriod {
+  id: string;
+  label?: string | null;
+  start_at: string;
+  end_at: string;
+  enabled: boolean;
+}
+
+export interface VacationPeriodPayload {
+  label?: string | null;
+  start_at: string;
+  end_at: string;
 }
 
 export interface EstablishmentSettings {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { settingsService } from '@/services/settingsService';
-import { UserProfile, EstablishmentSettings, MfaType, HourOfOperationPayload } from '@/types/settings';
+import { UserProfile, EstablishmentSettings, MfaType, HourOfOperationPayload, VacationPeriod, VacationPeriodPayload } from '@/types/settings';
 import { toast } from '@/hooks/use-toast';
 
 export const useUserProfile = () => {
@@ -163,6 +163,27 @@ export const useEstablishmentSettings = () => {
     }
   };
 
+  // Upload seul, sans toucher à `settings` : le logo_url est fusionné dans le
+  // formulaire par l'appelant et persisté avec le reste des champs au moment
+  // du `updateSettings` qui suit, pour éviter que la resynchro `settings` ->
+  // `formData` n'écrase des modifications non sauvegardées en cours de saisie.
+  const uploadLogo = async (file: File): Promise<string | null> => {
+    try {
+      setIsSaving(true);
+      const { logo_url } = await settingsService.uploadEstablishmentLogo(file);
+      return logo_url;
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de téléverser le logo",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const createHourOfOperation = async (payload: HourOfOperationPayload) => {
     try {
       setIsSaving(true);
@@ -254,9 +275,110 @@ export const useEstablishmentSettings = () => {
     isLoading,
     isSaving,
     updateSettings,
+    uploadLogo,
     createHourOfOperation,
     updateHourOfOperation,
     deleteHourOfOperation,
     refreshHoursOfOperations,
+  };
+};
+
+export const useVacationPeriods = () => {
+  const [vacationPeriods, setVacationPeriods] = useState<VacationPeriod[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    loadVacationPeriods();
+  }, []);
+
+  const loadVacationPeriods = async () => {
+    try {
+      setIsLoading(true);
+      const data = await settingsService.getVacationPeriods();
+      setVacationPeriods(data);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de charger les périodes de vacances",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createVacationPeriod = async (payload: VacationPeriodPayload) => {
+    try {
+      setIsSaving(true);
+      const created = await settingsService.createVacationPeriod(payload);
+      setVacationPeriods((prev) => [...prev, created]);
+      toast({
+        title: "Période de vacances ajoutée",
+        description: "L'établissement sera fermé sur cette période.",
+      });
+      return created;
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de créer la période de vacances.",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const updateVacationPeriod = async (id: string, payload: VacationPeriodPayload) => {
+    try {
+      setIsSaving(true);
+      const updated = await settingsService.updateVacationPeriod(id, payload);
+      setVacationPeriods((prev) => prev.map((period) => (period.id === id ? updated : period)));
+      toast({
+        title: "Période de vacances modifiée",
+        description: "Les modifications ont été enregistrées.",
+      });
+      return updated;
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de modifier la période de vacances.",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const deleteVacationPeriod = async (id: string) => {
+    try {
+      setIsSaving(true);
+      await settingsService.deleteVacationPeriod(id);
+      setVacationPeriods((prev) => prev.filter((period) => period.id !== id));
+      toast({
+        title: "Période de vacances supprimée",
+      });
+      return true;
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer la période de vacances.",
+        variant: "destructive"
+      });
+      return false;
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return {
+    vacationPeriods,
+    isLoading,
+    isSaving,
+    createVacationPeriod,
+    updateVacationPeriod,
+    deleteVacationPeriod,
   };
 };

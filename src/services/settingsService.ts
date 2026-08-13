@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
-import { UserProfile, EstablishmentSettings, HourOfOperation, HourOfOperationPayload } from "@/types/settings";
+import { UserProfile, EstablishmentSettings, HourOfOperation, HourOfOperationPayload, VacationPeriod, VacationPeriodPayload } from "@/types/settings";
 
 const unwrapWelloData = <T>(response: WelloApiResponse<T> | T): T => {
   if (response && typeof response === "object" && "data" in response) {
@@ -30,7 +30,8 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     currency: "EUR",
     primary_color: "#00b894",
     text_color: "#ffffff",
-    is_open: true
+    is_open: true,
+    logo_url: ""
   },
   timings: {
     wait_time_min: 15,
@@ -85,6 +86,8 @@ const cloneSettings = (settings: EstablishmentSettings): EstablishmentSettings =
   ...settings,
   hours_of_operations: settings.hours_of_operations.map((hour) => ({ ...hour })),
 });
+
+let mockVacationPeriods: VacationPeriod[] = [];
 
 // ============= API Functions =============
 export const settingsService = {
@@ -150,6 +153,26 @@ export const settingsService = {
     );
   },
 
+  async uploadEstablishmentLogo(file: File): Promise<{ logo_url: string }> {
+    logAPI('POST', '/pos/settings/logo', { logo: file.name });
+    return withMock(
+      () => {
+        const logoUrl = URL.createObjectURL(file);
+        mockEstablishmentSettings = {
+          ...mockEstablishmentSettings,
+          info: { ...mockEstablishmentSettings.info, logo_url: logoUrl },
+        };
+        return { logo_url: logoUrl };
+      },
+      async () => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const response = await apiClient.post<WelloApiResponse<{ logo_url: string }> | { logo_url: string }>('/pos/settings/logo', formData);
+        return unwrapWelloData(response);
+      }
+    );
+  },
+
   async createHourOfOperation(payload: HourOfOperationPayload): Promise<HourOfOperation> {
     logAPI('POST', '/pos/settings/hours_of_operations', payload);
     return withMock(
@@ -208,6 +231,61 @@ export const settingsService = {
       },
       async () => {
         const response = await apiClient.delete<WelloApiResponse<{ status: number }> | { status: number }>(`/pos/settings/hours_of_operations/${hourId}`);
+        return unwrapWelloData(response);
+      }
+    );
+  },
+
+  async getVacationPeriods(): Promise<VacationPeriod[]> {
+    logAPI('GET', '/pos/settings/vacations');
+    return withMock(
+      () => mockVacationPeriods.map((period) => ({ ...period })),
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<{ vacation_periods: VacationPeriod[] }> | { vacation_periods: VacationPeriod[] }>('/pos/settings/vacations');
+        return unwrapWelloData(response).vacation_periods;
+      }
+    );
+  },
+
+  async createVacationPeriod(payload: VacationPeriodPayload): Promise<VacationPeriod> {
+    logAPI('POST', '/pos/settings/vacations', payload);
+    return withMock(
+      () => {
+        const created: VacationPeriod = { ...payload, id: String(Date.now()), enabled: true };
+        mockVacationPeriods = [...mockVacationPeriods, created];
+        return created;
+      },
+      async () => {
+        const response = await apiClient.post<WelloApiResponse<{ vacation_period: VacationPeriod }> | { vacation_period: VacationPeriod }>('/pos/settings/vacations', payload);
+        return unwrapWelloData(response).vacation_period;
+      }
+    );
+  },
+
+  async updateVacationPeriod(id: string, payload: VacationPeriodPayload): Promise<VacationPeriod> {
+    logAPI('PATCH', `/pos/settings/vacations/${id}`, payload);
+    return withMock(
+      () => {
+        const updated: VacationPeriod = { ...payload, id, enabled: true };
+        mockVacationPeriods = mockVacationPeriods.map((period) => (period.id === id ? updated : period));
+        return updated;
+      },
+      async () => {
+        const response = await apiClient.patch<WelloApiResponse<{ vacation_period: VacationPeriod }> | { vacation_period: VacationPeriod }>(`/pos/settings/vacations/${id}`, payload);
+        return unwrapWelloData(response).vacation_period;
+      }
+    );
+  },
+
+  async deleteVacationPeriod(id: string): Promise<{ status: string }> {
+    logAPI('DELETE', `/pos/settings/vacations/${id}`);
+    return withMock(
+      () => {
+        mockVacationPeriods = mockVacationPeriods.filter((period) => period.id !== id);
+        return { status: 'success' };
+      },
+      async () => {
+        const response = await apiClient.delete<WelloApiResponse<{ status: string }> | { status: string }>(`/pos/settings/vacations/${id}`);
         return unwrapWelloData(response);
       }
     );

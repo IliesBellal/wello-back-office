@@ -1,13 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles } from "lucide-react";
-import { useEstablishmentSettings } from "@/hooks/useSettings";
+import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles, ImagePlus } from "lucide-react";
+import { useEstablishmentSettings, useVacationPeriods } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
 import { OpeningHours } from "./OpeningHours";
+import { VacationPeriods } from "./VacationPeriods";
 import { EstablishmentSettings, HourOfOperationPayload, DEFAULT_CUSTOMER_FORM_REQUIREMENTS } from "@/types/settings";
 import {
   establishmentInfoFields,
@@ -15,9 +16,15 @@ import {
   establishmentOrderingFields,
   establishmentSecurityFields
 } from "@/config/settingsConfig";
+
 import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
 import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressAutocomplete";
+
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const nameSiretFields = establishmentInfoFields.filter((field) => field.key === "name" || field.key === "siret");
+const otherInfoFields = establishmentInfoFields.filter((field) => field.key !== "name" && field.key !== "siret");
 
 const CUSTOMER_FORM_FIELDS: { key: string; label: string }[] = [
   { key: 'first_name', label: 'Prénom' },
@@ -39,13 +46,24 @@ export const EstablishmentTab = () => {
     isLoading,
     isSaving,
     updateSettings,
+    uploadLogo,
     createHourOfOperation,
     updateHourOfOperation,
     deleteHourOfOperation,
     refreshHoursOfOperations,
   } = useEstablishmentSettings();
+  const {
+    vacationPeriods,
+    isSaving: isSavingVacations,
+    createVacationPeriod,
+    updateVacationPeriod,
+    deleteVacationPeriod,
+  } = useVacationPeriods();
   const [formData, setFormData] = useState<EstablishmentSettings | null>(null);
   const [activeTab, setActiveTab] = useState<string>("general");
+  const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement | null>(null);
 
   const securityDelayField = establishmentSecurityFields.find((field) => field.key === 'pos_auto_lock_delay_minutes');
   const securityDelayMin = securityDelayField?.min ?? 5;
@@ -107,40 +125,94 @@ export const EstablishmentTab = () => {
     });
   };
 
-  const handleSave = () => {
-    if (formData) {
-      const trimmedPhone = formData.info.phone?.trim();
-      if (trimmedPhone && !isValidPhoneNumber(trimmedPhone)) {
-        toast({
-          title: "Numéro invalide",
-          description: "Le numéro de téléphone est incomplet pour le pays sélectionné.",
-          variant: "destructive"
-        });
-        return;
+  useEffect(() => {
+    return () => {
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
       }
+    };
+  }, [logoPreview]);
 
-      const securityDelayError = getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes);
-      if (securityDelayError) {
-        toast({
-          title: "Délai invalide",
-          description: securityDelayError,
-          variant: "destructive"
-        });
-        return;
-      }
+  const handleLogoButtonClick = () => {
+    logoInputRef.current?.click();
+  };
 
-      const normalizedPhone = trimmedPhone
-        ? parsePhoneNumber(trimmedPhone)?.number || trimmedPhone
-        : trimmedPhone;
+  const handleLogoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
 
-      updateSettings({
-        ...formData,
-        info: {
-          ...formData.info,
-          phone: normalizedPhone
-        }
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      toast({
+        title: "Format invalide",
+        description: "Le logo doit être une image JPEG, PNG ou WebP.",
+        variant: "destructive"
       });
+      return;
     }
+    if (file.size > MAX_LOGO_BYTES) {
+      toast({
+        title: "Fichier trop volumineux",
+        description: "Le logo doit faire moins de 2 Mo.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (logoPreview) {
+      URL.revokeObjectURL(logoPreview);
+    }
+    setPendingLogoFile(file);
+    setLogoPreview(URL.createObjectURL(file));
+  };
+
+  const handleSave = async () => {
+    if (!formData) return;
+
+    const trimmedPhone = formData.info.phone?.trim();
+    if (trimmedPhone && !isValidPhoneNumber(trimmedPhone)) {
+      toast({
+        title: "Numéro invalide",
+        description: "Le numéro de téléphone est incomplet pour le pays sélectionné.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const securityDelayError = getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes);
+    if (securityDelayError) {
+      toast({
+        title: "Délai invalide",
+        description: securityDelayError,
+        variant: "destructive"
+      });
+      return;
+    }
+
+    let logoUrl = formData.info.logo_url;
+    if (pendingLogoFile) {
+      const uploadedUrl = await uploadLogo(pendingLogoFile);
+      if (!uploadedUrl) return;
+      logoUrl = uploadedUrl;
+      if (logoPreview) {
+        URL.revokeObjectURL(logoPreview);
+      }
+      setPendingLogoFile(null);
+      setLogoPreview(null);
+    }
+
+    const normalizedPhone = trimmedPhone
+      ? parsePhoneNumber(trimmedPhone)?.number || trimmedPhone
+      : trimmedPhone;
+
+    updateSettings({
+      ...formData,
+      info: {
+        ...formData.info,
+        phone: normalizedPhone,
+        logo_url: logoUrl
+      }
+    });
   };
 
   if (isLoading || !formData) {
@@ -189,8 +261,50 @@ export const EstablishmentTab = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
+                <div className="flex items-start gap-4">
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={handleLogoChange}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleLogoButtonClick}
+                    disabled={isSaving}
+                    className="group relative h-36 w-36 flex-shrink-0 overflow-hidden rounded-lg border border-input bg-muted"
+                  >
+                    {logoPreview || formData.info.logo_url ? (
+                      <img
+                        src={logoPreview ?? formData.info.logo_url}
+                        alt="Logo de l'établissement"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center">
+                        <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-colors group-hover:bg-black/40 group-hover:opacity-100">
+                      <ImagePlus className="h-5 w-5 text-white" />
+                    </div>
+                  </button>
+
+                  <div className="flex-1 space-y-4">
+                    <SettingsSection
+                      fields={nameSiretFields}
+                      values={formData.info}
+                      onChange={(key, value) => handleFieldChange('info', key, value)}
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground -mt-2">
+                  Logo : JPG, PNG ou WebP. Max 2 Mo.
+                </p>
+
                 <SettingsSection
-                  fields={establishmentInfoFields}
+                  fields={otherInfoFields}
                   values={formData.info}
                   onChange={(key, value) => handleFieldChange('info', key, value)}
                   defaultPhoneCountry={formData.info.country_code}
@@ -454,6 +568,28 @@ export const EstablishmentTab = () => {
                 onUpdateHour={(hourId: string, payload: HourOfOperationPayload) => updateHourOfOperation(hourId, payload)}
                 onDeleteHour={(hourId: string) => deleteHourOfOperation(hourId)}
                 onSaved={refreshHoursOfOperations}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Calendar className="h-5 w-5" />
+                Vacances
+              </CardTitle>
+              <CardDescription>
+                Définissez des périodes de fermeture (vacances). L'établissement sera automatiquement
+                affiché comme fermé sur ces créneaux, en plus des horaires d'ouverture habituels.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <VacationPeriods
+                periods={vacationPeriods}
+                isSaving={isSavingVacations}
+                onCreatePeriod={createVacationPeriod}
+                onUpdatePeriod={updateVacationPeriod}
+                onDeletePeriod={deleteVacationPeriod}
               />
             </CardContent>
           </Card>

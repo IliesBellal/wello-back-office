@@ -22,7 +22,7 @@ export const NavHeader: React.FC<NavHeaderProps> = ({
   return (
     <div
       className={cn(
-        'flex items-center justify-between h-20 px-4 border-b border-sidebar-border',
+        'flex items-center justify-between h-16 px-4 border-b border-sidebar-border',
         'shrink-0 bg-gradient-to-r from-sidebar/50 to-sidebar',
         className,
       )}

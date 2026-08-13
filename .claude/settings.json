@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test -tags postgres_integration ./internal/modules/cash_registers/... -run TestCashRegisterLifecycle_Postgres -v)",
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test -tags postgres_integration ./internal/modules/cash_registers/... -v)",
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test -tags postgres_integration ./internal/modules/pos/accounting/... -run TestGetRealPaymentsData_Postgres -v)",
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test -tags postgres_integration ./internal/modules/pos/accounting/... ./internal/modules/cash_registers/... ./internal/modules/pos/reports/... -v)",
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test ./internal/modules/pos/accounting/... -run TestPOSAccountingReports_Postgres -v -tags postgres_integration)",
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test -tags postgres_integration ./internal/modules/pos/accounting/... -run \"TestGetRealPaymentsData_Postgres|TestExportAccountingReport_Postgres\" -v)",
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test -tags postgres_integration ./internal/modules/pos/accounting/... -run \"TestExportAccountingReport_Postgres\" -v)",
+      "Bash(DB_DIALECT=postgres POSTGRES_URL=\"postgres://welloresto:dev_local_only@localhost:5433/welloresto_dev\" go test -tags postgres_integration ./internal/modules/pos/accounting/... -run \"TestGetRealPaymentsData_Postgres\" -v)",
+      "Bash(VITE_USE_MOCK=true nohup npm run dev)",
+      "Bash(echo \"started with pid $!\")",
+      "Bash(timeout 40 bash -c 'until curl -sf http://localhost:8080 >/dev/null; do sleep 1; done')",
+      "Bash(node drive.js)",
+      "Bash(python3 -c ' *)",
+      "Bash(node drive2.js)",
+      "Bash(gofmt -l internal/infrastructure/r2/client.go internal/models/request_objects.go internal/modules/pos/repository.go internal/modules/pos/service.go internal/modules/pos/handler.go cmd/api/routes.go)",
+      "Bash(gofmt -d internal/models/request_objects.go cmd/api/routes.go internal/modules/pos/handler.go internal/modules/pos/repository.go internal/modules/pos/service.go internal/infrastructure/r2/client.go)",
+      "Bash(xargs -I{} grep -l \"CREATE TABLE\" {})",
+      "Bash(go -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" build ./...)",
+      "Bash(go -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" vet ./internal/modules/pos/... ./internal/modules/planning/settings/...)"
+    ]
+  }
+}
