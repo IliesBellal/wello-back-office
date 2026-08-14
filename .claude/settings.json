@@ -19,7 +19,8 @@
       "Bash(gofmt -d internal/models/request_objects.go cmd/api/routes.go internal/modules/pos/handler.go internal/modules/pos/repository.go internal/modules/pos/service.go internal/infrastructure/r2/client.go)",
       "Bash(xargs -I{} grep -l \"CREATE TABLE\" {})",
       "Bash(go -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" build ./...)",
-      "Bash(go -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" vet ./internal/modules/pos/... ./internal/modules/planning/settings/...)"
+      "Bash(go -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" vet ./internal/modules/pos/... ./internal/modules/planning/settings/...)",
+      "Bash(npm run *)"
     ]
   }
 }

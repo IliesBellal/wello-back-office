@@ -8,7 +8,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,8 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Badge } from '@/components/ui/badge';
-import { Trash2, AlertTriangle } from 'lucide-react';
+import { Copy, Download, FileText, Lock, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
   addCustomItem,
@@ -34,7 +32,8 @@ import {
   getCashRegisterSummary,
   SummaryItem,
 } from '@/services/cashRegisterService';
-import { CashRegisterHistoryRecord } from '@/services/cashRegisterHistoryService';
+import { CashRegisterHistoryRecord, exportRegisterPDF } from '@/services/cashRegisterHistoryService';
+import { CashRegisterTvaDetailsDialog } from '@/components/cash/CashRegisterTvaDetailsDialog';
 import { cn } from '@/lib/utils';
 import { getCashRegisterStatus } from '@/lib/cashRegisterStatus';
 
@@ -46,6 +45,7 @@ interface ClosureModalProps {
 }
 
 type Preset = { code: string; label: string; apiLabel: string };
+type TheoreticalView = 'mop' | 'user';
 
 const PRESETS: Preset[] = [
   { code: 'CB', label: 'Carte Bancaire', apiLabel: 'CB' },
@@ -64,32 +64,35 @@ const parseEuroToCents = (value: string): number => {
   return Math.round(parsed * 100);
 };
 
-const PaymentSummaryRow = ({
+const TheoreticalRow = ({
   item,
-  realAmount,
+  onCopyToReal,
+  copyDisabled,
 }: {
   item: SummaryItem;
-  realAmount: number;
-}) => {
-  const variance = realAmount - item.amount;
-  return (
-    <div className="grid grid-cols-4 items-center gap-2 py-2 text-sm">
-      <span className="font-medium">{item.label}</span>
-      <span className="text-right text-muted-foreground">{formatCurrency(item.amount)}</span>
-      <span className="text-right">{formatCurrency(realAmount)}</span>
-      <span
-        className={cn(
-          'text-right font-semibold',
-          variance === 0 ? 'text-green-600' : variance > 0 ? 'text-blue-600' : 'text-red-600'
-        )}
-      >
-        {variance > 0 ? '+' : ''}{formatCurrency(variance)}
-      </span>
+  onCopyToReal: (item: SummaryItem) => void;
+  copyDisabled: boolean;
+}) => (
+  <div className="flex items-center justify-between rounded-md border border-blue-100 bg-blue-50/50 px-3 py-2">
+    <div>
+      <p className="text-sm font-medium">{item.label}</p>
+      <p className="text-xs text-muted-foreground">{formatCurrency(item.amount)}</p>
     </div>
-  );
-};
+    {!copyDisabled && (
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onCopyToReal(item)}
+        aria-label="Copier vers réel"
+        title="Copier la valeur théorique vers réel"
+      >
+        <Copy className="h-4 w-4 text-blue-600" />
+      </Button>
+    )}
+  </div>
+);
 
-const CustomItemRow = ({
+const RealItemRow = ({
   id,
   label,
   value,
@@ -104,20 +107,22 @@ const CustomItemRow = ({
   onDelete: (id: string) => void;
   disabled: boolean;
 }) => (
-  <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+  <div className="flex items-center justify-between rounded-md border border-orange-100 bg-orange-50/50 px-3 py-2">
     <div>
       <p className="text-sm font-medium">{label}</p>
       <p className="text-xs text-muted-foreground">{formatCurrency(value)}</p>
     </div>
-    <Button
-      variant="ghost"
-      size="icon"
-      onClick={() => onDelete(id)}
-      disabled={disabled || deleting}
-      aria-label="Supprimer"
-    >
-      <Trash2 className="h-4 w-4 text-destructive" />
-    </Button>
+    {!disabled && (
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => onDelete(id)}
+        disabled={deleting}
+        aria-label="Supprimer"
+      >
+        <Trash2 className="h-4 w-4 text-destructive" />
+      </Button>
+    )}
   </div>
 );
 
@@ -125,7 +130,9 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
   const [summary, setSummary] = useState<CashRegisterSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('recap');
+  const [theoreticalView, setTheoreticalView] = useState<TheoreticalView>('mop');
+  const [tvaDialogOpen, setTvaDialogOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<string>('CB');
@@ -158,6 +165,7 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
 
   useEffect(() => {
     if (!open || !register) return;
+    setTheoreticalView('mop');
     loadSummary();
   }, [open, loadSummary, register]);
 
@@ -189,28 +197,23 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
     return total;
   }, [summary?.custom_items, theoreticalByMop]);
 
-  const sumAbsVariance = useMemo(() => {
-    const allCodes = new Set<string>([
-      ...Array.from(theoreticalByMop.keys()),
-      ...Array.from(realByMop.keys()),
-    ]);
+  const theoreticalTotal = useMemo(
+    () => (summary?.items ?? []).reduce((acc, item) => acc + item.amount, 0),
+    [summary?.items]
+  );
 
-    let total = 0;
-    allCodes.forEach((code) => {
-      const theoretical = theoreticalByMop.get(code) ?? 0;
-      const real = realByMop.get(code) ?? 0;
-      total += (real - theoretical);
-    });
+  const realTotal = useMemo(
+    () => (summary?.custom_items ?? []).reduce((acc, item) => acc + item.value, 0),
+    [summary?.custom_items]
+  );
 
-    return total;
-  }, [realByMop, theoreticalByMop]);
+  const sumAbsVariance = useMemo(() => realTotal - theoreticalTotal, [realTotal, theoreticalTotal]);
 
   const theoreticalFinalFund = useMemo(() => {
     if (!summary) return 0;
     if (typeof summary.final_cash_fund === 'number') return summary.final_cash_fund;
-    const theoreticalTotal = (summary.items ?? []).reduce((acc, item) => acc + item.amount, 0);
     return summary.cash_fund + theoreticalTotal;
-  }, [summary]);
+  }, [summary, theoreticalTotal]);
 
   const handleAddCustomItem = async () => {
     if (!register || !summary) return;
@@ -256,6 +259,30 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
       toast.error("Impossible d'ajouter le montant réel.");
     } finally {
       setAddingItem(false);
+    }
+  };
+
+  const handleCopyToReal = async (item: SummaryItem) => {
+    if (!register || !summary) return;
+
+    try {
+      const created = await addCustomItem(register.id, {
+        label: item.label,
+        value: item.amount,
+        mop_code: item.mop_code,
+      });
+
+      setSummary((prev) =>
+        prev
+          ? {
+              ...prev,
+              custom_items: [...prev.custom_items, { ...created, mop_code: created.mop_code ?? item.mop_code }],
+            }
+          : prev
+      );
+      toast.success('Valeur théorique copiée vers réel.');
+    } catch (e) {
+      toast.error('Impossible de copier cette valeur.');
     }
   };
 
@@ -315,6 +342,22 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
     }
   };
 
+  const handleExportPdf = async () => {
+    if (!register) return;
+    setExportingPdf(true);
+    try {
+      await exportRegisterPDF(register.id);
+    } catch (e) {
+      toast.error("Impossible d'exporter le PDF de ce registre.");
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
+  const dialogTitle = isEnclosed
+    ? `Registre de caisse #${register?.register_number || register?.id || ''}`
+    : 'Clôture de caisse';
+
   return (
     <>
       <Dialog
@@ -331,7 +374,7 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
       >
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Clôture de caisse</DialogTitle>
+            <DialogTitle>{dialogTitle}</DialogTitle>
             <DialogDescription>
               {register?.register_number || register?.id}
             </DialogDescription>
@@ -353,83 +396,131 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
               </CardContent>
             </Card>
           ) : summary ? (
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList className="grid grid-cols-2 w-full">
-                <TabsTrigger value="recap">Récapitulatif</TabsTrigger>
-                <TabsTrigger value="servers">Détails par Serveur</TabsTrigger>
-              </TabsList>
+            <div className="space-y-4">
+              {isEnclosed && (
+                <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900">
+                  <div className="flex items-center gap-2 font-semibold">
+                    <Lock className="h-4 w-4" />
+                    Registre clôturé
+                  </div>
+                  <p className="mt-1">
+                    Clôturé par {register?.closed_by_name || '-'}
+                  </p>
+                  {summary.enclose_comment && (
+                    <p className="mt-1 rounded bg-white/60 px-2 py-1">{summary.enclose_comment}</p>
+                  )}
+                </div>
+              )}
 
-              <TabsContent value="recap" className="space-y-4">
-                <Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Fond de caisse</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="rounded-md border border-border bg-muted/20 p-3">
+                    <p className="text-xs text-muted-foreground">Initial</p>
+                    <p className="text-lg font-semibold">{formatCurrency(summary.cash_fund)}</p>
+                  </div>
+                  <div className="rounded-md border border-border bg-muted/20 p-3">
+                    <p className="text-xs text-muted-foreground">Final théorique</p>
+                    <p className="text-lg font-semibold">{formatCurrency(theoreticalFinalFund)}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* --- THÉORIQUE --- */}
+                <Card className="border-blue-200">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Fond de caisse</CardTitle>
+                    <CardTitle className="text-base text-blue-700">Théorique</CardTitle>
+                    <p className="text-xs text-muted-foreground">Montants enregistrés sur le registre</p>
+                    <div className="flex gap-1 rounded-md bg-blue-50 p-1 w-fit">
+                      <button
+                        type="button"
+                        onClick={() => setTheoreticalView('mop')}
+                        className={cn(
+                          'rounded px-2 py-1 text-xs font-medium transition',
+                          theoreticalView === 'mop' ? 'bg-white shadow-sm text-blue-700' : 'text-blue-700/60'
+                        )}
+                      >
+                        Par mode de paiement
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheoreticalView('user')}
+                        className={cn(
+                          'rounded px-2 py-1 text-xs font-medium transition',
+                          theoreticalView === 'user' ? 'bg-white shadow-sm text-blue-700' : 'text-blue-700/60'
+                        )}
+                      >
+                        Par utilisateur
+                      </button>
+                    </div>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="rounded-md border border-border bg-muted/20 p-3">
-                      <p className="text-xs text-muted-foreground">Initial</p>
-                      <p className="text-lg font-semibold">{formatCurrency(summary.cash_fund)}</p>
-                    </div>
-                    <div className="rounded-md border border-border bg-muted/20 p-3">
-                      <p className="text-xs text-muted-foreground">Final théorique</p>
-                      <p className="text-lg font-semibold">{formatCurrency(theoreticalFinalFund)}</p>
-                    </div>
+                  <CardContent className="space-y-2">
+                    {theoreticalView === 'mop' ? (
+                      (summary.items ?? []).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Aucun montant théorique.</p>
+                      ) : (
+                        (summary.items ?? []).map((item) => (
+                          <TheoreticalRow
+                            key={item.mop_code}
+                            item={item}
+                            onCopyToReal={handleCopyToReal}
+                            copyDisabled={isEnclosed}
+                          />
+                        ))
+                      )
+                    ) : (summary.users_summary ?? []).length === 0 ? (
+                      <p className="text-sm text-muted-foreground">
+                        Aucun détail de paiements par serveur disponible.
+                      </p>
+                    ) : (
+                      (summary.users_summary ?? []).map((server) => {
+                        const total = (server.items ?? []).reduce((acc, item) => acc + item.amount, 0);
+                        return (
+                          <details key={server.user_id} className="rounded-md border border-blue-100">
+                            <summary className="cursor-pointer px-3 py-2 text-sm font-medium">
+                              {server.user_name || 'Serveur inconnu'} — {formatCurrency(total)}
+                            </summary>
+                            <div className="space-y-1 px-3 pb-2">
+                              {(server.items ?? []).map((item) => (
+                                <div
+                                  key={`${server.user_id}-${item.mop_code}`}
+                                  className="flex items-center justify-between text-sm"
+                                >
+                                  <span className="text-muted-foreground">{item.label}</span>
+                                  <span className="font-medium">{formatCurrency(item.amount)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </details>
+                        );
+                      })
+                    )}
                   </CardContent>
                 </Card>
 
-                <Card>
+                {/* --- RÉEL --- */}
+                <Card className="border-orange-200">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between gap-3">
-                      <CardTitle className="text-base">Comparaison par mode de paiement</CardTitle>
-                      {!isEnclosed && (
-                        <Button variant="outline" onClick={() => setAddDialogOpen(true)}>
-                          Ajouter un montant réel
-                        </Button>
-                      )}
+                      <div>
+                        <CardTitle className="text-base text-orange-700">Réel</CardTitle>
+                        <p className="text-xs text-muted-foreground">
+                          {isEnclosed
+                            ? 'Lecture seule du montant déclaré'
+                            : 'Ajoutez ou corrigez les valeurs observées'}
+                        </p>
+                      </div>
                     </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-4 gap-2 border-b border-border pb-2 text-xs font-medium text-muted-foreground">
-                      <span>Moyen</span>
-                      <span className="text-right">Théorique</span>
-                      <span className="text-right">Réel</span>
-                      <span className="text-right">Écart</span>
-                    </div>
-
-                    {(summary.items ?? []).map((item) => (
-                      <PaymentSummaryRow
-                        key={item.mop_code}
-                        item={item}
-                        realAmount={realByMop.get(item.mop_code) ?? 0}
-                      />
-                    ))}
-
-                    {unmatchedRealAmount > 0 && (
-                      <PaymentSummaryRow
-                        key="OTHER"
-                        item={{ mop_code: 'OTHER', label: 'Autre', amount: 0 }}
-                        realAmount={unmatchedRealAmount}
-                      />
-                    )}
-
-                    <div className="mt-3 border-t border-border pt-3 flex items-center justify-between text-sm">
-                      <span className="font-semibold">Écart total</span>
-                      <Badge variant={Math.abs(sumAbsVariance) > 500 ? 'destructive' : Math.abs(sumAbsVariance) > 0 ? 'warning' : 'positive'}>
-                        {formatCurrency(sumAbsVariance)}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">Montants réels saisis</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-2">
                     {summary.custom_items.length === 0 ? (
                       <p className="text-sm text-muted-foreground">Aucun montant réel saisi.</p>
                     ) : (
                       summary.custom_items.map((item) => (
-                        <CustomItemRow
+                        <RealItemRow
                           key={item.id}
                           id={item.id}
                           label={item.label}
@@ -440,59 +531,59 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
                         />
                       ))
                     )}
+                    {!isEnclosed && (
+                      <Button
+                        variant="outline"
+                        className="w-full border-orange-200 text-orange-700 hover:bg-orange-50"
+                        onClick={() => setAddDialogOpen(true)}
+                      >
+                        + Nouvelle entrée
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
-              </TabsContent>
+              </div>
 
-              <TabsContent value="servers" className="space-y-4">
-                {summary.users_summary && summary.users_summary.length > 0 ? (
-                  summary.users_summary.map((server) => {
-                    const total = (server.items ?? []).reduce((acc, item) => acc + item.amount, 0);
-                    return (
-                      <Card key={server.user_id}>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-base">
-                            {(server.user_name || 'Serveur inconnu')} ({server.user_id})
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          {(server.items ?? []).map((item) => (
-                            <div key={`${server.user_id}-${item.mop_code}`} className="flex items-center justify-between text-sm">
-                              <span className="text-muted-foreground">{item.label}</span>
-                              <span className="font-medium">{formatCurrency(item.amount)}</span>
-                            </div>
-                          ))}
-                          <div className="border-t border-border pt-2 mt-2 flex items-center justify-between text-sm font-semibold">
-                            <span>Total</span>
-                            <span>{formatCurrency(total)}</span>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                ) : (
-                  <Card>
-                    <CardContent className="py-6">
-                      <p className="text-sm text-muted-foreground">
-                        Aucun détail de paiements par serveur disponible pour ce registre.
-                      </p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            </Tabs>
+              <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-4 py-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">Total théorique</p>
+                  <p className="text-lg font-semibold text-blue-700">{formatCurrency(theoreticalTotal)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-muted-foreground">Écart</p>
+                  <p className={cn('text-lg font-semibold', sumAbsVariance === 0 ? 'text-green-600' : 'text-red-600')}>
+                    {sumAbsVariance > 0 ? '+' : ''}
+                    {formatCurrency(sumAbsVariance)}
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : null}
 
-          <DialogFooter>
+          <DialogFooter className="flex-wrap gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Fermer
             </Button>
-            <Button
-              onClick={startEncloseFlow}
-              disabled={!summary || !isClosed || isEnclosed || closing || loading}
-            >
-              {isEnclosed ? 'Déjà clôturé' : 'Clôturer'}
-            </Button>
+            {summary && (
+              <Button variant="outline" onClick={() => setTvaDialogOpen(true)} className="gap-2">
+                <FileText className="h-4 w-4" />
+                Détail TVA
+              </Button>
+            )}
+            {isEnclosed && (
+              <Button variant="outline" onClick={handleExportPdf} disabled={exportingPdf} className="gap-2">
+                <Download className="h-4 w-4" />
+                {exportingPdf ? 'Export...' : 'Exporter PDF'}
+              </Button>
+            )}
+            {!isEnclosed && (
+              <Button
+                onClick={startEncloseFlow}
+                disabled={!summary || !isClosed || closing || loading}
+              >
+                Clôturer
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -500,9 +591,9 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
       <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Ajouter un montant réel</DialogTitle>
+            <DialogTitle>Nouvelle entrée réelle</DialogTitle>
             <DialogDescription>
-              Sélectionnez un preset puis saisissez le montant en euros.
+              Sélectionnez un moyen de paiement puis saisissez le montant en euros.
             </DialogDescription>
           </DialogHeader>
 
@@ -614,6 +705,12 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CashRegisterTvaDetailsDialog
+        registerId={register?.id ?? null}
+        open={tvaDialogOpen}
+        onOpenChange={setTvaDialogOpen}
+      />
     </>
   );
 };

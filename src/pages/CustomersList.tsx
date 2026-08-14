@@ -3,8 +3,16 @@ import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import {
   Customer,
   CustomerListMetadata,
@@ -15,6 +23,8 @@ import {
 } from '@/services/customersService';
 import { Skeleton } from '@/components/ui/skeleton';
 import CustomerDetailsSheet from '@/components/customers/CustomerDetailsSheet';
+import { CustomerImportDialog } from '@/components/customers/import/CustomerImportDialog';
+import type { ImportDoor } from '@/hooks/useCustomerImport';
 import { OrderDetailModal } from '@/pages/DashboardOrderHistory';
 import {
   Table,
@@ -24,7 +34,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Search, ArrowUpDown, ArrowUp, ArrowDown, Users, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
+import {
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Users,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  Crown,
+  Upload,
+  UserPlus,
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -136,7 +158,10 @@ const CustomersList = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [sort, setSort] = useState<SortState>({ field: null, direction: null });
+  const [importOpen, setImportOpen] = useState(false);
+  const [importInitialDoor, setImportInitialDoor] = useState<ImportDoor | undefined>(undefined);
   const { toast } = useToast();
+  const { canManageCustomers } = usePermissions();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const getCustomerFullName = (customer: Customer): string => {
@@ -288,10 +313,53 @@ const CustomersList = () => {
       <PageContainer
         header={
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <h1 className="text-3xl font-bold text-foreground">Liste des clients</h1>
-            <p className="text-sm text-muted-foreground">
-              {totalCustomers} client{totalCustomers !== 1 ? 's' : ''}
-            </p>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Liste des clients</h1>
+              <p className="text-sm text-muted-foreground">
+                {totalCustomers} client{totalCustomers !== 1 ? 's' : ''}
+              </p>
+            </div>
+
+            {canManageCustomers && (
+              // Bouton scindé + menu, même patron que « Nouveau Produit » sur
+              // la page Menu : l'action principale (importer un fichier) à
+              // gauche, les portes secondaires (saisie manuelle) dans le menu.
+              <div className="flex items-stretch rounded-md bg-gradient-primary">
+                <Button
+                  className="rounded-r-none bg-transparent hover:bg-white/10"
+                  onClick={() => {
+                    setImportInitialDoor(undefined);
+                    setImportOpen(true);
+                  }}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Importer des clients
+                </Button>
+                <div className="my-2 w-px bg-primary-foreground/25" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      aria-label="Autres options d’import"
+                      className="rounded-l-none bg-transparent hover:bg-white/10"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-popover">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setImportInitialDoor('manual');
+                        setImportOpen(true);
+                      }}
+                    >
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Saisir plusieurs clients
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            )}
           </div>
         }
       >
@@ -465,6 +533,19 @@ const CustomersList = () => {
         // Render above the customer sheet and its overlay.
         zIndex={70}
       />
+
+      {canManageCustomers && (
+        <CustomerImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          // Même mécanisme que la recherche/le tri/la pagination pour
+          // rafraîchir cette page : elle n'est pas sur react-query, donc pas
+          // d'invalidation de cache possible, on rappelle juste le chargeur
+          // déjà en place avec les paramètres courants (page, tri, recherche).
+          onImported={() => loadCustomers()}
+          initialDoor={importInitialDoor}
+        />
+      )}
     </DashboardLayout>
   );
 };

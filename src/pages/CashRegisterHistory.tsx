@@ -26,6 +26,7 @@ import {
   getCashRegisterHistory,
 } from '@/services/cashRegisterHistoryService';
 import { closeCashRegister } from '@/services/cashRegisterService';
+import { financialReportsService } from '@/services/financialReportsService';
 import { getCashRegisterStatus } from '@/lib/cashRegisterStatus';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -34,6 +35,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  Download,
   FileText,
   Receipt,
   DollarSign,
@@ -138,6 +140,22 @@ const CashRegisterHistory = () => {
     }
   };
 
+  const handleExportGlobal = async () => {
+    try {
+      const result = await financialReportsService.exportGlobal(
+        dateRange.from,
+        dateRange.to
+      );
+      window.open(result.download_url, '_blank');
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de générer l\'export comptable',
+        variant: 'destructive',
+      });
+    }
+  };
+
   const handleEncloseSuccess = async () => {
     if (!selectedRegisterForEnclose) return;
 
@@ -166,13 +184,19 @@ const CashRegisterHistory = () => {
       <PageContainer
         header={
           <div className="space-y-4">
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold">Registres de caisse</h1>
-              <p className="text-sm text-muted-foreground">
-                Historique complet des registres Z et X
-              </p>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div className="space-y-2">
+                <h1 className="text-3xl font-bold">Registres de caisse</h1>
+                <p className="text-sm text-muted-foreground">
+                  Historique complet des registres Z et X
+                </p>
+              </div>
+              <Button onClick={handleExportGlobal} className="bg-gradient-primary gap-2">
+                <Download className="w-4 h-4" />
+                Export Comptable Global
+              </Button>
             </div>
-            
+
             {/* Date Picker */}
             <div className="w-full max-w-md">
               <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
@@ -327,7 +351,20 @@ const CashRegisterHistory = () => {
                           </Button>
                         );
                       }
-                      return <span className="text-xs text-muted-foreground">-</span>;
+                      return (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedRegisterForEnclose(row);
+                            setClosureDialogOpen(true);
+                          }}
+                          className="gap-2"
+                        >
+                          Détails
+                        </Button>
+                      );
                     }
                   },
                 ]}

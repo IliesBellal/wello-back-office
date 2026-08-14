@@ -54,6 +54,38 @@ export interface TvaDetails {
   items: TvaDetailItem[];
 }
 
+// Le vrai contrat de /cash_register/{id}/tva-details (models.CashRegisterDetails
+// côté API) — distinct de TvaDetails/TvaDetailItem ci-dessus, qui ne
+// correspondaient ni à ce chemin (tva_details vs tva-details) ni à cette
+// forme (objet vs tableau nu). Utilisé par CashRegisterTvaDetailsDialog.
+export interface CashRegisterTvaCategory {
+  tva_title: string;
+  tva_rate: number;
+  HT: number;
+  TTC: number;
+  TVA: number;
+}
+
+export interface CashRegisterTvaDeliveryGroup {
+  delivery_type_id: string;
+  delivery_type_label: string;
+  tva_categories: CashRegisterTvaCategory[];
+}
+
+export interface CashRegisterTvaBreakdown {
+  status: number;
+  cash_report_id: string;
+  period_from: string;
+  period_to: string;
+  cash_fund: number;
+  HT: number;
+  TTC: number;
+  TVA: number;
+  cash_report: CashRegisterTvaDeliveryGroup[];
+  mop: { mop: string; amount: number; label?: string }[];
+  cash_report_type: string;
+}
+
 interface ApiEnvelope<T> {
   id: string;
   data: T;
@@ -193,6 +225,41 @@ const mockTvaDetails: TvaDetails[] = [
     ],
   },
 ];
+
+const mockTvaBreakdown: CashRegisterTvaBreakdown = {
+  status: 1,
+  cash_report_id: 'cr3',
+  period_from: new Date(Date.now() - 86400000).toISOString(),
+  period_to: new Date().toISOString(),
+  cash_fund: 15000,
+  HT: 33137,
+  TTC: 36900,
+  TVA: 3763,
+  cash_report: [
+    {
+      delivery_type_id: 'IN',
+      delivery_type_label: 'Sur Place',
+      tva_categories: [
+        { tva_title: 'TVA 10%', tva_rate: 10, HT: 16818, TTC: 18500, TVA: 1682 },
+        { tva_title: 'TVA 20%', tva_rate: 20, HT: 6833, TTC: 8200, TVA: 1367 },
+      ],
+    },
+    {
+      delivery_type_id: 'TAKE_AWAY',
+      delivery_type_label: 'Emporter',
+      tva_categories: [
+        { tva_title: 'TVA 5.5%', tva_rate: 5.5, HT: 5213, TTC: 5500, TVA: 287 },
+        { tva_title: 'TVA 10%', tva_rate: 10, HT: 4273, TTC: 4700, TVA: 427 },
+      ],
+    },
+  ],
+  mop: [
+    { mop: 'CB', amount: 20750, label: 'Carte Bancaire' },
+    { mop: 'CASH', amount: 11650, label: 'Espèces' },
+    { mop: 'TR', amount: 4500, label: 'Ticket Restaurant' },
+  ],
+  cash_report_type: 'Z',
+};
 
 const toBool = (value: unknown): boolean => {
   if (typeof value === 'boolean') return value;
@@ -368,6 +435,25 @@ export const getCashRegisterTvaDetails = (id: string) => {
   return withMock(
     () => [...mockTvaDetails],
     () => apiClient.get<TvaDetails[]>(`/cash_register/${id}/tva_details`)
+  );
+};
+
+// Chemin réel (tiret, pas underscore) + forme réelle de la réponse — voir
+// CashRegisterTvaBreakdown ci-dessus. À utiliser pour tout nouveau
+// consommateur de ce endpoint (getCashRegisterTvaDetails ci-dessus reste en
+// place uniquement pour ne pas casser CashRegisterDetailsSheet.tsx).
+export const getCashRegisterTvaBreakdown = (id: string) => {
+  logAPI('GET', `/cash_register/${id}/tva-details`);
+  return withMock(
+    () => mockTvaBreakdown,
+    async () => {
+      const response = await apiClient.get<ApiEnvelope<CashRegisterTvaBreakdown> | CashRegisterTvaBreakdown>(
+        `/cash_register/${id}/tva-details`
+      );
+      return response && typeof response === 'object' && 'data' in response
+        ? (response as ApiEnvelope<CashRegisterTvaBreakdown>).data
+        : (response as CashRegisterTvaBreakdown);
+    }
   );
 };
 

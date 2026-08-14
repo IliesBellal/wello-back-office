@@ -61,18 +61,6 @@ const FinancialReports = () => {
     { ttc: 0, ht: 0, tva: 0 }
   );
 
-  const handleExportGlobal = async () => {
-    try {
-      const result = await financialReportsService.exportGlobal(
-        dateRange.from,
-        dateRange.to
-      );
-      window.open(result.download_url, '_blank');
-    } catch (err) {
-      console.error('Erreur export comptable:', err);
-    }
-  };
-
   const handleExportVAT = async () => {
     try {
       const result = await financialReportsService.exportVAT(
@@ -101,13 +89,7 @@ const FinancialReports = () => {
     <DashboardLayout>
       <PageContainer
         header={
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <h1 className="text-3xl font-bold text-foreground">Rapports Financiers</h1>
-            <Button onClick={handleExportGlobal} className="bg-gradient-primary">
-              <Download className="w-4 h-4 mr-2" />
-              Export Comptable Global
-            </Button>
-          </div>
+          <h1 className="text-3xl font-bold text-foreground">Rapports Financiers</h1>
         }
       >
         <div className="space-y-8">
