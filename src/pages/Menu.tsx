@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Plus, ChevronDown, CopyPlus, Upload, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon, PencilRuler, FolderPlus } from 'lucide-react';
+import { MoreVertical, Plus, ChevronDown, CopyPlus, Upload, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon, PencilRuler, FolderPlus, Boxes } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { useProductCreateSheet } from '@/contexts/ProductCreateSheetContext';
 import { useOrganizeModal } from '@/contexts/OrganizeModalContext';
@@ -30,7 +30,7 @@ import { toast } from 'sonner';
 /** Valeur sentinelle du filtre : ouvre la création au lieu de filtrer. */
 const CREATE_CATEGORY_OPTION = '__create_category__';
 
-type SortKey = 'name' | 'category' | 'tags' | 'status';
+type SortKey = 'name' | 'category' | 'tags' | 'status' | 'available_in' | 'available_take_away' | 'available_delivery';
 type SortDir = 'asc' | 'desc';
 
 function getProductValue(product: Product, key: SortKey, categories: Record<string, string>): string | number {
@@ -51,6 +51,9 @@ function getProductValue(product: Product, key: SortKey, categories: Record<stri
       }
       return statuses.length || 0;
     }
+    case 'available_in': return product.available_in ? 1 : 0;
+    case 'available_take_away': return product.available_take_away ? 1 : 0;
+    case 'available_delivery': return product.available_delivery ? 1 : 0;
   }
 }
 
@@ -73,6 +76,8 @@ export default function Menu() {
     deleteCategory,
     deleteProduct,
     createProduct,
+    setGroupMembers,
+    deleteProductGroup,
     applyProductsAllergens,
     applyProductsAttributes,
     applyProductsTags,
@@ -100,6 +105,7 @@ export default function Menu() {
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false);
 
   // Filtres et tri
   const [search, setSearch] = useState('');
@@ -110,6 +116,27 @@ export default function Menu() {
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
     setSheetOpen(true);
+  };
+
+  // selectedProduct est un instantané pris au clic, pas une référence vivante
+  // dans menuData : sans ce resync, la fiche ouverte (groupe ou produit)
+  // resterait figée sur les anciennes valeurs après un enregistrement ou un
+  // rattachement/détachement de sous-produit (qui rechargent menuData mais ne
+  // touchent jamais selectedProduct directement).
+  useEffect(() => {
+    if (!selectedProduct) return;
+    const fresh = menuData?.products?.find(p => p.product_id === selectedProduct.product_id);
+    if (fresh && fresh !== selectedProduct) {
+      setSelectedProduct(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [menuData]);
+
+  // Ouvre la fiche produit normale sur un sous-produit depuis la fiche groupe
+  // (bascule automatique : SimpleProductSheet/GroupProductSheet se répartissent
+  // l'affichage selon is_product_group du produit sélectionné).
+  const handleOpenSubProduct = (productId: string) => {
+    handleProductClick({ product_id: productId, name: '', is_product_group: false } as Product);
   };
 
   const handleToggleGroup = (productId: string) => {
@@ -184,6 +211,12 @@ export default function Menu() {
     }
   };
 
+  const handleDeleteProductGroup = async (groupId: string, subProductIds: string[]) => {
+    await deleteProductGroup(groupId, subProductIds);
+    setSelectedProduct(null);
+    setSheetOpen(false);
+  };
+
   // Build category mapping
   const categoryMap = useMemo(() => {
     if (!menuData) return {} as Record<string, string>;
@@ -202,10 +235,18 @@ export default function Menu() {
     // Filtre recherche
     if (search.trim()) {
       const q = search.trim().toLowerCase();
-      result = result.filter(p => 
-        p.name.toLowerCase().includes(q) || 
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
         (p.description && p.description.toLowerCase().includes(q))
       );
+    } else {
+      // menuData.products est une liste à plat qui inclut aussi les
+      // sous-produits (utile pour la grille de prix, la recherche, etc.) :
+      // sans ce filtre, un sous-produit apparaît deux fois dans le tableau —
+      // une fois comme ligne racine ordinaire, une fois imbriqué sous son
+      // groupe déplié. Hors recherche, seuls les produits racines s'affichent
+      // ; les sous-produits ne sont visibles qu'imbriqués sous leur groupe.
+      result = result.filter(p => !p.by_product_of);
     }
 
     // Filtre catégorie
@@ -319,6 +360,10 @@ export default function Menu() {
                       <DropdownMenuItem onClick={() => setCreateCategoryOpen(true)}>
                         <FolderPlus className="w-4 h-4 mr-2" />
                         Nouvelle catégorie caisse
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setGroupCreateOpen(true)}>
+                        <Boxes className="w-4 h-4 mr-2" />
+                        Nouveau groupe de produits
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -486,8 +531,30 @@ export default function Menu() {
           open={sheetOpen && selectedProduct !== null && selectedProduct.is_product_group}
           onOpenChange={setSheetOpen}
           categories={menuData?.products_types || []}
+          allProducts={menuData?.products || []}
           onSave={updateProduct}
+          onCreate={createProduct}
+          onDelete={handleDeleteProductGroup}
+          onSetMembers={setGroupMembers}
           onCreateCategory={createProductCategory}
+          onOpenProduct={handleOpenSubProduct}
+        />
+
+        {/* Création : instance dédiée, comme pour SimpleProductSheet/Nouveau
+            Produit — ouverture indépendante de la sélection courante. */}
+        <GroupProductSheet
+          createMode
+          product={null}
+          open={groupCreateOpen}
+          onOpenChange={setGroupCreateOpen}
+          categories={menuData?.products_types || []}
+          allProducts={menuData?.products || []}
+          onSave={updateProduct}
+          onCreate={createProduct}
+          onDelete={handleDeleteProductGroup}
+          onSetMembers={setGroupMembers}
+          onCreateCategory={createProductCategory}
+          onOpenProduct={handleOpenSubProduct}
         />
 
         <OrganizeModal

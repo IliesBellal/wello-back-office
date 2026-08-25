@@ -9,10 +9,10 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Store, ShoppingBag, Truck, Check } from 'lucide-react';
 import { useState } from 'react';
 
-type SortKey = 'name' | 'category' | 'tags' | 'status';
+type SortKey = 'name' | 'category' | 'tags' | 'status' | 'available_in' | 'available_take_away' | 'available_delivery';
 type SortDir = 'asc' | 'desc';
 
 interface ProductsTableProps {
@@ -282,6 +282,21 @@ export const ProductsTable = ({
               {status.label}
             </Badge>
           </TableCell>
+
+          {/* Disponible sur place */}
+          <TableCell className="text-center">
+            {product.available_in && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+          </TableCell>
+
+          {/* Disponible à emporter */}
+          <TableCell className="text-center">
+            {product.available_take_away && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+          </TableCell>
+
+          {/* Disponible en livraison */}
+          <TableCell className="text-center">
+            {product.available_delivery && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+          </TableCell>
         </TableRow>
       );
 
@@ -358,6 +373,21 @@ export const ProductsTable = ({
                   {subStatus.label}
                 </Badge>
               </TableCell>
+
+              {/* Disponible sur place */}
+              <TableCell className="text-center">
+                {subProductData.available_in && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+              </TableCell>
+
+              {/* Disponible à emporter */}
+              <TableCell className="text-center">
+                {subProductData.available_take_away && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+              </TableCell>
+
+              {/* Disponible en livraison */}
+              <TableCell className="text-center">
+                {subProductData.available_delivery && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+              </TableCell>
             </TableRow>
           );
         });
@@ -417,6 +447,36 @@ export const ProductsTable = ({
               <span className="inline-flex items-center">
                 Statut
                 {onSort && <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />}
+              </span>
+            </TableHead>
+            <TableHead
+              onClick={() => onSort?.('available_in')}
+              className={onSort ? 'cursor-pointer select-none hover:bg-muted/60 transition-colors' : ''}
+              title="Disponible sur place"
+            >
+              <span className="inline-flex items-center">
+                <Store className="w-4 h-4" />
+                {onSort && <SortIcon col="available_in" sortKey={sortKey} sortDir={sortDir} />}
+              </span>
+            </TableHead>
+            <TableHead
+              onClick={() => onSort?.('available_take_away')}
+              className={onSort ? 'cursor-pointer select-none hover:bg-muted/60 transition-colors' : ''}
+              title="Disponible à emporter"
+            >
+              <span className="inline-flex items-center">
+                <ShoppingBag className="w-4 h-4" />
+                {onSort && <SortIcon col="available_take_away" sortKey={sortKey} sortDir={sortDir} />}
+              </span>
+            </TableHead>
+            <TableHead
+              onClick={() => onSort?.('available_delivery')}
+              className={onSort ? 'cursor-pointer select-none hover:bg-muted/60 transition-colors' : ''}
+              title="Disponible en livraison"
+            >
+              <span className="inline-flex items-center">
+                <Truck className="w-4 h-4" />
+                {onSort && <SortIcon col="available_delivery" sortKey={sortKey} sortDir={sortDir} />}
               </span>
             </TableHead>
           </TableRow>
