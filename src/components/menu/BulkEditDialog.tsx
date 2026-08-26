@@ -45,14 +45,13 @@ import {
   Percent,
   Search,
   SlidersHorizontal,
+  CircleDot,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 type BulkAction =
   | 'delete'
-  | 'set_available'
-  | 'set_not_available'
-  | 'remove_from_menu'
+  | 'set_status'
   | 'set_attributes'
   | 'add_attribute'
   | 'set_tags'
@@ -109,6 +108,28 @@ const toBulkAvailabilityFields = (
   };
 };
 
+/** Statuts de vente proposés par l'écran « Définir le statut ». */
+const STATUS_CHOICES: { value: ProductStatus; label: string; hint: string; icon: typeof CheckCircle2 }[] = [
+  {
+    value: 'available',
+    label: 'Disponible',
+    hint: 'Les produits redeviennent commandables.',
+    icon: CheckCircle2,
+  },
+  {
+    value: 'not_available',
+    label: 'Indisponible',
+    hint: 'Les produits restent au menu, affichés comme indisponibles.',
+    icon: XCircle,
+  },
+  {
+    value: 'removed_from_menu',
+    label: 'Retiré du menu',
+    hint: 'Les produits sortent du menu de vente mais restent listés ici.',
+    icon: EyeOff,
+  },
+];
+
 /** Scope attendu par l'API pour chaque action de TVA de groupe. */
 const TVA_SCOPE_BY_ACTION: Partial<Record<BulkAction, 'on_site' | 'take_away' | 'delivery'>> = {
   set_tva_on_site: 'on_site',
@@ -160,22 +181,10 @@ const ACTIONS: {
     dangerous: true,
   },
   {
-    value: 'set_available',
-    label: 'Définir comme Disponible',
-    hint: 'Les produits redeviennent commandables.',
-    icon: CheckCircle2,
-  },
-  {
-    value: 'set_not_available',
-    label: 'Définir comme Indisponibles',
-    hint: 'Les produits restent au menu, affichés comme indisponibles.',
-    icon: XCircle,
-  },
-  {
-    value: 'remove_from_menu',
-    label: 'Retirer du menu',
-    hint: 'Les produits sortent du menu de vente mais restent listés ici.',
-    icon: EyeOff,
+    value: 'set_status',
+    label: 'Définir le statut',
+    hint: 'Choisissez le nouveau statut de vente : disponible, indisponible ou retiré du menu.',
+    icon: CircleDot,
   },
   {
     value: 'set_attributes',
@@ -245,14 +254,9 @@ const ACTIONS: {
   },
 ];
 
-const STATUS_BY_ACTION: Partial<Record<BulkAction, ProductStatus>> = {
-  set_available: 'available',
-  set_not_available: 'not_available',
-  remove_from_menu: 'removed_from_menu',
-};
-
 /** Actions qui réclament un paramètre : elles gagnent un second écran plutôt qu'un tiroir sous la ligne. */
 const DETAIL_ACTIONS: BulkAction[] = [
+  'set_status',
   'set_attributes',
   'add_attribute',
   'set_tags',
@@ -293,6 +297,7 @@ export const BulkEditDialog = ({
   const { statuses } = useIntegrationStatus();
   const [step, setStep] = useState<BulkEditStep>('choose');
   const [action, setAction] = useState<BulkAction | null>(null);
+  const [statusValue, setStatusValue] = useState<ProductStatus | ''>('');
   const [selectedAttributes, setSelectedAttributes] = useState<ProductAttribute[]>([]);
   const [attributeToAdd, setAttributeToAdd] = useState('');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -322,6 +327,7 @@ export const BulkEditDialog = ({
     setStep('choose');
     setAction(null);
     setActionSearch('');
+    setStatusValue('');
     setSelectedAttributes([]);
     setAttributeToAdd('');
     setSelectedTagIds([]);
@@ -410,6 +416,7 @@ export const BulkEditDialog = ({
   const canProceed = (() => {
     if (!action || productIds.length === 0) return false;
     if (step === 'choose') return true;
+    if (action === 'set_status') return !!statusValue;
     if (action === 'add_attribute') return !!attributeToAdd;
     if (action === 'add_tags') return selectedTagIds.length > 0;
     if (action === 'assign_category') return !!categoryId;
@@ -432,9 +439,8 @@ export const BulkEditDialog = ({
 
     setApplying(true);
     try {
-      const status = STATUS_BY_ACTION[action];
-      if (status) {
-        await onSetStatus(productIds, status);
+      if (action === 'set_status' && statusValue) {
+        await onSetStatus(productIds, statusValue);
         toast.success(`${count} produit${plural} mis à jour`);
       } else if (action === 'delete') {
         await onDeleteProducts(productIds);
@@ -584,6 +590,41 @@ export const BulkEditDialog = ({
                     <selectedActionMeta.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <span className="text-sm font-medium">{selectedActionMeta.label}</span>
                   </div>
+
+                  {action === 'set_status' && (
+                    <RadioGroup
+                      value={statusValue}
+                      onValueChange={(value) => setStatusValue(value as ProductStatus)}
+                      className="gap-2"
+                    >
+                      {STATUS_CHOICES.map(({ value, label, hint, icon: Icon }) => {
+                        const isSelected = statusValue === value;
+                        return (
+                          <label
+                            key={value}
+                            htmlFor={`bulk-status-${value}`}
+                            className={`flex items-start gap-3 rounded-lg border p-3 cursor-pointer transition-colors ${
+                              isSelected ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/50'
+                            }`}
+                          >
+                            <RadioGroupItem
+                              value={value}
+                              id={`bulk-status-${value}`}
+                              className="mt-1"
+                              disabled={applying}
+                            />
+                            <Icon className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
+                            <div className="min-w-0">
+                              <Label htmlFor={`bulk-status-${value}`} className="cursor-pointer">
+                                {label}
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-1">{hint}</p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </RadioGroup>
+                  )}
 
                   {action === 'set_attributes' && (
                     <div className="rounded-lg border border-border bg-card p-3">
