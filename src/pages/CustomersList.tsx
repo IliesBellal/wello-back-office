@@ -23,6 +23,7 @@ import {
 } from '@/services/customersService';
 import { Skeleton } from '@/components/ui/skeleton';
 import CustomerDetailsSheet from '@/components/customers/CustomerDetailsSheet';
+import { CustomerCreateSheet } from '@/components/customers/CustomerCreateSheet';
 import { CustomerImportDialog } from '@/components/customers/import/CustomerImportDialog';
 import type { ImportDoor } from '@/hooks/useCustomerImport';
 import { OrderDetailModal } from '@/pages/DashboardOrderHistory';
@@ -160,6 +161,7 @@ const CustomersList = () => {
   const [sort, setSort] = useState<SortState>({ field: null, direction: null });
   const [importOpen, setImportOpen] = useState(false);
   const [importInitialDoor, setImportInitialDoor] = useState<ImportDoor | undefined>(undefined);
+  const [createOpen, setCreateOpen] = useState(false);
   const { toast } = useToast();
   const { canManageCustomers } = usePermissions();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -322,31 +324,38 @@ const CustomersList = () => {
 
             {canManageCustomers && (
               // Bouton scindé + menu, même patron que « Nouveau Produit » sur
-              // la page Menu : l'action principale (importer un fichier) à
-              // gauche, les portes secondaires (saisie manuelle) dans le menu.
+              // la page Menu : l'action principale (créer un client) à
+              // gauche, les portes d'import (fichier / saisie multiple) dans
+              // le menu.
               <div className="flex items-stretch rounded-md bg-gradient-primary">
                 <Button
                   className="rounded-r-none bg-transparent hover:bg-white/10"
-                  onClick={() => {
-                    setImportInitialDoor(undefined);
-                    setImportOpen(true);
-                  }}
+                  onClick={() => setCreateOpen(true)}
                 >
-                  <Upload className="w-4 h-4 mr-2" />
-                  Importer des clients
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Créer un client
                 </Button>
                 <div className="my-2 w-px bg-primary-foreground/25" />
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       size="icon"
-                      aria-label="Autres options d’import"
+                      aria-label="Autres options d’ajout"
                       className="rounded-l-none bg-transparent hover:bg-white/10"
                     >
                       <ChevronDown className="w-4 h-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="bg-popover">
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setImportInitialDoor('provider');
+                        setImportOpen(true);
+                      }}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Importer un fichier
+                    </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => {
                         setImportInitialDoor('manual');
@@ -544,6 +553,14 @@ const CustomersList = () => {
           // déjà en place avec les paramètres courants (page, tri, recherche).
           onImported={() => loadCustomers()}
           initialDoor={importInitialDoor}
+        />
+      )}
+
+      {canManageCustomers && (
+        <CustomerCreateSheet
+          open={createOpen}
+          onOpenChange={setCreateOpen}
+          onCreated={() => loadCustomers()}
         />
       )}
     </DashboardLayout>

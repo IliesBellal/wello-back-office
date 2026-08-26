@@ -24,6 +24,10 @@ interface BulkAssignProductsDialogProps {
   initialSelectedIds?: string[]; // Pre-selected product IDs
   loading?: boolean;
   onConfirm: (selectedProductIds: string[]) => Promise<void>;
+  /** Titre/description personnalisés pour les usages hors "catégorie" (ex. sous-produits d'un groupe). */
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
 }
 
 export function BulkAssignProductsDialog({
@@ -34,6 +38,9 @@ export function BulkAssignProductsDialog({
   initialSelectedIds,
   loading = false,
   onConfirm,
+  title,
+  description,
+  confirmLabel = 'Assigner',
 }: BulkAssignProductsDialogProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -111,9 +118,9 @@ export function BulkAssignProductsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Assigner des produits à "{categoryName}"</DialogTitle>
+          <DialogTitle>{title || `Assigner des produits à "${categoryName}"`}</DialogTitle>
           <DialogDescription>
-            Sélectionnez les produits à assigner à cette catégorie
+            {description || 'Sélectionnez les produits à assigner à cette catégorie'}
           </DialogDescription>
         </DialogHeader>
 
@@ -197,7 +204,7 @@ export function BulkAssignProductsDialog({
             {isAssigning || loading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
             ) : null}
-            {isAssigning || loading ? 'Assignation...' : 'Assigner'}
+            {isAssigning || loading ? 'Assignation...' : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

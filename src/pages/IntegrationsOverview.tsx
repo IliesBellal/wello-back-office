@@ -9,7 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { CheckCircle, AlertCircle, ArrowRight, Euro, ShoppingCart, TrendingUp, Copy, ExternalLink } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
+import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasModuleAccess } from '@/lib/moduleAccess';
 
@@ -321,7 +321,7 @@ export default function IntegrationsOverviewPage() {
         header={
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-3xl font-bold text-foreground">Canaux et Plateformes</h1>
-            <EstablishmentClosureModal />
+            <EstablishmentOperationsModal />
           </div>
         }
         description="Gérez vos intégrations avec les plateformes de livraison et consultez vos KPIs"

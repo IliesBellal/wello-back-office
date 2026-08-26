@@ -207,6 +207,65 @@ export const integrationsService = {
     );
   },
 
+  /**
+   * Règle le temps de préparation permanent d'une plateforme, sans toucher à
+   * ses autres réglages (commission, auto-acceptation) : le back-end accepte
+   * des champs optionnels et n'écrit que ceux transmis.
+   *
+   * Seuls Uber Eats et Deliveroo sont adressables : le temps de préparation
+   * ScanNOrder (`merchant_parameters.preparation_time`) est aujourd'hui en
+   * lecture seule côté API, aucun endpoint ne l'écrit.
+   */
+  updatePlatformPreparationTime: async (
+    platform: Extract<IntegrationPlatform, 'uber_eats' | 'deliveroo'>,
+    preparationTimeMinutes: number,
+  ): Promise<IntegrationStatus> => {
+    const path = platform === 'uber_eats' ? '/integrations/uber-eats' : '/integrations/deliveroo';
+    const body = { preparation_time_minutes: preparationTimeMinutes };
+    logAPI('PATCH', path, body);
+
+    return withMock(
+      () => ({
+        ...mockIntegrations[platform === 'uber_eats' ? 'uber_eats' : 'deliveroo'],
+        preparation_time_minutes: preparationTimeMinutes,
+      }),
+      () => apiClient.patch<PatchIntegrationResponse>(path, body).then(res => res.data.integration)
+    );
+  },
+
+  /**
+   * Applique un temps d'attente supplémentaire temporaire sur les plateformes
+   * choisies. `duration_minutes` est optionnel : sans lui, l'API applique sa
+   * fenêtre par défaut (60 min) au terme de laquelle le supplément s'efface.
+   *
+   * Deliveroo n'expose qu'un mode de charge sans échéance : le supplément y est
+   * traduit en mode (QUIET/MODERATE/BUSY) et reste actif jusqu'au prochain
+   * changement — `applied_until` ne l'engage pas.
+   */
+  setEstablishmentWaitTime: async (data: {
+    wait_time_minutes: number;
+    affected_integrations: IntegrationPlatform[];
+    duration_minutes?: number;
+  }): Promise<{ status: string; wait_time_minutes: number; applied_until: string; affected_integrations: IntegrationPlatform[] }> => {
+    logAPI('PATCH', '/integrations/global/wait-time', data);
+
+    return withMock(
+      () => ({
+        status: 'success',
+        wait_time_minutes: data.wait_time_minutes,
+        applied_until: new Date(Date.now() + (data.duration_minutes ?? 60) * 60 * 1000).toISOString(),
+        affected_integrations: data.affected_integrations,
+      }),
+      () =>
+        apiClient
+          .patch<WelloApiResponse<{ status: string; wait_time_minutes: number; applied_until: string; affected_integrations: IntegrationPlatform[] }>>(
+            '/integrations/global/wait-time',
+            data
+          )
+          .then(res => res.data)
+    );
+  },
+
   // ════════════════════════════════════════════════════════════════════════════
   // STRIPE PAYMENT INTEGRATION
   // ════════════════════════════════════════════════════════════════════════════

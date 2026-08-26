@@ -41,8 +41,8 @@ import {
 import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2 } from 'lucide-react';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
-import { ProductTagsTab } from './ProductTagsTab';
 import { CategorySelector } from '@/components/shared/CategorySelector';
+import { MultiSelectDropdown } from '@/components/shared/MultiSelectDropdown';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
 import { useProductEditData } from '@/hooks/useProductEditData';
@@ -78,14 +78,6 @@ interface SimpleProductSheetProps {
   onCreate?: (data: ProductCreatePayload) => Promise<Product>;
   onDelete?: (productId: string) => Promise<void>;
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
-  onTagCreated?: (newTag: { id: string; name: string }) => void;
-  /**
-   * Notifie une assignation de tags/allergènes déjà persistée depuis l'onglet
-   * Tags (enregistrement immédiat, sans passer par onSave) afin que le parent
-   * rafraîchisse son cache local sans refetch.
-   */
-  onTagsPersisted?: (productId: string, tagIds: string[]) => void;
-  onAllergensPersisted?: (productId: string, allergenIds: string[]) => void;
 }
 
 // Socle de lecture en création : la fiche est rendue avant qu'aucun produit
@@ -183,9 +175,6 @@ export const SimpleProductSheet = ({
   onCreate,
   onDelete,
   onCreateCategory,
-  onTagCreated,
-  onTagsPersisted,
-  onAllergensPersisted
 }: SimpleProductSheetProps) => {
   // Load product data if productId is provided
   const { product: loadedProduct, loading } = useProductData(productId || null, open);
@@ -212,6 +201,13 @@ export const SimpleProductSheet = ({
     price_take_away: '',
     price_delivery: '',
   });
+
+  // Prix/TVA par défaut : raccourcis de création qui répliquent une seule
+  // saisie sur les 3 champs de l'onglet Tarif, plutôt que de forcer l'usager à
+  // y remplir 6 champs quasi identiques. Purement locaux à la fiche, jamais
+  // envoyés à l'API.
+  const [defaultPriceDisplay, setDefaultPriceDisplay] = useState('');
+  const [defaultTvaValue, setDefaultTvaValue] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { toast } = useToast();
@@ -414,6 +410,8 @@ export const SimpleProductSheet = ({
     });
     setPriceDisplayValues({ price: '', price_take_away: '', price_delivery: '' });
     setTvaSelection({ in: '', takeAway: '', delivery: '' });
+    setDefaultPriceDisplay('');
+    setDefaultTvaValue('');
     setSelectedImageFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -668,39 +666,52 @@ export const SimpleProductSheet = ({
     }
   };
 
-  // L'onglet Tags écrit directement via les endpoints dédiés : on réaligne le
-  // produit affiché sur ce qui est persisté, sinon « Annuler » restaurerait un
-  // formData bâti sur des tags périmés et masquerait une modification pourtant
-  // enregistrée.
-  const applyPersistedSelection = (patch: Pick<Product, 'tags'> | Pick<Product, 'allergens'>) => {
-    setDisplayedProduct(prev => {
-      const base = prev || baseProduct;
-      return base ? ({ ...base, ...patch } as Product) : prev;
+  // Tags/allergènes : simples champs de formData au même titre que Catégorie
+  // ou Statut, désormais — ils partent avec le reste du formulaire au clic sur
+  // « Enregistrer »/« Créer le produit », plus de synchronisation instantanée
+  // dédiée depuis qu'ils ne vivent plus dans un onglet séparé.
+  const selectedTagIds = (formData.tags || []).filter((t): t is string => typeof t === 'string');
+  const selectedAllergenIds = (formData.allergens || []).filter((a): a is string => typeof a === 'string');
+  const handleTagsChange = (tagIds: string[]) => setFormData(prev => ({ ...prev, tags: tagIds }));
+  const handleAllergensChange = (allergenIds: string[]) =>
+    setFormData(prev => ({ ...prev, allergens: allergenIds }));
+
+  // TVA par défaut (création uniquement) : les 3 groupes de taux (sur place,
+  // emporter, livraison) portent des ID différents pour un même pourcentage.
+  // On propose donc les pourcentages en commun aux 3 groupes, puis on résout
+  // l'ID propre à chaque groupe au moment d'appliquer la sélection.
+  const defaultTvaOptions = useMemo(() => {
+    const byValue = new Map<number, TvaRate>();
+    [...onSiteRates, ...takeAwayRates, ...deliveryRates].forEach((rate) => {
+      if (!byValue.has(rate.value)) byValue.set(rate.value, rate);
     });
+    return Array.from(byValue.values()).sort((a, b) => a.value - b.value);
+  }, [onSiteRates, takeAwayRates, deliveryRates]);
+
+  const handleDefaultPriceChange = (raw: string) => {
+    setDefaultPriceDisplay(raw);
+    const cents = parsePriceInput(raw);
+    setFormData(prev => ({ ...prev, price: cents, price_take_away: cents, price_delivery: cents }));
+    setPriceDisplayValues({ price: raw, price_take_away: raw, price_delivery: raw });
   };
 
-  const handleTagsPersisted = (tagIds: string[]) => {
-    applyPersistedSelection({ tags: tagIds });
-    if (baseProduct) onTagsPersisted?.(baseProduct.product_id, tagIds);
+  const handleDefaultPriceBlur = (raw: string) => {
+    const formatted = priceToDisplayValue(parsePriceInput(raw));
+    setDefaultPriceDisplay(formatted);
+    setPriceDisplayValues({ price: formatted, price_take_away: formatted, price_delivery: formatted });
   };
 
-  const handleAllergensPersisted = (allergenIds: string[]) => {
-    applyPersistedSelection({ allergens: allergenIds });
-    if (baseProduct) onAllergensPersisted?.(baseProduct.product_id, allergenIds);
-  };
-
-  const tagsTabProps = {
-    tags: tagsData ?? [],
-    allergens: allergensData ?? [],
-    selectedTagIds: (formData.tags || []).filter((t): t is string => typeof t === 'string'),
-    selectedAllergenIds: (formData.allergens || []).filter((a): a is string => typeof a === 'string'),
-    onTagsChange: (tagIds: string[]) => setFormData(prev => ({ ...prev, tags: tagIds })),
-    onAllergensChange: (allergenIds: string[]) =>
-      setFormData(prev => ({ ...prev, allergens: allergenIds })),
-    productId: isCreateMode ? null : baseProduct?.product_id ?? null,
-    onTagsPersisted: handleTagsPersisted,
-    onAllergensPersisted: handleAllergensPersisted,
-    onTagCreated,
+  const handleDefaultTvaChange = (value: string) => {
+    setDefaultTvaValue(value);
+    const numericValue = Number.parseFloat(value);
+    const matchIn = onSiteRates.find(r => r.value === numericValue);
+    const matchTakeAway = takeAwayRates.find(r => r.value === numericValue);
+    const matchDelivery = deliveryRates.find(r => r.value === numericValue);
+    setTvaSelection({
+      in: matchIn ? matchIn.id.toString() : '',
+      takeAway: matchTakeAway ? matchTakeAway.id.toString() : '',
+      delivery: matchDelivery ? matchDelivery.id.toString() : '',
+    });
   };
 
   const handleCancel = () => {
@@ -890,7 +901,6 @@ export const SimpleProductSheet = ({
                     </TabsTrigger>
                     <TabsTrigger value="composition" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Composition</TabsTrigger>
                     <TabsTrigger value="options" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Options</TabsTrigger>
-                    <TabsTrigger value="tags" className="flex-shrink-0 rounded-none border-b-2 text-xs py-2">Tags</TabsTrigger>
                   </TabsList>
                 </ScrollArea>
 
@@ -1048,6 +1058,67 @@ export const SimpleProductSheet = ({
                           </SelectContent>
                         </Select>
                       </div>
+
+                      {/* Tags */}
+                      <MultiSelectDropdown
+                        label="Tags"
+                        options={(tagsData ?? []).map((tag) => ({ id: tag.id, label: tag.name }))}
+                        selectedIds={selectedTagIds}
+                        onChange={handleTagsChange}
+                        placeholder="Aucun tag"
+                        triggerClassName="text-sm"
+                      />
+
+                      {/* Allergènes */}
+                      <MultiSelectDropdown
+                        label="Allergènes"
+                        options={(allergensData ?? []).map((allergen) => ({ id: allergen.allergen_id, label: allergen.name }))}
+                        selectedIds={selectedAllergenIds}
+                        onChange={handleAllergensChange}
+                        placeholder="Aucun allergène"
+                        triggerClassName="text-sm"
+                      />
+
+                      {isCreateMode && (
+                        <>
+                          {/* Prix par défaut */}
+                          <div>
+                            <Label className="text-xs">Prix par défaut</Label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              value={defaultPriceDisplay}
+                              onChange={(e) => handleDefaultPriceChange(e.target.value)}
+                              onBlur={(e) => handleDefaultPriceBlur(e.target.value)}
+                              placeholder="0,00"
+                              className="mt-1 text-sm"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Applique le même prix sur place, à emporter et en livraison (modifiable ensuite dans l’onglet Tarifs).
+                            </p>
+                          </div>
+
+                          {/* TVA par défaut */}
+                          <div>
+                            <Label className="text-xs">TVA par défaut</Label>
+                            <Select value={defaultTvaValue} onValueChange={handleDefaultTvaChange}>
+                              <SelectTrigger className="mt-1 text-sm">
+                                <SelectValue placeholder="Sélectionner un taux" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {defaultTvaOptions.map((rate) => (
+                                  <SelectItem key={rate.value} value={rate.value.toString()}>
+                                    {rate.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Applique le même taux sur place, à emporter et en livraison (modifiable ensuite dans l’onglet Tarifs).
+                            </p>
+                          </div>
+                        </>
+                      )}
 
                       {/* Colors */}
                       <div className="space-y-3">
@@ -1281,7 +1352,8 @@ export const SimpleProductSheet = ({
                               {isEditMode ? (
                                 <PriceInput 
                                   value={formData.integrations?.uber_eats?.price_override || 0}
-                                  onChange={(e) => setFormData({ ...formData, integrations: { ...formData.integrations, uber_eats: { ...(formData.integrations?.uber_eats || {}), price_override: Math.round(parseFloat(e.target.value.replace(',', '.') || '0') * 100) } } })} 
+                                  valueInCents
+                                  onChange={(e) => setFormData({ ...formData, integrations: { ...formData.integrations, uber_eats: { ...(formData.integrations?.uber_eats || {}), price_override: parsePriceInput(e.target.value) } } })} 
                                   placeholder="0,00" 
                                   className="mt-1 h-8 text-xs" 
                                 />
@@ -1323,7 +1395,8 @@ export const SimpleProductSheet = ({
                               {isEditMode ? (
                                 <PriceInput 
                                   value={formData.integrations?.deliveroo?.price_override || 0}
-                                  onChange={(e) => setFormData({ ...formData, integrations: { ...formData.integrations, deliveroo: { ...(formData.integrations?.deliveroo || {}), price_override: Math.round(parseFloat(e.target.value.replace(',', '.') || '0') * 100) } } })} 
+                                  valueInCents
+                                  onChange={(e) => setFormData({ ...formData, integrations: { ...formData.integrations, deliveroo: { ...(formData.integrations?.deliveroo || {}), price_override: parsePriceInput(e.target.value) } } })} 
                                   placeholder="0,00" 
                                   className="mt-1 h-8 text-xs" 
                                 />
@@ -1381,10 +1454,6 @@ export const SimpleProductSheet = ({
                     onChange={(attributes) => setFormData({ ...formData, attributes })}
                     disabled={!isEditMode}
                   />
-                </TabsContent>
-
-                <TabsContent value="tags" className="mt-0">
-                  <ProductTagsTab {...tagsTabProps} compact />
                 </TabsContent>
               </Tabs>
             ) : (
@@ -1567,7 +1636,6 @@ export const SimpleProductSheet = ({
                 </TabsTrigger>
                 <TabsTrigger value="composition" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Composition</TabsTrigger>
                 <TabsTrigger value="options" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Options</TabsTrigger>
-                <TabsTrigger value="tags" className={`${isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs' : 'text-xs'}`}>Tags</TabsTrigger>
               </TabsList>
             </ScrollArea>
 
@@ -1743,6 +1811,63 @@ export const SimpleProductSheet = ({
                             </SelectContent>
                           </Select>
                         </div>
+                        <div>
+                          <Label>Tags</Label>
+                          <MultiSelectDropdown
+                            options={(tagsData ?? []).map((tag) => ({ id: tag.id, label: tag.name }))}
+                            selectedIds={selectedTagIds}
+                            onChange={handleTagsChange}
+                            placeholder="Aucun tag"
+                            className="mt-1"
+                          />
+                        </div>
+                        <div>
+                          <Label>Allergènes</Label>
+                          <MultiSelectDropdown
+                            options={(allergensData ?? []).map((allergen) => ({ id: allergen.allergen_id, label: allergen.name }))}
+                            selectedIds={selectedAllergenIds}
+                            onChange={handleAllergensChange}
+                            placeholder="Aucun allergène"
+                            className="mt-1"
+                          />
+                        </div>
+                        {isCreateMode && (
+                          <>
+                            <div>
+                              <Label>Prix par défaut</Label>
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={defaultPriceDisplay}
+                                onChange={(e) => handleDefaultPriceChange(e.target.value)}
+                                onBlur={(e) => handleDefaultPriceBlur(e.target.value)}
+                                placeholder="0,00"
+                                className="mt-1"
+                              />
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Applique le même prix sur place, à emporter et en livraison.
+                              </p>
+                            </div>
+                            <div>
+                              <Label>TVA par défaut</Label>
+                              <Select value={defaultTvaValue} onValueChange={handleDefaultTvaChange}>
+                                <SelectTrigger className="mt-1">
+                                  <SelectValue placeholder="Sélectionner un taux" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {defaultTvaOptions.map((rate) => (
+                                    <SelectItem key={rate.value} value={rate.value.toString()}>
+                                      {rate.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Applique le même taux sur place, à emporter et en livraison.
+                              </p>
+                            </div>
+                          </>
+                        )}
                         <div>
                           <Label>Couleur fond</Label>
                           <div className="flex items-center gap-2 mt-1">
@@ -2045,13 +2170,14 @@ export const SimpleProductSheet = ({
                           {isEditMode ? (
                             <PriceInput
                               value={formData.integrations?.uber_eats?.price_override || 0}
+                              valueInCents
                               onChange={(e) => setFormData({
                                 ...formData,
                                 integrations: {
                                   ...formData.integrations,
                                   uber_eats: {
                                     ...(formData.integrations?.uber_eats || {}),
-                                    price_override: Math.round(parseFloat(e.target.value.replace(',', '.') || '0') * 100)
+                                    price_override: parsePriceInput(e.target.value)
                                   }
                                 }
                               })}
@@ -2106,13 +2232,14 @@ export const SimpleProductSheet = ({
                           {isEditMode ? (
                             <PriceInput
                               value={formData.integrations?.deliveroo?.price_override || 0}
+                              valueInCents
                               onChange={(e) => setFormData({
                                 ...formData,
                                 integrations: {
                                   ...formData.integrations,
                                   deliveroo: {
                                     ...(formData.integrations?.deliveroo || {}),
-                                    price_override: Math.round(parseFloat(e.target.value.replace(',', '.') || '0') * 100)
+                                    price_override: parsePriceInput(e.target.value)
                                   }
                                 }
                               })}
@@ -2176,10 +2303,6 @@ export const SimpleProductSheet = ({
               onChange={(attributes) => setFormData({ ...formData, attributes })}
               disabled={!isEditMode}
             />
-          </TabsContent>
-
-          <TabsContent value="tags" className="mt-0">
-            <ProductTagsTab {...tagsTabProps} />
           </TabsContent>
         </Tabs>
         ) : (

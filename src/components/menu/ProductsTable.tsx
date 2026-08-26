@@ -270,19 +270,6 @@ export const ProductsTable = ({
             </div>
           </TableCell>
 
-          {/* Statut */}
-          <TableCell
-            onClick={() => onProductClick(product)}
-            className="cursor-pointer"
-          >
-            <Badge
-              className={`text-xs ${status.color}`}
-              variant="outline"
-            >
-              {status.label}
-            </Badge>
-          </TableCell>
-
           {/* Disponible sur place */}
           <TableCell className="text-center">
             {product.available_in && <Check className="w-4 h-4 text-green-600 mx-auto" />}
@@ -296,6 +283,19 @@ export const ProductsTable = ({
           {/* Disponible en livraison */}
           <TableCell className="text-center">
             {product.available_delivery && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+          </TableCell>
+
+          {/* Statut */}
+          <TableCell
+            onClick={() => onProductClick(product)}
+            className="cursor-pointer"
+          >
+            <Badge
+              className={`text-xs ${status.color}`}
+              variant="outline"
+            >
+              {status.label}
+            </Badge>
           </TableCell>
         </TableRow>
       );
@@ -361,19 +361,6 @@ export const ProductsTable = ({
                 <span className="text-muted-foreground text-sm">Aucun</span>
               </TableCell>
 
-              {/* Statut */}
-              <TableCell
-                onClick={() => onProductClick(subProductData)}
-                className="cursor-pointer"
-              >
-                <Badge
-                  className={`text-xs ${subStatus.color}`}
-                  variant="outline"
-                >
-                  {subStatus.label}
-                </Badge>
-              </TableCell>
-
               {/* Disponible sur place */}
               <TableCell className="text-center">
                 {subProductData.available_in && <Check className="w-4 h-4 text-green-600 mx-auto" />}
@@ -387,6 +374,19 @@ export const ProductsTable = ({
               {/* Disponible en livraison */}
               <TableCell className="text-center">
                 {subProductData.available_delivery && <Check className="w-4 h-4 text-green-600 mx-auto" />}
+              </TableCell>
+
+              {/* Statut */}
+              <TableCell
+                onClick={() => onProductClick(subProductData)}
+                className="cursor-pointer"
+              >
+                <Badge
+                  className={`text-xs ${subStatus.color}`}
+                  variant="outline"
+                >
+                  {subStatus.label}
+                </Badge>
               </TableCell>
             </TableRow>
           );
@@ -441,15 +441,6 @@ export const ProductsTable = ({
             </TableHead>
             <TableHead>Allergènes</TableHead>
             <TableHead
-              onClick={() => onSort?.('status')}
-              className={onSort ? 'cursor-pointer select-none hover:bg-muted/60 transition-colors' : ''}
-            >
-              <span className="inline-flex items-center">
-                Statut
-                {onSort && <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />}
-              </span>
-            </TableHead>
-            <TableHead
               onClick={() => onSort?.('available_in')}
               className={onSort ? 'cursor-pointer select-none hover:bg-muted/60 transition-colors' : ''}
               title="Disponible sur place"
@@ -477,6 +468,15 @@ export const ProductsTable = ({
               <span className="inline-flex items-center">
                 <Truck className="w-4 h-4" />
                 {onSort && <SortIcon col="available_delivery" sortKey={sortKey} sortDir={sortDir} />}
+              </span>
+            </TableHead>
+            <TableHead
+              onClick={() => onSort?.('status')}
+              className={onSort ? 'cursor-pointer select-none hover:bg-muted/60 transition-colors' : ''}
+            >
+              <span className="inline-flex items-center">
+                Statut
+                {onSort && <SortIcon col="status" sortKey={sortKey} sortDir={sortDir} />}
               </span>
             </TableHead>
           </TableRow>

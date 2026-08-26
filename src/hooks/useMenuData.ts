@@ -362,6 +362,56 @@ export const useMenuData = () => {
     }
   };
 
+  // ===== Groupes de produits =====
+  // L'appartenance à un groupe (by_product_of) fait bouger un produit entre
+  // la liste racine de sa catégorie et la liste sous_products de son groupe :
+  // un patch local fidèle demanderait de dupliquer cette logique de
+  // placement. Un rechargement complet est plus sûr et reste bon marché ici
+  // (action d'admin peu fréquente), et garantit que l'affichage suit
+  // exactement ce que l'API considère comme racine vs sous-produit.
+  const setGroupMembers = async (groupId: string, addIds: string[], removeIds: string[]) => {
+    try {
+      await Promise.all([
+        ...addIds.map(id => menuService.updateProduct(id, { by_product_of: groupId })),
+        ...removeIds.map(id => menuService.updateProduct(id, { by_product_of: '' })),
+      ]);
+      await loadData();
+      toast({
+        title: "Succès",
+        description: "Sous-produits mis à jour avec succès"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de mettre à jour les sous-produits",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
+  // Un groupe supprimé détache ses sous-produits plutôt que de les supprimer
+  // en cascade : ce sont de vrais produits du catalogue, ils restent
+  // vendables de façon autonome après la suppression du groupe.
+  const deleteProductGroup = async (groupId: string, subProductIds: string[]) => {
+    try {
+      await Promise.all(subProductIds.map(id => menuService.updateProduct(id, { by_product_of: '' })));
+      await menuService.deleteProduct(groupId);
+      await loadData();
+      toast({
+        title: "Succès",
+        description: "Groupe supprimé, les sous-produits ont été conservés"
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de supprimer le groupe",
+        variant: "destructive"
+      });
+      throw error;
+    }
+  };
+
   const deleteCategory = async (categoryId: string) => {
     try {
       await menuService.deleteCategory(categoryId);
@@ -494,6 +544,47 @@ export const useMenuData = () => {
     patchProducts(productIds, p => ({ ...p, configuration: { attributes: matched } }));
   };
 
+  // Ajoute un groupe d'options/suppléments sans retirer ceux déjà attachés :
+  // chaque produit ciblé garde sa propre configuration existante en plus du
+  // nouveau groupe, d'où un merge par produit plutôt qu'un remplacement global.
+  const bulkAddProductsAttribute = async (productIds: string[], attributeId: string) => {
+    await menuService.bulkAssignAttributeToProducts(productIds, attributeId);
+    const attribute = attributes.find(a => a.id === attributeId);
+    if (!attribute) return;
+    patchProducts(productIds, p => {
+      const existing = (p.configuration && !Array.isArray(p.configuration) ? p.configuration.attributes : []) || [];
+      if (existing.some(a => a.id === attributeId)) return p;
+      return { ...p, configuration: { attributes: [...existing, attribute] } };
+    });
+  };
+
+  // Remplace la liste complète des tags des produits ciblés par la même liste.
+  const bulkSetProductsTags = async (productIds: string[], tagIds: string[]) => {
+    await menuService.bulkSetProductsTags(productIds, tagIds);
+    patchProducts(productIds, p => ({ ...p, tags: tagIds }));
+  };
+
+  // Ajoute des tags sans retirer ceux déjà présents : un appel API par tag
+  // (l'endpoint additif ne porte qu'un seul tag_id), fusion locale par produit
+  // puisque chacun peut partir d'une liste de tags différente.
+  const bulkAddProductsTags = async (productIds: string[], tagIds: string[]) => {
+    await Promise.all(tagIds.map(tagId => menuService.bulkAssignTagToProducts(productIds, tagId)));
+    patchProducts(productIds, p => {
+      const existingIds = new Set((p.tags || []).map(t => (typeof t === 'string' ? t : t.id)));
+      const additions = tagIds.filter(id => !existingIds.has(id));
+      if (additions.length === 0) return p;
+      return { ...p, tags: [...(p.tags || []), ...additions] };
+    });
+  };
+
+  // Applique un taux de TVA à un seul type de vente (scope) pour les produits
+  // ciblés. Pas de patch local fin : refetch, comme setGroupMembers /
+  // deleteProductGroup, pour rester fidèle aux libellés de taux résolus côté API.
+  const bulkSetProductsTva = async (productIds: string[], scope: 'on_site' | 'take_away' | 'delivery', tvaId: string) => {
+    await menuService.bulkSetProductsTva(productIds, scope, tvaId);
+    await loadData();
+  };
+
   const bulkAssignProductsToCategory = async (productIds: string[], categoryId: string) => {
     await menuService.bulkAssignProductsToCategory(productIds, categoryId);
     // La catégorie caisse est un champ unique : les produits quittent leur
@@ -524,12 +615,6 @@ export const useMenuData = () => {
   // n'est pas touchée — rien à refléter dans menuData, qui ne la porte pas.
   const bulkAssignProductsToMarketingCategory = async (productIds: string[], categoryId: string) => {
     await menuService.bulkAssignProductsToMarketCategory(productIds, categoryId);
-  };
-
-  // Adds a tag created elsewhere (product sheet) to the local catalog so the products
-  // table can resolve its name right away, without a refetch.
-  const registerTag = (newTag: { id: string; name: string }) => {
-    setTags(prev => prev.some(t => t.id === newTag.id) ? prev : [...prev, newTag as Tag]);
   };
 
   // Merges already-persisted allergen assignments into local state (no API call, no refetch).
@@ -607,7 +692,6 @@ export const useMenuData = () => {
     tags,
     loading,
     updateProduct,
-    registerTag,
     createAttribute,
     updateAttributeData,
     deleteAttribute,
@@ -617,6 +701,8 @@ export const useMenuData = () => {
     updateCategory,
     deleteProduct,
     createProduct,
+    setGroupMembers,
+    deleteProductGroup,
     createComponent,
     updateComponent,
     deleteComponent,
@@ -626,6 +712,10 @@ export const useMenuData = () => {
     bulkDeleteProducts,
     bulkSetProductsStatus,
     bulkSetProductsAttributes,
+    bulkAddProductsAttribute,
+    bulkSetProductsTags,
+    bulkAddProductsTags,
+    bulkSetProductsTva,
     bulkAssignProductsToCategory,
     bulkAssignProductsToMarketingCategory,
     applyProductsAllergens,

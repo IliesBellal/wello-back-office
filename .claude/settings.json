@@ -20,7 +20,16 @@
       "Bash(xargs -I{} grep -l \"CREATE TABLE\" {})",
       "Bash(go -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" build ./...)",
       "Bash(go -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" vet ./internal/modules/pos/... ./internal/modules/planning/settings/...)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:5173/)",
+      "Bash(Get-Process node *)",
+      "Bash(Select-Object ProcessName, Id)",
+      "Bash(netstat -tlnp)",
+      "Bash(tee /tmp/dev-output.log)",
+      "Bash(curl -s http://localhost:8081/)",
+      "Bash(pkill -f \"node.*vite\")",
+      "Bash(echo \"GO_BUILD_EXIT=$?\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8082/)"
     ]
   }
 }

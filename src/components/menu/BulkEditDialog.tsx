@@ -8,12 +8,21 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SelectableChip } from '@/components/ui/selectable-chip';
 import { CategorySelector, ConfirmDialog } from '@/components/shared';
 import { ProductOptionsTab } from '@/components/menu/ProductOptionsTab';
-import { Attribute, Category, Product, ProductAttribute, ProductStatus } from '@/types/menu';
+import { Attribute, Category, Product, ProductAttribute, ProductStatus, Tag, TvaRate, TvaRateGroup } from '@/types/menu';
 import { menuService } from '@/services/menuService';
 import {
   ArrowLeft,
@@ -23,8 +32,16 @@ import {
   XCircle,
   EyeOff,
   ListChecks,
+  ListPlus,
   FolderInput,
   Megaphone,
+  Tags as TagsIcon,
+  TagIcon,
+  Store,
+  ShoppingBag,
+  Truck,
+  Percent,
+  Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,8 +51,28 @@ type BulkAction =
   | 'set_not_available'
   | 'remove_from_menu'
   | 'set_attributes'
+  | 'add_attribute'
+  | 'set_tags'
+  | 'add_tags'
   | 'assign_category'
-  | 'assign_marketing_category';
+  | 'assign_marketing_category'
+  | 'set_tva_on_site'
+  | 'set_tva_take_away'
+  | 'set_tva_delivery'
+  | 'set_tva_all';
+
+/** Scope attendu par l'API pour chaque action de TVA de groupe. */
+const TVA_SCOPE_BY_ACTION: Partial<Record<BulkAction, 'on_site' | 'take_away' | 'delivery'>> = {
+  set_tva_on_site: 'on_site',
+  set_tva_take_away: 'take_away',
+  set_tva_delivery: 'delivery',
+};
+
+const TVA_DELIVERY_TYPE_BY_SCOPE: Record<'on_site' | 'take_away' | 'delivery', string> = {
+  on_site: 'IN',
+  take_away: 'TAKE_AWAY',
+  delivery: 'DELIVERY',
+};
 
 interface BulkEditDialogProps {
   open: boolean;
@@ -44,12 +81,17 @@ interface BulkEditDialogProps {
   selectedProducts: Product[];
   attributes: Attribute[];
   categories: Category[];
+  tags: Tag[];
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   onDeleteProducts: (productIds: string[]) => Promise<void>;
   onSetStatus: (productIds: string[], status: ProductStatus) => Promise<void>;
   onSetAttributes: (productIds: string[], attributeIds: string[]) => Promise<void>;
+  onAddAttribute: (productIds: string[], attributeId: string) => Promise<void>;
+  onSetTags: (productIds: string[], tagIds: string[]) => Promise<void>;
+  onAddTags: (productIds: string[], tagIds: string[]) => Promise<void>;
   onAssignCategory: (productIds: string[], categoryId: string) => Promise<void>;
   onAssignMarketingCategory: (productIds: string[], categoryId: string) => Promise<void>;
+  onSetTva: (productIds: string[], scope: 'on_site' | 'take_away' | 'delivery', tvaId: string) => Promise<void>;
   /** Appelé après une action réussie, pour vider la sélection du tableau. */
   onApplied: () => void;
 }
@@ -93,6 +135,24 @@ const ACTIONS: {
     icon: ListChecks,
   },
   {
+    value: 'add_attribute',
+    label: 'Ajouter une option',
+    hint: 'Ajoute un groupe d’options aux produits sans toucher à ceux déjà attachés.',
+    icon: ListPlus,
+  },
+  {
+    value: 'set_tags',
+    label: 'Définir les Tags',
+    hint: 'Remplace tous les tags des produits par la sélection ci-dessous.',
+    icon: TagsIcon,
+  },
+  {
+    value: 'add_tags',
+    label: 'Ajouter les tags',
+    hint: 'Ajoute les tags sélectionnés aux produits sans retirer ceux déjà présents.',
+    icon: TagIcon,
+  },
+  {
     value: 'assign_category',
     label: 'Ajouter à la catégorie caisse',
     hint: 'Un produit n’appartient qu’à une seule catégorie caisse : il quitte la précédente.',
@@ -104,6 +164,30 @@ const ACTIONS: {
     hint: 'Rattachement additif : la catégorie caisse des produits n’est pas modifiée.',
     icon: Megaphone,
   },
+  {
+    value: 'set_tva_on_site',
+    label: 'Définir TVA Sur place',
+    hint: 'Applique le taux de TVA choisi aux produits pour la vente sur place.',
+    icon: Store,
+  },
+  {
+    value: 'set_tva_take_away',
+    label: 'Définir TVA Emporter',
+    hint: 'Applique le taux de TVA choisi aux produits pour la vente à emporter.',
+    icon: ShoppingBag,
+  },
+  {
+    value: 'set_tva_delivery',
+    label: 'Définir TVA Livraison',
+    hint: 'Applique le taux de TVA choisi aux produits pour la livraison.',
+    icon: Truck,
+  },
+  {
+    value: 'set_tva_all',
+    label: 'Définir toutes les TVA',
+    hint: 'Applique en une seule fois un taux de TVA pour chacun des trois types de vente.',
+    icon: Percent,
+  },
 ];
 
 const STATUS_BY_ACTION: Partial<Record<BulkAction, ProductStatus>> = {
@@ -113,7 +197,18 @@ const STATUS_BY_ACTION: Partial<Record<BulkAction, ProductStatus>> = {
 };
 
 /** Actions qui réclament un paramètre : elles gagnent un second écran plutôt qu'un tiroir sous la ligne. */
-const DETAIL_ACTIONS: BulkAction[] = ['set_attributes', 'assign_category', 'assign_marketing_category'];
+const DETAIL_ACTIONS: BulkAction[] = [
+  'set_attributes',
+  'add_attribute',
+  'set_tags',
+  'add_tags',
+  'assign_category',
+  'assign_marketing_category',
+  'set_tva_on_site',
+  'set_tva_take_away',
+  'set_tva_delivery',
+  'set_tva_all',
+];
 const needsDetailStep = (action: BulkAction | null): boolean =>
   action !== null && DETAIL_ACTIONS.includes(action);
 
@@ -125,23 +220,35 @@ export const BulkEditDialog = ({
   selectedProducts,
   attributes,
   categories,
+  tags,
   onCreateCategory,
   onDeleteProducts,
   onSetStatus,
   onSetAttributes,
+  onAddAttribute,
+  onSetTags,
+  onAddTags,
   onAssignCategory,
   onAssignMarketingCategory,
+  onSetTva,
   onApplied,
 }: BulkEditDialogProps) => {
   const [step, setStep] = useState<BulkEditStep>('choose');
   const [action, setAction] = useState<BulkAction | null>(null);
   const [selectedAttributes, setSelectedAttributes] = useState<ProductAttribute[]>([]);
+  const [attributeToAdd, setAttributeToAdd] = useState('');
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [marketingCategoryId, setMarketingCategoryId] = useState('');
   const [marketingCategories, setMarketingCategories] = useState<Category[] | null>(null);
   const [loadingMarketing, setLoadingMarketing] = useState(false);
+  const [tvaRateId, setTvaRateId] = useState('');
+  const [tvaAllRateIds, setTvaAllRateIds] = useState({ on_site: '', take_away: '', delivery: '' });
+  const [tvaRateGroups, setTvaRateGroups] = useState<TvaRateGroup[] | null>(null);
+  const [loadingTva, setLoadingTva] = useState(false);
   const [applying, setApplying] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  const [actionSearch, setActionSearch] = useState('');
 
   const productIds = useMemo(
     () => selectedProducts.map((p) => p.product_id),
@@ -154,9 +261,14 @@ export const BulkEditDialog = ({
     if (!open) return;
     setStep('choose');
     setAction(null);
+    setActionSearch('');
     setSelectedAttributes([]);
+    setAttributeToAdd('');
+    setSelectedTagIds([]);
     setCategoryId('');
     setMarketingCategoryId('');
+    setTvaRateId('');
+    setTvaAllRateIds({ on_site: '', take_away: '', delivery: '' });
     setApplying(false);
   }, [open]);
 
@@ -173,6 +285,21 @@ export const BulkEditDialog = ({
       .finally(() => setLoadingMarketing(false));
   }, [action, marketingCategories]);
 
+  // Les taux de TVA ne sont pas chargés avec le menu non plus : on ne les
+  // récupère qu'au premier choix d'une action de TVA de groupe (les trois
+  // actions par scope, ou l'action groupée « Définir toutes les TVA »).
+  useEffect(() => {
+    const needsTva = !!action && (!!TVA_SCOPE_BY_ACTION[action] || action === 'set_tva_all');
+    if (!needsTva || tvaRateGroups !== null) return;
+
+    setLoadingTva(true);
+    menuService
+      .getTvaRates()
+      .then(setTvaRateGroups)
+      .catch(() => setTvaRateGroups([]))
+      .finally(() => setLoadingTva(false));
+  }, [action, tvaRateGroups]);
+
   const handleCreateMarketingCategory = async (name: string) => {
     const created = await menuService.createMarketingCategory(name);
     const category: Category = {
@@ -188,13 +315,48 @@ export const BulkEditDialog = ({
     return { category_id: created.id };
   };
 
+  const toggleTag = (tagId: string) => {
+    setSelectedTagIds((prev) =>
+      prev.includes(tagId) ? prev.filter((id) => id !== tagId) : [...prev, tagId]
+    );
+  };
+
+  const getRatesForScope = (scope: 'on_site' | 'take_away' | 'delivery'): TvaRate[] => {
+    if (!tvaRateGroups) return [];
+    const deliveryType = TVA_DELIVERY_TYPE_BY_SCOPE[scope];
+    return tvaRateGroups.find((group) => group.delivery_type === deliveryType)?.rates || [];
+  };
+
+  const tvaScope = action ? TVA_SCOPE_BY_ACTION[action] : undefined;
+  const tvaRates: TvaRate[] = useMemo(
+    () => (tvaScope ? getRatesForScope(tvaScope) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [tvaScope, tvaRateGroups]
+  );
+
+  // Liste filtrée par la recherche : le libellé et l'indice suffisent, pas
+  // besoin de chercher dans la description qui n'apparaît qu'au survol.
+  const filteredActions = useMemo(() => {
+    const query = actionSearch.trim().toLowerCase();
+    if (!query) return ACTIONS;
+    return ACTIONS.filter(
+      ({ label, hint }) => label.toLowerCase().includes(query) || hint.toLowerCase().includes(query)
+    );
+  }, [actionSearch]);
+
   // Sur l'écran de choix, il suffit d'avoir sélectionné une action — le
   // paramètre, lui, n'est réclamé qu'au moment d'appliquer.
   const canProceed = (() => {
     if (!action || productIds.length === 0) return false;
     if (step === 'choose') return true;
+    if (action === 'add_attribute') return !!attributeToAdd;
+    if (action === 'add_tags') return selectedTagIds.length > 0;
     if (action === 'assign_category') return !!categoryId;
     if (action === 'assign_marketing_category') return !!marketingCategoryId;
+    if (action === 'set_tva_all') {
+      return !!tvaAllRateIds.on_site && !!tvaAllRateIds.take_away && !!tvaAllRateIds.delivery;
+    }
+    if (tvaScope) return !!tvaRateId;
     return true;
   })();
 
@@ -219,12 +381,31 @@ export const BulkEditDialog = ({
           selectedAttributes.map((a) => a.attribute_id)
         );
         toast.success(`Options appliquées à ${count} produit${plural}`);
+      } else if (action === 'add_attribute') {
+        await onAddAttribute(productIds, attributeToAdd);
+        toast.success(`Option ajoutée à ${count} produit${plural}`);
+      } else if (action === 'set_tags') {
+        await onSetTags(productIds, selectedTagIds);
+        toast.success(`Tags appliqués à ${count} produit${plural}`);
+      } else if (action === 'add_tags') {
+        await onAddTags(productIds, selectedTagIds);
+        toast.success(`Tags ajoutés à ${count} produit${plural}`);
       } else if (action === 'assign_category') {
         await onAssignCategory(productIds, categoryId);
         toast.success(`${count} produit${plural} déplacé${plural}`);
       } else if (action === 'assign_marketing_category') {
         await onAssignMarketingCategory(productIds, marketingCategoryId);
         toast.success(`${count} produit${plural} rattaché${plural}`);
+      } else if (action === 'set_tva_all') {
+        await Promise.all([
+          onSetTva(productIds, 'on_site', tvaAllRateIds.on_site),
+          onSetTva(productIds, 'take_away', tvaAllRateIds.take_away),
+          onSetTva(productIds, 'delivery', tvaAllRateIds.delivery),
+        ]);
+        toast.success(`TVA mise à jour pour ${count} produit${plural}`);
+      } else if (tvaScope) {
+        await onSetTva(productIds, tvaScope, tvaRateId);
+        toast.success(`TVA mise à jour pour ${count} produit${plural}`);
       }
 
       onApplied();
@@ -262,7 +443,7 @@ export const BulkEditDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={(next) => !applying && onOpenChange(next)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Édition de groupe</DialogTitle>
             <DialogDescription>
@@ -271,15 +452,32 @@ export const BulkEditDialog = ({
             </DialogDescription>
           </DialogHeader>
 
+          {step === 'choose' && (
+            <div className="relative shrink-0 mt-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher une action…"
+                value={actionSearch}
+                onChange={(e) => setActionSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
+
           <ScrollArea className="flex-1 -mx-6 px-6">
             {step === 'choose' ? (
               <RadioGroup
                 key="choose"
                 value={action ?? ''}
                 onValueChange={(value) => setAction(value as BulkAction)}
-                className="gap-1 py-1 duration-200 animate-in fade-in slide-in-from-left-2"
+                className="gap-1 py-1 max-h-[340px] overflow-y-auto pr-1 duration-200 animate-in fade-in slide-in-from-left-2"
               >
-                {ACTIONS.map(({ value, label, hint, icon: Icon, dangerous }) => {
+                {filteredActions.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-6">
+                    Aucune action ne correspond à « {actionSearch} ».
+                  </p>
+                )}
+                {filteredActions.map(({ value, label, hint, icon: Icon, dangerous }) => {
                   const isSelected = action === value;
                   return (
                     <label
@@ -337,6 +535,50 @@ export const BulkEditDialog = ({
                     </div>
                   )}
 
+                  {action === 'add_attribute' && (
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <Select value={attributeToAdd} onValueChange={setAttributeToAdd} disabled={applying}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un groupe d’options" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {attributes.map((attr) => (
+                            <SelectItem key={attr.id} value={attr.id}>
+                              {attr.title || attr.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {(action === 'set_tags' || action === 'add_tags') && (
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      {tags.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Aucun tag disponible</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {tags.map((tag) => (
+                            <SelectableChip
+                              key={tag.id}
+                              color={tag.color}
+                              selected={selectedTagIds.includes(tag.id)}
+                              onToggle={() => toggleTag(tag.id)}
+                              disabled={applying}
+                            >
+                              {tag.name}
+                            </SelectableChip>
+                          ))}
+                        </div>
+                      )}
+                      {action === 'set_tags' && selectedTagIds.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-3">
+                          Aucun tag sélectionné : appliquer retirera tous les tags des produits.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {action === 'assign_category' && (
                     <CategorySelector
                       categories={categories}
@@ -361,6 +603,75 @@ export const BulkEditDialog = ({
                         onCreateCategory={handleCreateMarketingCategory}
                         placeholder="Sélectionner une catégorie marketing…"
                       />
+                    )
+                  )}
+
+                  {action === 'set_tva_all' && (
+                    loadingTva ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Chargement des taux de TVA…
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {(['on_site', 'take_away', 'delivery'] as const).map((scope) => (
+                          <div key={scope}>
+                            <Label className="text-xs text-muted-foreground mb-1 block">
+                              {scope === 'on_site' ? 'Sur place' : scope === 'take_away' ? 'À emporter' : 'Livraison'}
+                            </Label>
+                            <Select
+                              value={tvaAllRateIds[scope]}
+                              onValueChange={(value) =>
+                                setTvaAllRateIds((prev) => ({ ...prev, [scope]: value }))
+                              }
+                              disabled={applying}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Sélectionner un taux de TVA…" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {getRatesForScope(scope).map((rate) => (
+                                  <SelectItem key={rate.id} value={rate.id.toString()}>
+                                    <div className="flex flex-col">
+                                      <span>{rate.label}</span>
+                                      {rate.description && (
+                                        <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                      )}
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                  {tvaScope && (
+                    loadingTva ? (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Chargement des taux de TVA…
+                      </div>
+                    ) : (
+                      <Select value={tvaRateId} onValueChange={setTvaRateId} disabled={applying}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un taux de TVA…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tvaRates.map((rate) => (
+                            <SelectItem key={rate.id} value={rate.id.toString()}>
+                              <div className="flex flex-col">
+                                <span>{rate.label}</span>
+                                {rate.description && (
+                                  <span className="text-xs text-muted-foreground">{rate.description}</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )
                   )}
                 </div>

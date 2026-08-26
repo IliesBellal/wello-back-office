@@ -28,7 +28,7 @@ import { integrationsService, type IntegrationStatus } from '@/services/integrat
 import { settingsService } from '@/services/settingsService';
 import { type UserProfile, type EstablishmentSettings } from '@/types/settings';
 import { useToast } from '@/hooks/use-toast';
-import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
+import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
 
 // ════════════════════════════════════════════════════════════════════════════
 // ImageUploadField Component
@@ -852,7 +852,7 @@ export default function ScanNOrder() {
                 <CardTitle className="text-sm font-medium text-muted-foreground">
                   Etat des commandes
                 </CardTitle>
-                <EstablishmentClosureModal triggerMode="icon" />
+                <EstablishmentOperationsModal triggerMode="icon" />
               </div>
             </CardHeader>
             <CardContent>

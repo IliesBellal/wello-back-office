@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles, ImagePlus } from "lucide-react";
+import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles, ImagePlus, Users, Smartphone } from "lucide-react";
 import { useEstablishmentSettings, useVacationPeriods } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
@@ -382,6 +382,56 @@ export const EstablishmentTab = () => {
                   <Switch
                     checked={formData.ordering.active_delivery}
                     onCheckedChange={(checked) => handleFieldChange('ordering', 'active_delivery', checked)}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Prise de commande */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShoppingCart className="h-5 w-5" />
+                Prise de commande
+              </CardTitle>
+              <CardDescription>Comportement du POS pendant la saisie d'une commande</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Nombre de couverts */}
+                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Nombre de couverts obligatoire
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Ouvre automatiquement la saisie du nombre de couverts à la création d'une commande sur place,
+                      pré-remplie avec les places des tables sélectionnées
+                    </p>
+                  </div>
+                  <Switch
+                    checked={!!formData.ordering.covers_count_required}
+                    onCheckedChange={(checked) => handleFieldChange('ordering', 'covers_count_required', checked)}
+                  />
+                </div>
+
+                {/* Encaissement sur mobile */}
+                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      <Smartphone className="h-4 w-4" />
+                      Encaissement sur mobile
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Affiche les boutons de paiement rapide et la calculatrice sur les téléphones. Sans effet sur les
+                      tablettes
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.ordering.mobile_payment_enabled !== false}
+                    onCheckedChange={(checked) => handleFieldChange('ordering', 'mobile_payment_enabled', checked)}
                   />
                 </div>
               </div>

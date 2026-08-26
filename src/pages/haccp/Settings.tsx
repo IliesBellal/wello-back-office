@@ -4,6 +4,8 @@ import { PageContainer, TabSystem, ConfirmDialog } from '@/components/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { TemperatureInput } from '@/components/shared/TemperatureInput';
+import { parseTemperatureInput, temperatureToInput } from '@/utils/temperatureInputUtils';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +18,6 @@ import {
   HaccpTemperatureZone,
   HaccpCleaningZone,
   HaccpCleaningSurface,
-  CreateHaccpTemperatureZonePayload,
   UpdateHaccpTemperatureZonePayload,
   CreateHaccpCleaningZonePayload,
   UpdateHaccpCleaningZonePayload,
@@ -214,10 +215,18 @@ const GENERAL_MISC_FIELDS: HaccpSettingsKey[] = [
   'notif_security',
 ];
 
-const defaultTemperatureZoneForm: CreateHaccpTemperatureZonePayload = {
+// Les temperatures sont conservees en texte pour autoriser un champ vide
+// pendant la saisie (converti en 0 a l'enregistrement)
+type TemperatureZoneFormState = {
+  name: string;
+  target_temp_min: string;
+  target_temp_max: string;
+};
+
+const defaultTemperatureZoneForm: TemperatureZoneFormState = {
   name: '',
-  target_temp_min: 0,
-  target_temp_max: 0,
+  target_temp_min: '',
+  target_temp_max: '',
 };
 
 const defaultCleaningZoneForm: CreateHaccpCleaningZonePayload = {
@@ -251,7 +260,7 @@ const HaccpSettingsPage = () => {
   const [savingTemperatureZone, setSavingTemperatureZone] = useState(false);
   const [editingTemperatureZoneId, setEditingTemperatureZoneId] = useState<string | null>(null);
   const [temperatureZoneDialogOpen, setTemperatureZoneDialogOpen] = useState(false);
-  const [temperatureZoneForm, setTemperatureZoneForm] = useState<CreateHaccpTemperatureZonePayload>(defaultTemperatureZoneForm);
+  const [temperatureZoneForm, setTemperatureZoneForm] = useState<TemperatureZoneFormState>(defaultTemperatureZoneForm);
 
   const [cleaningZones, setCleaningZones] = useState<HaccpCleaningZone[]>([]);
   const [loadingCleaningZones, setLoadingCleaningZones] = useState(true);
@@ -404,8 +413,9 @@ const HaccpSettingsPage = () => {
   const handleSubmitTemperatureZone = async () => {
     const payload: UpdateHaccpTemperatureZonePayload = {
       name: temperatureZoneForm.name.trim(),
-      target_temp_min: Number(temperatureZoneForm.target_temp_min),
-      target_temp_max: Number(temperatureZoneForm.target_temp_max),
+      // Un champ laisse vide vaut 0
+      target_temp_min: parseTemperatureInput(temperatureZoneForm.target_temp_min) ?? 0,
+      target_temp_max: parseTemperatureInput(temperatureZoneForm.target_temp_max) ?? 0,
     };
 
     if (!payload.name) {
@@ -669,8 +679,8 @@ const HaccpSettingsPage = () => {
                         setEditingTemperatureZoneId(zone.id);
                         setTemperatureZoneForm({
                           name: zone.name,
-                          target_temp_min: zone.target_temp_min,
-                          target_temp_max: zone.target_temp_max,
+                          target_temp_min: temperatureToInput(zone.target_temp_min),
+                          target_temp_max: temperatureToInput(zone.target_temp_max),
                         });
                         setTemperatureZoneDialogOpen(true);
                       }}
@@ -718,31 +728,21 @@ const HaccpSettingsPage = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="temp-zone-min">Température min (°C)</Label>
-                <Input
+                <TemperatureInput
                   id="temp-zone-min"
-                  type="number"
-                  step="0.1"
                   value={temperatureZoneForm.target_temp_min}
-                  onChange={(e) =>
-                    setTemperatureZoneForm((prev) => ({
-                      ...prev,
-                      target_temp_min: Number(e.target.value),
-                    }))
+                  onChange={(value) =>
+                    setTemperatureZoneForm((prev) => ({ ...prev, target_temp_min: value }))
                   }
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="temp-zone-max">Température max (°C)</Label>
-                <Input
+                <TemperatureInput
                   id="temp-zone-max"
-                  type="number"
-                  step="0.1"
                   value={temperatureZoneForm.target_temp_max}
-                  onChange={(e) =>
-                    setTemperatureZoneForm((prev) => ({
-                      ...prev,
-                      target_temp_max: Number(e.target.value),
-                    }))
+                  onChange={(value) =>
+                    setTemperatureZoneForm((prev) => ({ ...prev, target_temp_max: value }))
                   }
                 />
               </div>

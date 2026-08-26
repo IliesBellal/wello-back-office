@@ -1477,6 +1477,48 @@ export const menuService = {
     );
   },
 
+  // Ajoute un groupe d'options/suppléments aux produits ciblés sans toucher à
+  // leurs autres groupes déjà attachés (additif).
+  async bulkAssignAttributeToProducts(productIds: string[], attributeId: string): Promise<void> {
+    const payload = { attribute_id: attributeId, product_ids: productIds };
+    logAPI('POST', '/menu/bulk/attributes/assign', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.post<void>('/menu/bulk/attributes/assign', payload)
+    );
+  },
+
+  // Remplace la liste complète des tags des produits ciblés par la même liste.
+  async bulkSetProductsTags(productIds: string[], tagIds: string[]): Promise<void> {
+    const payload = { product_ids: productIds, tag_ids: tagIds };
+    logAPI('PATCH', '/menu/products/bulk/tags', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/products/bulk/tags', payload)
+    );
+  },
+
+  // Ajoute un tag aux produits ciblés sans retirer leurs autres tags (additif).
+  async bulkAssignTagToProducts(productIds: string[], tagId: string): Promise<void> {
+    const payload = { tag_id: tagId, product_ids: productIds };
+    logAPI('POST', '/menu/bulk/tags/assign', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.post<void>('/menu/bulk/tags/assign', payload)
+    );
+  },
+
+  // Applique un taux de TVA aux produits ciblés pour un seul type de vente
+  // (scope: 'on_site' | 'take_away' | 'delivery').
+  async bulkSetProductsTva(productIds: string[], scope: 'on_site' | 'take_away' | 'delivery', tvaId: string): Promise<void> {
+    const payload = { product_ids: productIds, scope, tva_id: tvaId };
+    logAPI('PATCH', '/menu/products/bulk/tva', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/products/bulk/tva', payload)
+    );
+  },
+
   async bulkAssignProductsToCategory(productIds: string[], categoryId: string): Promise<void> {
     logAPI('PATCH', `/menu/products/categories/${categoryId}/bulk-assign`, { product_ids: productIds });
     return withMock(

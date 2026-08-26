@@ -17,7 +17,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
-import { EstablishmentClosureModal } from '@/components/integrations/EstablishmentClosureModal';
+import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
 import type { IntegrationStatus } from '@/services/integrationsService';
 import { Loader2, AlertCircle, RefreshCw, Power } from 'lucide-react';
 
@@ -188,7 +188,7 @@ export const IntegrationCard = ({
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Etat des commandes
               </CardTitle>
-              <EstablishmentClosureModal triggerMode="icon" />
+              <EstablishmentOperationsModal triggerMode="icon" />
             </div>
           </CardHeader>
           <CardContent>

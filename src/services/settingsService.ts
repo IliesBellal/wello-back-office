@@ -48,7 +48,9 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     active_on_site: true,
     active_takeaway: true,
     active_delivery: true,
-    upsell_enabled: false
+    upsell_enabled: false,
+    covers_count_required: false,
+    mobile_payment_enabled: true
   },
   scan_order: {
     active_delivery: true,

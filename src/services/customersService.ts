@@ -1,4 +1,5 @@
-import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
+import { apiClient, isApiHttpError, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
+import type { CustomerManualImportInput } from "@/types/customerImport";
 
 // ============= Types =============
 export interface CustomerAddress {
@@ -879,6 +880,61 @@ export const getCustomerOrders = async (
           };
         })
   );
+};
+
+/** Résultat de POST /customers — voir internal/modules/customers/handler.go CreateCustomer. */
+export interface CreateCustomerResult {
+  status: string;
+  /** false quand un client existant (même email/téléphone) a été mis à jour plutôt que créé. */
+  created: boolean;
+  customer_id: string;
+}
+
+/**
+ * Crée un client unique (bouton « Créer un client »).
+ *
+ * Réutilise le même format de payload que la saisie manuelle en masse
+ * (`CustomerManualImportInput`) : c'est le format déjà attendu par l'API pour
+ * un client saisi à la main. Si l'email ou le téléphone correspond à un
+ * client existant du marchand, l'API le met à jour au lieu d'échouer
+ * (`created: false` dans la réponse).
+ */
+export const createCustomer = async (payload: CustomerManualImportInput): Promise<CreateCustomerResult> => {
+  logAPI("POST", "/customers", payload);
+
+  return apiClient
+    .post<WelloApiResponse<CreateCustomerResult>>("/customers", payload)
+    .then((res) => res.data);
+};
+
+/**
+ * Message affiché quand `createCustomer` échoue.
+ *
+ * Codes émis par `CustomersHandler.CreateCustomer`
+ * (internal/modules/customers/handler.go) : `invalid_customer` porte le
+ * détail de la ligne fautive (mêmes règles que la saisie manuelle en masse).
+ */
+export const describeCreateCustomerError = (error: unknown): string => {
+  if (!isApiHttpError(error)) {
+    return error instanceof Error && error.message
+      ? error.message
+      : "La création du client a échoué. Réessayez dans un instant.";
+  }
+
+  const body = error.responseBody;
+  const data = typeof body === "object" && body !== null ? (body as { data?: unknown }).data : undefined;
+  const payload = typeof data === "object" && data !== null ? (data as { error?: unknown; message?: unknown }) : undefined;
+  const code = typeof payload?.error === "string" ? payload.error : undefined;
+  const message = typeof payload?.message === "string" ? payload.message : undefined;
+
+  if (code === "invalid_customer") {
+    return message || "Les informations saisies ne sont pas valides.";
+  }
+  if (error.status === 403) {
+    return "Vous n'avez pas les droits pour créer un client.";
+  }
+
+  return message || "La création du client a échoué. Réessayez dans un instant.";
 };
 
 export const getCustomerLoyalty = async (customerId: string): Promise<CustomerLoyalty> => {

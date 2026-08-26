@@ -67,7 +67,6 @@ export default function Menu() {
     tags,
     loading,
     updateProduct,
-    registerTag,
     createAttribute,
     updateAttributeData,
     saveOrder,
@@ -84,6 +83,10 @@ export default function Menu() {
     bulkDeleteProducts,
     bulkSetProductsStatus,
     bulkSetProductsAttributes,
+    bulkAddProductsAttribute,
+    bulkSetProductsTags,
+    bulkAddProductsTags,
+    bulkSetProductsTva,
     bulkAssignProductsToCategory,
     bulkAssignProductsToMarketingCategory
   } = useMenuData();
@@ -499,12 +502,17 @@ export default function Menu() {
           selectedProducts={selectedProducts}
           attributes={attributes}
           categories={menuData?.products_types || []}
+          tags={tags}
           onCreateCategory={createProductCategory}
           onDeleteProducts={bulkDeleteProducts}
           onSetStatus={bulkSetProductsStatus}
           onSetAttributes={bulkSetProductsAttributes}
+          onAddAttribute={bulkAddProductsAttribute}
+          onSetTags={bulkSetProductsTags}
+          onAddTags={bulkAddProductsTags}
           onAssignCategory={bulkAssignProductsToCategory}
           onAssignMarketingCategory={bulkAssignProductsToMarketingCategory}
+          onSetTva={bulkSetProductsTva}
           onApplied={() => setSelectedIds(new Set())}
         />
 
@@ -519,11 +527,6 @@ export default function Menu() {
           onSave={updateProduct}
           onDelete={handleDeleteProduct}
           onCreateCategory={createProductCategory}
-          onTagCreated={registerTag}
-          onTagsPersisted={(product_id, tags) => applyProductsTags([{ product_id, tags }])}
-          onAllergensPersisted={(product_id, allergens) =>
-            applyProductsAllergens([{ product_id, allergens }])
-          }
         />
 
         <GroupProductSheet
@@ -609,11 +612,6 @@ export default function Menu() {
           onCreate={createProduct}
           onDelete={handleDeleteProduct}
           onCreateCategory={createProductCategory}
-          onTagCreated={registerTag}
-          onTagsPersisted={(product_id, tags) => applyProductsTags([{ product_id, tags }])}
-          onAllergensPersisted={(product_id, allergens) =>
-            applyProductsAllergens([{ product_id, allergens }])
-          }
         />
 
         <ProductImportDialog

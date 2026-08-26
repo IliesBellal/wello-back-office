@@ -6,6 +6,7 @@ import { useDuplicateNameConfirm } from '@/hooks/useDuplicateNameConfirm';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PriceInput } from '@/components/shared/PriceInput';
+import { parsePriceInput } from '@/utils/priceInputUtils';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -54,7 +55,8 @@ import { CSS } from '@dnd-kit/utilities';
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 const formatPrice = (cents: number) => (cents / 100).toFixed(2);
-const parsePrice = (value: string) => Math.round(parseFloat(value || '0') * 100);
+// parsePriceInput gere la virgule comme separateur decimal et le champ vide (=> 0)
+const parsePrice = (value: string) => parsePriceInput(value);
 
 const getOptionPrice = (opt: AttributeOption) =>
   opt.extra_price !== undefined ? opt.extra_price : (opt.price ?? 0);

@@ -56,6 +56,8 @@ export interface EstablishmentOrdering {
   active_takeaway: boolean;
   active_delivery: boolean;
   upsell_enabled: boolean;
+  covers_count_required: boolean;
+  mobile_payment_enabled: boolean;
 }
 
 export interface EstablishmentScanOrder {
