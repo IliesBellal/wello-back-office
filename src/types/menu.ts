@@ -151,6 +151,20 @@ export interface ProductAvailability {
   scan_order?: boolean;
 }
 
+/**
+ * Canaux de disponibilité pilotables par l'édition de groupe « Définir les
+ * disponibilités ». Un champ absent (undefined) laisse le canal inchangé sur
+ * les produits ciblés — c'est l'option « Ne pas modifier ».
+ */
+export interface BulkAvailabilityFields {
+  available_in?: boolean;
+  available_take_away?: boolean;
+  available_delivery?: boolean;
+  is_available_on_sno?: boolean;
+  sync_uber_eats?: boolean;
+  sync_deliveroo?: boolean;
+}
+
 export interface ProductIntegration {
   enabled?: boolean;
   id?: string;

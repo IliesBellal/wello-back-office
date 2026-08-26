@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { Menu, Product, ProductStatus, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory, Tag, ProductCreatePayload } from '@/types/menu';
+import { Menu, Product, ProductStatus, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory, Tag, ProductCreatePayload, BulkAvailabilityFields } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
@@ -585,6 +585,32 @@ export const useMenuData = () => {
     await loadData();
   };
 
+  // Patch local ciblé plutôt que refetch : contrairement à la TVA, ces champs
+  // n'ont pas de libellé résolu côté API à récupérer, un patch immédiat suffit
+  // à refléter les colonnes disponibilité de ProductsTable.
+  const bulkSetProductsAvailability = async (productIds: string[], fields: BulkAvailabilityFields) => {
+    await menuService.bulkSetProductsAvailability(productIds, fields);
+    patchProducts(productIds, p => {
+      const next: Product = { ...p };
+      if (fields.available_in !== undefined) next.available_in = fields.available_in;
+      if (fields.available_take_away !== undefined) next.available_take_away = fields.available_take_away;
+      if (fields.available_delivery !== undefined) next.available_delivery = fields.available_delivery;
+      if (fields.is_available_on_sno !== undefined) next.is_available_on_sno = fields.is_available_on_sno;
+      if (fields.sync_uber_eats !== undefined || fields.sync_deliveroo !== undefined) {
+        next.integrations = {
+          ...p.integrations,
+          ...(fields.sync_uber_eats !== undefined && {
+            uber_eats: { ...p.integrations?.uber_eats, enabled: fields.sync_uber_eats }
+          }),
+          ...(fields.sync_deliveroo !== undefined && {
+            deliveroo: { ...p.integrations?.deliveroo, enabled: fields.sync_deliveroo }
+          })
+        };
+      }
+      return next;
+    });
+  };
+
   const bulkAssignProductsToCategory = async (productIds: string[], categoryId: string) => {
     await menuService.bulkAssignProductsToCategory(productIds, categoryId);
     // La catégorie caisse est un champ unique : les produits quittent leur
@@ -716,6 +742,7 @@ export const useMenuData = () => {
     bulkSetProductsTags,
     bulkAddProductsTags,
     bulkSetProductsTva,
+    bulkSetProductsAvailability,
     bulkAssignProductsToCategory,
     bulkAssignProductsToMarketingCategory,
     applyProductsAllergens,

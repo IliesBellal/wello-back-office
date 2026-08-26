@@ -20,10 +20,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { SelectableChip } from '@/components/ui/selectable-chip';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CategorySelector, ConfirmDialog } from '@/components/shared';
 import { ProductOptionsTab } from '@/components/menu/ProductOptionsTab';
-import { Attribute, Category, Product, ProductAttribute, ProductStatus, Tag, TvaRate, TvaRateGroup } from '@/types/menu';
+import { Attribute, BulkAvailabilityFields, Category, Product, ProductAttribute, ProductStatus, Tag, TvaRate, TvaRateGroup } from '@/types/menu';
 import { menuService } from '@/services/menuService';
+import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 import {
   ArrowLeft,
   Loader2,
@@ -42,6 +44,7 @@ import {
   Truck,
   Percent,
   Search,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -59,7 +62,52 @@ type BulkAction =
   | 'set_tva_on_site'
   | 'set_tva_take_away'
   | 'set_tva_delivery'
-  | 'set_tva_all';
+  | 'set_tva_all'
+  | 'set_availability';
+
+/** Valeur d'un canal dans l'écran « Définir les disponibilités ». */
+type AvailabilityValue = 'unchanged' | 'enable' | 'disable';
+
+/** Canal de disponibilité piloté par l'écran « Définir les disponibilités ». */
+type AvailabilityChannel = 'on_site' | 'take_away' | 'delivery' | 'scannorder' | 'uber_eats' | 'deliveroo';
+
+const AVAILABILITY_CHANNELS: {
+  key: AvailabilityChannel;
+  label: string;
+  icon?: typeof Store;
+  imageSrc?: string;
+}[] = [
+  { key: 'on_site', label: 'Sur place', icon: Store },
+  { key: 'take_away', label: 'Emporter', icon: ShoppingBag },
+  { key: 'delivery', label: 'Livraison', icon: Truck },
+  { key: 'scannorder', label: 'ScanNOrder', imageSrc: '/scannorder_logo.png' },
+  { key: 'uber_eats', label: 'Uber Eats', imageSrc: '/uber_eats_logo.png' },
+  { key: 'deliveroo', label: 'Deliveroo', imageSrc: '/deliveroo_logo.png' },
+];
+
+const DEFAULT_AVAILABILITY_FIELDS: Record<AvailabilityChannel, AvailabilityValue> = {
+  on_site: 'unchanged',
+  take_away: 'unchanged',
+  delivery: 'unchanged',
+  scannorder: 'unchanged',
+  uber_eats: 'unchanged',
+  deliveroo: 'unchanged',
+};
+
+/** Mappe chaque canal vers le champ attendu par l'API. undefined = inchangé. */
+const toBulkAvailabilityFields = (
+  values: Record<AvailabilityChannel, AvailabilityValue>
+): BulkAvailabilityFields => {
+  const toBool = (v: AvailabilityValue) => (v === 'unchanged' ? undefined : v === 'enable');
+  return {
+    available_in: toBool(values.on_site),
+    available_take_away: toBool(values.take_away),
+    available_delivery: toBool(values.delivery),
+    is_available_on_sno: toBool(values.scannorder),
+    sync_uber_eats: toBool(values.uber_eats),
+    sync_deliveroo: toBool(values.deliveroo),
+  };
+};
 
 /** Scope attendu par l'API pour chaque action de TVA de groupe. */
 const TVA_SCOPE_BY_ACTION: Partial<Record<BulkAction, 'on_site' | 'take_away' | 'delivery'>> = {
@@ -92,6 +140,7 @@ interface BulkEditDialogProps {
   onAssignCategory: (productIds: string[], categoryId: string) => Promise<void>;
   onAssignMarketingCategory: (productIds: string[], categoryId: string) => Promise<void>;
   onSetTva: (productIds: string[], scope: 'on_site' | 'take_away' | 'delivery', tvaId: string) => Promise<void>;
+  onSetAvailability: (productIds: string[], fields: BulkAvailabilityFields) => Promise<void>;
   /** Appelé après une action réussie, pour vider la sélection du tableau. */
   onApplied: () => void;
 }
@@ -188,6 +237,12 @@ const ACTIONS: {
     hint: 'Applique en une seule fois un taux de TVA pour chacun des trois types de vente.',
     icon: Percent,
   },
+  {
+    value: 'set_availability',
+    label: 'Définir les disponibilités',
+    hint: 'Active ou désactive sur place, emporter, livraison, ScanNOrder et les plateformes de livraison, canal par canal.',
+    icon: SlidersHorizontal,
+  },
 ];
 
 const STATUS_BY_ACTION: Partial<Record<BulkAction, ProductStatus>> = {
@@ -208,6 +263,7 @@ const DETAIL_ACTIONS: BulkAction[] = [
   'set_tva_take_away',
   'set_tva_delivery',
   'set_tva_all',
+  'set_availability',
 ];
 const needsDetailStep = (action: BulkAction | null): boolean =>
   action !== null && DETAIL_ACTIONS.includes(action);
@@ -231,8 +287,10 @@ export const BulkEditDialog = ({
   onAssignCategory,
   onAssignMarketingCategory,
   onSetTva,
+  onSetAvailability,
   onApplied,
 }: BulkEditDialogProps) => {
+  const { statuses } = useIntegrationStatus();
   const [step, setStep] = useState<BulkEditStep>('choose');
   const [action, setAction] = useState<BulkAction | null>(null);
   const [selectedAttributes, setSelectedAttributes] = useState<ProductAttribute[]>([]);
@@ -246,6 +304,8 @@ export const BulkEditDialog = ({
   const [tvaAllRateIds, setTvaAllRateIds] = useState({ on_site: '', take_away: '', delivery: '' });
   const [tvaRateGroups, setTvaRateGroups] = useState<TvaRateGroup[] | null>(null);
   const [loadingTva, setLoadingTva] = useState(false);
+  const [availabilityFields, setAvailabilityFields] =
+    useState<Record<AvailabilityChannel, AvailabilityValue>>(DEFAULT_AVAILABILITY_FIELDS);
   const [applying, setApplying] = useState(false);
   const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [actionSearch, setActionSearch] = useState('');
@@ -269,6 +329,7 @@ export const BulkEditDialog = ({
     setMarketingCategoryId('');
     setTvaRateId('');
     setTvaAllRateIds({ on_site: '', take_away: '', delivery: '' });
+    setAvailabilityFields(DEFAULT_AVAILABILITY_FIELDS);
     setApplying(false);
   }, [open]);
 
@@ -356,6 +417,9 @@ export const BulkEditDialog = ({
     if (action === 'set_tva_all') {
       return !!tvaAllRateIds.on_site && !!tvaAllRateIds.take_away && !!tvaAllRateIds.delivery;
     }
+    if (action === 'set_availability') {
+      return Object.values(availabilityFields).some((v) => v !== 'unchanged');
+    }
     if (tvaScope) return !!tvaRateId;
     return true;
   })();
@@ -403,6 +467,9 @@ export const BulkEditDialog = ({
           onSetTva(productIds, 'delivery', tvaAllRateIds.delivery),
         ]);
         toast.success(`TVA mise à jour pour ${count} produit${plural}`);
+      } else if (action === 'set_availability') {
+        await onSetAvailability(productIds, toBulkAvailabilityFields(availabilityFields));
+        toast.success(`Disponibilités mises à jour pour ${count} produit${plural}`);
       } else if (tvaScope) {
         await onSetTva(productIds, tvaScope, tvaRateId);
         toast.success(`TVA mise à jour pour ${count} produit${plural}`);
@@ -673,6 +740,56 @@ export const BulkEditDialog = ({
                         </SelectContent>
                       </Select>
                     )
+                  )}
+
+                  {action === 'set_availability' && (
+                    <div className="space-y-2">
+                      {AVAILABILITY_CHANNELS.filter(
+                        ({ key }) =>
+                          (key !== 'uber_eats' || statuses.uberEats.active) &&
+                          (key !== 'deliveroo' || statuses.deliveroo.active)
+                      ).map(({ key, label, icon: Icon, imageSrc }) => (
+                        <div
+                          key={key}
+                          className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            {Icon && <Icon className="w-4 h-4 shrink-0 text-muted-foreground" />}
+                            {imageSrc && (
+                              <img src={imageSrc} alt={label} className="w-4 h-4 object-contain rounded shrink-0" />
+                            )}
+                            <span className="text-sm truncate">{label}</span>
+                          </div>
+                          <ToggleGroup
+                            type="single"
+                            size="sm"
+                            value={availabilityFields[key]}
+                            onValueChange={(value) =>
+                              value &&
+                              setAvailabilityFields((prev) => ({ ...prev, [key]: value as AvailabilityValue }))
+                            }
+                            disabled={applying}
+                            className="shrink-0"
+                          >
+                            <ToggleGroupItem value="unchanged" className="text-xs">
+                              Ne pas modifier
+                            </ToggleGroupItem>
+                            <ToggleGroupItem
+                              value="enable"
+                              className="text-xs data-[state=on]:bg-green-600 data-[state=on]:text-white"
+                            >
+                              Activer
+                            </ToggleGroupItem>
+                            <ToggleGroupItem
+                              value="disable"
+                              className="text-xs data-[state=on]:bg-destructive data-[state=on]:text-white"
+                            >
+                              Désactiver
+                            </ToggleGroupItem>
+                          </ToggleGroup>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )

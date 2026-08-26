@@ -29,7 +29,8 @@
       "Bash(curl -s http://localhost:8081/)",
       "Bash(pkill -f \"node.*vite\")",
       "Bash(echo \"GO_BUILD_EXIT=$?\")",
-      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8082/)"
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8082/)",
+      "Bash(gofmt -l \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/cmd/api/routes.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/handler.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/service.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/repository.go\")"
     ]
   }
 }

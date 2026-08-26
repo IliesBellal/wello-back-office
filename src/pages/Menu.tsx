@@ -87,6 +87,7 @@ export default function Menu() {
     bulkSetProductsTags,
     bulkAddProductsTags,
     bulkSetProductsTva,
+    bulkSetProductsAvailability,
     bulkAssignProductsToCategory,
     bulkAssignProductsToMarketingCategory
   } = useMenuData();
@@ -513,6 +514,7 @@ export default function Menu() {
           onAssignCategory={bulkAssignProductsToCategory}
           onAssignMarketingCategory={bulkAssignProductsToMarketingCategory}
           onSetTva={bulkSetProductsTva}
+          onSetAvailability={bulkSetProductsAvailability}
           onApplied={() => setSelectedIds(new Set())}
         />
 

@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse, API_BASE_URL } from "@/services/apiClient";
-import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload, BulkAvailabilityFields } from "@/types/menu";
 import { getStoredAuthToken } from "@/types/auth";
 
 interface MarketingCategoryApiItem {
@@ -1516,6 +1516,19 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.patch<void>('/menu/products/bulk/tva', payload)
+    );
+  },
+
+  // Applique un sous-ensemble des six canaux de disponibilité (sur place, à
+  // emporter, livraison, ScanNOrder, Uber Eats, Deliveroo) à plusieurs
+  // produits. Un champ absent de fields (undefined) laisse le canal inchangé
+  // côté API grâce à un COALESCE — JSON.stringify n'envoie pas la clé.
+  async bulkSetProductsAvailability(productIds: string[], fields: BulkAvailabilityFields): Promise<void> {
+    const payload = { product_ids: productIds, ...fields };
+    logAPI('PATCH', '/menu/products/bulk/availability', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/products/bulk/availability', payload)
     );
   },
 
