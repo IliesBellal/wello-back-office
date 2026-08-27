@@ -123,6 +123,19 @@ export const qk = {
     settings: ["kiosks", "settings"] as const,
   },
 
+  // ─── RBAC – Roles ───────────────────────────────────────
+  roles: {
+    all: ["roles"] as const,
+    list: () => ["roles", "list"] as const,
+    detail: (id: string) => ["roles", "detail", id] as const,
+    members: (id: string) => ["roles", "detail", id, "members"] as const,
+  },
+  permissionsCatalog: ["permissions", "catalog"] as const,
+  // Keyed per user+merchant (not a bare constant) so switching accounts or
+  // merchants naturally gets a fresh cache entry — no manual invalidation
+  // needed on login/logout/merchant-switch.
+  myPermissions: (userId: string, merchantId: string) => ["me", "permissions", userId, merchantId] as const,
+
   // ─── Reservations / Bookings ────────────────────────────
   reservations: {
     all: ["reservations"] as const,

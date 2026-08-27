@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Navigate } from "react-router-dom";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { PageContainer } from "@/components/shared";
 import { Button } from "@/components/ui/button";
@@ -148,14 +148,62 @@ function EquipePageContent() {
   // ── Sheet state ──────────────────────────────────────────────────────────
   const [selectedMember, setSelectedMember] = useState<MerchantUserListItem | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetInitialTab, setSheetInitialTab] = useState("general");
   const [createOpen, setCreateOpen] = useState(false);
   const [positionsOpen, setPositionsOpen] = useState(false);
   const [employeesOpen, setEmployeesOpen] = useState(false);
 
   const handleRowClick = useCallback((member: MerchantUserListItem) => {
     setSelectedMember(member);
+    setSheetInitialTab("general");
     setSheetOpen(true);
   }, []);
+
+  // ── Deep link from the roles screen's "still held" dialog:
+  // /equipe/equipiers?openMember=<user_id>&tab=access ────────────────────
+  const [searchParams, setSearchParams] = useSearchParams();
+  const openMemberId = searchParams.get("openMember");
+
+  useEffect(() => {
+    if (!openMemberId) return;
+    const requestedTab = searchParams.get("tab") ?? "general";
+    let cancelled = false;
+
+    usersApi.get(openMemberId).then((detail) => {
+      if (cancelled) return;
+      setSelectedMember({
+        user_id: detail.user_id,
+        first_name: detail.first_name,
+        last_name: detail.last_name,
+        email: detail.email,
+        tel: detail.tel,
+        created_at: detail.created_at ?? "",
+        last_login_at: detail.last_login_at,
+        login_enabled: detail.login_enabled,
+        enabled: detail.enabled,
+        status: detail.status,
+        merchant_rights_id: detail.merchant_rights_id ?? "",
+        admin: detail.admin,
+        permissions: detail.permissions,
+        employee_id: detail.employee_id,
+        employee_name: detail.employee_name,
+      });
+      setSheetInitialTab(requestedTab);
+      setSheetOpen(true);
+    });
+
+    // Consumed — strip the params so a refresh/back doesn't reopen it.
+    setSearchParams((params) => {
+      params.delete("openMember");
+      params.delete("tab");
+      return params;
+    }, { replace: true });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openMemberId]);
 
   // ── Build query filters ──────────────────────────────────────────────────
   const filters: MerchantUserListFilters = {
@@ -311,6 +359,7 @@ function EquipePageContent() {
         open={sheetOpen}
         onOpenChange={setSheetOpen}
         onUpdated={() => refetch()}
+        initialTab={sheetInitialTab}
       />
 
       {/* ── Create / link sidesheet ─────────────────────────────────────── */}

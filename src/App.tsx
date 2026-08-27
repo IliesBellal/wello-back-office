@@ -44,6 +44,8 @@ import PlanningPage from './pages/equipe/PlanningPage';
 import Pointages from './pages/equipe/Pointages';
 import CongesEchanges from './pages/equipe/CongesEchanges';
 import EquipeSettings from './pages/equipe/EquipeSettings';
+import RolesPage from './pages/equipe/RolesPage';
+import MyPermissionsPage from './pages/settings/MyPermissionsPage';
 import HacCPActivity from './pages/haccp/Activity';
 import HacCPSettings from './pages/haccp/Settings';
 import ReservationsListPage from './pages/reservations/List';
@@ -112,7 +114,9 @@ const App = () => (
               <Route path="/settings/:section" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
               <Route path="/settings/integrations" element={<ProtectedRoute><NotImplementedPage title="Intégrations" /></ProtectedRoute>} />
               <Route path="/settings/printers" element={<ProtectedRoute><PrintersTable /></ProtectedRoute>} />
-              
+              {/* Mes droits — diagnostic page, no gate: every authenticated user sees their own rights */}
+              <Route path="/settings/my-permissions" element={<ProtectedRoute><MyPermissionsPage /></ProtectedRoute>} />
+
               {/* Dashboard Sub-pages */}
               <Route path="/dashboard/analysis" element={<ProtectedRoute><DashboardAnalysis /></ProtectedRoute>} />
               <Route path="/dashboard/order-history" element={<ProtectedRoute><DashboardOrderHistory /></ProtectedRoute>} />
@@ -124,7 +128,8 @@ const App = () => (
               <Route path="/equipe/pointages" element={<ProtectedRoute><Pointages /></ProtectedRoute>} />
               <Route path="/equipe/conges-echanges" element={<ProtectedRoute><CongesEchanges /></ProtectedRoute>} />
               <Route path="/equipe/parametres" element={<ProtectedRoute><EquipeSettings /></ProtectedRoute>} />
-              
+              <Route path="/equipe/roles" element={<ProtectedRoute><RolesPage /></ProtectedRoute>} />
+
               {/* Integrations */}
               <Route path="/integrations" element={<ProtectedRoute><IntegrationsOverview /></ProtectedRoute>} />
               <Route path="/integrations/overview" element={<ProtectedRoute><IntegrationsOverview /></ProtectedRoute>} />

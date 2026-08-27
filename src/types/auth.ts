@@ -154,6 +154,13 @@ export interface AuthData {
   user: AuthUser;
   merchant: AuthMerchant;
   access: AuthAccess;
+  /**
+   * RBAC lot 9 — catalog-key view of the caller's rights on the current
+   * establishment (e.g. "staff.manage"), a sibling of `access` rather than
+   * inside it: `access.permissions` keeps its historical snake_case shape
+   * unchanged. This is what usePermissions()/checkPermission() read.
+   */
+  permissions: string[];
   capabilities: AuthCapabilities;
   integrations: AuthIntegrations;
   SNOSettings?: {
@@ -445,6 +452,12 @@ export const normalizeAuthData = (rawData: RawAuthData | AuthData): AuthData => 
         return acc;
       }, {}),
     },
+    // RBAC lot 9: top-level catalog-key array, sibling of access (not inside
+    // it). Defensive Array.isArray check: a user with no role_id yet gets a
+    // nil slice from the API, which Go marshals as `null`, not `[]`.
+    permissions: Array.isArray(raw.permissions)
+      ? raw.permissions.filter((k): k is string => typeof k === 'string')
+      : [],
     capabilities,
     integrations,
     SNOSettings: {

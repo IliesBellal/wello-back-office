@@ -1,25 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { DashboardHero } from '@/components/dashboard/DashboardHero';
 import { RevenueEvolutionChart } from '@/components/dashboard/RevenueEvolutionChart';
 import { QuickProductSheet } from '@/components/dashboard/QuickProductSheet';
-import {
-  getDashboardSummary,
-  type DashboardSummary,
-} from '@/services/dashboardService';
+import { isApiHttpError } from '@/services/apiClient';
+import { getDashboardSummary } from '@/services/dashboardService';
 
 const Index = () => {
-  const [data, setData] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
   const [productSheetOpen, setProductSheetOpen] = useState(false);
 
-  useEffect(() => {
-    getDashboardSummary()
-      .then(setData)
-      .catch((err) => console.error('Failed to fetch dashboard:', err))
-      .finally(() => setLoading(false));
-  }, []);
+  // RBAC lot 9 (§6 debt): this tile is gated server-side by
+  // reports.sales.read. retry:false so a 403 resolves immediately instead of
+  // retrying a permission failure; isForbidden distinguishes "masked because
+  // this role can't see sales reports" (hide the section entirely) from a
+  // genuine load failure (DashboardHero's own "Impossible de charger les
+  // métriques" message, unchanged for that case).
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['dashboard', 'summary'],
+    queryFn: getDashboardSummary,
+    retry: false,
+  });
+  const isForbidden = isApiHttpError(error) && error.status === 403;
 
   const getGreeting = () => {
     const h = new Date().getHours();
@@ -48,12 +51,16 @@ const Index = () => {
           }
         >
           {/* ── Metric Cards ── */}
-          <DashboardHero data={data} loading={loading} />
+          {!isForbidden && (
+            <>
+              <DashboardHero data={data ?? null} loading={isLoading} />
 
-          {/* ── Revenue Evolution Chart ── */}
-          <div className="mt-8">
-            <RevenueEvolutionChart data={data?.hourly || []} />
-          </div>
+              {/* ── Revenue Evolution Chart ── */}
+              <div className="mt-8">
+                <RevenueEvolutionChart data={data?.hourly || []} />
+              </div>
+            </>
+          )}
         </PageContainer>
       </div>
 

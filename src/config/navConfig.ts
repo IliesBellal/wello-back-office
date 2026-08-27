@@ -1,6 +1,7 @@
 import { SVGProps } from 'react';
 import type { AuthData, ModuleCapability } from '@/types/auth';
 import { hasModuleAccess } from '@/lib/moduleAccess';
+import { checkPermission } from '@/lib/permissions';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -36,6 +37,8 @@ import {
   MonitorSmartphone,
   Tablet,
   Settings2,
+  KeyRound,
+  Fingerprint,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -116,6 +119,7 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'menu',
     title: 'Menu',
     icon: UtensilsCrossed,
+    visibilityCheck: (authData) => checkPermission(authData, 'catalog.manage'),
     children: [
       {
         id: 'products',
@@ -205,6 +209,7 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'customers',
     title: 'Clients',
     icon: Users,
+    visibilityCheck: (authData) => checkPermission(authData, 'customers.manage'),
     children: [
       {
         id: 'customers-list',
@@ -233,30 +238,49 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Équipiers',
         icon: Users,
         href: '/equipe/equipiers',
+        // Matches EquipePage.tsx's own self-gate (canManageUsers = staff.manage).
+        visibilityCheck: (authData) => checkPermission(authData, 'staff.manage'),
       },
       {
         id: 'planning',
         title: 'Planning',
         icon: CalendarDays,
         href: '/equipe/planning',
+        // Matches PlanningPage.tsx's self-gate (canManagePlannings = staff.schedule.manage).
+        visibilityCheck: (authData) => checkPermission(authData, 'staff.schedule.manage'),
       },
       {
         id: 'pointages',
         title: 'Pointages',
         icon: Clock,
         href: '/equipe/pointages',
+        // Matches Pointages.tsx's self-gate.
+        visibilityCheck: (authData) => checkPermission(authData, 'staff.schedule.manage'),
       },
       {
         id: 'conges-echanges',
         title: 'Congés & échanges',
         icon: ArrowLeftRight,
         href: '/equipe/conges-echanges',
+        // Matches CongesEchanges.tsx's self-gate.
+        visibilityCheck: (authData) => checkPermission(authData, 'staff.schedule.manage'),
       },
       {
         id: 'equipe-parametres',
         title: 'Paramètres',
         icon: Settings,
         href: '/equipe/parametres',
+        // Matches EquipeSettings.tsx's self-gate: "manage_settings (à défaut manage_plannings)".
+        visibilityCheck: (authData) =>
+          checkPermission(authData, 'settings.manage') || checkPermission(authData, 'staff.schedule.manage'),
+      },
+      {
+        id: 'roles',
+        title: 'Rôles',
+        icon: KeyRound,
+        href: '/equipe/roles',
+        // Matches RolesPage.tsx's self-gate (canManageUsers = staff.manage).
+        visibilityCheck: (authData) => checkPermission(authData, 'staff.manage'),
       },
     ],
   },
@@ -268,6 +292,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Boxes,
     href: '/stocks',
     requiredModule: 'stock',
+    visibilityCheck: (authData) => checkPermission(authData, 'inventory.manage'),
   },
   // ═══ ACCOUNTING ═══
   {
@@ -275,6 +300,8 @@ export const NAV_ITEMS: NavItem[] = [
     title: 'Comptabilité',
     icon: Receipt,
     primaryNav: true,
+    visibilityCheck: (authData) =>
+      checkPermission(authData, 'reports.financial.read') || checkPermission(authData, 'reports.sales.read'),
     children: [
       {
         id: 'cash-registers-history',
@@ -351,6 +378,16 @@ export const NAV_ITEMS: NavItem[] = [
         icon: ClipboardList,
         href: '/haccp/activity',
         requiredModule: 'haccp',
+        // RBAC lot 9 (§6 debt): gated client-side on haccp.manage like its
+        // sibling below, so the whole "HACCP" parent disappears for a role
+        // with none of the section's permissions (getVisibleNavItems hides
+        // a parent once it has zero visible children) rather than leaving
+        // one sub-item always reachable. Server-side, POST/GET
+        // /haccp/traceability stay deliberately free for every kitchen
+        // staff member (docs/decisions.md, 2026-08-27) — this is a
+        // back-office menu-visibility decision only, not a route guard;
+        // the Flutter/POS traceability entry point is untouched.
+        visibilityCheck: (authData) => checkPermission(authData, 'haccp.manage'),
       },
       {
         id: 'haccp-settings',
@@ -358,6 +395,7 @@ export const NAV_ITEMS: NavItem[] = [
         icon: Settings,
         href: '/haccp/settings',
         requiredModule: 'haccp',
+        visibilityCheck: (authData) => checkPermission(authData, 'haccp.manage'),
       },
     ],
   },
@@ -394,18 +432,26 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Établissement',
         icon: Store,
         href: '/settings/establishment',
+        visibilityCheck: (authData) => checkPermission(authData, 'settings.manage'),
       },
       {
         id: 'printers',
         title: 'Imprimantes',
         icon: Printer,
         href: '/settings/printers',
+        visibilityCheck: (authData) => checkPermission(authData, 'settings.manage'),
       },
       {
         id: 'profile',
         title: 'Mon Profil',
         icon: Users,
         href: '/settings/profile',
+      },
+      {
+        id: 'my-permissions',
+        title: 'Mes droits',
+        icon: Fingerprint,
+        href: '/settings/my-permissions',
       },
     ],
   },

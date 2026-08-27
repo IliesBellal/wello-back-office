@@ -1,85 +1,63 @@
 import { useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { checkPermission } from "@/lib/permissions";
+import type { PermissionKey } from "@/types/roles";
 
 /**
- * Reads the connected user's rights from AuthContext and exposes
- * granular boolean flags for feature-gating.
+ * Reads the connected user's rights from AuthContext and exposes granular
+ * boolean flags for feature-gating, plus a generic has(key) for new
+ * catalog-key checks.
  *
- * Source fields:
- *   - authData.access.admin                          → isAdmin
- *   - authData.access.permissions.manage_users       → canManageUsers
- *   - authData.access.permissions.manage_plannings   → canManagePlannings
- *   - authData.capabilities.actions.*                → canManage* (fallback)
- *   - authData.capabilities.modules.{planning,users} → hasModule*
+ * RBAC lot 9: purely synchronous, no effect, no query here — it only reads
+ * authData.permissions (the catalog-key array populated by the login
+ * response). Background revalidation against GET /me/permissions lives once
+ * in AuthContext, not here (this hook is mounted by ~10 components; an
+ * effect here would repeat the same sync work that many times for one
+ * useful write). Never add a loading state to this hook: the 7 screens that
+ * gate on it today (`if (!canManageX) return <Navigate/>`) rely on it being
+ * synchronous from the very first render.
+ *
+ * Source correspondence, new catalog key -> old exported name:
+ *   staff.manage           -> canManageUsers
+ *   staff.schedule.manage  -> canManagePlannings
+ *   catalog.manage         -> canManageMenu
+ *   settings.manage        -> canManageSettings
+ *   haccp.manage           -> canManageHaccp
+ *   customers.manage       -> canManageCustomers
+ *   pos.cash_drawer.open   -> canOpenCashDrawer
+ *   reports.sales.read     -> canViewReports, canExportReports, canPrintCashReport
+ *   reports.financial.read -> canViewFinancials, canExportFinancials
+ *
+ * canExportCustomers is dropped (guard removed — "qui peut lire peut
+ * copier"; was unused by every real consumer). canAccessReception/Delivery/
+ * Waiter are also dropped: unused, and backed by a separate mechanism
+ * (capabilities.apps.* merchant entitlements) unrelated to RBAC permissions.
  */
 export const usePermissions = () => {
   const { authData } = useAuth();
 
   return useMemo(() => {
-    if (!authData) {
-      return {
-        isAdmin: false,
-        canManageUsers: false,
-        canManagePlannings: false,
-        canManageMenu: false,
-        canManageSettings: false,
-        canManageHaccp: false,
-        canViewReports: false,
-        canExportReports: false,
-        canViewFinancials: false,
-        canExportFinancials: false,
-        canManageCustomers: false,
-        canExportCustomers: false,
-        canOpenCashDrawer: false,
-        canPrintCashReport: false,
-        canAccessReception: false,
-        canAccessDelivery: false,
-        canAccessWaiter: false,
-        hasModulePlanning: false,
-        hasModuleUsers: false,
-        hasModuleHr: false,
-      };
-    }
-
-    const admin = authData.access?.admin ?? false;
-    const perms = authData.access?.permissions ?? {};
-    const actions = authData.capabilities?.actions ?? {};
-    const modules = authData.capabilities?.modules ?? {};
-
-    /** Resolves a flag from permissions map, falling back to capabilities.actions. */
-    const flag = (key: string): boolean =>
-      (perms[key] ?? actions[key] ?? false) as boolean;
+    const has = (key: PermissionKey): boolean => checkPermission(authData, key);
+    const modules = authData?.capabilities?.modules ?? {};
 
     return {
-      isAdmin: admin,
+      isAdmin: authData?.access?.admin ?? false,
+      has,
 
-      // HR / planning capabilities
-      canManageUsers: admin || flag("manage_users"),
-      canManagePlannings: admin || flag("manage_plannings"),
+      canManageUsers: has("staff.manage"),
+      canManagePlannings: has("staff.schedule.manage"),
+      canManageMenu: has("catalog.manage"),
+      canManageSettings: has("settings.manage"),
+      canManageHaccp: has("haccp.manage"),
+      canManageCustomers: has("customers.manage"),
+      canOpenCashDrawer: has("pos.cash_drawer.open"),
 
-      // Back-office capabilities
-      canManageMenu: admin || flag("manage_menu"),
-      canManageSettings: admin || flag("manage_settings"),
-      canManageHaccp: admin || flag("manage_haccp"),
+      canViewReports: has("reports.sales.read"),
+      canExportReports: has("reports.sales.read"),
+      canPrintCashReport: has("reports.sales.read"),
+      canViewFinancials: has("reports.financial.read"),
+      canExportFinancials: has("reports.financial.read"),
 
-      // Reporting capabilities
-      canViewReports: admin || flag("view_reports"),
-      canExportReports: admin || flag("export_reports"),
-      canViewFinancials: admin || flag("view_financials"),
-      canExportFinancials: admin || flag("export_financials"),
-
-      // Customer capabilities
-      canManageCustomers: admin || flag("manage_customers"),
-      canExportCustomers: admin || flag("export_customers"),
-
-      // POS / cash capabilities
-      canOpenCashDrawer: admin || flag("open_cash_drawer"),
-      canPrintCashReport: admin || flag("print_merchant_cash_report"),
-      canAccessReception: admin || flag("access_reception"),
-      canAccessDelivery: admin || flag("access_delivery"),
-      canAccessWaiter: admin || flag("access_waiter"),
-
-      // Module-level activation flags
       hasModulePlanning: (modules["planning"] ?? false) as boolean,
       hasModuleUsers: (modules["users"] ?? false) as boolean,
       hasModuleHr: (modules["hr"] ?? false) as boolean,

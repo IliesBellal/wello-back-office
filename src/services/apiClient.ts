@@ -13,6 +13,15 @@ export interface ApiRequestOptions {
   body?: unknown;
   headers?: Record<string, string>;
   skipAuth?: boolean;
+  /**
+   * Skip the generic toast on a non-2xx response, without changing anything
+   * else (the ApiHttpError is still thrown). For a caller that renders its
+   * own masked/empty state on a specific status (e.g. a dashboard tile
+   * hidden on 403 for a merchant that lacks reports.sales.read) rather than
+   * surfacing an error — a generic toast on every load would defeat the
+   * "masked, not broken" intent.
+   */
+  suppressErrorToast?: boolean;
 }
 
 export interface ApiResponse<T> {
@@ -37,7 +46,7 @@ export const registerMFAHandler = (handler: MFAHandler) => {
 // Handlers normally send { status, message, error, recipient } at the top level
 // of the response body, but some error paths nest it under a `data` envelope
 // instead - check both so this doesn't depend on which shape a given endpoint uses.
-const unwrapErrorData = (errorData?: Record<string, unknown>): Record<string, unknown> | undefined => {
+export const unwrapErrorData = (errorData?: Record<string, unknown>): Record<string, unknown> | undefined => {
   if (!errorData) return undefined;
   if (errorData.data && typeof errorData.data === "object") {
     return errorData.data as Record<string, unknown>;
@@ -185,15 +194,66 @@ const DUPLICATE_NAME_RETRY_CODES = new Set([
   "attribute_name_already_exists_with_retry",
 ]);
 
+// RBAC lot 9 — two 409 codes (version_conflict, role_has_members) come back
+// enriched (current_version / holder_count) and are presented by a bespoke
+// dialog (useRoleVersionConflict / useArchiveRoleFlow), not a toast. Same
+// suppression mechanism as DUPLICATE_NAME_RETRY_CODES above but a separate
+// set — semantically distinct (bespoke recovery flow, not a blind retry).
+const ROLE_DIALOG_CODES = new Set(["version_conflict", "role_has_members"]);
+
+// RBAC lot 9 — French copy for the role-administration error codes that
+// don't need a bespoke dialog (see docs/RBAC_ROLES_API.md's "Erreurs
+// communes"), same pattern as DUPLICATE_NAME_MESSAGES above.
+const ROLE_ERROR_MESSAGES: Record<string, { title: string; description: string }> = {
+  role_not_found: {
+    title: "Rôle introuvable",
+    description: "Ce rôle n'existe pas ou a été supprimé.",
+  },
+  role_name_required: {
+    title: "Nom requis",
+    description: "Le nom du rôle est obligatoire.",
+  },
+  role_version_required: {
+    title: "Erreur de synchronisation",
+    description: "Impossible d'enregistrer : rechargez la page et réessayez.",
+  },
+  role_permission_key_unknown: {
+    title: "Droit inconnu",
+    description: "Un des droits sélectionnés n'existe plus au catalogue. Rechargez la page.",
+  },
+  role_immutable: {
+    title: "Rôle non modifiable",
+    description: "Le rôle Administrateur ne peut pas être modifié.",
+  },
+  role_self_modification: {
+    title: "Action impossible",
+    description: "Vous ne pouvez pas modifier votre propre rôle, ni les droits d'un rôle que vous portez vous-même.",
+  },
+  role_staff_manage_required: {
+    title: "Action impossible",
+    description: "Cette action laisserait l'établissement sans aucun gestionnaire d'équipe.",
+  },
+  role_is_merchant_default: {
+    title: "Rôle par défaut",
+    description: "Ce rôle est le rôle par défaut de l'établissement et ne peut pas être archivé.",
+  },
+  merchant_user_not_found: {
+    title: "Utilisateur introuvable",
+    description: "Cet utilisateur n'est plus lié à cet établissement.",
+  },
+};
+
 const handleApiError = (status: number, message?: string, errorCode?: string) => {
   switch (status) {
-    case 400:
+    case 400: {
+      const roleError = errorCode ? ROLE_ERROR_MESSAGES[errorCode] : undefined;
       toast({
-        title: "Données incorrectes",
-        description: message || "Veuillez vérifier les informations saisies.",
+        title: roleError?.title || "Données incorrectes",
+        description: roleError?.description || message || "Veuillez vérifier les informations saisies.",
         variant: "destructive",
       });
       break;
+    }
     case 401:
       toast({
         title: "Session expirée",
@@ -209,21 +269,24 @@ const handleApiError = (status: number, message?: string, errorCode?: string) =>
         variant: "destructive",
       });
       break;
-    case 404:
+    case 404: {
+      const roleError = errorCode ? ROLE_ERROR_MESSAGES[errorCode] : undefined;
       toast({
-        title: "Ressource introuvable",
-        description: message || "La ressource demandée n'existe pas.",
+        title: roleError?.title || "Ressource introuvable",
+        description: roleError?.description || message || "La ressource demandée n'existe pas.",
         variant: "destructive",
       });
       break;
+    }
     case 409: {
-      if (errorCode && DUPLICATE_NAME_RETRY_CODES.has(errorCode)) {
+      if (errorCode && (DUPLICATE_NAME_RETRY_CODES.has(errorCode) || ROLE_DIALOG_CODES.has(errorCode))) {
         break;
       }
       const duplicate = errorCode ? DUPLICATE_NAME_MESSAGES[errorCode] : undefined;
+      const roleError = errorCode ? ROLE_ERROR_MESSAGES[errorCode] : undefined;
       toast({
-        title: duplicate?.title || "Conflit",
-        description: duplicate?.description || message || "Cette action entre en conflit avec une ressource existante.",
+        title: duplicate?.title || roleError?.title || "Conflit",
+        description: duplicate?.description || roleError?.description || message || "Cette action entre en conflit avec une ressource existante.",
         variant: "destructive",
       });
       break;
@@ -363,7 +426,7 @@ const logApiError = (method: string, endpoint: string, error: unknown) => {
 // ============= Main API Client =============
 async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Promise<T> {
 
-  const { method = "GET", body, headers = {}, skipAuth = false } = options;
+  const { method = "GET", body, headers = {}, skipAuth = false, suppressErrorToast = false } = options;
   const url = `${API_BASE_URL}${endpoint}`;
 
   const logContext = startRequestLog(method, endpoint, url, body);
@@ -420,14 +483,20 @@ async function request<T>(endpoint: string, options: ApiRequestOptions = {}): Pr
       }
 
       endRequestLog(logContext, response.status, errorBody ?? errorBodyText ?? errorMessage, true);
-      handleApiError(response.status, errorMessage, typeof errorData?.status === "string" ? errorData.status : undefined);
-      throw createApiHttpError(response.status, errorMessage, errorBody, errorBodyText);
+      if (!suppressErrorToast) {
+        handleApiError(response.status, errorMessage, typeof mfaBody?.status === "string" ? mfaBody.status : undefined);
+      }
+      // responseBody carries the UNWRAPPED body (mfaBody) so every consumer
+      // (isApiHttpError callers reading err.responseBody.status/current_version/
+      // holder_count) sees a flat shape regardless of whether this endpoint
+      // wraps errors in {id, data} or sends them flat — see unwrapErrorData.
+      throw createApiHttpError(response.status, errorMessage, mfaBody ?? errorBody, errorBodyText);
     }
 
     // Handle empty responses
     const text = await response.text();
     const data = text ? JSON.parse(text) as T : {} as T;
-    
+
     endRequestLog(logContext, response.status, data);
     console.log(`📥 [API RESPONSE] ${method} ${endpoint}`, data);
     return data;
@@ -493,8 +562,8 @@ async function requestWithCustomToken<T>(endpoint: string, customToken: string, 
       }
 
       endRequestLog(logContext, response.status, errorBody ?? errorBodyText ?? errorMessage, true);
-      handleApiError(response.status, errorMessage, typeof errorData?.status === "string" ? errorData.status : undefined);
-      throw createApiHttpError(response.status, errorMessage, errorBody, errorBodyText);
+      handleApiError(response.status, errorMessage, typeof mfaBody?.status === "string" ? mfaBody.status : undefined);
+      throw createApiHttpError(response.status, errorMessage, mfaBody ?? errorBody, errorBodyText);
     }
 
     // Handle empty responses

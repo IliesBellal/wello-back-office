@@ -21,7 +21,7 @@ import { qk } from "@/lib/queryKeys";
 import { usePermissions } from "@/hooks/usePermissions";
 
 import { GeneralTab } from "./tabs/GeneralTab";
-import { RightsTab } from "./tabs/RightsTab";
+import { AccessTab } from "./tabs/AccessTab";
 import { ContractTab } from "./tabs/ContractTab";
 import { DocumentsTab } from "./tabs/DocumentsTab";
 import { SecurityTab } from "./tabs/SecurityTab";
@@ -56,14 +56,17 @@ interface MemberSheetProps {
   onOpenChange: (open: boolean) => void;
   /** Called after a successful rights/identity update so the parent can refresh */
   onUpdated?: () => void;
+  /** Tab to open on ("general" by default) — e.g. "access" when deep-linked
+   * from the roles screen's "this role is still held" dialog. */
+  initialTab?: string;
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-export function MemberSheet({ member, open, onOpenChange, onUpdated }: MemberSheetProps) {
+export function MemberSheet({ member, open, onOpenChange, onUpdated, initialTab = "general" }: MemberSheetProps) {
   const queryClient = useQueryClient();
   const { isAdmin } = usePermissions();
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState(initialTab);
 
   // Optimistic toggle for login_enabled (header switch)
   const [loginEnabled, setLoginEnabled] = useState(false);
@@ -71,9 +74,9 @@ export function MemberSheet({ member, open, onOpenChange, onUpdated }: MemberShe
   // Reset tab and seed the toggle each time the sheet opens for a new member
   useEffect(() => {
     if (!open || !member) return;
-    setActiveTab("general");
+    setActiveTab(initialTab);
     setLoginEnabled(member.login_enabled);
-  }, [open, member]);
+  }, [open, member, initialTab]);
 
   // ── Load full detail for header (status / admin badge / phone) ─────────────
   const { data: detail } = useQuery({
@@ -182,7 +185,7 @@ export function MemberSheet({ member, open, onOpenChange, onUpdated }: MemberShe
           >
             <TabsList className={`mt-4 shrink-0 grid w-full ${isAdmin ? "grid-cols-5" : "grid-cols-4"}`}>
               <TabsTrigger value="general">Général</TabsTrigger>
-              <TabsTrigger value="rights">Droits</TabsTrigger>
+              <TabsTrigger value="access">Accès</TabsTrigger>
               <TabsTrigger value="contract">Contrat</TabsTrigger>
               <TabsTrigger value="documents">Documents</TabsTrigger>
               {isAdmin && <TabsTrigger value="security">Sécurité</TabsTrigger>}
@@ -192,8 +195,8 @@ export function MemberSheet({ member, open, onOpenChange, onUpdated }: MemberShe
               <GeneralTab userId={userId} />
             </TabsContent>
 
-            <TabsContent value="rights" className="mt-4 flex-1 min-h-0 overflow-y-auto">
-              <RightsTab userId={userId} />
+            <TabsContent value="access" className="mt-4 flex-1 min-h-0 overflow-y-auto">
+              <AccessTab userId={userId} />
             </TabsContent>
 
             <TabsContent value="contract" className="mt-4 flex-1 min-h-0 overflow-y-auto">

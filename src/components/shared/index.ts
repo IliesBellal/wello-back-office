@@ -6,6 +6,7 @@ export { CardSkeleton } from './CardSkeleton';
 export { CategorySelector } from './CategorySelector';
 export { ConfirmDialog } from './ConfirmDialog';
 export { DateRangePicker } from './DateRangePicker';
+export { EmptyPermissionsNotice } from './EmptyPermissionsNotice';
 export { ExpandableDataTable } from './ExpandableDataTable';
 export { MultiFilter } from './MultiFilter';
 export { MultiSelectDropdown } from './MultiSelectDropdown';

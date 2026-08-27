@@ -1,4 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { usePermissions } from '@/hooks/usePermissions';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer, TabSystem, ConfirmDialog } from '@/components/shared';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -246,7 +248,18 @@ const frequencyUnitLabel: Record<FrequencyUnit, string> = {
   month: 'Mois',
 };
 
+// RBAC lot 9 (§6 debt): self-gate for direct-URL access — the nav item is
+// already hidden via visibilityCheck (navConfig.ts), but that alone doesn't
+// stop someone from navigating straight to /haccp/settings.
 const HaccpSettingsPage = () => {
+  const { canManageHaccp } = usePermissions();
+  if (!canManageHaccp) {
+    return <Navigate to="/" replace />;
+  }
+  return <HaccpSettingsPageContent />;
+};
+
+const HaccpSettingsPageContent = () => {
   const { toast } = useToast();
 
   const [activeTab, setActiveTab] = useState('general');

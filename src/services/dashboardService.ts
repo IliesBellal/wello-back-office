@@ -268,7 +268,11 @@ export const getDashboardSummary = (): Promise<DashboardSummary> => {
       return mockDashboardSummary;
     },
     async () => {
-      const response = await apiClient.get<DashboardSummaryApiResponse>('/stats/dashboard/summary');
+      // RBAC lot 9 (§6 debt): this tile is gated server-side by
+      // reports.sales.read — suppressErrorToast so a merchant/role without
+      // that permission gets a silently masked tile (see Index.tsx), not a
+      // toast on every dashboard load.
+      const response = await apiClient.get<DashboardSummaryApiResponse>('/stats/dashboard/summary', { suppressErrorToast: true });
       const payload = response.data;
 
       const normalizedHourly = payload.hourly_revenue ?? [];

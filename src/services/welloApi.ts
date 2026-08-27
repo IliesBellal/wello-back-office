@@ -30,6 +30,18 @@ import type {
 } from "@/types/adminUsers";
 
 import type {
+  Role,
+  RoleEntry,
+  RoleDetail,
+  RoleMember,
+  PermissionDomainGroup,
+  CreateRoleRequest,
+  UpdateRoleRequest,
+  UpdateRolePermissionsRequest,
+  MyPermissions,
+} from "@/types/roles";
+
+import type {
   PlanningSettings,
   PlanningSettingsUpdateRequest,
   EmployeePosition,
@@ -270,6 +282,101 @@ export const usersApi = {
       },
       { method: "POST", endpoint: path, forceMock: TEAM_FORCE_MOCK },
     );
+  },
+
+  /** PUT /users/{id}/role – assign an RBAC role to the member (RBAC lot 9) */
+  updateRole(id: string, roleId: string): Promise<Role> {
+    const path = `/users/${id}/role`;
+    logAPI("PUT", path, { role_id: roleId });
+    return apiClient
+      .put<WelloApiResponse<ApiEnvelopeData>>(path, { role_id: roleId })
+      .then((resp) => unwrap<{ user_id: string; role: Role } & Record<string, unknown>>(resp).role);
+  },
+};
+
+// ============================================================
+// RBAC – Roles  /roles, /permissions, /me/permissions  (RBAC lot 9)
+// ============================================================
+
+export const rolesApi = {
+  /** GET /roles */
+  list(): Promise<RoleEntry[]> {
+    const path = "/roles";
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<RoleEntry>(resp, "roles").items);
+  },
+
+  /** POST /roles */
+  create(payload: CreateRoleRequest): Promise<RoleDetail> {
+    logAPI("POST", "/roles", payload);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>("/roles", payload)
+      .then((resp) => unwrap<{ role: RoleDetail } & Record<string, unknown>>(resp).role);
+  },
+
+  /** GET /roles/{id} */
+  get(id: string): Promise<RoleDetail> {
+    const path = `/roles/${id}`;
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ role: RoleDetail } & Record<string, unknown>>(resp).role);
+  },
+
+  /** PATCH /roles/{id} – name/description, not permissions */
+  update(id: string, payload: UpdateRoleRequest): Promise<RoleDetail> {
+    const path = `/roles/${id}`;
+    logAPI("PATCH", path, payload);
+    return apiClient
+      .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ role: RoleDetail } & Record<string, unknown>>(resp).role);
+  },
+
+  /** PUT /roles/{id}/permissions – replaces the whole permission set */
+  updatePermissions(id: string, payload: UpdateRolePermissionsRequest): Promise<RoleDetail> {
+    const path = `/roles/${id}/permissions`;
+    logAPI("PUT", path, payload);
+    return apiClient
+      .put<WelloApiResponse<ApiEnvelopeData>>(path, payload)
+      .then((resp) => unwrap<{ role: RoleDetail } & Record<string, unknown>>(resp).role);
+  },
+
+  /** POST /roles/{id}/archive */
+  archive(id: string): Promise<Role> {
+    const path = `/roles/${id}/archive`;
+    logAPI("POST", path);
+    return apiClient
+      .post<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ role: Role } & Record<string, unknown>>(resp).role);
+  },
+
+  /** GET /roles/{id}/members */
+  getMembers(id: string): Promise<RoleMember[]> {
+    const path = `/roles/${id}/members`;
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<RoleMember>(resp, "members").items);
+  },
+
+  /** GET /permissions – the runtime permission catalogue, grouped by domain */
+  getCatalog(): Promise<PermissionDomainGroup[]> {
+    const path = "/permissions";
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrapList<PermissionDomainGroup>(resp, "domains").items);
+  },
+
+  /** GET /me/permissions – the caller's own effective permissions */
+  getMyPermissions(): Promise<MyPermissions> {
+    const path = "/me/permissions";
+    logAPI("GET", path);
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path)
+      .then((resp) => unwrap<{ my_permissions: MyPermissions } & Record<string, unknown>>(resp).my_permissions);
   },
 };
 
