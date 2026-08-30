@@ -129,10 +129,8 @@ export interface Employee {
   position_id?: string | null;
   position?: string | null;
   position_note?: string | null;
-  job_title?: string | null;
   email?: string | null;
   phone?: string | null;
-  role?: string | null;
   contract_type_code?: string | null;
   contract_start_date?: string | null;
   contract_end_date?: string | null;
@@ -166,10 +164,8 @@ export interface EmployeeCreateRequest {
   last_name: string;
   position_id?: string | null;
   position_note?: string | null;
-  job_title?: string | null;
   email?: string | null;
   phone?: string | null;
-  role?: string | null;
   contract_type_code?: string | null;
   contract_start_date?: string | null;
   contract_end_date?: string | null;
@@ -293,14 +289,12 @@ export interface PlanningShift {
    *   and are excluded from payroll & headcount aggregations.
    */
   employee_id: string | null;
-  title?: string | null;
   shift_date: string;
   start_time: string;
   end_time: string;
   break_minutes: number;
   position_id?: string | null;
   position?: string | null;
-  location?: string | null;
   notes?: string | null;
   status: string;
   created_at: string;
@@ -310,14 +304,12 @@ export interface PlanningShift {
 export interface PlanningShiftCreateRequest {
   /** `null` = create an unassigned shift. */
   employee_id: string | null;
-  title?: string | null;
   shift_date: string;
   start_time: string;
   end_time: string;
   break_minutes?: number;
   position_id?: string | null;
   position?: string | null;
-  location?: string | null;
   notes?: string | null;
   status?: string;
 }
@@ -741,6 +733,48 @@ export interface PlanningDayComment {
 /** Body of `PUT /planning/day-comments/{date}`. Un commentaire vide est rejeté par l'API — utiliser DELETE pour effacer. */
 export interface PlanningDayCommentUpsertRequest {
   comment: string;
+}
+
+// ============= Self-service team week (RBAC lot 10, "Mon planning") =============
+
+/**
+ * `GET /planning/me/team-week` -> `data.shifts[]`. Un shift de la semaine
+ * publiée courante, vue équipe complète (pas seulement les shifts de
+ * l'appelant — `employee_id` sert à distinguer les siens dans l'UI).
+ * Miroir de `internal/modules/planning/schedule/models.go` (`PlanningShiftTeamWeekView`).
+ */
+export interface PlanningShiftTeamWeekView {
+  id: string;
+  merchant_id: string;
+  week_id: string;
+  employee_id: string | null;
+  employee_name: string | null;
+  position_id: string | null;
+  position: string | null;
+  position_color: string | null;
+  title: string;
+  shift_date: string;
+  start_time: string;
+  end_time: string;
+  break_minutes: number;
+  location: string | null;
+  notes: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  deleted_at?: string | null;
+}
+
+/**
+ * `GET /planning/me/team-week` full response. Renvoie une liste de shifts
+ * vide (pas une erreur) quand la semaine ciblée n'est pas encore publiée ou
+ * n'existe pas — voir `ListCurrentUserTeamWeekShifts` côté API.
+ */
+export interface CurrentUserTeamWeekResponse {
+  current_employee_id: string;
+  week_id: string;
+  shifts: PlanningShiftTeamWeekView[];
+  day_comments: PlanningDayComment[];
 }
 
 // ============= POS Holidays (rendu en fond de colonne planning) =============

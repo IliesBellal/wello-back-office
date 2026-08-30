@@ -8,16 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 import { rolesApi } from "@/services/welloApi";
 import { qk } from "@/lib/queryKeys";
@@ -85,7 +75,6 @@ export function RoleEditorSheet({ open, onOpenChange, mode, roleId, sourceRole, 
   });
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [isSaving, setIsSaving] = useState(false);
-  const [pendingSensitiveGrant, setPendingSensitiveGrant] = useState<Permission | null>(null);
   const [pendingSaveDiff, setPendingSaveDiff] = useState<{ before: Permission[]; after: Permission[] } | null>(null);
   const [saveDiffResolver, setSaveDiffResolver] = useState<((confirmed: boolean) => void) | null>(null);
 
@@ -116,10 +105,6 @@ export function RoleEditorSheet({ open, onOpenChange, mode, roleId, sourceRole, 
   const memberCount = members?.length ?? 0;
 
   const handleToggle = (permission: Permission, checked: boolean) => {
-    if (checked && permission.is_sensitive) {
-      setPendingSensitiveGrant(permission);
-      return;
-    }
     applyToggle(permission.key, checked);
   };
 
@@ -130,11 +115,6 @@ export function RoleEditorSheet({ open, onOpenChange, mode, roleId, sourceRole, 
       else keys.delete(key);
       return { ...d, keys };
     });
-  };
-
-  const confirmSensitiveGrant = () => {
-    if (pendingSensitiveGrant) applyToggle(pendingSensitiveGrant.key, true);
-    setPendingSensitiveGrant(null);
   };
 
   const draftPermissionObjects = (): Permission[] => {
@@ -379,25 +359,6 @@ export function RoleEditorSheet({ open, onOpenChange, mode, roleId, sourceRole, 
           )}
         </SheetContent>
       </Sheet>
-
-      {/* Sensitive-permission grant confirm — fires the instant a sensitive
-          toggle flips ON, independent of and in addition to the save-diff dialog. */}
-      <AlertDialog open={!!pendingSensitiveGrant} onOpenChange={(next) => !next && setPendingSensitiveGrant(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Droit sensible</AlertDialogTitle>
-            <AlertDialogDescription>
-              « {pendingSensitiveGrant?.label} » est un droit sensible
-              {pendingSensitiveGrant?.description ? ` — ${pendingSensitiveGrant.description}.` : "."} Confirmer son ajout à ce
-              rôle ?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSensitiveGrant}>Ajouter le droit</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       <SaveDiffDialog
         open={!!pendingSaveDiff}

@@ -5,10 +5,12 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { Navigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, LineChart, Line, 
@@ -184,6 +186,19 @@ const DataTable = ({
 };
 
 export const DashboardAnalysis = () => {
+  const { canViewAnalytics } = usePermissions();
+
+  // RBAC lot 10 : gate, redirect if no permission. Kept in this thin
+  // wrapper so the early return never sits between two hook calls of the
+  // content component below.
+  if (!canViewAnalytics) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <DashboardAnalysisContent />;
+};
+
+const DashboardAnalysisContent = () => {
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<TabType>('ca');
   const [dateRange, setDateRange] = useState<DateRange>({

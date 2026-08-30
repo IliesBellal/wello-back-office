@@ -183,8 +183,6 @@ const members: MockMember[] = [
     planning: {
       position_id: "pos-1",
       position: "Manager",
-      job_title: "Responsable de salle",
-      role: "manager",
       contract_type_code: "CDI",
       contract_start_date: "2024-12-15",
       contract_hours: 39,
@@ -213,8 +211,6 @@ const members: MockMember[] = [
     planning: {
       position_id: "pos-2",
       position: "Serveur",
-      job_title: "Serveur·euse polyvalent",
-      role: "employee",
       contract_type_code: "CDI",
       contract_start_date: "2025-02-10",
       probation_end_date: "2025-04-10",
@@ -239,8 +235,6 @@ const members: MockMember[] = [
     planning: {
       position_id: "pos-1",
       position: "Manager",
-      job_title: "Adjointe de direction",
-      role: "manager",
       contract_type_code: "CDI",
       contract_start_date: "2025-04-22",
       contract_hours: 39,
@@ -263,8 +257,6 @@ const members: MockMember[] = [
     planning: {
       position_id: "pos-3",
       position: "Cuisinier",
-      job_title: "Chef de partie",
-      role: "employee",
       contract_type_code: "CDI",
       contract_start_date: "2025-06-01",
       contract_hours: 39,
@@ -291,7 +283,6 @@ const members: MockMember[] = [
     planning: {
       position_id: "pos-2",
       position: "Serveur",
-      role: "employee",
       contract_type_code: "CDD",
       contract_start_date: "2025-09-15",
       contract_end_date: "2026-09-14",
@@ -336,7 +327,6 @@ const members: MockMember[] = [
     planning: {
       position_id: "pos-5",
       position: "Livreur",
-      role: "employee",
       contract_type_code: "EXTRA",
       contract_start_date: "2026-03-02",
       hourly_rate: 1200,
@@ -486,13 +476,6 @@ function updateRights(id: string, payload: MerchantUserRightsUpsertRequest): Mer
   return m!.rights;
 }
 
-function updateMember(id: string, payload: Partial<MerchantUserPlanningUpsertRequest>): MerchantUserDetail {
-  const m = members.find((x) => x.detail.user_id === id);
-  if (!m) notFound(`Mock: user ${id} introuvable`);
-  m!.detail.planning = { ...m!.detail.planning, ...payload };
-  return m!.detail;
-}
-
 function createUser(payload: CreateUserRequest): CreateUserResponse {
   const userId = nextId("u");
   const newMember = makeMember({
@@ -507,7 +490,6 @@ function createUser(payload: CreateUserRequest): CreateUserResponse {
     planning: payload.planning
       ? {
           position_id: payload.planning.position_id ?? null,
-          role: payload.planning.role ?? null,
           contract_type_code: payload.planning.contract_type_code ?? null,
         }
       : undefined,
@@ -662,10 +644,8 @@ function createEmployee(payload: EmployeeCreateRequest): Employee {
     position_id: payload.position_id ?? null,
     position: positions.find((p) => p.id === payload.position_id)?.label ?? null,
     position_note: payload.position_note ?? null,
-    job_title: payload.job_title ?? null,
     email: payload.email ?? null,
     phone: payload.phone ?? null,
-    role: payload.role ?? null,
     contract_type_code: payload.contract_type_code ?? null,
     contract_start_date: payload.contract_start_date ?? null,
     contract_end_date: payload.contract_end_date ?? null,
@@ -759,7 +739,6 @@ export const teamMocks = {
   getMember,
   getRights,
   updateRights,
-  updateMember,
   createUser,
   linkableSearch,
   merchantLink,

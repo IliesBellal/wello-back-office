@@ -11,8 +11,6 @@ export const SENTINEL_NONE = "__none__";
 
 export interface EmployeeHrForm {
   position_id: string;
-  job_title: string;
-  role: string;
   contract_type_code: string;
 
   contract_start_date: string;
@@ -39,8 +37,6 @@ export interface EmployeeHrForm {
 
 export const EMPTY_HR_FORM: EmployeeHrForm = {
   position_id: "",
-  job_title: "",
-  role: "",
   contract_type_code: "",
   contract_start_date: "",
   contract_end_date: "",
@@ -137,8 +133,6 @@ export function validateEmployeeHrForm(form: EmployeeHrForm): string[] {
 /** The HR/contract fields shared verbatim by `MerchantUserPlanningUpsertRequest` and `EmployeeCreateRequest`/`EmployeeUpdateRequest`. */
 export interface EmployeeHrPatch {
   position_id: string | null;
-  job_title: string | null;
-  role: string | null;
   contract_type_code: string | null;
   contract_start_date: string | null;
   contract_end_date: string | null;
@@ -159,8 +153,6 @@ export interface EmployeeHrPatch {
 export function hrFormToPatch(form: EmployeeHrForm): EmployeeHrPatch {
   return {
     position_id: emptyToNull(form.position_id),
-    job_title: emptyToNull(form.job_title.trim()),
-    role: emptyToNull(form.role),
     contract_type_code: emptyToNull(form.contract_type_code),
     contract_start_date: emptyToNull(form.contract_start_date),
     contract_end_date: emptyToNull(form.contract_end_date),

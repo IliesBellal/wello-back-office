@@ -1,4 +1,4 @@
-import { ChevronRight, Download, FileSpreadsheet, Keyboard, Loader2 } from 'lucide-react';
+import { Building2, ChevronRight, Download, FileSpreadsheet, Keyboard, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 interface ImportDoorPickerProps {
   onChooseProvider: () => void;
   onChooseManual: () => void;
+  onChooseMerchant: () => void;
   onDownloadTemplate: () => void;
   isDownloadingTemplate: boolean;
 }
@@ -19,10 +20,11 @@ interface ImportDoorPickerProps {
 export const ImportDoorPicker = ({
   onChooseProvider,
   onChooseManual,
+  onChooseMerchant,
   onDownloadTemplate,
   isDownloadingTemplate,
 }: ImportDoorPickerProps) => (
-  <div className="grid gap-4 md:grid-cols-3">
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
     <Card className="flex flex-col gap-4 p-6">
       <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
         <FileSpreadsheet className="h-5 w-5 text-primary" />
@@ -79,6 +81,23 @@ export const ImportDoorPicker = ({
       </div>
       <Button variant="outline" className="w-full" onClick={onChooseManual}>
         Saisir mes produits
+        <ChevronRight className="ml-2 h-4 w-4" />
+      </Button>
+    </Card>
+
+    <Card className="flex flex-col gap-4 p-6">
+      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
+        <Building2 className="h-5 w-5 text-primary" />
+      </div>
+      <div className="flex-1 space-y-1">
+        <h3 className="font-semibold">Je copie un autre établissement</h3>
+        <p className="text-sm text-muted-foreground">
+          Reprenez le catalogue complet d’un établissement auquel vous avez déjà accès —
+          produits, composants, catégories, attributs, tags.
+        </p>
+      </div>
+      <Button variant="outline" className="w-full" onClick={onChooseMerchant}>
+        Choisir l’établissement
         <ChevronRight className="ml-2 h-4 w-4" />
       </Button>
     </Card>

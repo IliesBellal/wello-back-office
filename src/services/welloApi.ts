@@ -81,6 +81,7 @@ import type {
   PlanningHolidayOverridePatchRequest,
   PlanningDayComment,
   PlanningDayCommentUpsertRequest,
+  CurrentUserTeamWeekResponse,
   SystemRef,
 } from "@/types/planning";
 
@@ -182,21 +183,6 @@ export const usersApi = {
           .then((resp) => unwrapList<LinkableUser>(resp, "users").items);
       },
       { method: "GET", endpoint: path, forceMock: TEAM_FORCE_MOCK },
-    );
-  },
-
-  /** PATCH /users/{id}/member – update HR / planning block on the member */
-  updateMember(id: string, payload: Partial<MerchantUserPlanningUpsertRequest>): Promise<MerchantUserDetail> {
-    const path = `/users/${id}/member`;
-    return withMock(
-      () => teamMocks.updateMember(id, payload),
-      () => {
-        logAPI("PATCH", path, payload);
-        return apiClient
-          .patch<WelloApiResponse<ApiEnvelopeData>>(path, payload)
-          .then((resp) => unwrap<{ user: MerchantUserDetail } & Record<string, unknown>>(resp).user);
-      },
-      { method: "PATCH", endpoint: path, payload, forceMock: TEAM_FORCE_MOCK },
     );
   },
 
@@ -537,6 +523,30 @@ export const planningDayCommentsApi = {
     return apiClient
       .delete<WelloApiResponse<ApiEnvelopeData>>(path)
       .then((resp) => { unwrap(resp); });
+  },
+};
+
+// ============================================================
+// Planning – Self-service  /planning/me  (RBAC lot 10, "Mon planning")
+// ============================================================
+
+export const planningSelfApi = {
+  /**
+   * GET /planning/me/team-week?week_start=YYYY-MM-DD | week_id=...
+   * Gardée par authMiddleware seul côté API (pas staff.schedule.manage) —
+   * accessible à tout équipier lié à une fiche employé, indépendamment de
+   * ses droits RBAC. Passer soit `weekStart` soit `weekId`.
+   */
+  getTeamWeek(params: { weekStart?: string; weekId?: string }): Promise<CurrentUserTeamWeekResponse> {
+    const path = `/planning/me/team-week${qs(params.weekId ? { week_id: params.weekId } : { week_start: params.weekStart })}`;
+    logAPI("GET", path);
+    // suppressErrorToast: a 404 here means "no employee record linked to
+    // this account" (the only realistic error case — an unpublished/missing
+    // week is a 200 with empty shifts, not an error) and the page renders
+    // its own inline notice for it instead of a generic toast.
+    return apiClient
+      .get<WelloApiResponse<ApiEnvelopeData>>(path, { suppressErrorToast: true })
+      .then((resp) => unwrap<CurrentUserTeamWeekResponse & Record<string, unknown>>(resp));
   },
 };
 

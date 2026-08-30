@@ -73,6 +73,13 @@ export interface ImportPreviewSummary {
   attributes_to_create: number;
   attributes_already_imported: number;
   options_to_create: number;
+  /** Porte « autre établissement » uniquement — 0 pour toute autre source. */
+  component_categories_to_create: number;
+  component_categories_reused: number;
+  components_to_create: number;
+  components_reused: number;
+  /** Écartés par décision de l'utilisateur, avant tout autre arbitrage. */
+  products_excluded: number;
   unresolved_tva_rates: number;
 }
 
@@ -153,6 +160,26 @@ export interface ImportPreviewProduct {
   /** Déjà importé, mais le produit Wello a disparu depuis. */
   mapping_stale?: boolean;
   reimport?: ImportReimportResolution;
+  /** Reflète la décision courante `excluded_products` — porte « autre établissement » uniquement. */
+  excluded?: boolean;
+}
+
+/** Porte « autre établissement » uniquement. */
+export interface ImportPreviewComponentCategory {
+  external_id: string;
+  name: string;
+  action: ImportEntityAction;
+  existing_category_id?: string;
+  mapping_stale?: boolean;
+}
+
+/** Porte « autre établissement » uniquement. */
+export interface ImportPreviewComponent {
+  external_id: string;
+  name: string;
+  action: ImportEntityAction;
+  existing_component_id?: string;
+  mapping_stale?: boolean;
 }
 
 export interface ImportPreviewAttribute {
@@ -187,6 +214,11 @@ export interface ImportDecisions {
    * correspondance est périmée sont recréés d'office.
    */
   already_imported: Record<string, ImportReimportResolution>;
+  /**
+   * Produits explicitement écartés du catalogue source, avant tout autre
+   * arbitrage — porte « autre établissement » uniquement (`{}` ailleurs).
+   */
+  excluded_products: Record<string, boolean>;
 }
 
 export interface ImportPreviewResult {
@@ -199,6 +231,9 @@ export interface ImportPreviewResult {
   tags: ImportPreviewTag[];
   products: ImportPreviewProduct[];
   attributes: ImportPreviewAttribute[];
+  /** Porte « autre établissement » uniquement — absents/vides ailleurs. */
+  component_categories: ImportPreviewComponentCategory[];
+  components: ImportPreviewComponent[];
   warnings: ImportPreviewWarning[];
   decisions: ImportDecisions;
 }

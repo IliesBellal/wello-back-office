@@ -1,8 +1,10 @@
+import { Navigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Save, RotateCcw } from 'lucide-react';
 import { useFloorPlan } from '@/hooks/useFloorPlan';
+import { usePermissions } from '@/hooks/usePermissions';
 import { FloorPlanCanvas } from '@/components/locations/FloorPlanCanvas';
 import { TablePropertiesPanel } from '@/components/locations/TablePropertiesPanel';
 import { ObstaclePropertiesPanel } from '@/components/locations/ObstaclePropertiesPanel';
@@ -23,6 +25,19 @@ import { ToolBar } from '@/components/locations/ToolBar';
  * - Responsive design (desktop + mobile)
  */
 export default function Locations() {
+  const { canManageSeatingPlan } = usePermissions();
+
+  // RBAC lot 10 : gate, redirect if no permission. Kept in this thin
+  // wrapper so the early return never sits between two hook calls of the
+  // content component below.
+  if (!canManageSeatingPlan) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <LocationsContent />;
+}
+
+function LocationsContent() {
   const {
     floors,
     locations,

@@ -19,17 +19,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { ChevronDown, LogOut, Building2 } from 'lucide-react';
+import { ChevronDown, LogOut, Building2, Plus } from 'lucide-react';
 import { authService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import { NotificationBell } from '@/components/shared/NotificationBell';
+import { CreateEstablishmentDialog } from '@/components/dashboard/CreateEstablishmentDialog';
 
 export const Header = () => {
   const { authData, setAuthData, logout } = useAuth();
   const { toast } = useToast();
   const [isSwitching, setIsSwitching] = useState(false);
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showCreateEstablishmentDialog, setShowCreateEstablishmentDialog] = useState(false);
 
   const handleMerchantSwitch = async (token: string, businessName: string) => {
     setIsSwitching(true);
@@ -156,6 +158,14 @@ export const Header = () => {
                 )}
               </DropdownMenuItem>
             ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setShowCreateEstablishmentDialog(true)}
+              className="flex items-center gap-2 py-2.5 cursor-pointer text-primary"
+            >
+              <Plus className="w-4 h-4 flex-shrink-0" />
+              <span className="font-medium">Nouvel établissement</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
 
@@ -186,6 +196,11 @@ export const Header = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CreateEstablishmentDialog
+        open={showCreateEstablishmentDialog}
+        onOpenChange={setShowCreateEstablishmentDialog}
+      />
     </header>
   );
 };

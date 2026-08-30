@@ -10,12 +10,14 @@ import { Separator } from '@/components/ui/separator';
 import { qk } from '@/lib/queryKeys';
 import { alreadyImportedProducts, categoryOptions, indexBlockersByRef } from '@/lib/importDecisions';
 import { menuService } from '@/services/menuService';
+import { useAuth } from '@/contexts/AuthContext';
 import type { UseProductImport } from '@/hooks/useProductImport';
 import type { ImportPreviewResult } from '@/types/import';
 
 import { ImportAlreadyImported } from './review/ImportAlreadyImported';
 import { ImportMissingCategories } from './review/ImportMissingCategories';
 import { ImportNameCollisions } from './review/ImportNameCollisions';
+import { ImportProductSelection } from './review/ImportProductSelection';
 import { ImportTagClassification } from './review/ImportTagClassification';
 import { ImportTvaResolution } from './review/ImportTvaResolution';
 import { ImportWarningsPanel } from './review/ImportWarningsPanel';
@@ -70,6 +72,13 @@ const Count = ({ label, value, hint }: { label: string; value: number; hint?: st
 export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => {
   const { state, precheck, isCommitting } = wizard;
   const decisions = state.decisions;
+  const { authData } = useAuth();
+
+  const sourceMerchantName =
+    state.door === 'merchant'
+      ? authData?.session.merchants.find((merchant) => merchant.id === state.sourceMerchantId)
+          ?.business_name
+      : undefined;
 
   // Référentiel de TVA du marchand : une vraie lecture, cachée entre deux
   // ouvertures contrairement aux appels d'import.
@@ -94,8 +103,22 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
 
   const { summary } = preview;
 
+  const componentCount = summary.components_to_create + summary.components_reused;
+  const componentCategoryHint = [
+    summary.categories_reused > 0 ? `${summary.categories_reused} réutilisées` : null,
+    componentCount > 0 ? `${componentCount} composant(s)` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   return (
     <div className="flex flex-col gap-6">
+      {sourceMerchantName && (
+        <p className="text-sm text-muted-foreground">
+          Import depuis <span className="font-medium text-foreground">{sourceMerchantName}</span>
+        </p>
+      )}
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Count
           label="Produits à créer"
@@ -113,9 +136,7 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         <Count
           label="Catégories"
           value={summary.categories_to_create + summary.categories_reused}
-          hint={
-            summary.categories_reused > 0 ? `${summary.categories_reused} réutilisées` : undefined
-          }
+          hint={componentCategoryHint || undefined}
         />
         <Count
           label="Tags"
@@ -144,6 +165,25 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
             )}
           </AlertDescription>
         </Alert>
+      )}
+
+      {state.door === 'merchant' && (
+        <>
+          <Section
+            title="Produits à importer"
+            description="Décochez ce que vous ne voulez pas reprendre dans cet établissement."
+          >
+            <ImportProductSelection
+              products={preview.products}
+              excluded={decisions.excluded_products}
+              disabled={isCommitting}
+              onChange={wizard.setProductExcluded}
+              onChangeAll={wizard.setAllProductsExcluded}
+            />
+          </Section>
+
+          <Separator />
+        </>
       )}
 
       <Section

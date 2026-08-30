@@ -26,6 +26,7 @@ import {
   Link2,
   Receipt,
   Printer,
+  ChefHat,
 } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
@@ -79,6 +80,7 @@ const settingsSubItems: MenuItem[] = [
   { title: 'Établissement', icon: Store, path: '/settings/establishment' },
   { title: 'Mon Profil', icon: User, path: '/settings/profile' },
   { title: 'Imprimantes', icon: Printer, path: '/settings/printers' },
+  { title: 'Profils de production', icon: ChefHat, path: '/settings/production-profiles' },
 ];
 
 const accountingSubItems: MenuItem[] = [

@@ -49,8 +49,6 @@ interface EmployeesModalProps {
 function employeeToForm(e: Employee): EmployeeHrForm {
   return {
     position_id: e.position_id ?? "",
-    job_title: e.job_title ?? "",
-    role: e.role ?? "",
     contract_type_code: e.contract_type_code ?? "",
     contract_start_date: e.contract_start_date ? e.contract_start_date.slice(0, 10) : "",
     contract_end_date: e.contract_end_date ? e.contract_end_date.slice(0, 10) : "",

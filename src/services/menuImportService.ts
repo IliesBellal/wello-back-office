@@ -77,6 +77,8 @@ const normalizePreview = (preview: ImportPreviewResult): ImportPreviewResult => 
   tags: asArray(preview.tags),
   attributes: asArray(preview.attributes),
   warnings: asArray(preview.warnings),
+  component_categories: asArray(preview.component_categories),
+  components: asArray(preview.components),
   products: asArray(preview.products).map((product) => ({
     ...product,
     tag_external_ids: asArray(product.tag_external_ids),
@@ -87,6 +89,8 @@ const normalizePreview = (preview: ImportPreviewResult): ImportPreviewResult => 
     category_per_product: asRecord(preview.decisions?.category_per_product),
     tva_mapping: asRecord(preview.decisions?.tva_mapping),
     name_collisions: asRecord(preview.decisions?.name_collisions),
+    already_imported: asRecord(preview.decisions?.already_imported),
+    excluded_products: asRecord(preview.decisions?.excluded_products),
   },
 });
 
@@ -127,6 +131,23 @@ export const menuImportService = {
     const response = await apiClient.post<WelloApiResponse<ImportPreviewResult>>(
       '/menu/import/preview',
       { products },
+    );
+
+    return normalizePreview(response.data);
+  },
+
+  /**
+   * Prévisualise le catalogue d'un autre établissement auquel l'utilisateur a
+   * accès. Même endpoint de commit ensuite que les deux autres portes : seule
+   * la génération de l'aperçu diffère (lecture en base côté API plutôt que
+   * parsing d'un fichier).
+   */
+  async previewFromMerchant(sourceMerchantId: string): Promise<ImportPreviewResult> {
+    logAPI('POST', '/menu/import/preview-from-merchant', { sourceMerchantId });
+
+    const response = await apiClient.post<WelloApiResponse<ImportPreviewResult>>(
+      '/menu/import/preview-from-merchant',
+      { source_merchant_id: sourceMerchantId },
     );
 
     return normalizePreview(response.data);
@@ -237,6 +258,9 @@ export const describeImportError = (error: unknown): string => {
 
     case 'template_unavailable':
       return "Ce logiciel n'a pas de modèle à télécharger : utilisez son propre export.";
+
+    case 'source_merchant_not_found':
+      return "Cet établissement n'est plus accessible depuis votre compte.";
   }
 
   if (apiError.status === 413) {

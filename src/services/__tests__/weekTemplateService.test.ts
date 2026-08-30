@@ -18,13 +18,11 @@ function shift(over: Partial<PlanningShift>): PlanningShift {
     merchant_id: "m1",
     week_id: "w1",
     employee_id: "emp-1",
-    title: null,
     shift_date: "2026-06-01", // lundi
     start_time: "09:00",
     end_time: "17:00",
     break_minutes: 30,
     position: "Manager",
-    location: null,
     notes: null,
     status: "draft",
     created_at: "2026-06-01T00:00:00Z",

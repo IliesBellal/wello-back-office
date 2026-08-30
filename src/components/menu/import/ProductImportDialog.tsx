@@ -15,6 +15,7 @@ import { useProductImport, type ImportDoor } from '@/hooks/useProductImport';
 import { ImportDoneStep } from './ImportDoneStep';
 import { ImportDoorPicker } from './ImportDoorPicker';
 import { ImportManualStep } from './ImportManualStep';
+import { ImportMerchantSourceStep } from './ImportMerchantSourceStep';
 import { ImportReviewStep } from './ImportReviewStep';
 import { ImportProviderStep } from './ImportProviderStep';
 
@@ -43,7 +44,7 @@ interface ProductImportDialogProps {
 const STEP_TITLES: Record<string, { title: string; description: string }> = {
   choose: {
     title: 'Importer des produits',
-    description: 'Trois façons d’ajouter vos produits en une fois.',
+    description: 'Plusieurs façons d’ajouter vos produits en une fois.',
   },
   provider: {
     title: 'Importer un fichier',
@@ -61,6 +62,10 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
     title: 'Saisir mes produits',
     description: 'Une ligne par produit — rien n’est enregistré avant vérification.',
   },
+  merchant: {
+    title: 'Copier un autre établissement',
+    description: 'Choisissez l’établissement source, puis analysez son catalogue.',
+  },
 };
 
 /**
@@ -69,11 +74,12 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
  * (choix, dépôt de fichier, résumé final) n'ont pas à occuper le même espace.
  */
 const STEP_DIALOG_CLASS: Record<string, string> = {
-  choose: 'max-w-4xl max-h-[85vh]',
+  choose: 'max-w-5xl max-h-[85vh]',
   provider: 'max-w-2xl max-h-[85vh]',
   manual: 'max-w-7xl h-[90vh]',
   preview: 'max-w-7xl h-[90vh]',
   done: 'max-w-2xl max-h-[85vh]',
+  merchant: 'max-w-2xl max-h-[85vh]',
 };
 
 /**
@@ -98,6 +104,7 @@ export const ProductImportDialog = ({
   const {
     state,
     isUploading,
+    isAnalyzingMerchant,
     isDownloadingTemplate,
     goToDoor,
     back,
@@ -106,6 +113,8 @@ export const ProductImportDialog = ({
     setFile,
     submitFile,
     downloadTemplate,
+    setSourceMerchantId,
+    submitMerchantSource,
   } = wizard;
 
   // Repartir de zéro à chaque ouverture : réutiliser une prévisualisation
@@ -164,11 +173,24 @@ export const ProductImportDialog = ({
       case 'manual':
         return <ImportManualStep wizard={wizard} existingCategories={existingCategories} />;
 
+      case 'merchant':
+        return (
+          <ImportMerchantSourceStep
+            sourceMerchantId={state.sourceMerchantId}
+            error={state.error}
+            isAnalyzing={isAnalyzingMerchant}
+            onSourceChange={setSourceMerchantId}
+            onSubmit={submitMerchantSource}
+            onBack={back}
+          />
+        );
+
       default:
         return (
           <ImportDoorPicker
             onChooseProvider={() => goToDoor('provider')}
             onChooseManual={() => goToDoor('manual')}
+            onChooseMerchant={() => goToDoor('merchant')}
             onDownloadTemplate={() => downloadTemplate()}
             isDownloadingTemplate={isDownloadingTemplate}
           />

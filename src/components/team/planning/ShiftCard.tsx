@@ -75,7 +75,7 @@ export function ShiftCard({
       {...(selectable ? {} : listeners)}
       {...(selectable ? {} : attributes)}
       className={cn(
-        "group relative w-full text-left rounded-md border px-2 py-1.5 shadow-sm transition-shadow hover:shadow",
+        "group relative w-full min-w-0 text-left rounded-md border px-2 py-1.5 shadow-sm transition-shadow hover:shadow",
         selectable ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         "text-foreground",
         compact && "px-1 py-1",
@@ -107,7 +107,7 @@ export function ShiftCard({
             {fmtTime(shift.end_time)}
           </span>
           <div className="w-full truncate text-[10px] leading-tight opacity-80">
-            {shift.title || shift.position || "Shift"}
+            {shift.position || "Shift"}
           </div>
         </div>
       ) : (
@@ -128,7 +128,7 @@ export function ShiftCard({
       )}
       {!compact && (
         <div className="mt-0.5 truncate text-[11px] opacity-80">
-          {shift.title || shift.position || "Shift"}
+          {shift.position || "Shift"}
         </div>
       )}
     </button>

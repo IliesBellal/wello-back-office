@@ -50,7 +50,8 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     active_delivery: true,
     upsell_enabled: false,
     covers_count_required: false,
-    mobile_payment_enabled: true
+    mobile_payment_enabled: true,
+    production_display_mode: "CLASSIC"
   },
   scan_order: {
     active_delivery: true,
@@ -65,6 +66,16 @@ let mockEstablishmentSettings: EstablishmentSettings = {
   security: {
     pos_auto_lock_enabled: false,
     pos_auto_lock_delay_minutes: 5
+  },
+  delivery_zone: {
+    zoning_type: "",
+    cardinal_cone_count: 4,
+    cardinal_zone_ranges: "0-1,1-3,3-999",
+    radial_cone_count: 8,
+    radial_zone_ranges: "0-3,3-5,5-999",
+    grid_cell_size_km: 2,
+    grid_origin_lat: null,
+    grid_origin_lng: null
   },
   customer_form_requirements: null,
   hours_of_operations: [

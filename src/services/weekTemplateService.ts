@@ -172,11 +172,14 @@ export function shiftToTemplateInput(
     day_of_week: dayOfWeekFromIsoDate(shift.shift_date),
     employee_id: shift.employee_id, // ⚠️ PRÉSERVÉ — pas de strip.
     position_id,
-    title: shift.title ?? null,
+    // Le shift live n'a plus de titre/lieu propre (retirés — le poste sert
+    // de libellé) ; le modèle garde ses champs `title`/`location` pour un
+    // usage futur, mais rien ne peut plus les alimenter depuis une semaine réelle.
+    title: null,
     start_time: shift.start_time,
     end_time: shift.end_time,
     break_minutes: shift.break_minutes,
-    location: shift.location ?? null,
+    location: null,
     notes: shift.notes ?? null,
   };
 }
@@ -476,13 +479,11 @@ export async function instantiateWeekTemplate(
 
       const basePayload: PlanningShiftCreateRequest = {
         employee_id: null, // surchargé selon l'action
-        title: t.title,
         shift_date: date,
         start_time: t.start_time,
         end_time: t.end_time,
         break_minutes: t.break_minutes,
         position: positionLabel,
-        location: t.location,
         notes: t.notes,
       };
 

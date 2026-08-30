@@ -6,7 +6,7 @@
  */
 
 /**
- * Compile-time mirror of the 13-key permission catalog
+ * Compile-time mirror of the 18-key permission catalog
  * (internal/permission/keys_gen.go). This is NOT the UI catalogue — that
  * always comes from GET /permissions at runtime (labels, domains, sensitive
  * flag). This type exists only so permission-key lookups (usePermissions,
@@ -17,6 +17,7 @@ export type PermissionKey =
   | "pos.ticket.reopen"
   | "pos.refund"
   | "pos.cash_drawer.open"
+  | "pos.analytics"
   | "catalog.manage"
   | "inventory.manage"
   | "haccp.manage"
@@ -25,7 +26,11 @@ export type PermissionKey =
   | "staff.schedule.manage"
   | "reports.sales.read"
   | "reports.financial.read"
-  | "settings.manage";
+  | "settings.manage"
+  | "bookings.manage"
+  | "platforms.manage"
+  | "kiosk.manage"
+  | "seating_plan.manage";
 
 /** One entry of GET /permissions — key/domain stay `string`, not
  * PermissionKey: the catalog is the runtime source of truth and must not

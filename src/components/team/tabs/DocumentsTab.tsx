@@ -89,7 +89,7 @@ export function DocumentsTab({ employeeId, onGoToContract }: DocumentsTabProps) 
 
 function NoEmployeeLinked({ onGoToContract }: { onGoToContract: () => void }) {
   return (
-    <Card className="bg-muted/30 border-dashed">
+    <Card className="border-dashed">
       <CardContent className="p-6 text-center space-y-4">
         <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
           <FileText className="h-6 w-6 text-muted-foreground" />
@@ -161,7 +161,7 @@ function DocumentsList({ employeeId }: { employeeId: string }) {
           ))}
         </div>
       ) : documents.length === 0 ? (
-        <Card className="bg-muted/30 border-dashed">
+        <Card className="border-dashed">
           <CardContent className="p-6 text-center text-sm text-muted-foreground">
             Aucun document pour le moment.
           </CardContent>

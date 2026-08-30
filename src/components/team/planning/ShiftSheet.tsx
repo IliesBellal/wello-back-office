@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -76,16 +77,21 @@ interface FormState {
   end_time: string;
   break_minutes: number;
   position_id: string;
-  location: string;
-  title: string;
   notes: string;
   status: string;
 }
 
+/**
+ * Doit rester synchronisé avec `IsValidPlanningShiftStatus` côté API
+ * (internal/modules/planning/shared/helpers.go). Un shift "Brouillon" reste
+ * invisible de "Mon planning" (vue self-service équipe) même si la semaine
+ * est publiée — "Publié" au niveau semaine bascule tous ses shifts non
+ * publiés en masse, mais un manager peut ensuite en repasser certains en
+ * "Brouillon" individuellement.
+ */
 const STATUSES = [
   { value: "draft", label: "Brouillon" },
   { value: "published", label: "Publié" },
-  { value: "confirmed", label: "Confirmé" },
 ];
 
 function toFormState(
@@ -101,8 +107,6 @@ function toFormState(
       end_time: shift.end_time.slice(0, 5),
       break_minutes: shift.break_minutes ?? 0,
       position_id: shift.position_id ?? "",
-      location: shift.location ?? "",
-      title: shift.title ?? "",
       notes: shift.notes ?? "",
       status: shift.status ?? "draft",
     };
@@ -118,8 +122,6 @@ function toFormState(
     end_time: "17:00",
     break_minutes: 30,
     position_id: UNASSIGNED_KEY,
-    location: "",
-    title: "",
     notes: "",
     status: "draft",
   };
@@ -140,8 +142,8 @@ export function ShiftSheet({
   const [form, setForm] = useState<FormState>(() => toFormState(shift, defaults, week));
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  // Confirmation \"shift dans le passé\" : on bloque la cr\u00e9ation tant que
-  // l'utilisateur n'a pas confirm\u00e9 explicitement via l'AlertDialog.
+  // Confirmation \"shift dans le passé\" : on bloque la création tant que
+  // l'utilisateur n'a pas confirmé explicitement via l'AlertDialog.
   const [pastConfirmOpen, setPastConfirmOpen] = useState(false);
   const [pastConfirmed, setPastConfirmed] = useState(false);
 
@@ -216,8 +218,6 @@ export function ShiftSheet({
         break_minutes: form.break_minutes,
         position_id: form.position_id || null,
         position: (positionsQuery.data ?? []).find((p) => p.id === form.position_id)?.label ?? null,
-        location: form.location || null,
-        title: form.title || null,
         notes: form.notes || null,
         status: form.status,
       };
@@ -285,145 +285,127 @@ export function ShiftSheet({
             </div>
           )}
 
-          {/* Employee */}
-          <div className="space-y-1.5">
-            <Label htmlFor="employee">Employé</Label>
-            <Select value={form.employee_id} onValueChange={(v) => patch("employee_id", v)}>
-              <SelectTrigger id="employee">
-                <SelectValue placeholder="Choisir un employé" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNASSIGNED_KEY}>
-                  <span className="italic text-muted-foreground">— Non assigné —</span>
-                </SelectItem>
-                {employees.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.first_name} {e.last_name}
-                    {e.position ? ` · ${e.position}` : ""}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              {/* Employee */}
+              <div className="space-y-1.5">
+                <Label htmlFor="employee">Employé</Label>
+                <Select value={form.employee_id} onValueChange={(v) => patch("employee_id", v)}>
+                  <SelectTrigger id="employee">
+                    <SelectValue placeholder="Choisir un employé" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED_KEY}>
+                      <span className="italic text-muted-foreground">— Non assigné —</span>
+                    </SelectItem>
+                    {employees.map((e) => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.first_name} {e.last_name}
+                        {e.position ? ` · ${e.position}` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Date */}
-          <div className="space-y-1.5">
-            <Label htmlFor="shift_date">Date</Label>
-            <Input
-              id="shift_date"
-              type="date"
-              value={form.shift_date}
-              min={minDate}
-              max={maxDate}
-              onChange={(e) => patch("shift_date", e.target.value)}
-            />
-            {dateError && <p className="text-xs text-destructive">{dateError}</p>}
-          </div>
+              {/* Date */}
+              <div className="space-y-1.5">
+                <Label htmlFor="shift_date">Date</Label>
+                <Input
+                  id="shift_date"
+                  type="date"
+                  value={form.shift_date}
+                  min={minDate}
+                  max={maxDate}
+                  onChange={(e) => patch("shift_date", e.target.value)}
+                />
+                {dateError && <p className="text-xs text-destructive">{dateError}</p>}
+              </div>
 
-          {/* Time range */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="start_time">Début</Label>
-              <Input
-                id="start_time"
-                type="time"
-                value={form.start_time}
-                onChange={(e) => patch("start_time", e.target.value)}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="end_time">Fin</Label>
-              <Input
-                id="end_time"
-                type="time"
-                value={form.end_time}
-                onChange={(e) => patch("end_time", e.target.value)}
-              />
-            </div>
-          </div>
-          {timeError && <p className="text-xs text-destructive">{timeError}</p>}
+              {/* Time range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="start_time">Début</Label>
+                  <Input
+                    id="start_time"
+                    type="time"
+                    value={form.start_time}
+                    onChange={(e) => patch("start_time", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="end_time">Fin</Label>
+                  <Input
+                    id="end_time"
+                    type="time"
+                    value={form.end_time}
+                    onChange={(e) => patch("end_time", e.target.value)}
+                  />
+                </div>
+              </div>
+              {timeError && <p className="text-xs text-destructive">{timeError}</p>}
 
-          {/* Break */}
-          <div className="space-y-1.5">
-            <Label htmlFor="break">Pause (minutes)</Label>
-            <Input
-              id="break"
-              type="number"
-              min={0}
-              step={5}
-              value={form.break_minutes}
-              onChange={(e) => patch("break_minutes", Math.max(0, Number(e.target.value) || 0))}
-            />
-          </div>
+              {/* Break */}
+              <div className="space-y-1.5">
+                <Label htmlFor="break">Pause (minutes)</Label>
+                <Input
+                  id="break"
+                  type="number"
+                  min={0}
+                  step={5}
+                  value={form.break_minutes}
+                  onChange={(e) => patch("break_minutes", Math.max(0, Number(e.target.value) || 0))}
+                />
+              </div>
 
-          {/* Position */}
-          <div className="space-y-1.5">
-            <Label htmlFor="position">Poste</Label>
-            <Select value={form.position_id} onValueChange={(v) => patch("position_id", v)}>
-              <SelectTrigger id="position">
-                <SelectValue placeholder="Choisir un poste" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UNASSIGNED_KEY}>— Non assigné —</SelectItem>
-                {(positionsQuery.data ?? []).map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {/* Position */}
+              <div className="space-y-1.5">
+                <Label htmlFor="position">Poste</Label>
+                <Select value={form.position_id} onValueChange={(v) => patch("position_id", v)}>
+                  <SelectTrigger id="position">
+                    <SelectValue placeholder="Choisir un poste" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UNASSIGNED_KEY}>— Non assigné —</SelectItem>
+                    {(positionsQuery.data ?? []).map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          {/* Location */}
-          <div className="space-y-1.5">
-            <Label htmlFor="location">Lieu</Label>
-            <Input
-              id="location"
-              value={form.location}
-              onChange={(e) => patch("location", e.target.value)}
-              placeholder="Salle, bar, terrasse…"
-            />
-          </div>
+              {/* Notes */}
+              <div className="space-y-1.5">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  rows={3}
+                  value={form.notes}
+                  onChange={(e) => patch("notes", e.target.value)}
+                  placeholder="Informations utiles pour l'équipe…"
+                />
+              </div>
 
-          {/* Title */}
-          <div className="space-y-1.5">
-            <Label htmlFor="title">Titre</Label>
-            <Input
-              id="title"
-              value={form.title}
-              onChange={(e) => patch("title", e.target.value)}
-              placeholder="Ouverture, Service du soir…"
-            />
-          </div>
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              rows={3}
-              value={form.notes}
-              onChange={(e) => patch("notes", e.target.value)}
-              placeholder="Informations utiles pour l'équipe…"
-            />
-          </div>
-
-          {/* Status */}
-          <div className="space-y-1.5">
-            <Label htmlFor="status">Statut</Label>
-            <Select value={form.status} onValueChange={(v) => patch("status", v)}>
-              <SelectTrigger id="status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value}>
-                    {s.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+              {/* Status */}
+              <div className="space-y-1.5">
+                <Label htmlFor="status">Statut</Label>
+                <Select value={form.status} onValueChange={(v) => patch("status", v)}>
+                  <SelectTrigger id="status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {STATUSES.map((s) => (
+                      <SelectItem key={s.value} value={s.value}>
+                        {s.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
           <SheetFooter className="mt-6 flex flex-row items-center justify-between gap-2 sm:justify-between">
             {mode === "edit" && shift ? (

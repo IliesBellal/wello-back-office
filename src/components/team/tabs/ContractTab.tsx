@@ -29,8 +29,6 @@ function planningToForm(p: MerchantUserPlanning | undefined | null): EmployeeHrF
   if (!p) return EMPTY_HR_FORM;
   return {
     position_id: p.position_id ?? "",
-    job_title: p.job_title ?? "",
-    role: p.role ?? "",
     contract_type_code: p.contract_type_code ?? "",
     contract_start_date: p.contract_start_date ?? "",
     contract_end_date: p.contract_end_date ?? "",
@@ -63,7 +61,7 @@ function NoEmployeeGate({
   onOpenLink: () => void;
 }) {
   return (
-    <Card className="bg-muted/30 border-dashed">
+    <Card className="border-dashed">
       <CardContent className="p-6 text-center space-y-4">
         <div className="mx-auto h-12 w-12 rounded-full bg-muted flex items-center justify-center">
           <Link2 className="h-6 w-6 text-muted-foreground" />

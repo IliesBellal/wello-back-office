@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { Navigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { usePermissions } from "@/hooks/usePermissions";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { PageContainer } from "@/components/shared";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -180,6 +182,19 @@ const defaultShift = (day: number): DayShift => ({
 });
 
 const ReservationsSettingsPage = () => {
+  const { canManageBookings } = usePermissions();
+
+  // RBAC lot 10 : gate, redirect if no permission. Kept in this thin
+  // wrapper (not inline in the content component below) so the early
+  // return never sits between two hook calls of the same component.
+  if (!canManageBookings) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <ReservationsSettingsPageContent />;
+};
+
+const ReservationsSettingsPageContent = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

@@ -78,6 +78,11 @@ export const isMaterializable = (
   product: ImportPreviewProduct,
   decisions: ImportDecisions,
 ): boolean => {
+  // Exclusion utilisateur (porte « autre établissement ») : avant tout autre
+  // arbitrage, y compris le sort d'un produit déjà importé — miroir exact de
+  // l'ordre de court-circuit du backend (commitPlanner.buildProducts).
+  if (decisions.excluded_products[product.external_id]) return false;
+
   if (product.action === 'already_imported') {
     return decisions.already_imported[product.external_id] === 'recreate';
   }
@@ -244,6 +249,10 @@ export const buildImportDecisions = (
     tva_mapping: { ...decisions.tva_mapping },
     name_collisions: nameCollisions,
     already_imported: alreadyImported,
+    // Pas de dérivation nécessaire ici, contrairement aux autres champs :
+    // l'exclusion ne se recalcule à partir de rien côté aperçu, c'est
+    // uniquement un choix de l'utilisateur qui transite tel quel.
+    excluded_products: { ...decisions.excluded_products },
   };
 };
 

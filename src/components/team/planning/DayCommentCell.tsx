@@ -62,7 +62,11 @@ export function DayCommentCell({ dateIso, comment, onSave, onDelete }: DayCommen
   };
 
   return (
-    <div className="flex flex-col gap-1 border-b border-r bg-muted/30 p-1">
+    // min-w-0 : ce div est directement un item de la grille CSS des
+    // colonnes-jour (voir PlanningGrid.tsx) — sans ça, le bouton
+    // "Enregistrer" (qui ne passe pas à la ligne) peut pousser la colonne
+    // au-delà du plancher `minmax(84px, 1fr)` du mode compact.
+    <div className="flex min-w-0 flex-col gap-1 border-b border-r bg-muted/30 p-1">
       <Textarea
         value={draft}
         onChange={(e) => setDraft(e.target.value.slice(0, MAX_COMMENT_LENGTH))}

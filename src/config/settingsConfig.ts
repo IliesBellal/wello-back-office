@@ -30,6 +30,13 @@ export const establishmentOrderingFields: FieldConfig[] = [
   { key: 'disable_low_stock', label: 'Désactiver articles en rupture', type: 'switch', group: 'ordering' },
 ];
 
+export const establishmentProductionDisplayFields: FieldConfig[] = [
+  { key: 'production_display_mode', label: "Type d'affichage en production", type: 'select', group: 'ordering', options: [
+    { value: 'CLASSIC', label: 'Classique' },
+    { value: 'PRODUCT_FOCUS', label: 'Focus produit' },
+  ]},
+];
+
 export const establishmentScanOrderFields: FieldConfig[] = [
   { key: 'active_delivery', label: 'Livraison activée', type: 'switch', group: 'scan_order' },
   { key: 'active_takeaway', label: 'À emporter activé', type: 'switch', group: 'scan_order' },

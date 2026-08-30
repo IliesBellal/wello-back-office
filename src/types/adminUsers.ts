@@ -53,8 +53,6 @@ export interface MerchantUserPlanning {
   position_id?: string | null;
   position?: string | null;
   position_note?: string | null;
-  job_title?: string | null;
-  role?: string | null;
   contract_type_code?: string | null;
   contract_start_date?: string | null;
   contract_end_date?: string | null;
@@ -113,6 +111,9 @@ export interface MerchantUserDetail {
   employee_id?: string | null;
   employee_name?: string | null;
   planning?: MerchantUserPlanning;
+  /** RBAC lot 9 — the user's current role, preloaded so the "Accès" tab avoids a second round trip. */
+  role_id?: string | null;
+  role?: { id: string; name: string; system_key?: string | null } | null;
 }
 
 /** Result of `GET /users/linkable-search` (`data.users[]`). */
@@ -167,8 +168,6 @@ export interface MerchantUserRightsUpsertRequest {
 export interface MerchantUserPlanningUpsertRequest {
   position_id?: string | null;
   position_note?: string | null;
-  job_title?: string | null;
-  role?: string | null;
   contract_type_code?: string | null;
   contract_start_date?: string | null;
   contract_end_date?: string | null;

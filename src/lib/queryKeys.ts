@@ -78,6 +78,8 @@ export const qk = {
     range: (from: string, to: string) => ["planning", "day-comments", from, to] as const,
   },
 
+  planningMyTeamWeek: (weekStart: string) => ["planning", "me", "team-week", weekStart] as const,
+
   // ─── Planning – Employees ─────────────────────────────────
   planningEmployees: {
     all: ["planning", "employees"] as const,
@@ -113,6 +115,21 @@ export const qk = {
   printers: {
     all: ["printers"] as const,
     detail: (id: string) => ["printers", "detail", id] as const,
+  },
+
+  // ─── Production Profiles ──────────────────────────────────
+  productionProfiles: {
+    all: ["production-profiles"] as const,
+    detail: (id: string) => ["production-profiles", "detail", id] as const,
+  },
+
+  // ─── Menu – Products (read-only) ──────────────────────────
+  // Second menu read migrated to react-query, alongside menuTvaRates: the
+  // production-profiles matrix dialog needs the full product catalog but not
+  // units/components/attributes/tags, so it wraps menuService.getProducts()
+  // directly instead of pulling in the whole useMenuData hook.
+  menuProducts: {
+    all: ["menu", "products"] as const,
   },
 
   // ─── Kiosks ───────────────────────────────────────────────

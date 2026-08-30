@@ -27,6 +27,11 @@ import type { PermissionKey } from "@/types/roles";
  *   pos.cash_drawer.open   -> canOpenCashDrawer
  *   reports.sales.read     -> canViewReports, canExportReports, canPrintCashReport
  *   reports.financial.read -> canViewFinancials, canExportFinancials
+ *   bookings.manage        -> canManageBookings (RBAC lot 10)
+ *   platforms.manage       -> canManagePlatforms (RBAC lot 10)
+ *   kiosk.manage           -> canManageKiosk (RBAC lot 10)
+ *   pos.analytics          -> canViewAnalytics (RBAC lot 10)
+ *   seating_plan.manage    -> canManageSeatingPlan (RBAC lot 10)
  *
  * canExportCustomers is dropped (guard removed — "qui peut lire peut
  * copier"; was unused by every real consumer). canAccessReception/Delivery/
@@ -57,6 +62,12 @@ export const usePermissions = () => {
       canPrintCashReport: has("reports.sales.read"),
       canViewFinancials: has("reports.financial.read"),
       canExportFinancials: has("reports.financial.read"),
+
+      canManageBookings: has("bookings.manage"),
+      canManagePlatforms: has("platforms.manage"),
+      canManageKiosk: has("kiosk.manage"),
+      canViewAnalytics: has("pos.analytics"),
+      canManageSeatingPlan: has("seating_plan.manage"),
 
       hasModulePlanning: (modules["planning"] ?? false) as boolean,
       hasModuleUsers: (modules["users"] ?? false) as boolean,

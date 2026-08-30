@@ -34,6 +34,7 @@ import {
   UsersRound,
   CalendarDays,
   Printer,
+  ChefHat,
   MonitorSmartphone,
   Tablet,
   Settings2,
@@ -104,6 +105,8 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Analyse',
         icon: LineChart,
         href: '/dashboard/analysis',
+        // RBAC lot 10 : matches DashboardAnalysis.tsx's self-gate.
+        visibilityCheck: (authData) => checkPermission(authData, 'pos.analytics'),
       },
       {
         id: 'dashboard-order-history',
@@ -179,6 +182,8 @@ export const NAV_ITEMS: NavItem[] = [
     title: 'Plan de salle',
     icon: LayoutGrid,
     href: '/locations',
+    // RBAC lot 10 : matches Locations.tsx's self-gate.
+    visibilityCheck: (authData) => checkPermission(authData, 'seating_plan.manage'),
   },
 
   {
@@ -200,6 +205,10 @@ export const NAV_ITEMS: NavItem[] = [
         icon: Settings,
         href: '/reservations/settings',
         requiredModule: 'bookings',
+        // RBAC lot 10 : matches reservations/Settings.tsx's self-gate. Only
+        // the settings sub-item — the reservations list stays open to
+        // anyone with the bookings module, unaffected by this permission.
+        visibilityCheck: (authData) => checkPermission(authData, 'bookings.manage'),
       },
     ],
   },
@@ -247,7 +256,22 @@ export const NAV_ITEMS: NavItem[] = [
         icon: CalendarDays,
         href: '/equipe/planning',
         // Matches PlanningPage.tsx's self-gate (canManagePlannings = staff.schedule.manage).
+        // requiredModule (RBAC lot 10) : capabilities.modules.planning was
+        // computed by the backend (HasPlanningAccess() && PlanningEnabled)
+        // but never consumed by any nav item — wiring it here so the
+        // planning editor actually respects the establishment's subscription.
+        requiredModule: 'planning',
         visibilityCheck: (authData) => checkPermission(authData, 'staff.schedule.manage'),
+      },
+      {
+        id: 'my-planning',
+        title: 'Mon planning',
+        icon: CalendarDays,
+        href: '/equipe/mon-planning',
+        // RBAC lot 10 : read-only view of the published team week, for
+        // anyone without staff.schedule.manage (and for managers who want a
+        // quick personal view too — visible to everyone, no RBAC gate).
+        requiredModule: 'planning',
       },
       {
         id: 'pointages',
@@ -329,18 +353,24 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'channels',
     title: 'Canaux et Plateformes',
     icon: Link2,
+    // RBAC lot 10 : matches IntegrationsOverview.tsx's self-gate. The
+    // parent check alone isn't enough — getVisibleNavItems filters each
+    // child independently, so every child below repeats it.
+    visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
     children: [
       {
         id: 'integrations-overview',
         title: 'Vue d\'ensemble',
         icon: LayoutGrid,
         href: '/integrations/overview',
+        visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
       },
       {
         id: 'market-categories',
         title: 'Catégories vitrine',
         icon: Folder,
         href: '/menu/market-categories',
+        visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
       },
       {
         id: 'scannorder',
@@ -348,18 +378,21 @@ export const NAV_ITEMS: NavItem[] = [
         icon: Store,
         href: '/integrations/scannorder',
         requiredModule: 'scannorder',
+        visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
       },
       {
         id: 'uber-eats',
         title: 'Uber Eats',
         icon: Store,
         href: '/integrations/uber-eats',
+        visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
       },
       {
         id: 'deliveroo',
         title: 'Deliveroo',
         icon: Store,
         href: '/integrations/deliveroo',
+        visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
       },
     ],
   },
@@ -405,18 +438,29 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'kiosk',
     title: 'Kiosk',
     icon: MonitorSmartphone,
+    // RBAC lot 10 : matches KiosksPage.tsx/KioskSettingsPage.tsx's self-gate.
+    // requiredModule: 'kiosks' wires the establishment's subscription flag
+    // (capabilities.modules.kiosks, sent by the login response but never
+    // consumed by any nav item until now) alongside the RBAC permission —
+    // same AND pattern as Stocks (requiredModule: 'stock' + inventory.manage).
+    requiredModule: 'kiosks',
+    visibilityCheck: (authData) => checkPermission(authData, 'kiosk.manage'),
     children: [
       {
         id: 'kiosk-devices',
         title: 'Mes bornes',
         icon: Tablet,
         href: '/kiosk/devices',
+        requiredModule: 'kiosks',
+        visibilityCheck: (authData) => checkPermission(authData, 'kiosk.manage'),
       },
       {
         id: 'kiosk-settings',
         title: 'Paramètres',
         icon: Settings2,
         href: '/kiosk/settings',
+        requiredModule: 'kiosks',
+        visibilityCheck: (authData) => checkPermission(authData, 'kiosk.manage'),
       },
     ],
   },
@@ -439,6 +483,13 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Imprimantes',
         icon: Printer,
         href: '/settings/printers',
+        visibilityCheck: (authData) => checkPermission(authData, 'settings.manage'),
+      },
+      {
+        id: 'production-profiles',
+        title: 'Profils de production',
+        icon: ChefHat,
+        href: '/settings/production-profiles',
         visibilityCheck: (authData) => checkPermission(authData, 'settings.manage'),
       },
       {

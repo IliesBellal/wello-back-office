@@ -13,6 +13,36 @@ interface ResetPasswordResponse {
   data: { status: string; message: string };
 }
 
+/**
+ * Payload of POST /pos/create. `full_name`, `siret`, `tel` and `package_id`
+ * are the only fields the backend requires (see
+ * internal/modules/pos/create_service.go) — everything else is accepted
+ * even empty. When `user_id` is set the caller is linked to the new
+ * merchant in the same transaction, with `admin` rights.
+ */
+export interface CreateMerchantRequest {
+  full_name: string;
+  siret: string;
+  tel: string;
+  package_id: string;
+  address?: string;
+  street_number?: string;
+  street?: string;
+  zip_code?: string;
+  city?: string;
+  country?: string;
+  web_site?: string;
+  email?: string;
+  user_id?: string;
+  admin?: boolean;
+}
+
+/** Envelope of POST /pos/create. */
+interface CreateMerchantResponse {
+  id: string;
+  data: { merchant_id: string };
+}
+
 // ============= Mock Data =============
 const mockAuthResponse: AuthResponse = {
     id: "auth.login",
@@ -116,6 +146,7 @@ const mockAuthResponse: AuthResponse = {
       },
       permissions: {}
     },
+    permissions: [],
     capabilities: {
       apps: {
         reception: true,
@@ -135,6 +166,7 @@ const mockAuthResponse: AuthResponse = {
         hr: true,
         scannorder: true,
         bookings: true,
+        kiosks: true,
       },
       order_types: {
         on_site: true,
@@ -264,6 +296,24 @@ export const authService = {
           { login },
           { skipAuth: true },
         );
+      },
+    );
+  },
+
+  /**
+   * POST /pos/create — creates a new merchant/establishment. Returns the
+   * new merchant's id; the caller is responsible for refreshing the
+   * session (e.g. via loginWithToken) if the new establishment must show
+   * up in session.merchants right away.
+   */
+  createMerchant: async (payload: CreateMerchantRequest): Promise<string> => {
+    logAPI('POST', '/pos/create', payload);
+
+    return withMock(
+      () => `mock-merchant-${Date.now()}`,
+      async () => {
+        const response = await apiClient.post<CreateMerchantResponse>('/pos/create', payload);
+        return response.data.merchant_id;
       },
     );
   },

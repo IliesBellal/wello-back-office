@@ -21,8 +21,8 @@ import { EmptyPermissionsNotice } from "@/components/shared";
  * grants — so an admin sees what they're assigning without opening the
  * roles screen separately.
  *
- * Deliberately its own tab, never merged with "Contrat" (which owns
- * position/job_title — the "poste"): keeping role assignment and job
+ * Deliberately its own tab, never merged with "Contrat" (which owns the
+ * planning position — the "poste"): keeping RBAC role assignment and job
  * position in separate forms is the only thing preventing the two concepts
  * from blurring together again.
  *
@@ -113,9 +113,6 @@ export function AccessTab({ userId }: AccessTabProps) {
                 {roles?.map((role) => (
                   <SelectItem key={role.id} value={role.id}>
                     {role.name}
-                    {role.system_key && (
-                      <span className="text-muted-foreground"> · Système</span>
-                    )}
                   </SelectItem>
                 ))}
               </SelectContent>

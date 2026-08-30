@@ -58,6 +58,7 @@ export interface EstablishmentOrdering {
   upsell_enabled: boolean;
   covers_count_required: boolean;
   mobile_payment_enabled: boolean;
+  production_display_mode: 'CLASSIC' | 'PRODUCT_FOCUS';
 }
 
 export interface EstablishmentScanOrder {
@@ -74,6 +75,19 @@ export interface EstablishmentScanOrder {
 export interface EstablishmentSecurity {
   pos_auto_lock_enabled: boolean;
   pos_auto_lock_delay_minutes: number;
+}
+
+export type DeliveryZoningType = '' | 'CARDINAL' | 'RADIAL' | 'GRID';
+
+export interface EstablishmentDeliveryZone {
+  zoning_type: DeliveryZoningType;
+  cardinal_cone_count: number;
+  cardinal_zone_ranges: string;
+  radial_cone_count: number;
+  radial_zone_ranges: string;
+  grid_cell_size_km: number;
+  grid_origin_lat: number | null;
+  grid_origin_lng: number | null;
 }
 
 export interface CustomerFormRequirements {
@@ -130,6 +144,7 @@ export interface EstablishmentSettings {
   ordering: EstablishmentOrdering;
   scan_order: EstablishmentScanOrder;
   security: EstablishmentSecurity;
+  delivery_zone: EstablishmentDeliveryZone;
   hours_of_operations: HourOfOperation[];
   customer_form_requirements: CustomerFormRequirements | null;
 }

@@ -90,12 +90,12 @@ export function EmployeeHrFieldsCards({ form, set, positions, contractTypes }: E
         </CardContent>
       </Card>
 
-      {/* Poste / rôle */}
+      {/* Poste */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm">Poste & rôle</CardTitle>
+          <CardTitle className="text-sm">Poste</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <CardContent>
           <div className="space-y-1.5">
             <Label className="text-xs">Poste planning</Label>
             <Select
@@ -114,34 +114,6 @@ export function EmployeeHrFieldsCards({ form, set, positions, contractTypes }: E
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label className="text-xs">Rôle</Label>
-            <Select
-              value={form.role || SENTINEL_NONE}
-              onValueChange={(v) => set("role", v === SENTINEL_NONE ? "" : v)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Sélectionner…" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={SENTINEL_NONE}>— Non défini —</SelectItem>
-                <SelectItem value="employee">Employé</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="admin">Admin</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="hr-job_title" className="text-xs">Poste affiché</Label>
-            <Input
-              id="hr-job_title"
-              value={form.job_title}
-              onChange={(e) => set("job_title", e.target.value)}
-              placeholder="Ex : Serveur, Chef de rang…"
-            />
           </div>
         </CardContent>
       </Card>

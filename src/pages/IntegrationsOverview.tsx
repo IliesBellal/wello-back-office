@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasModuleAccess } from '@/lib/moduleAccess';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface IntegrationOverviewProps {
   platform: string;
@@ -287,6 +288,19 @@ const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scann
 };
 
 export default function IntegrationsOverviewPage() {
+  const { canManagePlatforms } = usePermissions();
+
+  // RBAC lot 10 : gate, redirect if no permission. Kept in this thin
+  // wrapper so the early return never sits between two hook calls of the
+  // content component below.
+  if (!canManagePlatforms) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <IntegrationsOverviewPageContent />;
+}
+
+function IntegrationsOverviewPageContent() {
   const { authData } = useAuth();
   const [uberStatus, setUberStatus] = useState<IntegrationStatus | null>(null);
   const [deliverooStatus, setDeliverooStatus] = useState<IntegrationStatus | null>(null);

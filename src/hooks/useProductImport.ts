@@ -39,10 +39,10 @@ import {
  * `preview` n'est atteinte qu'avec un `ImportPreviewResult` en main, `done`
  * qu'avec un résultat de commit.
  */
-export type ImportStep = 'choose' | 'provider' | 'preview' | 'manual' | 'done';
+export type ImportStep = 'choose' | 'provider' | 'preview' | 'manual' | 'done' | 'merchant';
 
 /** Porte par laquelle la prévisualisation a été obtenue. */
-export type ImportDoor = 'provider' | 'manual';
+export type ImportDoor = 'provider' | 'manual' | 'merchant';
 
 export interface ProductImportState {
   step: ImportStep;
@@ -60,6 +60,8 @@ export interface ProductImportState {
    * produits saisis à la main serait inacceptable.
    */
   manualRows: ManualRow[];
+  /** Établissement source choisi — porte « autre établissement » uniquement. */
+  sourceMerchantId: string | null;
   preview: ImportPreviewResult | null;
   /** Décisions en cours d'édition, initialisées depuis la prévisualisation. */
   decisions: ImportDecisions | null;
@@ -77,6 +79,7 @@ const initialState: ProductImportState = {
   provider: 'wello-generic',
   file: null,
   manualRows: [createManualRow()],
+  sourceMerchantId: null,
   preview: null,
   decisions: null,
   blockers: [],
@@ -91,6 +94,7 @@ const emptyDecisions = (): ImportDecisions => ({
   tva_mapping: {},
   name_collisions: {},
   already_imported: {},
+  excluded_products: {},
 });
 
 export const useProductImport = () => {
@@ -120,6 +124,7 @@ export const useProductImport = () => {
           door,
           provider: previous.provider,
           manualRows: previous.manualRows,
+          sourceMerchantId: previous.sourceMerchantId,
         };
       }
       return { ...initialState, provider: previous.provider };
@@ -139,6 +144,10 @@ export const useProductImport = () => {
       }
       return { ...previous, file, error: null };
     });
+  }, []);
+
+  const setSourceMerchantId = useCallback((merchantId: string) => {
+    setState((previous) => ({ ...previous, sourceMerchantId: merchantId, error: null }));
   }, []);
 
   // ─── Saisie de masse ────────────────────────────────────
@@ -298,6 +307,30 @@ export const useProductImport = () => {
     [patchDecisions],
   );
 
+  const setProductExcluded = useCallback(
+    (productExternalId: string, excluded: boolean) => {
+      patchDecisions((current) => ({
+        ...current,
+        excluded_products: { ...current.excluded_products, [productExternalId]: excluded },
+      }));
+    },
+    [patchDecisions],
+  );
+
+  /** Inclut ou écarte tout le catalogue d'un coup — « tout sélectionner ». */
+  const setAllProductsExcluded = useCallback(
+    (productExternalIds: string[], excluded: boolean) => {
+      patchDecisions((current) => {
+        const next = { ...current.excluded_products };
+        for (const productId of productExternalIds) {
+          next[productId] = excluded;
+        }
+        return { ...current, excluded_products: next };
+      });
+    },
+    [patchDecisions],
+  );
+
   // ─── Appels ─────────────────────────────────────────────
 
   /**
@@ -363,6 +396,22 @@ export const useProductImport = () => {
     manualPreviewMutation.mutate(buildManualPayload(state.manualRows));
   }, [manualPreviewMutation, manualValidation, state.manualRows]);
 
+  // ─── Autre établissement ────────────────────────────────
+
+  const merchantPreviewMutation = useMutation({
+    mutationFn: (sourceMerchantId: string) => menuImportService.previewFromMerchant(sourceMerchantId),
+    onSuccess: applyPreview,
+    onError: failPreview,
+  });
+
+  const submitMerchantSource = useCallback(() => {
+    if (!state.sourceMerchantId) {
+      setState((previous) => ({ ...previous, error: 'Choisissez un établissement source.' }));
+      return;
+    }
+    merchantPreviewMutation.mutate(state.sourceMerchantId);
+  }, [merchantPreviewMutation, state.sourceMerchantId]);
+
   const commitMutation = useMutation({
     mutationFn: ({ token, decisions }: { token: string; decisions: ImportDecisions }) =>
       menuImportService.commitImport(token, decisions),
@@ -413,6 +462,7 @@ export const useProductImport = () => {
     manualValidation,
     isUploading: previewMutation.isPending,
     isSubmittingManual: manualPreviewMutation.isPending,
+    isAnalyzingMerchant: merchantPreviewMutation.isPending,
     isCommitting: commitMutation.isPending,
     isDownloadingTemplate: templateMutation.isPending,
 
@@ -430,6 +480,9 @@ export const useProductImport = () => {
     removeManualRow,
     submitManual,
 
+    setSourceMerchantId,
+    submitMerchantSource,
+
     setTagClass,
     setProductCategory,
     assignCategoryToAll,
@@ -437,6 +490,8 @@ export const useProductImport = () => {
     setCollisionResolution,
     setReimportResolution,
     setAllReimportResolutions,
+    setProductExcluded,
+    setAllProductsExcluded,
     commit,
   };
 };

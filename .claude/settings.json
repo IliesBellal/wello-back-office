@@ -30,7 +30,26 @@
       "Bash(pkill -f \"node.*vite\")",
       "Bash(echo \"GO_BUILD_EXIT=$?\")",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8082/)",
-      "Bash(gofmt -l \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/cmd/api/routes.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/handler.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/service.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/repository.go\")"
+      "Bash(gofmt -l \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/cmd/api/routes.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/handler.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/service.go\" \"/d/Desktop/DTL/Project/git-projects/ib-welloresto-api/internal/modules/menu/repository.go\")",
+      "Bash(git -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\wello-back-office\" status --short)",
+      "Bash(git -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" status --short)",
+      "Bash(xargs grep -ln \"\\\\.role\\\\b\\\\|job_title\")",
+      "Bash(git -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" diff --unified=0 -- internal/modules/planning/employees/repository.go)",
+      "Bash(git -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" status --short -- internal/modules/auth internal/modules/planning/leave internal/modules/order_life_cycle)",
+      "Bash(go test *)",
+      "Bash(git -C \"d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api\" status --short -- internal/modules/planning/swaps internal/modules/planning/leave)",
+      "Bash(curl -sf http://localhost:8081)",
+      "Bash(node \"C:\\\\Users\\\\Ilies\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\d--Desktop-DTL-Project-git-projects-wello-back-office\\\\e78b30fd-db17-4e7b-8f6c-5f05f4235acb\\\\scratchpad\\\\drive.mjs\")",
+      "Bash(gofmt -l -w ./internal/modules/menu/importer/ ./internal/modules/auth/repository.go)",
+      "Bash(gofmt -l -w ./internal/modules/menu/)",
+      "Bash(gofmt -l -w internal/modules/menu/importer/models.go internal/modules/menu/importer/preview.go internal/modules/menu/importer/commit_plan.go internal/modules/menu/models.go internal/modules/menu/repository.go internal/modules/menu/import_repository.go internal/modules/menu/import_commit_repository.go internal/modules/menu/import_service.go internal/modules/menu/import_merchant_models.go internal/modules/menu/import_merchant_handler.go internal/modules/menu/import_merchant_service.go internal/modules/menu/import_merchant_repository.go internal/modules/auth/repository.go)",
+      "Bash(echo \"VET_EXIT:$?\")"
+    ],
+    "additionalDirectories": [
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\users",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\planningcomm",
+      "\\tmp"
     ]
   }
 }

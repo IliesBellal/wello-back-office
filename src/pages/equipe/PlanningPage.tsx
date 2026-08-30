@@ -460,8 +460,6 @@ function PlanningPageContent() {
         end_time: sourceShift.end_time,
         break_minutes: sourceShift.break_minutes,
         position_id: sourceShift.position_id ?? null,
-        title: sourceShift.title ?? null,
-        location: sourceShift.location ?? null,
         notes: sourceShift.notes ?? null,
         status: sourceShift.status,
       });

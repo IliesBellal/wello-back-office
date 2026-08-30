@@ -1,9 +1,8 @@
-import { AlertTriangle } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Fragment } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmptyPermissionsNotice } from "@/components/shared";
 import type { Permission, PermissionDomainGroup } from "@/types/roles";
 
@@ -36,45 +35,47 @@ export function PermissionsEditor({ domains, isLoading, selectedKeys, onToggle, 
   }
 
   return (
-    <Accordion type="multiple" defaultValue={domains.map((d) => d.domain)} className="w-full">
-      {domains.map((group) => (
-        <AccordionItem key={group.domain} value={group.domain}>
-          <AccordionTrigger className="text-sm capitalize">
-            {group.domain}
-            <span className="ml-2 text-xs text-muted-foreground font-normal">
-              ({group.permissions.filter((p) => selectedKeys.has(p.key)).length}/{group.permissions.length})
-            </span>
-          </AccordionTrigger>
-          <AccordionContent>
-            <div className="space-y-3">
+    <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Droit</TableHead>
+            <TableHead className="w-0" />
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {domains.map((group) => (
+            <Fragment key={group.domain}>
+              <TableRow className="bg-muted/40 hover:bg-muted/40">
+                <TableCell colSpan={2} className="py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  <span className="capitalize">{group.domain}</span>{" "}
+                  <span className="font-normal normal-case">
+                    ({group.permissions.filter((p) => selectedKeys.has(p.key)).length}/{group.permissions.length})
+                  </span>
+                </TableCell>
+              </TableRow>
               {group.permissions.map((permission) => (
-                <div key={permission.key} className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Label htmlFor={`perm-${permission.key}`} className="text-sm cursor-pointer flex items-center gap-1.5">
+                <TableRow key={permission.key} className="hover:bg-transparent">
+                  <TableCell>
+                    <Label htmlFor={`perm-${permission.key}`} className="text-sm cursor-pointer">
                       {permission.label}
-                      {permission.is_sensitive && (
-                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800 text-[10px] px-1.5 py-0 gap-1">
-                          <AlertTriangle className="h-2.5 w-2.5" />
-                          Sensible
-                        </Badge>
-                      )}
                     </Label>
-                    {permission.description && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{permission.description}</p>
-                    )}
-                  </div>
-                  <Switch
-                    id={`perm-${permission.key}`}
-                    checked={selectedKeys.has(permission.key)}
-                    onCheckedChange={(checked) => onToggle(permission, checked)}
-                    disabled={readOnly}
-                  />
-                </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">{permission.description}</p>
+                  </TableCell>
+                  <TableCell className="w-0">
+                    <Switch
+                      id={`perm-${permission.key}`}
+                      checked={selectedKeys.has(permission.key)}
+                      onCheckedChange={(checked) => onToggle(permission, checked)}
+                      disabled={readOnly}
+                    />
+                  </TableCell>
+                </TableRow>
               ))}
-            </div>
-          </AccordionContent>
-        </AccordionItem>
-      ))}
-    </Accordion>
+            </Fragment>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

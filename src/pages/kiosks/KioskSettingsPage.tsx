@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -21,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { ImageIcon, Loader2, Trash2, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { qk } from '@/lib/queryKeys';
 import { kioskService } from '@/services/kioskService';
 import type { ForceFulfillmentType, KioskSettings, UpdateKioskSettingsRequest } from '@/types/kiosks';
@@ -73,6 +75,19 @@ const defaultCommandValues: CommandFormValues = {
 };
 
 export default function KioskSettingsPage() {
+  const { canManageKiosk } = usePermissions();
+
+  // RBAC lot 10 : gate, redirect if no permission. Kept in this thin
+  // wrapper so the early return never sits between two hook calls of the
+  // content component below.
+  if (!canManageKiosk) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <KioskSettingsPageContent />;
+}
+
+function KioskSettingsPageContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 

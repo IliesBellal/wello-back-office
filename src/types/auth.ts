@@ -112,6 +112,7 @@ export interface AuthCapabilities {
     hr: boolean;
     scannorder: boolean;
     bookings: boolean;
+    kiosks: boolean;
   };
   order_types: {
     on_site: boolean;
@@ -353,7 +354,7 @@ export const normalizeAuthData = (rawData: RawAuthData | AuthData): AuthData => 
       delivery: asBoolean(raw.allow_delivery_account),
       waiter: asBoolean(raw.allow_waiter_account),
     }),
-    modules: normalizeBooleanMap<AuthCapabilities['modules']>(rawCapabilityModules, ['menu', 'planning', 'users', 'settings', 'haccp', 'reports', 'financials', 'customers', 'stock', 'hr', 'scannorder', 'bookings'], {
+    modules: normalizeBooleanMap<AuthCapabilities['modules']>(rawCapabilityModules, ['menu', 'planning', 'users', 'settings', 'haccp', 'reports', 'financials', 'customers', 'stock', 'hr', 'scannorder', 'bookings', 'kiosks'], {
       planning: true,
       haccp: true,
       stock: asBoolean(raw.stock_management, true),

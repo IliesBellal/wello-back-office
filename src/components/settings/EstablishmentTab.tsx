@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles, ImagePlus, Users, Smartphone } from "lucide-react";
+import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles, ImagePlus, Users, Smartphone, Monitor, MapPin } from "lucide-react";
 import { useEstablishmentSettings, useVacationPeriods } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
@@ -14,8 +14,10 @@ import {
   establishmentInfoFields,
   establishmentTimingsFields,
   establishmentOrderingFields,
-  establishmentSecurityFields
+  establishmentSecurityFields,
+  establishmentProductionDisplayFields
 } from "@/config/settingsConfig";
+import { DeliveryZoneSettings } from "./DeliveryZoneSettings";
 
 import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
@@ -539,6 +541,24 @@ export const EstablishmentTab = () => {
             </CardContent>
           </Card>
 
+          {/* Affichage en production */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Monitor className="h-5 w-5" />
+                Affichage en production
+              </CardTitle>
+              <CardDescription>Choisissez comment les commandes s'affichent sur les écrans de production</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SettingsSection
+                fields={establishmentProductionDisplayFields}
+                values={formData.ordering}
+                onChange={(key, value) => handleFieldChange('ordering', key, value)}
+              />
+            </CardContent>
+          </Card>
+
           {/* Cuisine */}
           <Card>
             <CardHeader>
@@ -588,6 +608,35 @@ export const EstablishmentTab = () => {
                     ? { pos_auto_lock_delay_minutes: getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes)! }
                     : undefined
                 }
+              />
+            </CardContent>
+          </Card>
+
+          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
+            {isSaving ? "Enregistrement..." : "Enregistrer"}
+          </Button>
+        </div>
+      );
+    }
+
+    if (tabId === "delivery-zone") {
+      return (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <MapPin className="h-5 w-5" />
+                Zones de livraison
+              </CardTitle>
+              <CardDescription>
+                Découpez votre zone de livraison en secteurs pour préparer un futur pilotage par zone
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeliveryZoneSettings
+                values={formData.delivery_zone}
+                onChange={(key, value) => handleFieldChange('delivery_zone', key, value)}
+                establishmentCoords={{ lat: formData.info.lat ?? null, lng: formData.info.lng ?? null }}
               />
             </CardContent>
           </Card>
@@ -657,6 +706,7 @@ export const EstablishmentTab = () => {
           { id: "general", label: "Général" },
           { id: "ordering", label: "Prise de commande" },
           { id: "production", label: "Production" },
+          { id: "delivery-zone", label: "Livraison" },
           { id: "security", label: "Sécurité" },
           { id: "hours", label: "Horaires d'ouvertures" }
         ]}

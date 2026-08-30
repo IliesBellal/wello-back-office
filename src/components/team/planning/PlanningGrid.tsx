@@ -156,7 +156,13 @@ function GridCell({
   return (
     <div
       className={cn(
-        "relative border-b border-r transition-colors",
+        // min-w-0 : sans ça, ce div (item de la grille CSS des colonnes-jour)
+        // hérite d'un min-width automatique basé sur le contenu le plus
+        // large qu'il contient (ex. le bouton "Enregistrer" du commentaire
+        // du jour, ou le libellé d'un shift), qui peut dépasser le plancher
+        // explicite `minmax(84px, 1fr)` du mode compact — les colonnes
+        // refusent alors de se resserrer en dessous de ce contenu.
+        "relative min-w-0 border-b border-r transition-colors",
         density === "compact" ? "min-h-[60px] p-1" : "min-h-[88px] p-1.5",
         className,
         isHoliday && "bg-amber-50/60",
@@ -208,7 +214,7 @@ function GridCell({
         </>
       )}
 
-      <div className="flex flex-col gap-1 relative z-10">
+      <div className="flex min-w-0 flex-col gap-1 relative z-10">
         {shifts.map((s) => (
           <ShiftCard
             key={s.id}

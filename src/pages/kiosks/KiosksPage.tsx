@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { MonitorSmartphone, MoreHorizontal, Pencil, Power, PowerOff, Ban, Trash2, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { qk } from '@/lib/queryKeys';
 import { kioskService } from '@/services/kioskService';
 import { KioskFormSheet } from '@/components/settings/kiosks/KioskFormSheet';
@@ -45,6 +47,19 @@ const formatDate = (value: string): string => {
 };
 
 export default function KiosksPage() {
+  const { canManageKiosk } = usePermissions();
+
+  // RBAC lot 10 : gate, redirect if no permission. Kept in this thin
+  // wrapper so the early return never sits between two hook calls of the
+  // content component below.
+  if (!canManageKiosk) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <KiosksPageContent />;
+}
+
+function KiosksPageContent() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
