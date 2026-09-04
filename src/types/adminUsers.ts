@@ -14,13 +14,17 @@ import type { ApiPagination } from "@/services/apiUnwrap";
 // ============= Permissions =============
 
 /**
- * Merchant-scoped permission flags (16 keys, per the docs). Combined with the
- * top-level `admin` flag this forms the 17 access flags of a member's rights.
+ * Merchant-scoped permission flags (11 keys, per the docs). Combined with the
+ * top-level `admin` flag this forms the 12 access flags of a member's rights.
+ *
+ * access_delivery, access_waiter, export_reports, export_financials and
+ * export_customers were dropped from this contract (2026-09-01, dead-rights
+ * cleanup): none ever backed a gating decision anywhere in this app — see
+ * the git history for the audit. access_reception stays: it still backs
+ * pos.status.manage's legacy fallback on the API side.
  */
 export interface MerchantUserPermissions {
   access_reception: boolean;
-  access_delivery: boolean;
-  access_waiter: boolean;
   print_merchant_cash_report: boolean;
   open_cash_drawer: boolean;
   manage_menu: boolean;
@@ -29,11 +33,8 @@ export interface MerchantUserPermissions {
   manage_settings: boolean;
   manage_haccp: boolean;
   view_reports: boolean;
-  export_reports: boolean;
   view_financials: boolean;
-  export_financials: boolean;
   manage_customers: boolean;
-  export_customers: boolean;
 }
 
 /** Merchant-scoped rights model returned by `GET /users/{id}/rights`. */

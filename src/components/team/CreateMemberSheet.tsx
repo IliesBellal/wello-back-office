@@ -351,8 +351,6 @@ function LinkForm({ onSuccess }: { onSuccess: () => void }) {
           login_enabled: true,
           permissions: {
             access_reception: false,
-            access_delivery: false,
-            access_waiter: false,
             print_merchant_cash_report: false,
             open_cash_drawer: false,
             manage_menu: false,
@@ -361,11 +359,8 @@ function LinkForm({ onSuccess }: { onSuccess: () => void }) {
             manage_settings: false,
             manage_haccp: false,
             view_reports: false,
-            export_reports: false,
             view_financials: false,
-            export_financials: false,
             manage_customers: false,
-            export_customers: false,
           },
         },
       });

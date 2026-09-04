@@ -96,8 +96,6 @@ export interface AuthAccess {
 export interface AuthCapabilities {
   apps: {
     reception: boolean;
-    delivery: boolean;
-    waiter: boolean;
   };
   modules: {
     menu: boolean;
@@ -128,11 +126,8 @@ export interface AuthCapabilities {
     manage_settings: boolean;
     manage_haccp: boolean;
     view_reports: boolean;
-    export_reports: boolean;
     view_financials: boolean;
-    export_financials: boolean;
     manage_customers: boolean;
-    export_customers: boolean;
   };
   integrations: {
     uber_eats: boolean;
@@ -200,8 +195,6 @@ export interface LegacyAuthFlatFields {
   currency?: string;
   is_open?: boolean;
   admin?: boolean;
-  allow_waiter_account?: boolean;
-  allow_delivery_account?: boolean;
   /** @deprecated Use capabilities.modules.scannorder instead. */
   scannorder_ready?: boolean;
   /** @deprecated Use capabilities.modules.stock instead. */
@@ -350,10 +343,7 @@ export const normalizeAuthData = (rawData: RawAuthData | AuthData): AuthData => 
   const activeMerchant = merchants.find((merchant) => merchant.id === sessionMerchantId);
 
   const capabilities = {
-    apps: normalizeBooleanMap<AuthCapabilities['apps']>(rawCapabilityApps, ['reception', 'delivery', 'waiter'], {
-      delivery: asBoolean(raw.allow_delivery_account),
-      waiter: asBoolean(raw.allow_waiter_account),
-    }),
+    apps: normalizeBooleanMap<AuthCapabilities['apps']>(rawCapabilityApps, ['reception']),
     modules: normalizeBooleanMap<AuthCapabilities['modules']>(rawCapabilityModules, ['menu', 'planning', 'users', 'settings', 'haccp', 'reports', 'financials', 'customers', 'stock', 'hr', 'scannorder', 'bookings', 'kiosks'], {
       planning: true,
       haccp: true,
@@ -367,7 +357,7 @@ export const normalizeAuthData = (rawData: RawAuthData | AuthData): AuthData => 
       take_away: asBoolean(raw.manage_take_away),
       delivery: asBoolean(raw.manage_delivery),
     }),
-    actions: normalizeBooleanMap<AuthCapabilities['actions']>(rawCapabilityActions, ['open_cash_drawer', 'print_merchant_cash_report', 'manage_menu', 'manage_plannings', 'manage_users', 'manage_settings', 'manage_haccp', 'view_reports', 'export_reports', 'view_financials', 'export_financials', 'manage_customers', 'export_customers'], {
+    actions: normalizeBooleanMap<AuthCapabilities['actions']>(rawCapabilityActions, ['open_cash_drawer', 'print_merchant_cash_report', 'manage_menu', 'manage_plannings', 'manage_users', 'manage_settings', 'manage_haccp', 'view_reports', 'view_financials', 'manage_customers'], {
       open_cash_drawer: asBoolean(raw.open_cash_drawer),
       print_merchant_cash_report: asBoolean(raw.print_merchant_cash_report),
     }),

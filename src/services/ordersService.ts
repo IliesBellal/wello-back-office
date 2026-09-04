@@ -137,7 +137,6 @@ export interface Order {
   isPaid: boolean;
   isDistributed: boolean;
   isSNO: boolean;
-  callHour: string;
   estimated_ready: number | null;
   isDelivery: number;
   merchant_approval: string;
@@ -192,7 +191,6 @@ const mockPendingOrders: Order[] = [
     isPaid: true,
     isDistributed: false,
     isSNO: false,
-    callHour: "2026-01-04T15:30:33Z",
     estimated_ready: 1767540933,
     isDelivery: 0,
     merchant_approval: "ACCEPTED",
@@ -331,7 +329,6 @@ const mockHistoryOrders: Order[] = Array.from({ length: 50 }, (_, i) => {
     isPaid: true,
     isDistributed: true,
     isSNO: false,
-    callHour: new Date(2024, 1, Math.floor(Math.random() * 28) + 1).toISOString(),
     estimated_ready: null,
     isDelivery: i % 3 === 0 ? 1 : 0,
     merchant_approval: "1",

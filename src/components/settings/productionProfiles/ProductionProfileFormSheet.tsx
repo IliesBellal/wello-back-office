@@ -31,6 +31,9 @@ const formSchema = z.object({
   name: z.string().min(1, 'Le nom est requis'),
   split_by_source: z.boolean(),
   display_only_paid_orders: z.boolean(),
+  load_slot_interval_minutes: z.coerce.number().int().positive('Doit être > 0'),
+  load_slot_duration_hours: z.coerce.number().int().positive('Doit être > 0'),
+  load_max_capacity_count: z.coerce.number().int().positive('Doit être > 0'),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -52,6 +55,9 @@ export function ProductionProfileFormSheet({ open, onOpenChange, profile }: Prod
       name: '',
       split_by_source: true,
       display_only_paid_orders: false,
+      load_slot_interval_minutes: 15,
+      load_slot_duration_hours: 4,
+      load_max_capacity_count: 15,
     },
   });
 
@@ -61,6 +67,9 @@ export function ProductionProfileFormSheet({ open, onOpenChange, profile }: Prod
         name: profile?.name ?? '',
         split_by_source: profile?.split_by_source ?? true,
         display_only_paid_orders: profile?.display_only_paid_orders ?? false,
+        load_slot_interval_minutes: profile?.load_slot_interval_minutes ?? 15,
+        load_slot_duration_hours: profile?.load_slot_duration_hours ?? 4,
+        load_max_capacity_count: profile?.load_max_capacity_count ?? 15,
       });
     }
   }, [open, profile, form]);
@@ -93,6 +102,9 @@ export function ProductionProfileFormSheet({ open, onOpenChange, profile }: Prod
       name: values.name.trim(),
       split_by_source: values.split_by_source,
       display_only_paid_orders: values.display_only_paid_orders,
+      load_slot_interval_minutes: values.load_slot_interval_minutes,
+      load_slot_duration_hours: values.load_slot_duration_hours,
+      load_max_capacity_count: values.load_max_capacity_count,
     });
   };
 
@@ -160,6 +172,55 @@ export function ProductionProfileFormSheet({ open, onOpenChange, profile }: Prod
                   </FormItem>
                 )}
               />
+
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Charge de production (écran PRODUCTION)</p>
+                <p className="text-sm text-muted-foreground">
+                  Cadence et capacité de ce poste — l'écran "commandes en cours" combine ces
+                  réglages avec ceux des autres profils.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <FormField
+                  control={form.control}
+                  name="load_slot_interval_minutes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Intervalle (min)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="load_slot_duration_hours"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Durée (h)</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="load_max_capacity_count"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Capacité max</FormLabel>
+                      <FormControl>
+                        <Input type="number" min={1} {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
               <div className="flex gap-3 pt-4">
                 <Button

@@ -141,8 +141,6 @@ const mockAuthResponse: AuthResponse = {
       admin: true,
       apps: {
         reception: true,
-        delivery: true,
-        waiter: true,
       },
       permissions: {}
     },
@@ -150,8 +148,6 @@ const mockAuthResponse: AuthResponse = {
     capabilities: {
       apps: {
         reception: true,
-        delivery: true,
-        waiter: true,
       },
       modules: {
         menu: true,
@@ -182,11 +178,8 @@ const mockAuthResponse: AuthResponse = {
         manage_settings: true,
         manage_haccp: true,
         view_reports: true,
-        export_reports: true,
         view_financials: true,
-        export_financials: true,
         manage_customers: true,
-        export_customers: true,
       },
       integrations: {
         uber_eats: true,

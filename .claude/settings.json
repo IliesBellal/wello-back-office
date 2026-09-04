@@ -43,13 +43,19 @@
       "Bash(gofmt -l -w ./internal/modules/menu/importer/ ./internal/modules/auth/repository.go)",
       "Bash(gofmt -l -w ./internal/modules/menu/)",
       "Bash(gofmt -l -w internal/modules/menu/importer/models.go internal/modules/menu/importer/preview.go internal/modules/menu/importer/commit_plan.go internal/modules/menu/models.go internal/modules/menu/repository.go internal/modules/menu/import_repository.go internal/modules/menu/import_commit_repository.go internal/modules/menu/import_service.go internal/modules/menu/import_merchant_models.go internal/modules/menu/import_merchant_handler.go internal/modules/menu/import_merchant_service.go internal/modules/menu/import_merchant_repository.go internal/modules/auth/repository.go)",
-      "Bash(echo \"VET_EXIT:$?\")"
+      "Bash(echo \"VET_EXIT:$?\")",
+      "Bash(xargs grep -l \"integration_uber_eats\\\\|integration_deliveroo\")",
+      "Bash(xargs grep -l \"deliveroo\\\\|uber\")"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\users",
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\planningcomm",
-      "\\tmp"
+      "\\tmp",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\webhook\\deliveroo_orders",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\ubereats",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\deliveroo",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\integrations"
     ]
   }
 }

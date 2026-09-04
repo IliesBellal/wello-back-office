@@ -51,8 +51,6 @@ const nowISO = () => new Date().toISOString();
 
 const EMPTY_PERMS: MerchantUserPermissions = {
   access_reception: false,
-  access_delivery: false,
-  access_waiter: false,
   print_merchant_cash_report: false,
   open_cash_drawer: false,
   manage_menu: false,
@@ -61,17 +59,12 @@ const EMPTY_PERMS: MerchantUserPermissions = {
   manage_settings: false,
   manage_haccp: false,
   view_reports: false,
-  export_reports: false,
   view_financials: false,
-  export_financials: false,
   manage_customers: false,
-  export_customers: false,
 };
 
 const FULL_PERMS: MerchantUserPermissions = {
   access_reception: true,
-  access_delivery: true,
-  access_waiter: true,
   print_merchant_cash_report: true,
   open_cash_drawer: true,
   manage_menu: true,
@@ -80,11 +73,8 @@ const FULL_PERMS: MerchantUserPermissions = {
   manage_settings: true,
   manage_haccp: true,
   view_reports: true,
-  export_reports: true,
   view_financials: true,
-  export_financials: true,
   manage_customers: true,
-  export_customers: true,
 };
 
 function computeStatus(enabled: boolean, loginEnabled: boolean): MerchantUserListItem["status"] {
@@ -203,7 +193,7 @@ const members: MockMember[] = [
     last_name: "Martin",
     email: "alex.martin@wello.fr",
     tel: "+33 6 23 45 67 89",
-    permissions: { access_reception: true, access_waiter: true, open_cash_drawer: true },
+    permissions: { access_reception: true, open_cash_drawer: true },
     employee_id: "emp-2002",
     employee_name: "Alex Martin",
     created_at: "2025-02-10T08:30:00Z",
@@ -275,7 +265,7 @@ const members: MockMember[] = [
     email: "lea.rousseau@wello.fr",
     tel: "+33 6 56 78 90 12",
     loginEnabled: false, // status = login_disabled
-    permissions: { access_waiter: true },
+    permissions: {},
     employee_id: "emp-2005",
     employee_name: "Léa Rousseau",
     created_at: "2025-09-15T10:00:00Z",
@@ -308,7 +298,7 @@ const members: MockMember[] = [
     last_name: "Cohen",
     email: "sarah.cohen@wello.fr",
     tel: "+33 6 78 90 12 34",
-    permissions: { access_reception: true, access_delivery: true, open_cash_drawer: true },
+    permissions: { access_reception: true, open_cash_drawer: true },
     employee_id: null, // exprès : pas de fiche planning
     created_at: "2026-01-08T10:00:00Z",
     last_login_at: "2026-05-30T11:23:00Z",
@@ -319,7 +309,7 @@ const members: MockMember[] = [
     last_name: "Ali",
     email: "mehdi.ali@wello.fr",
     tel: "+33 6 89 01 23 45",
-    permissions: { access_delivery: true },
+    permissions: {},
     employee_id: "emp-2008",
     employee_name: "Mehdi Ali",
     created_at: "2026-03-02T08:00:00Z",

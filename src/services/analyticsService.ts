@@ -1,5 +1,6 @@
 import { apiClient, withMock, WelloApiResponse } from './apiClient';
 import type { Order } from './ordersService';
+import { toLocalDateString } from '../utils/apiDate';
 import {
   mapBrandFilterForApi,
   mapOrderTypeFilterForApi,
@@ -12,69 +13,141 @@ export interface DateRange {
   to: Date;
 }
 
-interface RevenuePeriodData {
-  total: number;
-  by_channel: Record<string, number>;
-  timeline?: TimepointData[];
+// Shapes below mirror internal/modules/analytics (ib-welloresto-api repo)
+// field-for-field — see RevenueResponse in that module's models.go. Amounts
+// are integer cents everywhere (*_ttc_cents, *_ht_cents), never euros: the
+// old mock mixed the two (AUDIT.md I2/I3, docs/analytics/), this contract
+// doesn't leave room to repeat that.
+export interface RevenuePeriodTotals {
+  from: string;
+  to: string;
+  total_ttc_cents: number;
+  total_ht_cents?: number;
+  order_count: number;
 }
 
-interface PeriodComparison {
-  total: number;
-  change: number;
+export interface RevenueDayPoint {
+  local_day: string;
+  total_ttc_cents: number;
+  by_channel_ttc_cents: Record<string, number>;
 }
 
-interface TimepointData {
-  [key: string]: unknown;
-  date: string;
+export interface RevenueChannelTotal {
+  channel: string;
+  total_ttc_cents: number;
+  order_count: number;
 }
 
-interface RevenueAnalyticsResponse {
-  current_period: RevenuePeriodData;
-  previous_period: PeriodComparison;
-  year_ago: PeriodComparison;
-  timeline: TimepointData[];
+export interface RevenueMerchantTotal {
+  merchant_id: string;
+  total_ttc_cents: number;
+  order_count: number;
 }
 
-interface OrdersMetrics {
-  total_orders: number;
-  avg_basket: number;
-  covers?: number;
-  avg_per_cover?: number;
+export interface RevenueAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  current_period: RevenuePeriodTotals;
+  previous_period: RevenuePeriodTotals;
+  previous_year: RevenuePeriodTotals;
+  timeline: RevenueDayPoint[];
+  by_channel: RevenueChannelTotal[];
+  by_merchant?: RevenueMerchantTotal[];
+  ht_computed: boolean;
+}
+
+// Shapes below mirror internal/modules/analytics's Orders*/Payments*/VAT*
+// types (ib-welloresto-api repo, models.go) field-for-field, same convention
+// as RevenueAnalyticsResponse above.
+
+export interface OrdersPeriodTotals {
+  from: string;
+  to: string;
+  order_count: number;
+  avg_basket_ttc_cents: number;
+  covers_data_available: boolean;
   total_covers?: number;
+  avg_basket_per_cover_cents?: number;
 }
 
-interface OrderTimeline {
-  date: string;
-  orders: number;
-  revenue: number;
+export interface OrdersDayPoint {
+  local_day: string;
+  total_orders: number;
+  by_channel_orders: Record<string, number>;
 }
 
-interface PaymentMethod {
-  amount: number;
-  percentage: number;
+export interface OrdersChannelTotal {
+  channel: string;
+  order_count: number;
 }
 
-interface OrderMode {
-  mode: string;
-  orders: number;
-  revenue: number;
-  avg_basket: number;
+export interface OrdersAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  current_period: OrdersPeriodTotals;
+  previous_period: OrdersPeriodTotals;
+  previous_year: OrdersPeriodTotals;
+  timeline: OrdersDayPoint[];
+  by_channel: OrdersChannelTotal[];
 }
 
-interface OrdersComparison {
-  orders: number;
-  change: number;
+export interface PaymentsPeriodTotals {
+  from: string;
+  to: string;
+  total_amount_cents: number;
+  payment_count: number;
 }
 
-interface OrdersAnalyticsResponse {
-  metrics: OrdersMetrics;
-  timeline: OrderTimeline[];
-  payment_methods: Record<string, PaymentMethod>;
-  by_mode: OrderMode[];
-  comparisons: {
-    previous_period: OrdersComparison;
-    year_ago: OrdersComparison;
-  };
+export interface PaymentsDayPoint {
+  local_day: string;
+  total_amount_cents: number;
+  by_method_amount_cents: Record<string, number>;
+}
+
+export interface PaymentMethodTotal {
+  method: string;
+  total_amount_cents: number;
+  payment_count: number;
+}
+
+export interface PaymentsAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  current_period: PaymentsPeriodTotals;
+  previous_period: PaymentsPeriodTotals;
+  previous_year: PaymentsPeriodTotals;
+  timeline: PaymentsDayPoint[];
+  by_method: PaymentMethodTotal[];
+}
+
+export interface VATPeriodTotals {
+  from: string;
+  to: string;
+  total_ttc_cents: number;
+  total_ht_cents: number;
+  total_vat_cents: number;
+}
+
+export interface VATRateTotal {
+  rate: number;
+  base_ht_cents: number;
+  vat_cents: number;
+}
+
+export interface VATChannelTotal {
+  channel: string;
+  base_ht_cents: number;
+  vat_cents: number;
+  total_ttc_cents: number;
+}
+
+// VATAnalyticsResponse is the canonical analytics VAT view — NOT a fiscal
+// document, deliberately not reconciled with pos/reports/tva. See
+// VATAnalyticsTab.tsx for the label this drives.
+export interface VATAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  current_period: VATPeriodTotals;
+  previous_period: VATPeriodTotals;
+  previous_year: VATPeriodTotals;
+  by_rate: VATRateTotal[];
+  by_channel: VATChannelTotal[];
 }
 
 // Products Analytics
@@ -273,34 +346,6 @@ interface CustomersAnalyticsResponse {
   };
 }
 
-// VAT Analytics
-interface VATByRate {
-  rate: number;
-  base_ht: number;
-  vat_amount: number;
-}
-
-interface VATByChannel {
-  channel: string;
-  base_ht: number;
-  vat_10: number;
-  vat_5_5: number;
-  vat_total: number;
-  total_ttc: number;
-}
-
-interface VATAnalyticsResponse {
-  total_vat: number;
-  total_base_ht: number;
-  total_ttc: number;
-  by_rate: VATByRate[];
-  by_channel: VATByChannel[];
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
-}
-
 // Restaurants Comparative
 interface RestaurantComparative {
   restaurant_id: string;
@@ -405,10 +450,6 @@ const toUtcBoundaryISOString = (value: string | Date, endOfDay = false): string 
 };
 
 const getOrderHistoryTimestamp = (order: Order): string => {
-  if (order.callHour) {
-    return order.callHour;
-  }
-
   if (order.creation_date) {
     return new Date(order.creation_date * 1000).toISOString();
   }
@@ -487,97 +528,123 @@ const mapOrderToHistoryItem = (order: Order): OrderHistoryItem => {
  */
 class AnalyticsService {
   /**
-   * Récupère les données de chiffre d'affaires avec comparaisons
+   * Récupère les données de chiffre d'affaires avec comparaisons.
+   * Onglet CA — premier onglet branché en SQL direct sur
+   * POST /analytics/revenue (internal/modules/analytics, ib-welloresto-api
+   * repo). Les périodes de comparaison sont calculées côté serveur, en un
+   * seul appel — voir docs/analytics/ PROMPT 03 Partie 2.
    */
-  getRevenueAnalytics(
+  async getRevenueAnalytics(
     startDate: string | Date,
-    endDate: string | Date,
-    channels: string[],
-    aggregation: 'day' | 'week' | 'month' = 'day'
-  ): RevenueAnalyticsResponse {
-    // Convert Date to string if needed
-    const start = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
-    const end = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
+    endDate: string | Date
+  ): Promise<RevenueAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
 
-    // Mock data response
-    const mockTimeline = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (29 - i));
-      return {
-        date: date.toISOString().split('T')[0],
-        restaurant: Math.floor(8500 + Math.random() * 2000),
-        takeaway: Math.floor(3200 + Math.random() * 800),
-        delivery: Math.floor(1800 + Math.random() * 400),
-      };
-    });
+    return withMock(
+      () => {
+        const mockTimeline: RevenueDayPoint[] = Array.from({ length: 30 }, (_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - (29 - i));
+          return {
+            local_day: date.toISOString().split('T')[0],
+            total_ttc_cents: 0,
+            by_channel_ttc_cents: {
+              dine_in: Math.floor(850000 + Math.random() * 200000),
+              takeaway: Math.floor(320000 + Math.random() * 80000),
+              delivery: Math.floor(180000 + Math.random() * 40000),
+            },
+          };
+        }).map((point) => ({
+          ...point,
+          total_ttc_cents: Object.values(point.by_channel_ttc_cents).reduce((a, b) => a + b, 0),
+        }));
 
-    return {
-      timeline: mockTimeline,
-      current_period: {
-        total: 14420,
-        by_channel: {
-          restaurant: 8500,
-          takeaway: 3200,
-          delivery: 1800,
-          ubereats: 720,
-          deliveroo: 200,
-        },
+        return {
+          scope: { merchant_ids: ['mock'], group_by: 'none' },
+          current_period: { from: dateFrom, to: dateTo, total_ttc_cents: 1442000, total_ht_cents: 1201700, order_count: 320 },
+          previous_period: { from: dateFrom, to: dateTo, total_ttc_cents: 1420000, total_ht_cents: 1183300, order_count: 305 },
+          previous_year: { from: dateFrom, to: dateTo, total_ttc_cents: 1288000, total_ht_cents: 1073300, order_count: 280 },
+          timeline: mockTimeline,
+          by_channel: [
+            { channel: 'dine_in', total_ttc_cents: 850000, order_count: 180 },
+            { channel: 'takeaway', total_ttc_cents: 320000, order_count: 70 },
+            { channel: 'delivery', total_ttc_cents: 180000, order_count: 30 },
+            { channel: 'ubereats_takeaway', total_ttc_cents: 45000, order_count: 12 },
+            { channel: 'ubereats_delivery', total_ttc_cents: 27000, order_count: 8 },
+            { channel: 'deliveroo_takeaway', total_ttc_cents: 12000, order_count: 4 },
+            { channel: 'deliveroo_delivery', total_ttc_cents: 8000, order_count: 2 },
+          ],
+          ht_computed: true,
+        };
       },
-      previous_period: { total: 14200, change: 1.5 },
-      year_ago: { total: 12880, change: 11.9 },
-    };
+      async () => {
+        const response = await apiClient.post<{ id: string; data: RevenueAnalyticsResponse }>(
+          '/analytics/revenue',
+          { date_from: dateFrom, date_to: dateTo }
+        );
+        return response.data;
+      }
+    );
   }
 
   /**
-   * Récupère les données de commandes avec comparaisons
+   * Récupère les données de commandes avec comparaisons.
+   * Onglet Commandes — branché en SQL direct sur POST /analytics/orders
+   * (internal/modules/analytics, ib-welloresto-api repo), même gabarit que
+   * l'onglet CA. Couverts jamais un zéro silencieux : total_covers /
+   * avg_basket_per_cover_cents sont absents quand covers_data_available est
+   * false (places_settings non saisi sur 99,9% du périmètre PROD).
    */
-  getOrdersAnalytics(
+  async getOrdersAnalytics(
     startDate: string | Date,
-    endDate: string | Date,
-    orderModes: string[],
-    serviceType: 'all' | 'dine_in' | 'takeaway' | 'delivery' = 'all'
-  ): OrdersAnalyticsResponse {
-    // Convert Date to string if needed
-    const start = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
-    const end = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
+    endDate: string | Date
+  ): Promise<OrdersAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
 
-    // Mock data response
-    const mockTimeline = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (29 - i));
-      return {
-        date: date.toISOString().split('T')[0],
-        total_orders: Math.floor(80 + Math.random() * 40),
-      };
-    });
-
-    return {
-      metrics: {
-        total_orders: 2600,
-        avg_basket: 12.3,
-        covers: 215,
-        avg_per_cover: 12.1,
-      },
-      by_mode: [
-        { mode: 'Restaurant', orders: 1560, revenue: 18600, avg_basket: 11.92 },
-        { mode: 'À emporter', orders: 680, revenue: 7640, avg_basket: 11.24 },
-        { mode: 'Livraison', orders: 360, revenue: 3960, avg_basket: 11 },
-      ],
-      payment_methods: {
-        card: { amount: 21840, percentage: 0.74 },
-        cash: { amount: 5200, percentage: 0.18 },
-        app: { amount: 3160, percentage: 0.08 },
-      },
-      timeline: mockTimeline.map((item) => ({
-        date: item.date,
-        orders: Math.floor(50 + Math.random() * 60),
-        revenue: Math.floor(3000 + Math.random() * 2000),
-      })),
-      comparisons: {
-        previous_period: { orders: 2450, change: 6.1 },
-        year_ago: { orders: 2200, change: 18.2 },
-      },
-    };
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        current_period: {
+          from: dateFrom, to: dateTo, order_count: 320, avg_basket_ttc_cents: 4506,
+          covers_data_available: false,
+        },
+        previous_period: {
+          from: dateFrom, to: dateTo, order_count: 305, avg_basket_ttc_cents: 4656,
+          covers_data_available: false,
+        },
+        previous_year: {
+          from: dateFrom, to: dateTo, order_count: 280, avg_basket_ttc_cents: 4600,
+          covers_data_available: false,
+        },
+        timeline: Array.from({ length: 30 }, (_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - (29 - i));
+          return {
+            local_day: date.toISOString().split('T')[0],
+            total_orders: Math.floor(8 + Math.random() * 6),
+            by_channel_orders: { dine_in: Math.floor(4 + Math.random() * 3), takeaway: Math.floor(2 + Math.random() * 2) },
+          };
+        }),
+        by_channel: [
+          { channel: 'dine_in', order_count: 180 },
+          { channel: 'takeaway', order_count: 70 },
+          { channel: 'delivery', order_count: 30 },
+          { channel: 'ubereats_takeaway', order_count: 12 },
+          { channel: 'ubereats_delivery', order_count: 8 },
+          { channel: 'deliveroo_takeaway', order_count: 4 },
+          { channel: 'deliveroo_delivery', order_count: 2 },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: OrdersAnalyticsResponse }>(
+          '/analytics/orders',
+          { date_from: dateFrom, date_to: dateTo }
+        );
+        return response.data;
+      }
+    );
   }
 
   /**
@@ -611,6 +678,133 @@ class AnalyticsService {
       return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     } catch (error) {
       console.error('Error exporting orders CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les données de règlements avec comparaisons.
+   * Onglet Règlements — branché en SQL direct sur POST /analytics/payments.
+   * `by_method` utilise les 7 valeurs canoniques de `mop` + "other" — voir
+   * src/utils/paymentMethods.ts. Aucune valeur "mobile" : le référentiel réel
+   * n'en comporte pas (DROITS.md/AUDIT.md P14).
+   */
+  async getPaymentsAnalytics(
+    startDate: string | Date,
+    endDate: string | Date
+  ): Promise<PaymentsAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        current_period: { from: dateFrom, to: dateTo, total_amount_cents: 1442000, payment_count: 320 },
+        previous_period: { from: dateFrom, to: dateTo, total_amount_cents: 1420000, payment_count: 305 },
+        previous_year: { from: dateFrom, to: dateTo, total_amount_cents: 1288000, payment_count: 280 },
+        timeline: Array.from({ length: 30 }, (_, i) => {
+          const date = new Date();
+          date.setDate(date.getDate() - (29 - i));
+          return {
+            local_day: date.toISOString().split('T')[0],
+            total_amount_cents: Math.floor(35000 + Math.random() * 15000),
+            by_method_amount_cents: {
+              CB: Math.floor(25000 + Math.random() * 8000),
+              ES: Math.floor(8000 + Math.random() * 3000),
+            },
+          };
+        }),
+        by_method: [
+          { method: 'CB', total_amount_cents: 865200, payment_count: 210 },
+          { method: 'ES', total_amount_cents: 288400, payment_count: 68 },
+          { method: 'STRIPE', total_amount_cents: 144200, payment_count: 30 },
+          { method: 'UBER_EATS', total_amount_cents: 86520, payment_count: 8 },
+          { method: 'DELIVEROO', total_amount_cents: 43260, payment_count: 3 },
+          { method: 'other', total_amount_cents: 14420, payment_count: 1 },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: PaymentsAnalyticsResponse }>(
+          '/analytics/payments',
+          { date_from: dateFrom, date_to: dateTo }
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
+   * Exporte les données règlements en CSV
+   */
+  async exportPaymentsCSV(
+    startDate: string,
+    endDate: string,
+    paymentMethods?: string[],
+    channel?: string
+  ): Promise<Blob> {
+    try {
+      const csv = 'Date,Méthode,Montant\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    } catch (error) {
+      console.error('Error exporting payments CSV:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Récupère les données TVA avec comparaisons.
+   * Onglet TVA — branché en SQL direct sur POST /analytics/vat. Périmètre
+   * analytique canonique, toutes marques — CE N'EST PAS un document
+   * comptable, ne pas le confondre avec pos/reports/tva (VATAnalyticsTab.tsx
+   * porte le libellé explicite).
+   */
+  async getVATAnalytics(
+    startDate: string | Date,
+    endDate: string | Date
+  ): Promise<VATAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        current_period: { from: dateFrom, to: dateTo, total_ttc_cents: 1442000, total_ht_cents: 1201700, total_vat_cents: 240300 },
+        previous_period: { from: dateFrom, to: dateTo, total_ttc_cents: 1420000, total_ht_cents: 1183300, total_vat_cents: 236700 },
+        previous_year: { from: dateFrom, to: dateTo, total_ttc_cents: 1288000, total_ht_cents: 1073300, total_vat_cents: 214700 },
+        by_rate: [
+          { rate: 20, base_ht_cents: 180000, vat_cents: 36000 },
+          { rate: 10, base_ht_cents: 950000, vat_cents: 95000 },
+          { rate: 5.5, base_ht_cents: 71700, vat_cents: 3900 },
+        ],
+        by_channel: [
+          { channel: 'dine_in', base_ht_cents: 708300, vat_cents: 141700, total_ttc_cents: 850000 },
+          { channel: 'takeaway', base_ht_cents: 266700, vat_cents: 53300, total_ttc_cents: 320000 },
+          { channel: 'delivery', base_ht_cents: 150000, vat_cents: 30000, total_ttc_cents: 180000 },
+          { channel: 'ubereats_takeaway', base_ht_cents: 37500, vat_cents: 7500, total_ttc_cents: 45000 },
+          { channel: 'ubereats_delivery', base_ht_cents: 22500, vat_cents: 4500, total_ttc_cents: 27000 },
+          { channel: 'deliveroo_takeaway', base_ht_cents: 10000, vat_cents: 2000, total_ttc_cents: 12000 },
+          { channel: 'deliveroo_delivery', base_ht_cents: 6700, vat_cents: 1300, total_ttc_cents: 8000 },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: VATAnalyticsResponse }>(
+          '/analytics/vat',
+          { date_from: dateFrom, date_to: dateTo }
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
+   * Exporte les données TVA en CSV
+   */
+  async exportVatCSV(startDate: string, endDate: string): Promise<Blob> {
+    try {
+      const csv = 'Taux,Base HT,TVA\nMock CSV export';
+      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    } catch (error) {
+      console.error('Error exporting VAT CSV:', error);
       throw error;
     }
   }
@@ -1130,69 +1324,6 @@ class AnalyticsService {
       comparisons: {
         previous_period: { value: 14500, change: 2.4 },
         year_ago: { value: 12800, change: 15.7 },
-      },
-    };
-  }
-
-  /**
-   * Récupère les données TVA
-   */
-  getVATAnalytics(
-    startDate: string | Date,
-    endDate: string | Date,
-    channels?: string[]
-  ): VATAnalyticsResponse {
-    // Convert Date to string if needed
-    const start = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
-    const end = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
-    const mockByChannel: VATByChannel[] = [
-      {
-        channel: 'Restaurant',
-        base_ht: 8500,
-        vat_10: 850,
-        vat_5_5: 156,
-        vat_total: 1006,
-        total_ttc: 9506,
-      },
-      {
-        channel: 'À emporter',
-        base_ht: 3200,
-        vat_10: 320,
-        vat_5_5: 59,
-        vat_total: 379,
-        total_ttc: 3579,
-      },
-      {
-        channel: 'Uber Eats',
-        base_ht: 1800,
-        vat_10: 180,
-        vat_5_5: 33,
-        vat_total: 213,
-        total_ttc: 2013,
-      },
-      {
-        channel: 'Deliveroo',
-        base_ht: 1320,
-        vat_10: 132,
-        vat_5_5: 24,
-        vat_total: 156,
-        total_ttc: 1476,
-      },
-    ];
-
-    return {
-      total_vat: 1754,
-      total_base_ht: 14820,
-      total_ttc: 16574,
-      by_rate: [
-        { rate: 10, base_ht: 10500, vat_amount: 1050 },
-        { rate: 5.5, base_ht: 4320, vat_amount: 237.6 },
-        { rate: 20, base_ht: 0, vat_amount: 0 },
-      ],
-      by_channel: mockByChannel,
-      comparisons: {
-        previous_period: { value: 1680, change: 4.4 },
-        year_ago: { value: 1520, change: 15.4 },
       },
     };
   }

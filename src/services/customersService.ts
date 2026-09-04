@@ -197,7 +197,6 @@ type CustomerOrdersHistoryApiResponse = WelloApiResponse<{
     TTC?: number;
     order_type?: string | null;
     fulfillment_type?: string;
-    callHour?: string;
     creation_date?: string | number | null;
     products?: Array<{ quantity?: number }>;
   }>;
@@ -327,7 +326,7 @@ const mapHistoryOrderToCustomerOrder = (order: NonNullable<CustomerOrdersHistory
   return {
     id: order.order_id,
     order_number: order.order_num,
-    date: toOrderDateIsoString(order.callHour || order.creation_date),
+    date: toOrderDateIsoString(order.creation_date),
     status: (order.state || order.brand_status || "").toUpperCase() || "UNKNOWN",
     total: order.TTC || 0,
     items_count: itemsCount,

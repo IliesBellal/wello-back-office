@@ -398,7 +398,7 @@ export const OrderDetailModal = ({ isOpen, onClose, orderId, zIndex = 50 }: Orde
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Date/Heure</p>
-                <p className="font-medium">{formatTimestamp(orderDetail.callHour || orderDetail.creation_date)}</p>
+                <p className="font-medium">{formatTimestamp(orderDetail.creation_date)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground text-xs">Canal</p>
