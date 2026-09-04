@@ -33,7 +33,7 @@ import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
 import { Tile } from '@/components/shared/Tile';
 import { toast } from 'sonner';
 
-type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'tags' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'paiements' | 'tva' | 'restaurants';
+type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'paiements' | 'tva' | 'restaurants';
 
 interface DateRange {
   from: Date;
@@ -214,7 +214,6 @@ const DashboardAnalysisContent = () => {
   const [productCategory, setProductCategory] = useState<string | undefined>();
   const [productSort, setProductSort] = useState('quantity');
   const [optionTypes, setOptionTypes] = useState<string[]>(['paid', 'free', 'removed']);
-  const [selectedTags, setSelectedTags] = useState<string[]>(['Végétarien', 'Vegan', 'Sans gluten']);
   const [cancellationReasons, setCancellationReasons] = useState<string[]>(['ordering_error', 'customer_wait', 'kitchen_issue', 'payment_issue']);
   const [cancellationChannels, setCancellationChannels] = useState<('all' | 'sur_place' | 'emporter' | 'uber_eats' | 'deliveroo')[]>(['sur_place', 'emporter', 'uber_eats', 'deliveroo']);
   const [discountTypes, setDiscountTypes] = useState<string[]>(['promotion', 'happy_hour', 'gesture', 'loyalty', 'promo_code']);
@@ -224,17 +223,18 @@ const DashboardAnalysisContent = () => {
     return {
       products: analyticsService.getProductsAnalytics(dateRange.from, dateRange.to, productCategory, productSort),
       options: analyticsService.getOptionsAnalytics(dateRange.from, dateRange.to, optionTypes),
-      tags: analyticsService.getTagsAnalytics(dateRange.from, dateRange.to, selectedTags),
       cancellations: analyticsService.getCancellationsAnalytics(dateRange.from, dateRange.to, cancellationReasons),
       discounts: analyticsService.getDiscountsAnalytics(dateRange.from, dateRange.to, discountTypes),
       clients: analyticsService.getCustomersAnalytics(dateRange.from, dateRange.to),
       restaurants: analyticsService.getRestaurantsAnalytics(dateRange.from, dateRange.to),
     };
-  }, [dateRange, productCategory, productSort, optionTypes, selectedTags, cancellationReasons, discountTypes]);
+  }, [dateRange, productCategory, productSort, optionTypes, cancellationReasons, discountTypes]);
 
   // ==================== ONGLETS CA / COMMANDES / RÈGLEMENTS / TVA ====================
   // Branchés en SQL direct — voir components/analytics/{Revenue,Orders,Payments,VAT}AnalyticsTab.tsx.
-  // Reste des 7 autres onglets : toujours sur analyticsData (mocks) ci-dessus.
+  // Reste des 6 autres onglets : toujours sur analyticsData (mocks) ci-dessus.
+  // (Tags retiré, PROMPT 09 lot 3 C4 — voir docs/analytics/TAGS_RETRAIT.md :
+  // aucun établissement PROD n'étiquette ses produits.)
 
   // ==================== ONGLET PRODUITS ====================
   const renderProductsTab = () => {
@@ -492,124 +492,6 @@ const DashboardAnalysisContent = () => {
             dateRange.from.toISOString().split('T')[0],
             dateRange.to.toISOString().split('T')[0],
             optionTypes
-          )}
-        />
-      </div>
-    </div>
-    );
-  };
-
-  // ==================== ONGLET TAGS ====================
-  const renderTagsTab = () => {
-    // Calcul des totaux pour les pourcentages
-    const totalQuantity = analyticsData.tags.by_tag.reduce((sum, tag) => sum + tag.quantity, 0);
-    const totalRevenue = analyticsData.tags.by_tag.reduce((sum, tag) => sum + tag.revenue, 0);
-    const totalWithTags = totalQuantity;
-    const totalWithoutTags = Math.round(totalWithTags * 0.3); // 30% estimation for tagged vs untagged
-
-    return (
-      <div className="space-y-6">
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <Card className="bg-card border border-border">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Part de quantité par tag</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={analyticsData.tags.by_tag}
-                    dataKey="quantity"
-                    nameKey="tag"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label
-                  >
-                    {analyticsData.tags.by_tag.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border border-border">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Quantité: avec tags vs sans tags</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: 'Avec tags', value: totalWithTags },
-                      { name: 'Sans tags', value: totalWithoutTags },
-                    ]}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={100}
-                    label
-                  >
-                    <Cell fill="#3b82f6" />
-                    <Cell fill="#d1d5db" />
-                  </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="bg-card border border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Détails par tag</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <DataTable
-              columns={[
-                { key: 'tag', label: 'Tag', sortable: true },
-                { key: 'product_count', label: 'Nombre de produits', sortable: true },
-                {
-                  key: 'quantity',
-                  label: 'Quantité vendue',
-                  sortable: true,
-                  render: (v: number, row: any) => {
-                    const pct = ((v / totalQuantity) * 100).toFixed(1);
-                    return `${v} (${pct}%)`;
-                  },
-                },
-                {
-                  key: 'revenue',
-                  label: 'CA total (€)',
-                  sortable: true,
-                  render: (v: number, row: any) => {
-                    const pct = ((v / totalRevenue) * 100).toFixed(1);
-                    return `${v.toFixed(2)} (${pct}%)`;
-                  },
-                },
-                { key: 'avg_basket', label: 'Panier moyen (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              ]}
-              data={analyticsData.tags.by_tag}
-              sortBy="quantity"
-            />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <ExportButton
-          filename="Tags"
-          onExport={() => analyticsService.exportTagsCSV(
-            dateRange.from.toISOString().split('T')[0],
-            dateRange.to.toISOString().split('T')[0],
-            selectedTags
           )}
         />
       </div>
@@ -1166,8 +1048,6 @@ const DashboardAnalysisContent = () => {
         return renderProductsTab();
       case 'options':
         return renderOptionsTab();
-      case 'tags':
-        return renderTagsTab();
       case 'annulations':
         return renderCancellationsTab();
       case 'upsell':
@@ -1192,7 +1072,6 @@ const DashboardAnalysisContent = () => {
     { id: 'commandes', label: 'Commandes' },
     { id: 'produits', label: 'Produits' },
     { id: 'options', label: 'Options' },
-    { id: 'tags', label: 'Tags' },
     { id: 'annulations', label: 'Annulations' },
     { id: 'upsell', label: 'Vente additionnelle' },
     { id: 'remises', label: 'Remises' },

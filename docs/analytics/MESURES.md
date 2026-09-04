@@ -105,6 +105,99 @@ vérifié qu'en local jusqu'ici :
     rapport TVA officiel (Point de vente → Rapports → TVA), qui exclut les marketplaces
     et ScanNOrder. »*
 
+Fait et vérifié (PROMPT 09, 2026-09-04) — TVA des frais de livraison (C5), retrait de
+l'onglet Tags (C4), et revue de matérialité des 3 autres onglets branchés :
+
+- **frais de livraison inclus dans l'onglet TVA analytique.** Décision : un
+  restaurateur qui consulte sa TVA collectée s'attend à y voir celle des frais de
+  livraison — `GetVATTotals`/`GetVATByRate`/`GetVATByChannel`
+  (`internal/modules/analytics/repository.go`) unionnent désormais
+  `orderitems` (déjà en place) avec `orders.delivery_fees` via un second bloc
+  `UNION ALL` joint sans condition à `tva_categories WHERE tva_id = -1`, à l'image de
+  la branche `pos/reports.GetTVAReportData` — mêmes deux blocs, seule la portée diffère
+  (`AnalyticsOrdersScope`, tous canaux, contre le périmètre WELLO_RESTO/CLOSED/
+  non-ScanNOrder de `pos/reports`).
+- **`tva_id = -1` : décision documentée dans le code, pas seulement ici**
+  (`GetVATTotals`'s doc comment, repository.go). Cette catégorie est
+  `enabled = false`, `show_in_report = false` en référentiel tout en étant utilisée par
+  des commandes PROD réelles (frais de livraison effectivement facturés) — désactivée
+  au sens « ne pas la proposer à la création d'un produit », pas au sens « son taux ne
+  s'applique à rien ». Traitée exactement comme `pos/reports` la traite déjà : jointe
+  sans condition sur `enabled`/`show_in_report`, dans les deux endpoints, pour la même
+  raison (une catégorie taguée « n'existe pas côté écran de configuration » n'a pas de
+  raison de faire disparaître un montant réel de TVA collectée).
+- **vérification en lecture seule contre staging** (`POSTGRES_URL` de
+  `ib-welloresto-api/.vscode/launch.json`, transaction `READ ONLY`, aucune écriture,
+  aucune mesure de durée), établissement `212`, fenêtre de 12 mois se terminant le
+  2026-09-04 :
+  - `GetVATTotals` (nouveau, avec frais de livraison) : TTC=18 907 918, HT=16 543 422,
+    TVA=2 364 496 — identique à un recalcul SQL indépendant écrit à la main ;
+  - delta vs. l'ancien calcul (sans frais de livraison) : +120 300 TTC / +100 250 HT,
+    exactement égal à un recalcul indépendant des frais de livraison seuls sur le même
+    périmètre (`orders.delivery_fees`, tous canaux, `tva_id=-1` à 20 %) ;
+  - `by_rate`/`by_channel` recalculés, sommes vérifiées égales au centime au nouveau
+    total (garantie déjà posée par PROMPT 06 pour l'apportionnement — inchangée, juste
+    revérifiée avec le nouveau total) ;
+  - **tableau de réconciliation avec `POST /pos/reports/tva` mis à jour** (remplace
+    celui de PROMPT 06 ci-dessus — même établissement, nouvelle fenêtre de 12 mois se
+    terminant le 2026-09-04 au lieu du 2026-09-03, d'où des montants légèrement
+    différents pour les lignes déjà connues) :
+
+    | Filtre nommé | TTC (centimes) | Commandes |
+    |---|---:|---:|
+    | Commandes hors `WELLO_RESTO` (lignes produit + leurs propres frais de livraison), exclues par `pos/reports` | 9 722 969 | 3 643 |
+    | Commandes ScanNOrder (lignes produit + leurs propres frais de livraison), exclues par `pos/reports`, dans le périmètre `WELLO_RESTO` | 188 090 | 75 |
+    | `state='DONE'` exclu par le filtre `state='CLOSED'` de `pos/reports` (lignes + frais de livraison, périmètre WELLO_RESTO/non-ScanNOrder) | 0 | 0 |
+    | Lignes `tva.show_in_report=false` exclues par `pos/reports` (même périmètre, hors branche frais de livraison qui ne filtre jamais sur ce flag, ni ici ni côté pos/reports) | 0 | 0 |
+
+    9 722 969 + 188 090 + 0 + 0 = **9 911 059**, exactement égal à
+    `analytics.TotalTTCCents (18 907 918) − pos/reports.TTC (8 996 859)` — réconciliation
+    exacte au centime, aucun résidu.
+  - **la ligne `delivery_fees` du tableau du prompt précédent tombe bien à zéro** —
+    elle a disparu du tableau ci-dessus plutôt que d'être encore listée à 0, parce
+    qu'elle n'a plus de raison d'être nommée séparément : les deux côtés l'incluent
+    désormais (vérifié : 108 000 centimes / 360 commandes identiques des deux côtés,
+    dans le périmètre WELLO_RESTO/CLOSED/non-ScanNOrder). Un écart résiduel de 12 300
+    centimes est apparu lors de la première itération de cette vérification — dû aux
+    frais de livraison des commandes ScanNOrder (elles aussi hors périmètre
+    `pos/reports`, mais qui n'avaient pas encore leur propre frais de livraison compté
+    dans le bucket « ScanNOrder » du tableau) : nommé, corrigé en élargissant ce bucket
+    à lignes+frais plutôt que lignes seules, pas laissé comme résidu inexpliqué.
+  - tests d'intégration : nouveau `TestVATDeliveryFees_Postgres`
+    (`internal/modules/analytics/postgres_integration_vat_delivery_fees_test.go`) —
+    TTC/HT combinés, fusion dans le même groupe de taux qu'une ligne produit à 20 %,
+    attribution au bon canal, absence de frais fantôme sur une commande sans frais de
+    livraison. `TestOrdersPaymentsVAT_Postgres` (accuracy pré-existante) repassé sans
+    modification — aucune régression. Exécutés contre le Postgres 16 de dev local
+    (`docker-compose.postgres.yml`), tous verts.
+- **onglet Tags retiré** (C4) : voir `TAGS_RETRAIT.md` pour le détail — aucun
+  établissement PROD n'a de tags (`AUDIT.md` P17 : les 192 associations appartiennent à
+  un établissement de test et à l'établissement inactif 237), donc rien à afficher même
+  une fois branché. Navigation, composant inline (`renderTagsTab`), mock
+  (`getTagsAnalytics`/`exportTagsCSV`) et état de filtre (`selectedTags`, référentiel
+  `['Végétarien','Vegan','Sans gluten']` qui ne correspondait déjà à aucune donnée)
+  retirés. Tables `tags`/`product_tags` et gestion des tags produit ailleurs dans
+  l'app (menu, `TagFilter.tsx` réutilisé par `OrganizeModal.tsx`) non touchées.
+- **revue de matérialité des 3 autres onglets branchés** (CA, Commandes, Règlements —
+  TVA traité ci-dessus, Upsell hors périmètre des « 4 onglets »). Aucun seuil
+  supplémentaire ajouté — le patron des couverts (`coversCoverageThreshold`) ne
+  s'applique nulle part ailleurs, pour deux raisons vérifiées, pas supposées :
+  - toutes les métriques de ces 3 onglets sont dérivées de colonnes obligatoires,
+    toujours renseignées pour toute commande close (montant, canal via brand/order_type,
+    méthode de paiement) — pas d'équivalent au caractère optionnel/rarement saisi de
+    `places_settings` (couverts) ;
+  - les seuls calculs de pourcentage sensibles à une donnée de référence proche de zéro
+    (`pctChange`, évolution vs. période précédente / année précédente) sont déjà gardés
+    dans les 4 composants d'onglet (`RevenueAnalyticsTab.tsx`, `OrdersAnalyticsTab.tsx`,
+    `PaymentsAnalyticsTab.tsx`, `VATAnalyticsTab.tsx`) : `if (reference === 0) return
+    null`, avec le commentaire explicite « a 0 -> N% change would be
+    meaningless/infinite » — vérifié présent identiquement dans les 4 fichiers, pas
+    seulement documenté ;
+  - le seul autre champ conditionnel de ce type (`avg_basket_per_cover_cents`) est déjà
+    gardé côté backend par `coversCoverageThreshold` et côté frontend par un affichage
+    « Donnée non saisie » explicite (`OrdersAnalyticsTab.tsx`) quand
+    `covers_data_available` est faux — déjà couvert, rien à ajouter.
+
 Non fait, par construction (règle absolue de cette session) :
 - aucune mesure de durée, ni depuis ce poste, ni contre staging ;
 - `EXPLAIN ANALYZE` n'a été exécuté qu'à titre de *smoke test de compilation* du kit de
