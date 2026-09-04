@@ -214,33 +214,6 @@ interface OptionsAnalyticsResponse {
   };
 }
 
-// Tags Analytics
-interface TagAnalysis {
-  tag: string;
-  product_count: number;
-  quantity: number;
-  revenue: number;
-  avg_basket: number;
-  revenue_percent: number;
-  evolution_percent: number;
-}
-
-interface TagsMetrics {
-  tagged_products: number;
-  tagged_revenue: number;
-  evolution_percent: number;
-}
-
-interface TagsAnalyticsResponse {
-  metrics: TagsMetrics;
-  by_tag: TagAnalysis[];
-  timeline: Array<{ date: string; [key: string]: unknown }>;
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
-}
-
 // Cancellations Analytics
 interface CancellationByServer {
   server_name: string;
@@ -1007,89 +980,6 @@ class AnalyticsService {
   }
 
   /**
-   * Récupère les données tags
-   */
-  getTagsAnalytics(
-    startDate: Date,
-    endDate: Date,
-    tags: string[]
-  ): TagsAnalyticsResponse {
-    const mockTags: TagAnalysis[] = [
-      {
-        tag: 'Signature du Chef',
-        product_count: 5,
-        quantity: 420,
-        revenue: 4995,
-        avg_basket: 11.88,
-        revenue_percent: 33.7,
-        evolution_percent: 18,
-      },
-      {
-        tag: 'Végétarien',
-        product_count: 8,
-        quantity: 315,
-        revenue: 3465,
-        avg_basket: 11,
-        revenue_percent: 23.4,
-        evolution_percent: 22,
-      },
-      {
-        tag: 'Bio',
-        product_count: 4,
-        quantity: 198,
-        revenue: 2376,
-        avg_basket: 12,
-        revenue_percent: 16,
-        evolution_percent: 45,
-      },
-      {
-        tag: 'Sans gluten',
-        product_count: 6,
-        quantity: 156,
-        revenue: 1872,
-        avg_basket: 12,
-        revenue_percent: 12.6,
-        evolution_percent: 35,
-      },
-      {
-        tag: 'Nouveauté',
-        product_count: 3,
-        quantity: 132,
-        revenue: 1584,
-        avg_basket: 12,
-        revenue_percent: 10.7,
-        evolution_percent: 65,
-      },
-    ];
-
-    const mockTimeline = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
-      return {
-        date: date.toISOString().split('T')[0],
-        'Signature du Chef': Math.floor(120 + Math.random() * 80),
-        Végétarien: Math.floor(90 + Math.random() * 60),
-        Bio: Math.floor(50 + Math.random() * 40),
-        'Sans gluten': Math.floor(40 + Math.random() * 30),
-      };
-    });
-
-    return {
-      metrics: {
-        tagged_products: 26,
-        tagged_revenue: 14292,
-        evolution_percent: 30,
-      },
-      by_tag: mockTags,
-      timeline: mockTimeline,
-      comparisons: {
-        previous_period: { value: 11020, change: 29.7 },
-        year_ago: { value: 8950, change: 59.8 },
-      },
-    };
-  }
-
-  /**
    * Récupère les données annulations
    */
   getCancellationsAnalytics(
@@ -1570,23 +1460,6 @@ class AnalyticsService {
       return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     } catch (error) {
       console.error('Error exporting options CSV:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Exporte les données tags en CSV
-   */
-  async exportTagsCSV(
-    startDate: string,
-    endDate: string,
-    tags?: string[]
-  ): Promise<Blob> {
-    try {
-      const csv = 'Tag,Produits,Quantité,CA\nMock CSV export';
-      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    } catch (error) {
-      console.error('Error exporting tags CSV:', error);
       throw error;
     }
   }
