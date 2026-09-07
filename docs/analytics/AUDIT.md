@@ -68,7 +68,7 @@ Grain implicite commun : **jour** pour les timelines, **période entière** pour
 
 #### Onglet 2 — « Commandes » (`renderOrdersTab`, ligne 355)
 - **Question métier** : combien de commandes, quel panier, combien de couverts.
-- **KPI** : Nombre de commandes (2600) · Panier moyen (12,3 €) · Couverts (215) · Panier/couvert (12,1 €).
+- **KPI** : Nombre de commandes (2600) · Panier moyen (12,3 €) · Couverts (215) · Ticket moyen (12,1 €).
 - **Viz** : `LineChart` 7 séries canal ; `PieChart` répartition (mêmes coefficients en dur, lignes 357-365).
 - **Mock** : `getOrdersAnalytics()` (ligne 534) — `{ metrics, by_mode[], payment_methods{}, timeline[], comparisons }`.
 - **Incohérences** : `timeline` expose `{date, orders, revenue}` alors que le `LineChart` lit `dine_in`/`takeaway`/… → **les 7 courbes sont vides**. `by_mode` et `payment_methods` ne sont affichés nulle part. Le canal est nommé `restaurant` dans l'onglet CA et `dine_in` ici, pour la même chose (`CHANNEL_COLORS` maintient les deux alias, lignes 41-42).
@@ -298,7 +298,7 @@ FROM orders;
 |---|---|---|
 | **P1 — `orders.ht` non fiable** | Sur le périmètre CA (31 437 cmdes) : **5 718 avec `ht = 0`** soit **18,2 %** ; et **6 050 (19,2 %) où `price <> ht + tva`** | Le CA HT calculé depuis `orders.ht` est faux d'un cinquième. Il faut le recalculer depuis les lignes × taux de TVA. |
 | **P2 — `is_upsell` jamais renseigné** | `SELECT COUNT(*) FROM orderitems WHERE is_upsell` → **0** | L'onglet Vente additionnelle, seul branché, affiche 0 partout. |
-| **P3 — Couverts quasi absents** | `places_settings = 0` sur **31 985 / 33 842 (94,5 %)** ; sur les commandes sur place : **1 820 / 14 507 renseignées (12,5 %)**, somme = 5 606 couverts | KPI « Couverts » et « Panier/couvert » non produisibles. |
+| **P3 — Couverts quasi absents** | `places_settings = 0` sur **31 985 / 33 842 (94,5 %)** ; sur les commandes sur place : **1 820 / 14 507 renseignées (12,5 %)**, somme = 5 606 couverts | KPI « Couverts » et « Ticket moyen » non produisibles. |
 | **P4 — Client inconnu sur 70 % des commandes** | `customer_id IS NULL` sur **23 703 / 33 842 (70,0 %)** | Toute analyse client porte sur 30 % du volume. Segmentation biaisée par construction. |
 | **P5 — `brand_status` en casse mixte** | **36 lignes** avec une valeur non-majuscule (`canceled`, `accepted`…) | Le filtre canonique `brand_status NOT IN ('DELETED','CANCELED')` **laisse passer des commandes annulées** dans le CA. |
 | **P6 — `order_type` NULL** | **2 749 / 33 842 (8,1 %)** | Ces commandes basculent sur la branche `ELSE p.tva_in_id` du calcul TVA (taux « sur place ») même si elles sont en livraison → TVA potentiellement fausse. Et elles n'ont pas de canal. |
@@ -385,7 +385,7 @@ Convention : `Directe` = disponible par simple agrégation ; `Dérivable` = calc
 | # | Métrique impossible | Pourquoi | Ce qu'il faudrait capter |
 |---|---|---|---|
 | **M1** | **Vente additionnelle (tout l'onglet)** | `orderitems.is_upsell` = 0 sur 77 406 lignes. La colonne existe, le SQL existe, **personne ne l'écrit**. | Positionner `is_upsell = true` au moment de l'ajout au panier quand la ligne vient d'une suggestion. Vérifier les chemins POS / ScanNOrder / Kiosk. |
-| **M2** | **Couverts et Panier/couvert** | `places_settings` renseigné sur 12,5 % du sur-place seulement. | Rendre la saisie du nombre de couverts obligatoire à l'ouverture d'une table, ou la dériver du plan de salle (`booked_location`, `locations`). |
+| **M2** | **Couverts et Ticket moyen** | `places_settings` renseigné sur 12,5 % du sur-place seulement. | Rendre la saisie du nombre de couverts obligatoire à l'ouverture d'une table, ou la dériver du plan de salle (`booked_location`, `locations`). |
 | **M3** | **Typologie des remises** (Promotion / Happy Hour / Geste commercial / Fidélité / Code promo) | Aucune colonne de type. `discount_name` est du texte libre saisi par le restaurateur. | Ajouter un `discount_type` énuméré sur `discounts`, et l'historiser sur la ligne au moment de l'application. |
 | **M4** | **Rattachement ligne ↔ remise moderne** | `orderitems.discount_id` **integer** vs `discounts.discount_id` **varchar** (`discount-<uuid>`). | Aligner les types, ou alimenter `discount_redemptions` (table prévue pour ça, **0 ligne**). |
 | **M5** | **Remises panier** | `orders.cart_discount_amount > 0` : **0 ligne**. Les colonnes existent, ne sont jamais alimentées. | Écrire `cart_discount_id/_code/_amount` à l'application d'une remise panier. |
@@ -885,7 +885,7 @@ Formulées pour être tranchées par oui/non ou par un chiffre.
 | **Q1** | **Combien de commandes contient la table `orders` en production, et combien d'établissements y sont actifs ?** (un `COUNT(*)` suffit) | **Détermine l'architecture.** Staging = 33 842 commandes ; à ce volume les index (QW1) suffisent et une pré-agrégation serait prématurée. Au-delà de ~2–3 M de lignes, elle devient nécessaire. Sans ce chiffre, l'arbitrage n'est pas défendable. |
 | **Q2** | **Une journée d'exploitation se termine-t-elle à minuit, ou à une heure de clôture (ex. 5h) ?** Si clôture : la même pour tous les établissements, ou paramétrable ? | 632 commandes (2,0 %) tombent entre 00h et 06h. La réponse change la **clé primaire** de toute table pré-agrégée. Rétroactif et coûteux à changer après coup. La table `cash_registers` (710 sessions) pourrait fournir la borne réelle. |
 | **Q3** | **Quelle définition du CA fait foi : celle de `stats` (toutes marques, ScanNOrder inclus) ou celle de `pos/reports` (Wello Resto seul, hors ScanNOrder, avec frais de livraison) ?** | Sans arbitrage, la pré-agrégation fige une incohérence produit et comptable. **Aucune ligne de code d'agrégation ne devrait être écrite avant cette réponse.** |
-| **Q4** | **Le nombre de couverts doit-il devenir une saisie obligatoire au POS ?** (oui / non) | Renseigné sur 12,5 % du sur-place. Si non, les KPI « Couverts » et « Panier/couvert » doivent être **retirés de la maquette** de l'onglet Commandes. |
+| **Q4** | **Le nombre de couverts doit-il devenir une saisie obligatoire au POS ?** (oui / non) | Renseigné sur 12,5 % du sur-place. Si non, les KPI « Couverts » et « Ticket moyen » doivent être **retirés de la maquette** de l'onglet Commandes. |
 | **Q5** | **Un utilisateur doit-il pouvoir consulter plusieurs établissements ?** (oui / non) | `users.merchant_id` est scalaire ; `brands` a 1 ligne. Si oui, il faut un modèle groupe + habilitation **avant** de concevoir la table pré-agrégée, dont la clé de partitionnement en dépend. Si non, l'onglet « Restaurants » est à supprimer. |
 | **Q6** | **La marge doit-elle être figée au moment de la vente, ou refléter les coûts courants ?** | Détermine s'il faut snapshoter le coût de revient sur `orderitems` (changement de schéma sur une table de 77 406 lignes) ou accepter que l'historique de marge soit mouvant. |
 | **Q7** | **Sous quel délai maximal une commande passée peut-elle être régularisée ?** (un nombre de jours) | Mesuré : 11 % modifiées après J+1, 2,3 % après J+7, 0,5 % après J+30, max **541 jours**. Ce chiffre fixe la **largeur de la fenêtre glissante** de recalcul nocturne. |

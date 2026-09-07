@@ -121,12 +121,12 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
         {current.covers_data_available ? (
           <>
             <Tile title="Couverts" value={current.total_covers ?? 0} />
-            <Tile title="Panier/couvert" value={eur(current.avg_basket_per_cover_cents ?? 0)} />
+            <Tile title="Ticket moyen" value={eur(current.avg_basket_per_cover_cents ?? 0)} />
           </>
         ) : (
           <>
             <Tile title="Couverts" value="Donnée non saisie" />
-            <Tile title="Panier/couvert" value="Donnée non saisie" />
+            <Tile title="Ticket moyen" value="Donnée non saisie" />
           </>
         )}
       </div>
