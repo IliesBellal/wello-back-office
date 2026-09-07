@@ -7,12 +7,17 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { analyticsService, OrdersAnalyticsResponse } from '@/services/analyticsService';
+import { analyticsService, OrdersAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS, CHANNEL_ORDER } from '@/utils/channels';
+import { ScopeSummary } from '@/components/analytics/ScopeNotice';
+import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 
 interface OrdersAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
+  merchantIds?: string[];
+  comparisonMode?: ComparisonMode;
+  merchantsById?: Record<string, string>;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -29,7 +34,7 @@ const pctChange = (current: number, reference: number): number | null => {
   return ((current - reference) / reference) * 100;
 };
 
-export const OrdersAnalyticsTab = ({ dateRange }: OrdersAnalyticsTabProps) => {
+export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: OrdersAnalyticsTabProps) => {
   const [data, setData] = useState<OrdersAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // Même fusible que l'onglet CA : un 403 masque le contenu au lieu de casser la page.
@@ -40,7 +45,7 @@ export const OrdersAnalyticsTab = ({ dateRange }: OrdersAnalyticsTabProps) => {
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getOrdersAnalytics(dateRange.from, dateRange.to)
+    analyticsService.getOrdersAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode })
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -57,7 +62,7 @@ export const OrdersAnalyticsTab = ({ dateRange }: OrdersAnalyticsTabProps) => {
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to]);
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
 
   const presentChannels = useMemo(() => {
     if (!data) return [];
@@ -106,6 +111,8 @@ export const OrdersAnalyticsTab = ({ dateRange }: OrdersAnalyticsTabProps) => {
 
   return (
     <div className="space-y-6">
+      <ScopeSummary merchantIds={data.scope.merchant_ids} merchantsById={merchantsById} />
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Tile title="Commandes" value={current.order_count} isHighlighted>
           {currentVsPrevious !== null && <EvolutionBadge percent={currentVsPrevious} />}
@@ -137,6 +144,25 @@ export const OrdersAnalyticsTab = ({ dateRange }: OrdersAnalyticsTabProps) => {
         <p className="text-sm text-muted-foreground">
           Le nombre de couverts n'est pas saisi sur cette période (donnée non renseignée au POS).
         </p>
+      )}
+
+      {data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0 && (
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Commandes par établissement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EstablishmentComparisonChart
+              valueLabel="Commandes"
+              valueFormatter={(v) => `${v} commandes`}
+              data={data.by_merchant.map((row) => ({
+                merchantId: row.merchant_id,
+                label: merchantsById[row.merchant_id] ?? row.merchant_id,
+                value: row.order_count,
+              }))}
+            />
+          </CardContent>
+        </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

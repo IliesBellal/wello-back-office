@@ -13,6 +13,38 @@ export interface DateRange {
   to: Date;
 }
 
+// Mirrors internal/modules/analytics.AccessibleMerchant/AccessibleMerchantsResponse
+// (ib-welloresto-api repo) — GET /analytics/merchants, PROMPT 24 Phase 1.
+// Names every establishment where the caller holds pos.analytics, backing
+// the global multi-establishment selector (PROMPT 24 Phase 3).
+export interface AccessibleMerchant {
+  merchant_id: string;
+  name: string;
+}
+
+export interface AccessibleMerchantsResponse {
+  merchants: AccessibleMerchant[];
+}
+
+// ComparisonMode drives both the selector's mode toggle and the group_by
+// value sent to the 5 comparable endpoints (Revenue/Orders/Payments/VAT/
+// Cancellations) — 'cumule' -> group_by "none", 'compare' -> "merchant".
+export type ComparisonMode = 'cumule' | 'compare';
+
+// AnalyticsScopeOptions is threaded into the 5 comparable tabs' service
+// calls. groupBy is only meaningful with 2+ merchantIds — a single
+// establishment always renders as "none" regardless of mode (PROMPT 24
+// Phase 3: "le sélecteur de mode n'a de sens qu'au-delà d'un établissement").
+export interface AnalyticsScopeOptions {
+  merchantIds?: string[];
+  groupBy?: ComparisonMode;
+}
+
+const scopeToRequestFields = (options?: AnalyticsScopeOptions) => ({
+  merchant_ids: options?.merchantIds && options.merchantIds.length > 0 ? options.merchantIds : undefined,
+  group_by: options?.groupBy === 'compare' && (options?.merchantIds?.length ?? 0) > 1 ? 'merchant' : undefined,
+});
+
 // Shapes below mirror internal/modules/analytics (ib-welloresto-api repo)
 // field-for-field — see RevenueResponse in that module's models.go. Amounts
 // are integer cents everywhere (*_ttc_cents, *_ht_cents), never euros: the
@@ -80,6 +112,12 @@ export interface OrdersChannelTotal {
   order_count: number;
 }
 
+export interface OrdersMerchantTotal {
+  merchant_id: string;
+  order_count: number;
+  total_ttc_cents: number;
+}
+
 export interface OrdersAnalyticsResponse {
   scope: { merchant_ids: string[]; group_by: string };
   current_period: OrdersPeriodTotals;
@@ -87,6 +125,7 @@ export interface OrdersAnalyticsResponse {
   previous_year: OrdersPeriodTotals;
   timeline: OrdersDayPoint[];
   by_channel: OrdersChannelTotal[];
+  by_merchant?: OrdersMerchantTotal[];
 }
 
 export interface PaymentsPeriodTotals {
@@ -108,6 +147,12 @@ export interface PaymentMethodTotal {
   payment_count: number;
 }
 
+export interface PaymentsMerchantTotal {
+  merchant_id: string;
+  total_amount_cents: number;
+  payment_count: number;
+}
+
 export interface PaymentsAnalyticsResponse {
   scope: { merchant_ids: string[]; group_by: string };
   current_period: PaymentsPeriodTotals;
@@ -115,6 +160,7 @@ export interface PaymentsAnalyticsResponse {
   previous_year: PaymentsPeriodTotals;
   timeline: PaymentsDayPoint[];
   by_method: PaymentMethodTotal[];
+  by_merchant?: PaymentsMerchantTotal[];
 }
 
 export interface VATPeriodTotals {
@@ -141,6 +187,19 @@ export interface VATChannelTotal {
 // VATAnalyticsResponse is the canonical analytics VAT view — NOT a fiscal
 // document, deliberately not reconciled with pos/reports/tva. See
 // VATAnalyticsTab.tsx for the label this drives.
+// VATMerchantTotal mirrors internal/modules/analytics.VATMerchantTotal —
+// by_rate/by_channel here are apportioned PER ESTABLISHMENT against this
+// establishment's own total_ht_cents (PROMPT 24 Phase 2), so they sum
+// exactly to this row's own totals, never to the combined scope's.
+export interface VATMerchantTotal {
+  merchant_id: string;
+  total_ttc_cents: number;
+  total_ht_cents: number;
+  total_vat_cents: number;
+  by_rate: VATRateTotal[];
+  by_channel: VATChannelTotal[];
+}
+
 export interface VATAnalyticsResponse {
   scope: { merchant_ids: string[]; group_by: string };
   current_period: VATPeriodTotals;
@@ -148,175 +207,596 @@ export interface VATAnalyticsResponse {
   previous_year: VATPeriodTotals;
   by_rate: VATRateTotal[];
   by_channel: VATChannelTotal[];
+  by_merchant?: VATMerchantTotal[];
 }
 
-// Products Analytics
-interface Product {
-  id: string;
+// Products Analytics — onglet Produits (PROMPT 16), branché sur
+// POST /analytics/products (reports.sales.read, même porte que les 5 autres
+// onglets). Shapes mirroir internal/modules/analytics/models.go field-for-
+// field, même convention que CancellationsAnalyticsResponse.
+//
+// Coût/marge sont TOUJOURS `null`, jamais `0`, quand le coût de revient n'est
+// pas connu — c'est la règle posée au lot 1 (PROMPT 07) et rappelée
+// explicitement par PROMPT 16 : un coût à 0 se lit comme un produit gratuit,
+// donc une marge de 100%. Rendu à l'écran comme « — », jamais comme un
+// montant.
+export interface ProductCategoryOption {
+  category_id: string;
   name: string;
-  category: string;
-  quantity: number;
-  revenue: number;
-  cost: number;
-  margin: number;
-  margin_percent: number;
-  evolution_percent: number;
 }
 
-interface ProductsMetrics {
-  total_products_sold: number;
-  total_revenue: number;
-  total_margin: number;
-  avg_margin_percent: number;
+export interface ProductsPeriodTotals {
+  from: string;
+  to: string;
+  quantity_sold: number;
+  revenue_ttc_cents: number;
+  revenue_ht_cents: number;
 }
 
-interface ProductsAnalyticsResponse {
-  metrics: ProductsMetrics;
-  products: Product[];
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
+// margin_cents/margin_percent sont nil dès que coverage_ratio est sous le
+// seuil de matérialité (20%, le même que CoversDataAvailable ailleurs dans ce
+// même contrat) — dans ce cas afficher revenue_ttc_cents_covered /
+// revenue_ttc_cents_total (« marge connue sur X% du CA »), jamais un taux
+// calculé sur une part infime des ventes.
+export interface ProductsCostCoverage {
+  revenue_ttc_cents_total: number;
+  revenue_ttc_cents_covered: number;
+  coverage_ratio: number;
+  margin_cents?: number;
+  margin_percent?: number;
+  no_recipe_quantity: number;
+  incomplete_recipe_quantity: number;
 }
 
-// Options Analytics
-interface OptionItem {
-  id: string;
+// cost_price_cents/margin_cents/margin_percent sont absents (jamais 0) tant
+// que cost_known_quantity est 0 pour ce produit — un produit sans recette
+// (NO_RECIPE) ou dont la recette est incomplète (INCOMPLETE_RECIPE) n'a
+// simplement pas de coût connu sur la période. evolution_percent est absent
+// pour un produit sans vente sur la période précédente (jamais un -100%
+// trompeur).
+export interface ProductRow {
+  product_id: string;
   name: string;
+  category_id: string;
+  category_name: string;
+  quantity_sold: number;
+  revenue_ttc_cents: number;
+  revenue_ht_cents: number;
+  cost_known_quantity: number;
+  cost_known_revenue_ttc_cents: number;
+  cost_price_cents?: number;
+  margin_cents?: number;
+  margin_percent?: number;
+  no_recipe_quantity: number;
+  incomplete_recipe_quantity: number;
+  evolution_percent?: number;
+}
+
+export interface ProductsAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  category_id: string;
+  sort_by: string;
+  sort_dir: string;
+  current_period: ProductsPeriodTotals;
+  previous_period: ProductsPeriodTotals;
+  cost_coverage: ProductsCostCoverage;
+  available_categories: ProductCategoryOption[];
+  pagination: { total_items: number; total_pages: number; current_page: number; limit: number };
+  rows: ProductRow[];
+}
+
+export interface ProductsAnalyticsFilters {
+  categoryId?: string;
+  sortBy?: 'quantity' | 'revenue_ttc' | 'margin';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+  // merchantIds scopes to a subset of the accessible establishments (PROMPT
+  // 24 Phase 3) — no group_by here: Produits is a paginated table, not one
+  // of the 5 comparable tabs, so a multi-establishment selection always
+  // aggregates.
+  merchantIds?: string[];
+}
+
+// Mock fixture for getProductsAnalytics's withMock branch — some rows
+// carry a known cost (margin present), some don't (NO_RECIPE/
+// INCOMPLETE_RECIPE), matching the real contract's nil-not-zero rule so the
+// mock branch exercises the same "—" rendering path as production data.
+const mockProductRows: ProductRow[] = [
+  {
+    product_id: '1', name: 'Burger Classique', category_id: 'plats', category_name: 'Plats',
+    quantity_sold: 340, revenue_ttc_cents: 340000, revenue_ht_cents: 291000,
+    cost_known_quantity: 340, cost_known_revenue_ttc_cents: 340000,
+    cost_price_cents: 119000, margin_cents: 221000, margin_percent: 65,
+    no_recipe_quantity: 0, incomplete_recipe_quantity: 0, evolution_percent: 12,
+  },
+  {
+    product_id: '2', name: 'Pizza Quatre Fromages', category_id: 'plats', category_name: 'Plats',
+    quantity_sold: 290, revenue_ttc_cents: 406000, revenue_ht_cents: 348000,
+    cost_known_quantity: 290, cost_known_revenue_ttc_cents: 406000,
+    cost_price_cents: 131800, margin_cents: 274200, margin_percent: 67.5,
+    no_recipe_quantity: 0, incomplete_recipe_quantity: 0, evolution_percent: 8,
+  },
+  {
+    product_id: '3', name: 'Salade César', category_id: 'entrees', category_name: 'Entrées',
+    quantity_sold: 210, revenue_ttc_cents: 168000, revenue_ht_cents: 144000,
+    cost_known_quantity: 0, cost_known_revenue_ttc_cents: 0,
+    no_recipe_quantity: 210, incomplete_recipe_quantity: 0, evolution_percent: 15,
+  },
+  {
+    product_id: '4', name: 'Pâtes Carbonara', category_id: 'plats', category_name: 'Plats',
+    quantity_sold: 185, revenue_ttc_cents: 277500, revenue_ht_cents: 238000,
+    cost_known_quantity: 90, cost_known_revenue_ttc_cents: 135000,
+    cost_price_cents: 45000, margin_cents: 90000, margin_percent: 66.7,
+    no_recipe_quantity: 0, incomplete_recipe_quantity: 95, evolution_percent: 5,
+  },
+  {
+    product_id: '5', name: 'Tiramisu', category_id: 'desserts', category_name: 'Desserts',
+    quantity_sold: 180, revenue_ttc_cents: 135000, revenue_ht_cents: 116000,
+    cost_known_quantity: 0, cost_known_revenue_ttc_cents: 0,
+    no_recipe_quantity: 0, incomplete_recipe_quantity: 180, evolution_percent: 22,
+  },
+  {
+    product_id: '6', name: 'Coca-Cola 33cl', category_id: 'boissons', category_name: 'Boissons',
+    quantity_sold: 520, revenue_ttc_cents: 156000, revenue_ht_cents: 130000,
+    cost_known_quantity: 0, cost_known_revenue_ttc_cents: 0,
+    no_recipe_quantity: 520, incomplete_recipe_quantity: 0, evolution_percent: -5,
+  },
+];
+
+// Options Analytics — onglet Options (PROMPT 17), branché sur
+// POST /analytics/options, même gabarit que Produits (coût/marge nil-not-
+// zero, pagination/tri serveur). Shapes miroir internal/modules/analytics/
+// models.go field-for-field.
+//
+// Toutes les valeurs monétaires sont des centimes entiers (*_cents),
+// formatées à l'affichage — PROMPT 17 §3 : c'était le seul onglet de
+// l'ancienne maquette documenté en centimes tout en affichant des euros sans
+// conversion. Ce contrat n'a plus cette ambiguïté.
+export const OPTION_TYPE_PAID = 'paid';
+export const OPTION_TYPE_FREE = 'free';
+export const OPTION_TYPE_REMOVED = 'removed';
+
+export interface OptionsPeriodTotals {
+  from: string;
+  to: string;
+  quantity_sold: number;
+  revenue_ttc_cents: number;
+}
+
+export interface OptionsCostCoverage {
+  revenue_ttc_cents_total: number;
+  revenue_ttc_cents_covered: number;
+  coverage_ratio: number;
+  margin_cents?: number;
+  margin_percent?: number;
+  no_recipe_quantity: number;
+  incomplete_recipe_quantity: number;
+}
+
+// quantity_sold (instances vendues, coté CA) et units_with_this (unités
+// produit ayant choisi l'option au moins une fois, dénominateur d'adoption)
+// sont DEUX nombres différents dès qu'une même ligne sélectionne l'option
+// plus d'une fois ("2x bacon" sur un seul burger) — voir options.go
+// (ib-welloresto-api repo) pour le détail. adoption_rate est absent (jamais
+// une division par zéro) quand product_units_sold est 0.
+//
+// cost_price_cents/margin_cents/margin_percent sont absents (jamais 0) tant
+// que cost_known_quantity est 0 — pour option_type "removed" c'est TOUJOURS
+// le cas : `without` ne porte aucun instantané de coût, ce n'est pas une
+// donnée manquante, c'est structurellement non applicable.
+//
+// revenue_ttc_cents est un vrai 0 (jamais absent) pour "free" et "removed" :
+// ni une modification gratuite ni un retrait d'ingrédient ne génère de CA.
+export interface OptionRow {
+  entity_id: string;
+  name: string;
+  attribute_name?: string;
+  product_id: string;
   product_name: string;
+  option_type: typeof OPTION_TYPE_PAID | typeof OPTION_TYPE_FREE | typeof OPTION_TYPE_REMOVED;
+
+  quantity_sold: number;
+
+  product_units_sold: number;
+  units_with_this: number;
+  adoption_rate?: number;
+
+  revenue_ttc_cents: number;
+
+  basket_impact_cents?: number;
+
+  cost_known_quantity: number;
+  cost_known_revenue_ttc_cents: number;
+  cost_price_cents?: number;
+  margin_cents?: number;
+  margin_percent?: number;
+  no_recipe_quantity: number;
+  incomplete_recipe_quantity: number;
+}
+
+export interface OptionsAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  option_types: string[];
+  sort_by: string;
+  sort_dir: string;
+  current_period: OptionsPeriodTotals;
+  previous_period: OptionsPeriodTotals;
+  cost_coverage: OptionsCostCoverage;
+  pagination: { total_items: number; total_pages: number; current_page: number; limit: number };
+  rows: OptionRow[];
+}
+
+export interface OptionsAnalyticsFilters {
+  optionTypes?: string[];
+  sortBy?: 'quantity' | 'revenue_ttc' | 'margin';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+  // See ProductsAnalyticsFilters.merchantIds's doc comment — same posture.
+  merchantIds?: string[];
+}
+
+const mockOptionRows: OptionRow[] = [
+  {
+    entity_id: '1', name: 'Extra Bacon', attribute_name: 'Toppings', product_id: '1', product_name: 'Burger Classique',
+    option_type: OPTION_TYPE_PAID,
+    quantity_sold: 178, product_units_sold: 340, units_with_this: 170, adoption_rate: 50,
+    revenue_ttc_cents: 71200,
+    basket_impact_cents: 120,
+    cost_known_quantity: 178, cost_known_revenue_ttc_cents: 71200,
+    cost_price_cents: 26700, margin_cents: 44500, margin_percent: 62.5,
+    no_recipe_quantity: 0, incomplete_recipe_quantity: 0,
+  },
+  {
+    entity_id: '2', name: 'Extra Fromage', attribute_name: 'Toppings', product_id: '2', product_name: 'Pizza Quatre Fromages',
+    option_type: OPTION_TYPE_PAID,
+    quantity_sold: 145, product_units_sold: 290, units_with_this: 145, adoption_rate: 50,
+    revenue_ttc_cents: 43500,
+    cost_known_quantity: 0, cost_known_revenue_ttc_cents: 0,
+    no_recipe_quantity: 145, incomplete_recipe_quantity: 0,
+  },
+  {
+    entity_id: '3', name: 'Sans Sel', attribute_name: 'Personnalisation', product_id: '1', product_name: 'Burger Classique',
+    option_type: OPTION_TYPE_FREE,
+    quantity_sold: 98, product_units_sold: 340, units_with_this: 98, adoption_rate: 28.8,
+    revenue_ttc_cents: 0,
+    cost_known_quantity: 0, cost_known_revenue_ttc_cents: 0,
+    no_recipe_quantity: 98, incomplete_recipe_quantity: 0,
+  },
+  {
+    entity_id: '4', name: 'Olives', product_id: '2', product_name: 'Pizza Quatre Fromages',
+    option_type: OPTION_TYPE_REMOVED,
+    quantity_sold: 45, product_units_sold: 290, units_with_this: 45, adoption_rate: 15.5,
+    revenue_ttc_cents: 0,
+    basket_impact_cents: -80,
+    cost_known_quantity: 0, cost_known_revenue_ttc_cents: 0,
+    no_recipe_quantity: 0, incomplete_recipe_quantity: 0,
+  },
+];
+
+// Cancellations Analytics — onglet Annulations, branché sur
+// POST /analytics/cancellations (agrégats, reports.sales.read) et
+// POST /analytics/cancellations/by-staff (nominatif, reports.staff_performance.read
+// — clé distincte, seule route de la page qui ne suit pas reports.sales.read).
+// Shapes mirroir internal/modules/analytics/models.go field-for-field
+// (CancellationsResponse / CancellationsByStaffResponse), même convention que
+// RevenueAnalyticsResponse. Le backend n'émet jamais de taux pré-divisé : ni
+// current_period.cancelled_count/total_orders_created, ni
+// StaffCancellationRow.cancelled_count/orders_created — seuls les entiers
+// bruts sont renvoyés, le front calcule l'affichage.
+export interface CancellationsPeriodTotals {
+  from: string;
+  to: string;
+  total_orders_created: number;
+  cancelled_count: number;
+  cancelled_amount_cents: number;
+  internal_cancelled_count: number;
+  platform_cancelled_count: number;
+  unknown_cancelled_count: number;
+}
+
+// reason_id est un identifiant stable (le deletion_reason_id catalogue, ou
+// "uncatalogued:<brut>" / "none"), jamais un libellé — c'est label qui porte
+// le texte affichable. AUDIT.md avait relevé un filtre sur des slugs anglais
+// inventés qui ne matchaient jamais les libellés français réels ; ne jamais
+// reproduire ça en filtrant sur autre chose que reason_id.
+export interface CancellationReasonTotal {
+  reason_id: string;
+  label: string;
   count: number;
-  revenue: number;
-  adoption_rate: number;
-  avg_price: number;
-  basket_impact: number;
-  cost_per_unit: number;  // Coût unitaire (centimes)
-  total_cost: number;     // Coût total
-  profit: number;         // Bénéfice total (centimes)
-  margin_percent: number; // Marge en %
 }
 
-interface OptionsMetrics {
-  total_options: number;
-  options_revenue: number;
-  avg_adoption_rate: number;
-  basket_impact_avg: number;
-  total_cost: number;     // Coût total  (centimes)
-  total_profit: number;   // Bénéfice total (centimes)
-  avg_margin_percent: number; // Marge moyenne %
+// author_type ∈ STAFF | CUSTOMER | SYSTEM | PLATFORM | UNKNOWN (NULL en base).
+export interface CancellationAuthorTypeTotal {
+  author_type: string;
+  count: number;
+  amount_cents: number;
 }
 
-interface OptionsAnalyticsResponse {
-  metrics: OptionsMetrics;
-  options: OptionItem[];
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
+export interface CancellationChannelTotal {
+  channel: string;
+  count: number;
+  amount_cents: number;
 }
 
-// Cancellations Analytics
-interface CancellationByServer {
-  server_name: string;
-  cancellations: number;
-  cancellation_rate: number;
-  amount_lost: number;
-  main_reason: string;
-  evolution_percent: number;
+export interface CancellationsMerchantTotal {
+  merchant_id: string;
+  total_orders_created: number;
+  cancelled_count: number;
+  cancelled_amount_cents: number;
+  internal_cancelled_count: number;
+  platform_cancelled_count: number;
+  unknown_cancelled_count: number;
 }
 
-interface CancellationMetrics {
-  total_cancellations: number;
-  cancellation_rate: number;
-  amount_lost: number;
-  avg_cancellation: number;
+export interface CancellationsAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  current_period: CancellationsPeriodTotals;
+  previous_period: CancellationsPeriodTotals;
+  previous_year: CancellationsPeriodTotals;
+  by_reason: CancellationReasonTotal[];
+  by_author_type: CancellationAuthorTypeTotal[];
+  by_channel: CancellationChannelTotal[];
+  by_merchant?: CancellationsMerchantTotal[];
 }
 
-interface CancellationsAnalyticsResponse {
-  metrics: CancellationMetrics;
-  by_reason: Array<{ reason: string; count: number; percentage: number }>;
-  by_server: CancellationByServer[];
-  timeline: Array<{ date: string; rate: number }>;
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
+// user_id === "unattributed" est la ligne synthétique portant les
+// annulations STAFF dont created_by ne correspond à aucun users.user_id réel
+// — orders_created y vaut toujours 0 et rate_available toujours false.
+export interface StaffCancellationRow {
+  user_id: string;
+  name: string;
+  orders_created: number;
+  cancelled_count: number;
+  rate_available: boolean;
 }
 
-// Upsell Analytics
-export interface UpsellByServer {
-  server_id: string;
-  server_name: string;
+// Pas de comparaisons période préc./N-1 ici : un classement nominatif se lit
+// "qui, cette période", pas comme une tendance. min_orders_for_rate vient du
+// serveur (pas codé en dur côté front) : c'est le seuil sous lequel
+// rate_available bascule à false pour une ligne.
+export interface CancellationsByStaffResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  from: string;
+  to: string;
+  min_orders_for_rate: number;
+  staff: StaffCancellationRow[];
+}
+
+// Upsell Analytics (PROMPT 19) — mirrors internal/modules/analytics's
+// Upsell*/UpsellStaffRow types (ib-welloresto-api repo, models.go)
+// field-for-field, same convention as CancellationsAnalyticsResponse/
+// ClientsAnalyticsResponse. Two endpoints, not one — same split as
+// Annulations/Clients: getUpsellAnalytics (agrégats + suggestions,
+// reports.sales.read) and getUpsellByStaff (classement nominatif,
+// reports.staff_performance.read).
+//
+// instrumentation_active is the central fact this tab is built around:
+// orderitems.is_upsell is false on every line in this system today (only the
+// POS channel writes it — Kiosk/ScanNOrder both have working upsell UIs but
+// neither serializes the flag yet). While false, current_period/
+// previous_period/staff MUST NOT be rendered as real zeros — the tab's
+// primary message is then "donnée non collectée," not a KPI row of 0s. It
+// flips to true on its own, no redeploy, once any channel starts writing
+// is_upsell = true.
+//
+// suggestions is the one block NOT gated by instrumentation_active: it reads
+// upsell_suggestions, a different, already-working write path (populated
+// whenever an order references a suggestion, independent of is_upsell).
+export interface UpsellPeriodTotals {
+  from: string;
+  to: string;
   upsell_lines: number;
-  upsell_revenue_ht: number;
+  upsell_revenue_ht_cents: number;
+  orders_with_upsell_count: number;
+  total_orders_count: number;
 }
 
-export interface UpsellStatsResponse {
-  total_upsell_lines: number;
-  upsell_revenue_ht: number;
-  orders_with_upsell_rate: number;
-  by_server: UpsellByServer[];
+// transformation_rate_available gates accepted_count/proposed_count's ratio
+// on min_proposed_for_rate — below it, only the two raw counts should be
+// shown, never a computed percentage.
+export interface UpsellSuggestionsTotals {
+  from: string;
+  to: string;
+  proposed_count: number;
+  accepted_count: number;
+  transformation_rate_available: boolean;
+  min_proposed_for_rate: number;
 }
 
-// Discounts Analytics
-interface DiscountByType {
-  type: string;
-  count: number;
-  amount: number;
-  avg_discount: number;
-  percent_of_revenue: number;
-  margin_impact: number;
-  evolution_percent: number;
+export interface UpsellAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  channels: string[];
+  instrumentation_active: boolean;
+  current_period: UpsellPeriodTotals;
+  previous_period: UpsellPeriodTotals;
+  suggestions: UpsellSuggestionsTotals;
 }
 
-interface DiscountsMetrics {
-  total_discounts: number;
-  discount_rate: number;
-  margin_impact: number;
-  orders_with_discount: number;
+// user_id/name mirror StaffCancellationRow's naming (renamed from the old
+// stats.UpsellServerStat's server_id/server_name for consistency within this
+// package's own contracts).
+export interface UpsellStaffRow {
+  user_id: string;
+  name: string;
+  upsell_lines: number;
+  upsell_revenue_ht_cents: number;
 }
 
-interface DiscountsAnalyticsResponse {
-  metrics: DiscountsMetrics;
-  by_type: DiscountByType[];
-  margin_impact: {
-    gross_margin_without: number;
-    gross_margin_with: number;
-    margin_loss: number;
-    margin_loss_percent: number;
-  };
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
+export interface UpsellByStaffResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  channels: string[];
+  from: string;
+  to: string;
+  instrumentation_active: boolean;
+  staff: UpsellStaffRow[];
 }
 
-// Customers Analytics
-interface CustomerSegment {
+// Discounts Analytics (PROMPT 22) — mirrors internal/modules/analytics's
+// Discounts*/DiscountRow types (ib-welloresto-api repo, models.go) field-for-
+// field. Single endpoint, no nominative sibling (no per-staff breakdown, no
+// data nominative at all — reports.sales.read alone suffices). No
+// discount_type anywhere: grouping is by discount_id, never by label, so a
+// rename can never fragment or merge a discount's history. No cart-discount
+// section: applyCartDiscount does not exist anywhere in the codebase (the
+// maquette this replaces described a feature never built).
+export interface DiscountsPeriodTotals {
+  from: string;
+  to: string;
+  total_discounted_cents: number;
+  // reconstructed_* / measured_* split total_discounted_cents exactly — the
+  // 545 rows reconstructed from historical base_price/price mismatches are a
+  // FLOOR, not a total (PROMPT 22), never presented as a single ambiguous
+  // number. See DiscountsAnalyticsResponse.measurement_complete_from.
+  reconstructed_amount_cents: number;
+  measured_amount_cents: number;
+  reconstructed_redemptions_count: number;
+  measured_redemptions_count: number;
+  discounted_orders_count: number;
+  total_orders_count: number;
+  // orders_with_discount_rate_percent / discount_rate_percent are absent
+  // (never 0) below the server's materiality threshold (30 discounted
+  // orders, same bar as Annulations/Clients/Upsell) — the raw counts above
+  // stay visible regardless, so "X sur Y" can always be rendered.
+  orders_with_discount_rate_percent?: number;
+  reference_revenue_ttc_cents: number;
+  // discount_rate_percent = total_discounted_cents / reference_revenue_ttc_cents
+  // (this period's whole CA TTC, channel-filtered, ALL orders — not just the
+  // discounted ones; the server's own deliberate choice, see PROMPT 22's
+  // decisions.md entry for the tradeoff against the other defensible
+  // denominator).
+  discount_rate_percent?: number;
+}
+
+// DiscountsMarginCoverage mirrors ProductsAnalyticsResponse.cost_coverage's
+// contract exactly: margin_impact_cents/percent are absent (never 0) below
+// 20% coverage — today that is always true, cost_price_unit being null on
+// the near-totality of orderitems, so the screen must show "non disponible,"
+// never a zero that reads as "this discount costs nothing in margin."
+export interface DiscountsMarginCoverage {
+  discounted_lines_revenue_ttc_cents_total: number;
+  discounted_lines_revenue_ttc_cents_covered: number;
+  coverage_ratio: number;
+  margin_impact_cents?: number;
+  margin_impact_percent?: number;
+}
+
+// DiscountRow is one row of the répartition-par-remise table, grouped by
+// discount_id (never discount_name) — the question this table answers is
+// "laquelle me coûte le plus." is_deleted marks a soft-deleted discount that
+// still shows its historical redemptions in full.
+export interface DiscountRow {
+  discount_id: number;
+  discount_name: string;
+  is_deleted: boolean;
+  total_amount_cents: number;
+  redemptions_count: number;
+  reconstructed_amount_cents: number;
+  measured_amount_cents: number;
+}
+
+export interface DiscountsAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  channels: string[];
+  // measurement_complete_from names the point (YYYY-MM-DD) from which this
+  // tab's numbers stop being a floor and start being complete — the earliest
+  // live-written (non-reconstructed) redemption, all time, this merchant.
+  // Absent when no live write has happened yet: every figure above is then
+  // "at least," with no date to anchor a "complete since" statement.
+  measurement_complete_from?: string;
+  sort_by: string;
+  sort_dir: string;
+  current_period: DiscountsPeriodTotals;
+  previous_period: DiscountsPeriodTotals;
+  margin_impact: DiscountsMarginCoverage;
+  pagination: { total_items: number; total_pages: number; current_page: number; limit: number };
+  rows: DiscountRow[];
+}
+
+export interface DiscountsAnalyticsFilters {
+  channels?: string[];
+  sortBy?: 'amount' | 'count';
+  sortDir?: 'asc' | 'desc';
+  page?: number;
+  pageSize?: number;
+  // See ProductsAnalyticsFilters.merchantIds's doc comment — same posture.
+  merchantIds?: string[];
+}
+
+// Clients Analytics (PROMPT 18) — mirrors internal/modules/analytics's
+// Clients*/ClientRow types (ib-welloresto-api repo, models.go) field-for-
+// field, same convention as RevenueAnalyticsResponse. Two endpoints, not one:
+// getClientsAnalytics (agrégats, reports.sales.read) and getClientsTop
+// (classement nominatif, customers.manage, plus restrictif) — see both
+// methods' doc comments below, same split as Annulations/getCancellationsByStaff.
+export interface ClientsCoverage {
+  orders_with_customer_id: number;
+  total_orders: number;
+  coverage_ratio: number;
+}
+
+// Une seule interprétation retenue côté serveur par terme ambigu (récurrence,
+// segments, fréquence, inactivité) — ces libellés SONT la source de vérité à
+// afficher à l'écran, jamais un texte figé côté front qui pourrait diverger
+// du calcul réel si le seuil serveur change.
+export interface ClientsDefinitions {
+  recurrence: string;
+  segments: string;
+  frequency: string;
+  inactivity: string;
+}
+
+// avg_basket_ttc_cents est absent quand le segment n'a aucune commande sur la
+// période (inactif/dormant, par construction) — jamais une division par 0.
+export interface ClientsSegmentCount {
   segment: string;
   count: number;
-  total_orders: number;
-  revenue: number;
-  avg_basket: number;
-  frequency: number;
-  revenue_percent: number;
+  avg_basket_ttc_cents?: number;
 }
 
-interface CustomersMetrics {
-  new_customers: number;
-  recurring_customers: number;
-  avg_frequency: number;
-  avg_basket_by_segment: number;
+// recurring_rate est absent sous min_customers_for_rate identified_customers
+// (seuil de matérialité, PROMPT 18 §6, même seuil que
+// CancellationsByStaffResponse.min_orders_for_rate) — recurring_count et
+// identified_customers_in_period restent toujours affichés en valeur absolue.
+export interface ClientsAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  channels: string[];
+  from: string;
+  to: string;
+  coverage: ClientsCoverage;
+  definitions: ClientsDefinitions;
+  no_identified_customers: boolean;
+  identified_customers_in_period: number;
+  new_customers_count: number;
+  recurring_count: number;
+  recurring_rate?: number;
+  min_customers_for_rate: number;
+  avg_orders_per_active_customer: number;
+  segment_rates_available: boolean;
+  segments: ClientsSegmentCount[];
 }
 
-interface CustomersAnalyticsResponse {
-  metrics: CustomersMetrics;
-  new_vs_recurring: { new: number; recurring: number; new_percent: number };
-  by_segment: CustomerSegment[];
-  timeline: Array<{ date: string; new_customers: number }>;
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
+// lifetime_value_cents/lifetime_orders/avg_basket_ttc_cents sont calculés sur
+// TOUT l'historique du client, jamais bornés à la période demandée — voir
+// ClientsAnalyticsResponse et le commentaire de clients.go (ib-welloresto-api
+// repo) sur "valeur vie cumulée depuis toujours".
+export interface ClientRow {
+  customer_id: string;
+  name: string;
+  lifetime_value_cents: number;
+  lifetime_orders: number;
+  last_order_date: string;
+  avg_basket_ttc_cents: number;
+}
+
+export interface ClientsTopResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  channels: string[];
+  from: string;
+  to: string;
+  identified_customers_in_period: number;
+  top_clients: ClientRow[];
 }
 
 // Restaurants Comparative
@@ -501,6 +981,29 @@ const mapOrderToHistoryItem = (order: Order): OrderHistoryItem => {
  */
 class AnalyticsService {
   /**
+   * Récupère les établissements accessibles à l'utilisateur (ceux où il
+   * détient pos.analytics) — GET /analytics/merchants, PROMPT 24 Phase 1.
+   * Alimente le sélecteur global multi-établissements (PROMPT 24 Phase 3).
+   * Contrairement aux autres endpoints de ce service, celui-ci ne prend ni
+   * date ni scope : la liste est entièrement fonction du token.
+   */
+  async getAccessibleMerchants(): Promise<AccessibleMerchantsResponse> {
+    return withMock(
+      () => ({
+        merchants: [
+          { merchant_id: 'mock-1', name: 'Établissement Mock' },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.get<{ id: string; data: AccessibleMerchantsResponse }>(
+          '/analytics/merchants'
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
    * Récupère les données de chiffre d'affaires avec comparaisons.
    * Onglet CA — premier onglet branché en SQL direct sur
    * POST /analytics/revenue (internal/modules/analytics, ib-welloresto-api
@@ -509,7 +1012,8 @@ class AnalyticsService {
    */
   async getRevenueAnalytics(
     startDate: string | Date,
-    endDate: string | Date
+    endDate: string | Date,
+    scope?: AnalyticsScopeOptions
   ): Promise<RevenueAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
@@ -554,7 +1058,7 @@ class AnalyticsService {
       async () => {
         const response = await apiClient.post<{ id: string; data: RevenueAnalyticsResponse }>(
           '/analytics/revenue',
-          { date_from: dateFrom, date_to: dateTo }
+          { date_from: dateFrom, date_to: dateTo, ...scopeToRequestFields(scope) }
         );
         return response.data;
       }
@@ -571,7 +1075,8 @@ class AnalyticsService {
    */
   async getOrdersAnalytics(
     startDate: string | Date,
-    endDate: string | Date
+    endDate: string | Date,
+    scope?: AnalyticsScopeOptions
   ): Promise<OrdersAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
@@ -613,7 +1118,7 @@ class AnalyticsService {
       async () => {
         const response = await apiClient.post<{ id: string; data: OrdersAnalyticsResponse }>(
           '/analytics/orders',
-          { date_from: dateFrom, date_to: dateTo }
+          { date_from: dateFrom, date_to: dateTo, ...scopeToRequestFields(scope) }
         );
         return response.data;
       }
@@ -664,7 +1169,8 @@ class AnalyticsService {
    */
   async getPaymentsAnalytics(
     startDate: string | Date,
-    endDate: string | Date
+    endDate: string | Date,
+    scope?: AnalyticsScopeOptions
   ): Promise<PaymentsAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
@@ -699,7 +1205,7 @@ class AnalyticsService {
       async () => {
         const response = await apiClient.post<{ id: string; data: PaymentsAnalyticsResponse }>(
           '/analytics/payments',
-          { date_from: dateFrom, date_to: dateTo }
+          { date_from: dateFrom, date_to: dateTo, ...scopeToRequestFields(scope) }
         );
         return response.data;
       }
@@ -733,7 +1239,8 @@ class AnalyticsService {
    */
   async getVATAnalytics(
     startDate: string | Date,
-    endDate: string | Date
+    endDate: string | Date,
+    scope?: AnalyticsScopeOptions
   ): Promise<VATAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
@@ -762,7 +1269,7 @@ class AnalyticsService {
       async () => {
         const response = await apiClient.post<{ id: string; data: VATAnalyticsResponse }>(
           '/analytics/vat',
-          { date_from: dateFrom, date_to: dateTo }
+          { date_from: dateFrom, date_to: dateTo, ...scopeToRequestFields(scope) }
         );
         return response.data;
       }
@@ -783,439 +1290,416 @@ class AnalyticsService {
   }
 
   /**
-   * Récupère les données produits
+   * Récupère les données produits — onglet Produits (PROMPT 16), branché sur
+   * POST /analytics/products, même gabarit scope/cache que CA/Commandes/
+   * Règlements/TVA/Annulations. Pagination et tri sont résolus côté serveur
+   * (voir ProductsAnalyticsFilters) — jamais tronqués/triés côté client
+   * (PROMPT 16 §3, le défaut central de la maquette à ne pas reproduire).
    */
-  getProductsAnalytics(
+  async getProductsAnalytics(
     startDate: string | Date,
     endDate: string | Date,
-    category?: string,
-    sortBy: string = 'quantity'
-  ): ProductsAnalyticsResponse {
-    const mockProducts: Product[] = [
-      {
-        id: '1',
-        name: 'Burger Classique',
-        category: 'Plats',
-        quantity: 340,
-        revenue: 3400,
-        cost: 1190,
-        margin: 2210,
-        margin_percent: 65,
-        evolution_percent: 12,
-      },
-      {
-        id: '2',
-        name: 'Pizza Quatre Fromages',
-        category: 'Plats',
-        quantity: 290,
-        revenue: 4060,
-        cost: 1318,
-        margin: 2742,
-        margin_percent: 67.5,
-        evolution_percent: 8,
-      },
-      {
-        id: '3',
-        name: 'Salade César',
-        category: 'Entrées',
-        quantity: 210,
-        revenue: 1680,
-        cost: 504,
-        margin: 1176,
-        margin_percent: 70,
-        evolution_percent: 15,
-      },
-      {
-        id: '4',
-        name: 'Pâtes Carbonara',
-        category: 'Plats',
-        quantity: 185,
-        revenue: 2775,
-        cost: 832,
-        margin: 1943,
-        margin_percent: 70,
-        evolution_percent: 5,
-      },
-      {
-        id: '5',
-        name: 'Tiramisu',
-        category: 'Desserts',
-        quantity: 180,
-        revenue: 1350,
-        cost: 324,
-        margin: 1026,
-        margin_percent: 76,
-        evolution_percent: 22,
-      },
-      {
-        id: '6',
-        name: 'Coca-Cola 33cl',
-        category: 'Boissons',
-        quantity: 520,
-        revenue: 1560,
-        cost: 390,
-        margin: 1170,
-        margin_percent: 75,
-        evolution_percent: -5,
-      },
-    ];
+    filters: ProductsAnalyticsFilters = {}
+  ): Promise<ProductsAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+    const { categoryId, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds } = filters;
 
-    return {
-      metrics: {
-        total_products_sold: 1725,
-        total_revenue: 14825,
-        total_margin: 10267,
-        avg_margin_percent: 69.2,
-      },
-      products: mockProducts,
-      comparisons: {
-        previous_period: { value: 14200, change: 4.4 },
-        year_ago: { value: 12500, change: 18.6 },
-      },
-    };
-  }
-
-  /**
-   * Récupère les données options
-   */
-  getOptionsAnalytics(
-    startDate: string | Date,
-    endDate: string | Date,
-    optionTypes: string[],
-    productId?: string
-  ): OptionsAnalyticsResponse {
-    const mockOptions: OptionItem[] = [
-      {
-        id: '1',
-        name: 'Supplément Bacon (Burger)',
-        product_name: 'Burger Classique',
-        count: 178,
-        revenue: 71200,
-        adoption_rate: 52.4,
-        avg_price: 400,
-        basket_impact: 1.2,
-        cost_per_unit: 150,
-        total_cost: 26700,
-        profit: 44500,
-        margin_percent: 62.4,
-      },
-      {
-        id: '2',
-        name: 'Extra Fromage',
-        product_name: 'Pizza Quatre Fromages',
-        count: 145,
-        revenue: 43500,
-        adoption_rate: 50,
-        avg_price: 300,
-        basket_impact: 1.0,
-        cost_per_unit: 80,
-        total_cost: 11600,
-        profit: 31900,
-        margin_percent: 73.3,
-      },
-      {
-        id: '3',
-        name: 'Crème fraîche',
-        product_name: 'Pâtes Carbonara',
-        count: 98,
-        revenue: 19600,
-        adoption_rate: 52.9,
-        avg_price: 200,
-        basket_impact: 0.8,
-        cost_per_unit: 60,
-        total_cost: 5880,
-        profit: 13720,
-        margin_percent: 70,
-      },
-      {
-        id: '4',
-        name: 'Sauce BBQ',
-        product_name: 'Burger Classique',
-        count: 120,
-        revenue: 24000,
-        adoption_rate: 35.3,
-        avg_price: 200,
-        basket_impact: 0.6,
-        cost_per_unit: 40,
-        total_cost: 4800,
-        profit: 19200,
-        margin_percent: 80,
-      },
-      {
-        id: '5',
-        name: 'Tranche de Gâteau',
-        product_name: 'Tiramisu',
-        count: 45,
-        revenue: 13500,
-        adoption_rate: 25,
-        avg_price: 300,
-        basket_impact: 0.5,
-        cost_per_unit: 100,
-        total_cost: 4500,
-        profit: 9000,
-        margin_percent: 66.7,
-      },
-    ];
-
-    const totalCost = mockOptions.reduce((sum, opt) => sum + opt.total_cost, 0);
-    const totalProfit = mockOptions.reduce((sum, opt) => sum + opt.profit, 0);
-    const totalRevenue = mockOptions.reduce((sum, opt) => sum + opt.revenue, 0);
-
-    return {
-      metrics: {
-        total_options: 586,
-        options_revenue: totalRevenue,
-        avg_adoption_rate: 43.1,
-        basket_impact_avg: 0.82,
-        total_cost: totalCost,
-        total_profit: totalProfit,
-        avg_margin_percent: totalProfit > 0 ? (totalProfit / totalRevenue) * 100 : 0,
-      },
-      options: mockOptions,
-      comparisons: {
-        previous_period: { value: 154000, change: 11.6 },
-        year_ago: { value: 142000, change: 21.1 },
-      },
-    };
-  }
-
-  /**
-   * Récupère les données annulations
-   */
-  getCancellationsAnalytics(
-    startDate: string | Date,
-    endDate: string | Date,
-    reasons: string[],
-    serverId?: string
-  ): CancellationsAnalyticsResponse {
-    const mockCancellations: CancellationByServer[] = [
-      {
-        server_name: 'Marie Dupont',
-        cancellations: 24,
-        cancellation_rate: 3.2,
-        amount_lost: 412,
-        main_reason: 'Erreur de commande',
-        evolution_percent: -15,
-      },
-      {
-        server_name: 'Jean Martin',
-        cancellations: 18,
-        cancellation_rate: 2.1,
-        amount_lost: 315,
-        main_reason: 'Client n\'a pas attendu',
-        evolution_percent: -8,
-      },
-      {
-        server_name: 'Sophie Bernard',
-        cancellations: 31,
-        cancellation_rate: 4.8,
-        amount_lost: 527,
-        main_reason: 'Problème cuisine',
-        evolution_percent: 12,
-      },
-      {
-        server_name: 'Autres/Non assigé',
-        cancellations: 12,
-        cancellation_rate: 2.5,
-        amount_lost: 198,
-        main_reason: 'Problème paiement',
-        evolution_percent: 5,
-      },
-    ];
-
-    const mockTimeline = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
-      return {
-        date: date.toISOString().split('T')[0],
-        rate: 2.5 + (Math.random() - 0.5) * 2,
-        sur_place: 2.1 + (Math.random() - 0.5) * 1.5,
-        emporter: 3.2 + (Math.random() - 0.5) * 2,
-        uber_eats: 2.8 + (Math.random() - 0.5) * 1.8,
-        deliveroo: 3.5 + (Math.random() - 0.5) * 2.2,
-      };
+    const mockPeriod = (from: string, to: string): ProductsPeriodTotals => ({
+      from, to, quantity_sold: 1725, revenue_ttc_cents: 1482500, revenue_ht_cents: 1268500,
     });
 
-    return {
-      metrics: {
-        total_cancellations: 85,
-        cancellation_rate: 3.1,
-        amount_lost: 1452,
-        avg_cancellation: 17.08,
-      },
-      by_reason: [
-        { reason: 'Erreur de commande', count: 32, percentage: 37.6 },
-        { reason: 'Problème cuisine', count: 25, percentage: 29.4 },
-        { reason: 'Client n\'a pas attendu', count: 18, percentage: 21.2 },
-        { reason: 'Problème paiement', count: 7, percentage: 8.2 },
-        { reason: 'Autre', count: 3, percentage: 3.5 },
-      ],
-      by_server: mockCancellations,
-      timeline: mockTimeline,
-      comparisons: {
-        previous_period: { value: 92, change: -7.6 },
-        year_ago: { value: 110, change: -22.7 },
-      },
-    };
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        category_id: categoryId ?? '',
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        current_period: mockPeriod(dateFrom, dateTo),
+        previous_period: mockPeriod(dateFrom, dateTo),
+        cost_coverage: {
+          revenue_ttc_cents_total: 1482500,
+          revenue_ttc_cents_covered: 1026700,
+          coverage_ratio: 0.692,
+          margin_cents: 613100,
+          margin_percent: 41.35,
+          no_recipe_quantity: 320,
+          incomplete_recipe_quantity: 85,
+        },
+        available_categories: [
+          { category_id: 'plats', name: 'Plats' },
+          { category_id: 'entrees', name: 'Entrées' },
+          { category_id: 'desserts', name: 'Desserts' },
+          { category_id: 'boissons', name: 'Boissons' },
+        ],
+        pagination: { total_items: 6, total_pages: 1, current_page: page, limit: pageSize },
+        rows: mockProductRows,
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: ProductsAnalyticsResponse }>(
+          '/analytics/products',
+          {
+            date_from: dateFrom, date_to: dateTo,
+            category_id: categoryId || undefined,
+            sort_by: sortBy, sort_dir: sortDir,
+            page, page_size: pageSize,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+          }
+        );
+        return response.data;
+      }
+    );
   }
 
   /**
-   * Récupère les données remises
+   * Exporte les données produits en CSV — reconstruit à partir des lignes
+   * déjà chargées par l'onglet (la page courante), jamais régénéré côté
+   * serveur (aucun endpoint CSV n'existe, même limite que exportCancellationsCSV).
    */
-  getDiscountsAnalytics(
-    startDate: string | Date,
-    endDate: string | Date,
-    discountTypes: string[],
-    serverId?: string
-  ): DiscountsAnalyticsResponse {
-    const mockDiscounts: DiscountByType[] = [
-      {
-        type: 'Promotion',
-        count: 156,
-        amount: 702,
-        avg_discount: 4.5,
-        percent_of_revenue: 4.7,
-        margin_impact: 441,
-        evolution_percent: -8,
-      },
-      {
-        type: 'Happy Hour',
-        count: 98,
-        amount: 441,
-        avg_discount: 4.5,
-        percent_of_revenue: 3,
-        margin_impact: 276,
-        evolution_percent: 12,
-      },
-      {
-        type: 'Geste Commercial',
-        count: 124,
-        amount: 558,
-        avg_discount: 4.5,
-        percent_of_revenue: 3.8,
-        margin_impact: 349,
-        evolution_percent: 25,
-      },
-      {
-        type: 'Fidélité',
-        count: 67,
-        amount: 268,
-        avg_discount: 4,
-        percent_of_revenue: 1.8,
-        margin_impact: 134,
-        evolution_percent: 15,
-      },
-      {
-        type: 'Codes Promo',
-        count: 45,
-        amount: 180,
-        avg_discount: 4,
-        percent_of_revenue: 1.2,
-        margin_impact: 90,
-        evolution_percent: 8,
-      },
-    ];
-
-    return {
-      metrics: {
-        total_discounts: 490,
-        discount_rate: 3.2,
-        margin_impact: 1290,
-        orders_with_discount: 490,
-      },
-      by_type: mockDiscounts,
-      margin_impact: {
-        gross_margin_without: 10267,
-        gross_margin_with: 8977,
-        margin_loss: 1290,
-        margin_loss_percent: 12.6,
-      },
-      comparisons: {
-        previous_period: { value: 1968, change: -1.6 },
-        year_ago: { value: 1825, change: 14.5 },
-      },
-    };
+  async exportProductsCSV(data: ProductsAnalyticsResponse): Promise<Blob> {
+    const header = 'Produit,Catégorie,Quantité vendue,CA TTC (€),CA HT (€),Coût (€),Marge (€),Marge (%),Évolution (%)\n';
+    const rows = data.rows.map((r) => {
+      const cost = r.cost_price_cents !== undefined ? (r.cost_price_cents / 100).toFixed(2) : '';
+      const margin = r.margin_cents !== undefined ? (r.margin_cents / 100).toFixed(2) : '';
+      const marginPct = r.margin_percent !== undefined ? r.margin_percent.toFixed(1) : '';
+      const evolution = r.evolution_percent !== undefined ? r.evolution_percent.toFixed(1) : '';
+      return [
+        r.name, r.category_name, r.quantity_sold,
+        (r.revenue_ttc_cents / 100).toFixed(2), (r.revenue_ht_cents / 100).toFixed(2),
+        cost, margin, marginPct, evolution,
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    return new Blob([header + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
   }
 
   /**
-   * Récupère les données clients
+   * Récupère les données options — onglet Options (PROMPT 17), branché sur
+   * POST /analytics/options, même gabarit scope/pagination/tri que Produits
+   * (POST /analytics/products). option_types est réellement appliqué côté
+   * serveur (contrairement à l'ancien mock qui l'acceptait sans jamais le
+   * brancher sur le calcul, PROMPT 17 §3).
    */
-  getCustomersAnalytics(
+  async getOptionsAnalytics(
     startDate: string | Date,
     endDate: string | Date,
-    segment?: string,
-    acquisitionChannels?: string[]
-  ): CustomersAnalyticsResponse {
-    // Convert Date to string if needed
-    const start = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
-    const end = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
-    const mockSegments: CustomerSegment[] = [
-      {
-        segment: 'Nouveaux',
-        count: 145,
-        total_orders: 156,
-        revenue: 2340,
-        avg_basket: 15,
-        frequency: 1.07,
-        revenue_percent: 15.8,
-      },
-      {
-        segment: 'Récurrents (2-4)',
-        count: 235,
-        total_orders: 658,
-        revenue: 7410,
-        avg_basket: 11.26,
-        frequency: 2.8,
-        revenue_percent: 49.9,
-      },
-      {
-        segment: 'Fidèles (5+)',
-        count: 89,
-        total_orders: 487,
-        revenue: 4872,
-        avg_basket: 10.01,
-        frequency: 5.47,
-        revenue_percent: 32.8,
-      },
-      {
-        segment: 'Inactifs (>3m)',
-        count: 124,
-        total_orders: 0,
-        revenue: 0,
-        avg_basket: 0,
-        frequency: 0,
-        revenue_percent: 0,
-      },
-    ];
+    filters: OptionsAnalyticsFilters = {}
+  ): Promise<OptionsAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+    const { optionTypes, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds } = filters;
 
-    const mockTimeline = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
-      return {
-        date: date.toISOString().split('T')[0],
-        new_customers: Math.floor(4 + Math.random() * 6),
-      };
+    const mockPeriod = (from: string, to: string): OptionsPeriodTotals => ({
+      from, to, quantity_sold: 466, revenue_ttc_cents: 114700,
     });
 
-    return {
-      metrics: {
-        new_customers: 145,
-        recurring_customers: 324,
-        avg_frequency: 2.8,
-        avg_basket_by_segment: 12.1,
-      },
-      new_vs_recurring: {
-        new: 2340,
-        recurring: 12282,
-        new_percent: 16.0,
-      },
-      by_segment: mockSegments,
-      timeline: mockTimeline,
-      comparisons: {
-        previous_period: { value: 14500, change: 2.4 },
-        year_ago: { value: 12800, change: 15.7 },
-      },
-    };
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        option_types: optionTypes && optionTypes.length > 0 ? optionTypes : [OPTION_TYPE_PAID, OPTION_TYPE_FREE, OPTION_TYPE_REMOVED],
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        current_period: mockPeriod(dateFrom, dateTo),
+        previous_period: mockPeriod(dateFrom, dateTo),
+        cost_coverage: {
+          revenue_ttc_cents_total: 114700,
+          revenue_ttc_cents_covered: 71200,
+          coverage_ratio: 0.621,
+          margin_cents: 44500,
+          margin_percent: 62.5,
+          no_recipe_quantity: 243,
+          incomplete_recipe_quantity: 0,
+        },
+        pagination: { total_items: mockOptionRows.length, total_pages: 1, current_page: page, limit: pageSize },
+        rows: mockOptionRows,
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: OptionsAnalyticsResponse }>(
+          '/analytics/options',
+          {
+            date_from: dateFrom, date_to: dateTo,
+            option_types: optionTypes && optionTypes.length > 0 ? optionTypes : undefined,
+            sort_by: sortBy, sort_dir: sortDir,
+            page, page_size: pageSize,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+          }
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
+   * Récupère les données annulations (agrégats).
+   * Onglet Annulations — branché en SQL direct sur POST /analytics/cancellations
+   * (internal/modules/analytics, ib-welloresto-api repo), reports.sales.read,
+   * même gabarit que CA/Commandes/Règlements/TVA. Le bloc nominatif par
+   * serveur est un endpoint séparé, voir getCancellationsByStaff — une route
+   * ne peut porter qu'une seule permission (reports.staff_performance.read
+   * y est plus restrictive), d'où le découpage en deux appels indépendants.
+   */
+  async getCancellationsAnalytics(
+    startDate: string | Date,
+    endDate: string | Date,
+    scope?: AnalyticsScopeOptions
+  ): Promise<CancellationsAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    const mockPeriod = (from: string, to: string): CancellationsPeriodTotals => ({
+      from, to,
+      total_orders_created: 10474,
+      cancelled_count: 830,
+      cancelled_amount_cents: 1567382,
+      internal_cancelled_count: 775,
+      platform_cancelled_count: 53,
+      unknown_cancelled_count: 2,
+    });
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        current_period: mockPeriod(dateFrom, dateTo),
+        previous_period: mockPeriod(dateFrom, dateTo),
+        previous_year: mockPeriod(dateFrom, dateTo),
+        by_reason: [
+          { reason_id: '3', label: 'Client n\'a pas attendu', count: 340 },
+          { reason_id: '7', label: 'Erreur de commande', count: 210 },
+          { reason_id: 'none', label: 'Motif non renseigné', count: 190 },
+          { reason_id: '12', label: 'Problème cuisine', count: 90 },
+        ],
+        by_author_type: [
+          { author_type: 'STAFF', count: 775, amount_cents: 1420000 },
+          { author_type: 'PLATFORM', count: 53, amount_cents: 98000 },
+          { author_type: 'CUSTOMER', count: 0, amount_cents: 0 },
+          { author_type: 'SYSTEM', count: 0, amount_cents: 0 },
+          { author_type: 'UNKNOWN', count: 2, amount_cents: 4200 },
+        ],
+        by_channel: [
+          { channel: 'dine_in', count: 520, amount_cents: 950000 },
+          { channel: 'takeaway', count: 210, amount_cents: 380000 },
+          { channel: 'delivery', count: 100, amount_cents: 237382 },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: CancellationsAnalyticsResponse }>(
+          '/analytics/cancellations',
+          { date_from: dateFrom, date_to: dateTo, ...scopeToRequestFields(scope) }
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
+   * Récupère le classement nominatif par serveur (bloc distinct, endpoint
+   * séparé) — reports.staff_performance.read, PROMPT 10 §2/§6. Un 403 ici ne
+   * doit masquer que ce bloc, jamais le reste de l'onglet Annulations : c'est
+   * pourquoi cet appel est indépendant de getCancellationsAnalytics et non
+   * groupé dans un seul Promise.all côté composant.
+   */
+  async getCancellationsByStaff(
+    startDate: string | Date,
+    endDate: string | Date,
+    merchantIds?: string[]
+  ): Promise<CancellationsByStaffResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        from: dateFrom,
+        to: dateTo,
+        min_orders_for_rate: 30,
+        staff: [
+          { user_id: '226', name: 'Marie Dupont', orders_created: 4102, cancelled_count: 774, rate_available: true },
+          { user_id: '2', name: 'Jean Martin', orders_created: 18, cancelled_count: 1, rate_available: false },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: CancellationsByStaffResponse }>(
+          '/analytics/cancellations/by-staff',
+          { date_from: dateFrom, date_to: dateTo, merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined }
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
+   * Récupère les données remises (PROMPT 22) — onglet Remises, branché en SQL
+   * direct sur POST /analytics/discounts (internal/modules/analytics,
+   * ib-welloresto-api repo), reports.sales.read, même gabarit que Produits/
+   * Options (pagination et tri côté serveur sur la répartition par remise,
+   * channels via ChannelFilter comme Clients/Upsell). Un seul endpoint : pas
+   * de classement nominatif pour cet onglet.
+   */
+  async getDiscountsAnalytics(
+    startDate: string | Date,
+    endDate: string | Date,
+    filters: DiscountsAnalyticsFilters = {}
+  ): Promise<DiscountsAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+    const { channels, sortBy = 'amount', sortDir = 'desc', page = 1, pageSize = 50, merchantIds } = filters;
+
+    const mockPeriod = (from: string, to: string): DiscountsPeriodTotals => ({
+      from, to,
+      total_discounted_cents: 110840,
+      reconstructed_amount_cents: 110840,
+      measured_amount_cents: 0,
+      reconstructed_redemptions_count: 367,
+      measured_redemptions_count: 0,
+      discounted_orders_count: 186,
+      total_orders_count: 9619,
+      orders_with_discount_rate_percent: 1.93,
+      reference_revenue_ttc_cents: 16016930,
+      discount_rate_percent: 0.69,
+    });
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        channels: channels && channels.length > 0 ? channels : [],
+        measurement_complete_from: undefined,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        current_period: mockPeriod(dateFrom, dateTo),
+        previous_period: mockPeriod(dateFrom, dateTo),
+        margin_impact: {
+          discounted_lines_revenue_ttc_cents_total: 253040,
+          discounted_lines_revenue_ttc_cents_covered: 0,
+          coverage_ratio: 0,
+        },
+        pagination: { total_items: 1, total_pages: 1, current_page: page, limit: pageSize },
+        rows: [
+          { discount_id: 3, discount_name: '2 pizzas pour 12€', is_deleted: false, total_amount_cents: 110840, redemptions_count: 367, reconstructed_amount_cents: 110840, measured_amount_cents: 0 },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: DiscountsAnalyticsResponse }>(
+          '/analytics/discounts',
+          {
+            date_from: dateFrom, date_to: dateTo,
+            channels: channels && channels.length > 0 ? channels : undefined,
+            sort_by: sortBy, sort_dir: sortDir,
+            page, page_size: pageSize,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+          }
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
+   * Récupère les données clients (agrégats) — onglet Clients, branché en SQL
+   * direct sur POST /analytics/clients (internal/modules/analytics,
+   * ib-welloresto-api repo), reports.sales.read, même gabarit que CA/
+   * Commandes/Annulations. Le classement nominatif (Top Clients) est un
+   * endpoint séparé, voir getClientsTop — customers.manage y est plus
+   * restrictif (is_sensitive), d'où le découpage en deux appels indépendants,
+   * même raison que Annulations/getCancellationsByStaff.
+   *
+   * channels filtre par canal (channels.ts/CHANNEL_ORDER) — vide ou omis
+   * signifie "tous les canaux", jamais un filtre appliqué à moitié : 86% des
+   * commandes en propre (Wello Resto) n'ont aucun client identifié, contre
+   * la quasi-totalité des commandes marketplace qui en portent un, donc un
+   * classement "meilleurs clients" sans ce filtre serait dominé par des
+   * comptes Uber Eats/Deliveroo.
+   */
+  async getClientsAnalytics(
+    startDate: string | Date,
+    endDate: string | Date,
+    channels?: string[],
+    merchantIds?: string[]
+  ): Promise<ClientsAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        channels: channels && channels.length > 0 ? channels : [],
+        from: dateFrom,
+        to: dateTo,
+        coverage: { orders_with_customer_id: 1350, total_orders: 9620, coverage_ratio: 0.1403 },
+        definitions: {
+          recurrence: 'Part des clients actifs sur la période ayant au moins 2 commandes au total depuis toujours (pas seulement sur la période).',
+          segments: 'Nouveau : première commande de tous les temps tombe dans la période. Fidèle : actif sur la période et au moins 5 commandes au total depuis toujours. Récurrent : actif sur la période, moins de 5 commandes au total. Inactif : dernière commande il y a plus de 180 jours (calculé à la date de fin de la période). Dormant : dernière commande avant la période mais il y a moins de 180 jours — ni actif ni inactif.',
+          frequency: "Nombre moyen de commandes par client actif sur la période (commandes de la période ÷ clients ayant commandé sur la période) — pas l'intervalle moyen entre deux commandes.",
+          inactivity: 'Dernière commande il y a plus de 180 jours, calculé à la date de fin de la période analysée — pas à la date du jour.',
+        },
+        no_identified_customers: false,
+        identified_customers_in_period: 3341,
+        new_customers_count: 3115,
+        recurring_count: 523,
+        recurring_rate: 0.1565,
+        min_customers_for_rate: 30,
+        avg_orders_per_active_customer: 1.31,
+        segment_rates_available: true,
+        segments: [
+          { segment: 'nouveau', count: 3115, avg_basket_ttc_cents: 1450 },
+          { segment: 'recurrent', count: 150, avg_basket_ttc_cents: 1620 },
+          { segment: 'fidele', count: 76, avg_basket_ttc_cents: 1780 },
+          { segment: 'inactif', count: 1010 },
+          { segment: 'dormant', count: 0 },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: ClientsAnalyticsResponse }>(
+          '/analytics/clients',
+          {
+            date_from: dateFrom, date_to: dateTo,
+            channels: channels && channels.length > 0 ? channels : undefined,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+          }
+        );
+        return response.data;
+      }
+    );
+  }
+
+  /**
+   * Récupère le classement nominatif Top Clients (bloc distinct, endpoint
+   * séparé) — customers.manage, PROMPT 18 §2. Un 403 ici ne doit masquer que
+   * ce bloc, jamais le reste de l'onglet Clients : c'est pourquoi cet appel
+   * est indépendant de getClientsAnalytics et non groupé dans un seul
+   * Promise.all côté composant.
+   */
+  async getClientsTop(
+    startDate: string | Date,
+    endDate: string | Date,
+    channels?: string[],
+    merchantIds?: string[]
+  ): Promise<ClientsTopResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        channels: channels && channels.length > 0 ? channels : [],
+        from: dateFrom,
+        to: dateTo,
+        identified_customers_in_period: 3341,
+        top_clients: [
+          { customer_id: '781', name: 'Augustin', lifetime_value_cents: 198160, lifetime_orders: 40, last_order_date: '2026-07-05', avg_basket_ttc_cents: 4954 },
+          { customer_id: '4102', name: 'Marie Dupont', lifetime_value_cents: 87400, lifetime_orders: 22, last_order_date: '2026-06-18', avg_basket_ttc_cents: 3973 },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: ClientsTopResponse }>(
+          '/analytics/clients/top',
+          {
+            date_from: dateFrom, date_to: dateTo,
+            channels: channels && channels.length > 0 ? channels : undefined,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+          }
+        );
+        return response.data;
+      }
+    );
   }
 
   /**
@@ -1429,122 +1913,238 @@ class AnalyticsService {
   }
 
   /**
-   * Exporte les données produits en CSV
+   * Exporte les données options en CSV — reconstruit à partir des lignes déjà
+   * chargées par l'onglet (la page courante), même limite que
+   * exportProductsCSV (aucun endpoint CSV backend n'existe).
    */
-  async exportProductsCSV(
-    startDate: string,
-    endDate: string,
-    category?: string,
-    sortBy?: string
-  ): Promise<Blob> {
-    try {
-      const csv = 'Produit,Catégorie,Quantité,CA,Marge\nMock CSV export';
-      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    } catch (error) {
-      console.error('Error exporting products CSV:', error);
-      throw error;
-    }
+  async exportOptionsCSV(data: OptionsAnalyticsResponse): Promise<Blob> {
+    const header = 'Type,Option,Attribut,Produit,Quantité vendue,Unités concernées,Taux d\'adoption (%),CA TTC (€),Coût (€),Marge (€),Marge (%),Impact panier (€)\n';
+    const rows = data.rows.map((r) => {
+      const adoption = r.adoption_rate !== undefined ? r.adoption_rate.toFixed(1) : '';
+      const cost = r.cost_price_cents !== undefined ? (r.cost_price_cents / 100).toFixed(2) : '';
+      const margin = r.margin_cents !== undefined ? (r.margin_cents / 100).toFixed(2) : '';
+      const marginPct = r.margin_percent !== undefined ? r.margin_percent.toFixed(1) : '';
+      const basketImpact = r.basket_impact_cents !== undefined ? (r.basket_impact_cents / 100).toFixed(2) : '';
+      return [
+        r.option_type, r.name, r.attribute_name || '', r.product_name,
+        r.quantity_sold, r.units_with_this, adoption,
+        (r.revenue_ttc_cents / 100).toFixed(2), cost, margin, marginPct, basketImpact,
+      ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',');
+    });
+    return new Blob([header + rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
   }
 
   /**
-   * Exporte les données options en CSV
+   * Récupère les données de vente additionnelle (agrégats + suggestions).
+   * Onglet Vente additionnelle (PROMPT 19) — branché en SQL direct sur
+   * POST /analytics/upsell (reports.sales.read, même porte que les 7 autres
+   * onglets), remplace l'ancien GET /stats/upsell (pos.analytics seul, hors
+   * du contrat unifié). Le bloc nominatif par serveur est un endpoint séparé,
+   * voir getUpsellByStaff — reports.staff_performance.read est plus
+   * restrictif, d'où le découpage en deux appels indépendants (même raison
+   * que getCancellationsByStaff/getClientsTop).
    */
-  async exportOptionsCSV(
-    startDate: string,
-    endDate: string,
-    optionTypes?: string[],
-    productId?: string
-  ): Promise<Blob> {
-    try {
-      const csv = 'Option,Produit,Ajouts,CA\nMock CSV export';
-      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    } catch (error) {
-      console.error('Error exporting options CSV:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Récupère les statistiques de vente additionnelle (upsell)
-   */
-  async getUpsellStats(
+  async getUpsellAnalytics(
     startDate: string | Date,
-    endDate: string | Date
-  ): Promise<UpsellStatsResponse> {
-    const from = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
-    const to = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
+    endDate: string | Date,
+    channels?: string[],
+    merchantIds?: string[]
+  ): Promise<UpsellAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    const mockPeriod = (from: string, to: string): UpsellPeriodTotals => ({
+      from, to, upsell_lines: 0, upsell_revenue_ht_cents: 0, orders_with_upsell_count: 0, total_orders_count: 1935,
+    });
 
     return withMock(
-      () => {
-        const mockByServer: UpsellByServer[] = [
-          { server_id: 'srv-1', server_name: 'Marie Dupont', upsell_lines: 42, upsell_revenue_ht: 318.50 },
-          { server_id: 'srv-2', server_name: 'Jean Martin', upsell_lines: 35, upsell_revenue_ht: 264.20 },
-          { server_id: 'srv-3', server_name: 'Sophie Bernard', upsell_lines: 28, upsell_revenue_ht: 197.80 },
-          { server_id: 'srv-4', server_name: 'Lucas Petit', upsell_lines: 19, upsell_revenue_ht: 142.90 },
-        ];
-        return {
-          total_upsell_lines: mockByServer.reduce((sum, s) => sum + s.upsell_lines, 0),
-          upsell_revenue_ht: mockByServer.reduce((sum, s) => sum + s.upsell_revenue_ht, 0),
-          orders_with_upsell_rate: 18.4,
-          by_server: mockByServer,
-        };
-      },
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        channels: channels && channels.length > 0 ? channels : [],
+        instrumentation_active: false,
+        current_period: mockPeriod(dateFrom, dateTo),
+        previous_period: mockPeriod(dateFrom, dateTo),
+        suggestions: {
+          from: dateFrom, to: dateTo,
+          proposed_count: 287, accepted_count: 1,
+          transformation_rate_available: true, min_proposed_for_rate: 30,
+        },
+      }),
       async () => {
-        const response = await apiClient.get<{
-          total_upsell_lines: number;
-          upsell_revenue_ht: number;
-          orders_with_upsell_rate: number;
-          by_server: UpsellByServer[];
-        }>(`/stats/upsell?from=${from}&to=${to}`);
-
-        return {
-          total_upsell_lines: response.total_upsell_lines,
-          upsell_revenue_ht: response.upsell_revenue_ht / 100,
-          orders_with_upsell_rate: response.orders_with_upsell_rate,
-          by_server: response.by_server.map((server) => ({
-            ...server,
-            upsell_revenue_ht: server.upsell_revenue_ht / 100,
-          })),
-        };
-      },
-      { method: 'GET', endpoint: '/stats/upsell' }
+        const response = await apiClient.post<{ id: string; data: UpsellAnalyticsResponse }>(
+          '/analytics/upsell',
+          {
+            date_from: dateFrom, date_to: dateTo,
+            channels: channels && channels.length > 0 ? channels : undefined,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+          }
+        );
+        return response.data;
+      }
     );
   }
 
   /**
-   * Exporte les données annulations en CSV
+   * Récupère le classement nominatif CA upsell par serveur (bloc distinct,
+   * endpoint séparé) — reports.staff_performance.read. Un 403 ici ne doit
+   * masquer que ce bloc, jamais le reste de l'onglet Vente additionnelle.
    */
-  async exportCancellationsCSV(
-    startDate: string,
-    endDate: string,
-    reasons?: string[],
-    serverId?: string
-  ): Promise<Blob> {
-    try {
-      const csv = 'Serveur,Annulations,Montant,Motif\nMock CSV export';
-      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    } catch (error) {
-      console.error('Error exporting cancellations CSV:', error);
-      throw error;
-    }
+  async getUpsellByStaff(
+    startDate: string | Date,
+    endDate: string | Date,
+    channels?: string[],
+    merchantIds?: string[]
+  ): Promise<UpsellByStaffResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+
+    return withMock(
+      () => ({
+        scope: { merchant_ids: ['mock'], group_by: 'none' },
+        channels: channels && channels.length > 0 ? channels : [],
+        from: dateFrom,
+        to: dateTo,
+        instrumentation_active: false,
+        staff: [],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: UpsellByStaffResponse }>(
+          '/analytics/upsell/by-staff',
+          {
+            date_from: dateFrom, date_to: dateTo,
+            channels: channels && channels.length > 0 ? channels : undefined,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+          }
+        );
+        return response.data;
+      }
+    );
   }
 
   /**
-   * Exporte les données remises en CSV
+   * Exporte les données annulations en CSV.
+   * Aucun endpoint CSV backend n'existe pour ce module (seulement les deux
+   * routes JSON) — contrairement à la chaîne littérale "Mock CSV export"
+   * héritée du mock, ce CSV est reconstruit ligne à ligne à partir des
+   * données déjà chargées par l'onglet (agrégat + nominatif), jamais
+   * régénéré côté serveur. staffData est optionnel : un 403 sur
+   * /by-staff ne doit pas empêcher l'export du reste.
    */
-  async exportDiscountsCSV(
-    startDate: string,
-    endDate: string,
-    discountTypes?: string[],
-    serverId?: string
+  async exportCancellationsCSV(
+    data: CancellationsAnalyticsResponse,
+    staffData: CancellationsByStaffResponse | null
   ): Promise<Blob> {
-    try {
-      const csv = 'Type,Utilisations,Montant,Impact\nMock CSV export';
-      return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    } catch (error) {
-      console.error('Error exporting discounts CSV:', error);
-      throw error;
+    const lines: string[] = [];
+    const { current_period: p } = data;
+
+    lines.push('Section,Clé,Libellé,Valeur');
+    lines.push(`Période,,Du,${p.from}`);
+    lines.push(`Période,,Au,${p.to}`);
+    lines.push(`Agrégat,,Commandes créées,${p.total_orders_created}`);
+    lines.push(`Agrégat,,Annulations totales,${p.cancelled_count}`);
+    lines.push(`Agrégat,,Annulations internes (staff+client+système),${p.internal_cancelled_count}`);
+    lines.push(`Agrégat,,Annulations plateforme,${p.platform_cancelled_count}`);
+    lines.push(`Agrégat,,Annulations typologie non déterminée,${p.unknown_cancelled_count}`);
+    lines.push(`Agrégat,,Montant perdu (centimes),${p.cancelled_amount_cents}`);
+
+    for (const r of data.by_reason) {
+      lines.push(`Motif,${r.reason_id},${r.label.replace(/,/g, ';')},${r.count}`);
     }
+    for (const a of data.by_author_type) {
+      lines.push(`Typologie auteur,${a.author_type},${a.author_type},${a.count}`);
+    }
+    for (const c of data.by_channel) {
+      lines.push(`Canal,${c.channel},${c.channel},${c.count}`);
+    }
+
+    if (staffData) {
+      lines.push(`Nominatif,,Seuil taux (commandes),${staffData.min_orders_for_rate}`);
+      for (const s of staffData.staff) {
+        const rate = s.rate_available ? ((s.cancelled_count / s.orders_created) * 100).toFixed(2) + '%' : 'n/a';
+        lines.push(`Nominatif,${s.user_id},${s.name.replace(/,/g, ';')},${s.cancelled_count} sur ${s.orders_created} (${rate})`);
+      }
+    }
+
+    const csv = lines.join('\n');
+    return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  }
+
+  /**
+   * Exporte les données clients en CSV.
+   * Aucun endpoint CSV backend n'existe pour ce module (seulement les deux
+   * routes JSON, même limite que exportCancellationsCSV) — ce CSV est
+   * reconstruit ligne à ligne à partir des données déjà chargées par
+   * l'onglet (agrégat + Top Clients), jamais régénéré côté serveur. topData
+   * est optionnel : un 403 sur /clients/top ne doit pas empêcher l'export du
+   * reste.
+   */
+  async exportClientsCSV(
+    data: ClientsAnalyticsResponse,
+    topData: ClientsTopResponse | null
+  ): Promise<Blob> {
+    const lines: string[] = [];
+
+    lines.push('Section,Clé,Libellé,Valeur');
+    lines.push(`Période,,Du,${data.from}`);
+    lines.push(`Période,,Au,${data.to}`);
+    lines.push(`Période,,Canaux,${data.channels.join(';') || 'tous'}`);
+    lines.push(`Couverture,,Commandes avec client identifié,${data.coverage.orders_with_customer_id}`);
+    lines.push(`Couverture,,Commandes totales sur la période,${data.coverage.total_orders}`);
+    lines.push(`Couverture,,Taux de couverture,${(data.coverage.coverage_ratio * 100).toFixed(1)}%`);
+    lines.push(`Agrégat,,Nouveaux clients,${data.new_customers_count}`);
+    lines.push(`Agrégat,,Clients actifs sur la période,${data.identified_customers_in_period}`);
+    lines.push(`Agrégat,,Clients récurrents (>=2 commandes au total),${data.recurring_count}`);
+    lines.push(`Agrégat,,Taux de récurrence,${data.recurring_rate !== undefined ? (data.recurring_rate * 100).toFixed(1) + '%' : 'n/a (effectif insuffisant)'}`);
+    lines.push(`Agrégat,,Fréquence d'achat moyenne,${data.avg_orders_per_active_customer.toFixed(2)}`);
+
+    for (const s of data.segments) {
+      const basket = s.avg_basket_ttc_cents !== undefined ? (s.avg_basket_ttc_cents / 100).toFixed(2) + '€' : 'n/a';
+      lines.push(`Segment,${s.segment},${s.segment},${s.count} (panier moyen ${basket})`);
+    }
+
+    if (topData) {
+      lines.push(`Top Clients,,Clients identifiés sur la période,${topData.identified_customers_in_period}`);
+      for (const c of topData.top_clients) {
+        lines.push(`Top Clients,${c.customer_id},${c.name.replace(/,/g, ';')},${(c.lifetime_value_cents / 100).toFixed(2)}€ (${c.lifetime_orders} commandes, dernière visite ${c.last_order_date})`);
+      }
+    }
+
+    const csv = lines.join('\n');
+    return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  }
+
+  /**
+   * Exporte les données remises en CSV. Aucun endpoint CSV backend n'existe
+   * pour ce module (même limite que exportCancellationsCSV/exportClientsCSV)
+   * — reconstruit ligne à ligne à partir des données déjà chargées par
+   * l'onglet, y compris la répartition par remise (seulement la page
+   * actuellement affichée : pagination/tri sont côté serveur).
+   */
+  async exportDiscountsCSV(data: DiscountsAnalyticsResponse): Promise<Blob> {
+    const lines: string[] = [];
+    const { current_period: p } = data;
+
+    lines.push('Section,Clé,Libellé,Valeur');
+    lines.push(`Période,,Du,${p.from}`);
+    lines.push(`Période,,Au,${p.to}`);
+    lines.push(`Période,,Canaux,${data.channels.join(';') || 'tous'}`);
+    lines.push(`Agrégat,,Montant total remisé (centimes),${p.total_discounted_cents}`);
+    lines.push(`Agrégat,,dont reconstitué avant bascule (centimes),${p.reconstructed_amount_cents}`);
+    lines.push(`Agrégat,,dont mesuré en direct (centimes),${p.measured_amount_cents}`);
+    lines.push(`Agrégat,,Mesure complète à partir de,${data.measurement_complete_from ?? 'jamais (aucune écriture en direct pour le moment)'}`);
+    lines.push(`Agrégat,,Commandes avec remise,${p.discounted_orders_count} sur ${p.total_orders_count}`);
+    lines.push(`Agrégat,,Taux de commandes avec remise,${p.orders_with_discount_rate_percent !== undefined ? p.orders_with_discount_rate_percent.toFixed(2) + '%' : 'n/a (effectif insuffisant)'}`);
+    lines.push(`Agrégat,,CA de référence (centimes),${p.reference_revenue_ttc_cents}`);
+    lines.push(`Agrégat,,Taux de remise moyen (sur CA de la période),${p.discount_rate_percent !== undefined ? p.discount_rate_percent.toFixed(2) + '%' : 'n/a (effectif insuffisant)'}`);
+    lines.push(`Marge,,CA des lignes remisées à coût connu,${data.margin_impact.discounted_lines_revenue_ttc_cents_covered} sur ${data.margin_impact.discounted_lines_revenue_ttc_cents_total}`);
+    lines.push(`Marge,,Impact sur la marge (centimes),${data.margin_impact.margin_impact_cents ?? 'non disponible'}`);
+
+    for (const r of data.rows) {
+      lines.push(`Remise,${r.discount_id},${r.discount_name.replace(/,/g, ';')}${r.is_deleted ? ' (supprimée)' : ''},${r.total_amount_cents} sur ${r.redemptions_count} utilisations`);
+    }
+
+    const csv = lines.join('\n');
+    return new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   }
 }
 

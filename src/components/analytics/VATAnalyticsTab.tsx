@@ -6,17 +6,22 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { analyticsService, VATAnalyticsResponse } from '@/services/analyticsService';
+import { analyticsService, VATAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS } from '@/utils/channels';
+import { ScopeSummary } from '@/components/analytics/ScopeNotice';
+import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 
 interface VATAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
+  merchantIds?: string[];
+  comparisonMode?: ComparisonMode;
+  merchantsById?: Record<string, string>;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
-export const VATAnalyticsTab = ({ dateRange }: VATAnalyticsTabProps) => {
+export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: VATAnalyticsTabProps) => {
   const [data, setData] = useState<VATAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -26,7 +31,7 @@ export const VATAnalyticsTab = ({ dateRange }: VATAnalyticsTabProps) => {
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getVATAnalytics(dateRange.from, dateRange.to)
+    analyticsService.getVATAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode })
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -43,7 +48,7 @@ export const VATAnalyticsTab = ({ dateRange }: VATAnalyticsTabProps) => {
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to]);
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
 
   const byRateChartData = useMemo(() => {
     if (!data) return [];
@@ -78,6 +83,8 @@ export const VATAnalyticsTab = ({ dateRange }: VATAnalyticsTabProps) => {
 
   return (
     <div className="space-y-6">
+      <ScopeSummary merchantIds={data.scope.merchant_ids} merchantsById={merchantsById} />
+
       {/* Périmètre analytique canonique, toutes marques — pas un document
           comptable. Ne remplace pas le rapport TVA de pos/reports, qui
           restreint à WELLO_RESTO et exclut ScanNOrder : les deux chiffres
@@ -150,6 +157,25 @@ export const VATAnalyticsTab = ({ dateRange }: VATAnalyticsTabProps) => {
           </CardContent>
         </Card>
       </div>
+
+      {data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0 && (
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">TVA par établissement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EstablishmentComparisonChart
+              valueLabel="TVA collectée"
+              valueFormatter={eur}
+              data={data.by_merchant.map((row) => ({
+                merchantId: row.merchant_id,
+                label: merchantsById[row.merchant_id] ?? row.merchant_id,
+                value: row.total_vat_cents,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="flex justify-end">
         <ExportButton

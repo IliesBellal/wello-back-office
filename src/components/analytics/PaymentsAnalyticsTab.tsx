@@ -7,12 +7,17 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { analyticsService, PaymentsAnalyticsResponse } from '@/services/analyticsService';
+import { analyticsService, PaymentsAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { PAYMENT_METHOD_COLORS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_ORDER } from '@/utils/paymentMethods';
+import { ScopeSummary } from '@/components/analytics/ScopeNotice';
+import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 
 interface PaymentsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
+  merchantIds?: string[];
+  comparisonMode?: ComparisonMode;
+  merchantsById?: Record<string, string>;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -33,7 +38,7 @@ const pctChange = (current: number, reference: number): number | null => {
 // sur PROD, AUDIT.md P13) et bucketise mop sur les 7 valeurs canoniques —
 // aucune ne correspond au "paiement mobile" de l'ancienne maquette, retiré
 // délibérément (voir docs/analytics/AUDIT.md).
-export const PaymentsAnalyticsTab = ({ dateRange }: PaymentsAnalyticsTabProps) => {
+export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: PaymentsAnalyticsTabProps) => {
   const [data, setData] = useState<PaymentsAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -43,7 +48,7 @@ export const PaymentsAnalyticsTab = ({ dateRange }: PaymentsAnalyticsTabProps) =
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getPaymentsAnalytics(dateRange.from, dateRange.to)
+    analyticsService.getPaymentsAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode })
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -60,7 +65,7 @@ export const PaymentsAnalyticsTab = ({ dateRange }: PaymentsAnalyticsTabProps) =
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to]);
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
 
   const presentMethods = useMemo(() => {
     if (!data) return [];
@@ -109,6 +114,8 @@ export const PaymentsAnalyticsTab = ({ dateRange }: PaymentsAnalyticsTabProps) =
 
   return (
     <div className="space-y-6">
+      <ScopeSummary merchantIds={data.scope.merchant_ids} merchantsById={merchantsById} />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Tile title="Encaissements" value={eur(current.total_amount_cents)} isHighlighted>
           {currentVsPrevious !== null && <EvolutionBadge percent={currentVsPrevious} />}
@@ -118,6 +125,25 @@ export const PaymentsAnalyticsTab = ({ dateRange }: PaymentsAnalyticsTabProps) =
           {currentVsLastYear !== null && <EvolutionBadge percent={currentVsLastYear} />}
         </Tile>
       </div>
+
+      {data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0 && (
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Règlements par établissement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EstablishmentComparisonChart
+              valueLabel="Encaissements"
+              valueFormatter={eur}
+              data={data.by_merchant.map((row) => ({
+                merchantId: row.merchant_id,
+                label: merchantsById[row.merchant_id] ?? row.merchant_id,
+                value: row.total_amount_cents,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="bg-card border border-border lg:col-span-2">

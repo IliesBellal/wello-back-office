@@ -4,32 +4,31 @@
  * 10-tab analytics dashboard with all tabs implemented
  */
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePermissions } from '@/hooks/usePermissions';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import {
-  AreaChart, Area, BarChart, Bar, PieChart, Pie, LineChart, Line, 
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, ComposedChart
-} from 'recharts';
-import { analyticsService } from '@/services/analyticsService';
+import { analyticsService, AccessibleMerchant, ComparisonMode } from '@/services/analyticsService';
+import { EstablishmentFilter } from '@/components/analytics/EstablishmentFilter';
 import { subDays, format } from 'date-fns';
 import { TrendingUp, TrendingDown, Download, ChevronRight } from 'lucide-react';
-import { ExportButton } from '@/components/analytics';
 import { UpsellAnalyticsTab } from '@/components/analytics/UpsellAnalyticsTab';
 import { RevenueAnalyticsTab } from '@/components/analytics/RevenueAnalyticsTab';
 import { OrdersAnalyticsTab } from '@/components/analytics/OrdersAnalyticsTab';
+import { ProductsAnalyticsTab } from '@/components/analytics/ProductsAnalyticsTab';
+import { OptionsAnalyticsTab } from '@/components/analytics/OptionsAnalyticsTab';
 import { PaymentsAnalyticsTab } from '@/components/analytics/PaymentsAnalyticsTab';
 import { VATAnalyticsTab } from '@/components/analytics/VATAnalyticsTab';
-import { MultiFilter } from '@/components/shared/MultiFilter';
+import { CancellationsAnalyticsTab } from '@/components/analytics/CancellationsAnalyticsTab';
+import { ClientsAnalyticsTab } from '@/components/analytics/ClientsAnalyticsTab';
+import { DiscountsAnalyticsTab } from '@/components/analytics/DiscountsAnalyticsTab';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
-import { ChannelToggleButtons } from '@/components/dashboard/ChannelToggleButtons';
 import { TabSystem } from '@/components/shared/TabSystem';
-import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
 import { Tile } from '@/components/shared/Tile';
 import { toast } from 'sonner';
 
@@ -39,24 +38,6 @@ interface DateRange {
   from: Date;
   to: Date;
 }
-
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
-
-// Couleurs cohérentes pour les canaux de vente
-const CHANNEL_COLORS: Record<string, string> = {
-  'restaurant': '#3b82f6',           // Bleu
-  'dine_in': '#3b82f6',              // Bleu (alias)
-  'takeaway': '#10b981',             // Vert
-  'delivery': '#f59e0b',             // Orange
-  'ubereats': '#06b6d4',             // Cyan
-  'ubereats_takeaway': '#06b6d4',    // Cyan
-  'ubereats_delivery': '#0891b2',    // Cyan foncé
-  'deliveroo': '#14b8a6',            // Teal
-  'deliveroo_takeaway': '#14b8a6',   // Teal
-  'deliveroo_delivery': '#0d9488',   // Teal foncé
-  'scanorder': '#8b5cf6',            // Violet
-  'click_collect': '#f59e0b',        // Orange
-};
 
 const EvolutionBadge = ({ percent }: { percent: number }) => (
   <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -76,119 +57,6 @@ const MetricCard = ({ label, value, change, isHighlighted }: { label: string; va
   </Tile>
 );
 
-// Legacy DataTable component for tabs that haven't been migrated to ExpandableDataTable yet
-const DataTable = ({ 
-  columns, 
-  data, 
-  sortBy,
-  renderExpandedRow,
-  expandableRowKey,
-}: { 
-  columns: Array<{ key: string; label: string; sortable?: boolean; render?: (val: any, row: any) => React.ReactNode }>;
-  data: any[];
-  sortBy: string;
-  renderExpandedRow?: (row: any) => React.ReactNode;
-  expandableRowKey?: string;
-}) => {
-  const [sortColumn, setSortColumn] = useState(sortBy);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-
-  const handleSort = (column: string) => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection('desc');
-    }
-  };
-
-  const toggleRowExpand = (rowId: string) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(rowId)) {
-      newExpanded.delete(rowId);
-    } else {
-      newExpanded.add(rowId);
-    }
-    setExpandedRows(newExpanded);
-  };
-
-  const sortedData = [...data].sort((a, b) => {
-    const aVal = a[sortColumn];
-    const bVal = b[sortColumn];
-    const comparison = aVal < bVal ? -1 : aVal > bVal ? 1 : 0;
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
-
-  return (
-    <div className="w-full overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border">
-            {renderExpandedRow && <th className="w-10 px-2 py-3" />}
-            {columns.map((col: any) => (
-              <th
-                key={col.key}
-                onClick={() => col.sortable && handleSort(col.key)}
-                className={`px-4 py-3 text-left font-medium text-muted-foreground ${col.sortable ? 'cursor-pointer hover:text-foreground' : ''}`}
-              >
-                <div className="flex items-center gap-2">
-                  {col.label}
-                  {col.sortable && sortColumn === col.key && (
-                    <span>{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </div>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sortedData.slice(0, 10).map((row: Record<string, any>, idx: number) => {
-            const rowId = expandableRowKey ? row[expandableRowKey] : String(idx);
-            const isExpanded = expandedRows.has(rowId);
-            
-            return (
-              <React.Fragment key={rowId}>
-                <tr className="border-b border-border hover:bg-muted/50">
-                  {renderExpandedRow && (
-                    <td className="w-10 px-2 py-3">
-                      <button
-                        onClick={() => toggleRowExpand(rowId)}
-                        className="inline-flex items-center justify-center w-6 h-6 hover:bg-muted rounded transition-colors"
-                      >
-                        <svg
-                          className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </button>
-                    </td>
-                  )}
-                  {columns.map((col: any) => (
-                    <td key={col.key} className="px-4 py-3">
-                      {col.render ? col.render(row[col.key], row) : row[col.key]}
-                    </td>
-                  ))}
-                </tr>
-                {isExpanded && renderExpandedRow && (
-                  <tr className="bg-muted/30 border-b border-border">
-                    <td colSpan={columns.length + 1} className="px-4 py-4">
-                      {renderExpandedRow(row)}
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
 export const DashboardAnalysis = () => {
   const { canViewAnalytics } = usePermissions();
 
@@ -204,820 +72,77 @@ export const DashboardAnalysis = () => {
 
 const DashboardAnalysisContent = () => {
   const isMobile = useIsMobile();
+  const { authData } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('ca');
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
 
-  // Filtres spécifiques par onglet
-  const [productCategory, setProductCategory] = useState<string | undefined>();
-  const [productSort, setProductSort] = useState('quantity');
-  const [optionTypes, setOptionTypes] = useState<string[]>(['paid', 'free', 'removed']);
-  const [cancellationReasons, setCancellationReasons] = useState<string[]>(['ordering_error', 'customer_wait', 'kitchen_issue', 'payment_issue']);
-  const [cancellationChannels, setCancellationChannels] = useState<('all' | 'sur_place' | 'emporter' | 'uber_eats' | 'deliveroo')[]>(['sur_place', 'emporter', 'uber_eats', 'deliveroo']);
-  const [discountTypes, setDiscountTypes] = useState<string[]>(['promotion', 'happy_hour', 'gesture', 'loyalty', 'promo_code']);
+  // ==================== SÉLECTEUR ÉTABLISSEMENTS (PROMPT 24 Phase 3) ====================
+  // Portée commune à toute la page, comme le filtre de période. Chargé une
+  // fois au montage — la liste ne dépend ni de la période ni de l'onglet
+  // actif.
+  const [accessibleMerchants, setAccessibleMerchants] = useState<AccessibleMerchant[]>([]);
+  const [selectedMerchantIds, setSelectedMerchantIds] = useState<string[]>([]);
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('cumule');
+
+  useEffect(() => {
+    let isMounted = true;
+    analyticsService.getAccessibleMerchants()
+      .then((result) => {
+        if (!isMounted) return;
+        setAccessibleMerchants(result.merchants);
+        // Sélection par défaut : l'établissement du token seul (PROMPT 24,
+        // "Décisions arrêtées"). Repli sur le premier de la liste si, pour
+        // une raison quelconque, l'établissement du token n'y figure pas.
+        const tokenMerchantId = authData?.session.merchant_id;
+        const defaultId = result.merchants.some((m) => m.merchant_id === tokenMerchantId)
+          ? tokenMerchantId
+          : result.merchants[0]?.merchant_id;
+        setSelectedMerchantIds(defaultId ? [defaultId] : []);
+      })
+      .catch(() => {
+        // Silencieux : chaque onglet gère déjà son propre échec de chargement
+        // (403, etc.) — l'absence de sélecteur ne doit pas casser la page,
+        // les onglets retombent alors sur le périmètre par défaut du serveur
+        // (le seul établissement du token).
+      });
+
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const merchantsById = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const m of accessibleMerchants) map[m.merchant_id] = m.name;
+    return map;
+  }, [accessibleMerchants]);
+
+  // Sélectionner un deuxième établissement passe automatiquement en comparé
+  // (PROMPT 24 : "on n'ajoute pas un site pour le noyer dans un total") —
+  // bascule possible ensuite vers cumulé via le sélecteur de mode.
+  const handleMerchantSelectionChange = (next: string[]) => {
+    if (next.length >= 2 && selectedMerchantIds.length < 2) {
+      setComparisonMode('compare');
+    }
+    setSelectedMerchantIds(next);
+  };
 
   // Données analytiques
   const analyticsData = useMemo(() => {
     return {
-      products: analyticsService.getProductsAnalytics(dateRange.from, dateRange.to, productCategory, productSort),
-      options: analyticsService.getOptionsAnalytics(dateRange.from, dateRange.to, optionTypes),
-      cancellations: analyticsService.getCancellationsAnalytics(dateRange.from, dateRange.to, cancellationReasons),
-      discounts: analyticsService.getDiscountsAnalytics(dateRange.from, dateRange.to, discountTypes),
-      clients: analyticsService.getCustomersAnalytics(dateRange.from, dateRange.to),
       restaurants: analyticsService.getRestaurantsAnalytics(dateRange.from, dateRange.to),
     };
-  }, [dateRange, productCategory, productSort, optionTypes, cancellationReasons, discountTypes]);
+  }, [dateRange]);
 
-  // ==================== ONGLETS CA / COMMANDES / RÈGLEMENTS / TVA ====================
-  // Branchés en SQL direct — voir components/analytics/{Revenue,Orders,Payments,VAT}AnalyticsTab.tsx.
-  // Reste des 6 autres onglets : toujours sur analyticsData (mocks) ci-dessus.
+  // ==================== ONGLETS CA / COMMANDES / PRODUITS / OPTIONS / RÈGLEMENTS / TVA / ANNULATIONS / VENTE ADDITIONNELLE / CLIENTS / REMISES ====================
+  // Branchés en SQL direct — voir components/analytics/{Revenue,Orders,Products,Options,Payments,VAT,Cancellations,Upsell,Clients,Discounts}AnalyticsTab.tsx.
+  // Reste des onglets : toujours sur analyticsData (mocks) ci-dessus.
   // (Tags retiré, PROMPT 09 lot 3 C4 — voir docs/analytics/TAGS_RETRAIT.md :
   // aucun établissement PROD n'étiquette ses produits.)
-
-  // ==================== ONGLET PRODUITS ====================
-  const renderProductsTab = () => {
-    // Calcul des totaux pour les pourcentages
-    const totalQuantity = analyticsData.products.products.reduce((sum, prod) => sum + prod.quantity, 0);
-    const totalRevenue = analyticsData.products.products.reduce((sum, prod) => sum + prod.revenue, 0);
-
-    return (
-    <div className="space-y-6">
-      <Card className="bg-card border border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-2 block">Catégorie</label>
-              <select
-                value={productCategory || 'all'}
-                onChange={(e) => setProductCategory(e.target.value === 'all' ? undefined : e.target.value)}
-                className="w-full px-3 py-2 rounded border border-input bg-background text-foreground text-sm"
-              >
-                <option value="all">Toutes catégories</option>
-                <option value="entrees">Entrées</option>
-                <option value="plats">Plats</option>
-                <option value="desserts">Desserts</option>
-                <option value="boissons">Boissons</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-muted-foreground mb-2 block">Tri</label>
-              <select
-                value={productSort}
-                onChange={(e) => setProductSort(e.target.value)}
-                className="w-full px-3 py-2 rounded border border-input bg-background text-foreground text-sm"
-              >
-                <option value="quantity">Plus vendus (quantité)</option>
-                <option value="revenue">Plus vendus (CA)</option>
-                <option value="margin">Marge la plus haute</option>
-                <option value="margin_desc">Marge la plus basse</option>
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Nombre de produits vendus"
-          value={analyticsData.products.metrics.total_products_sold}
-          isHighlighted
-        />
-        <MetricCard
-          label="CA total produits"
-          value={analyticsData.products.metrics.total_revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-        <MetricCard
-          label="Marge contributive totale"
-          value={analyticsData.products.metrics.total_margin.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-        <MetricCard
-          label="Taux de marge moyen"
-          value={analyticsData.products.metrics.avg_margin_percent.toFixed(1) + '%'}
-        />
-      </div>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Détails des produits</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={[
-              { key: 'name', label: 'Produit', sortable: true },
-              { key: 'category', label: 'Catégorie', sortable: true },
-              {
-                key: 'quantity',
-                label: 'Quantité vendue',
-                sortable: true,
-                render: (v: number) => {
-                  const pct = totalQuantity > 0 ? Math.round((v / totalQuantity) * 100) : 0;
-                  return `${v} (${pct}%)`;
-                }
-              },
-              {
-                key: 'revenue',
-                label: 'CA (€)',
-                sortable: true,
-                render: (v: number) => {
-                  const pct = totalRevenue > 0 ? Math.round((v / totalRevenue) * 100) : 0;
-                  return `${v.toFixed(2)} (${pct}%)`;
-                }
-              },
-              { key: 'cost', label: 'Coût (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'margin', label: 'Marge (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'margin_percent', label: 'Marge %', sortable: true, render: (v: number) => v.toFixed(1) + '%' },
-              { key: 'evolution_percent', label: 'Évolution %', sortable: true, render: (v: number) => <EvolutionBadge percent={v} /> },
-            ]}
-            data={analyticsData.products.products}
-            sortBy="revenue"
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <ExportButton
-          filename="Produits"
-          onExport={() => analyticsService.exportProductsCSV(
-            dateRange.from.toISOString().split('T')[0],
-            dateRange.to.toISOString().split('T')[0],
-            productCategory,
-            productSort
-          )}
-        />
-      </div>
-    </div>
-    );
-  };
-
-  // ==================== ONGLET OPTIONS ====================
-  const renderOptionsTab = () => {
-    // Calcul des totaux pour les pourcentages
-    const totalCount = analyticsData.options.options.reduce((sum, opt) => sum + opt.count, 0);
-    const totalRevenue = analyticsData.options.options.reduce((sum, opt) => sum + opt.revenue, 0);
-
-    return (
-    <div className="space-y-6">
-      <Card className="bg-card border border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <MultiFilter
-              options={[
-                { id: 'paid', label: 'Suppléments payants' },
-                { id: 'free', label: 'Modifications gratuites' },
-                { id: 'removed', label: 'Ingrédients retirés' },
-              ]}
-              selectedIds={optionTypes}
-              onChange={setOptionTypes}
-              label="Types d'option"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard label="Nombre total d'options" value={analyticsData.options.metrics.total_options} isHighlighted />
-        <MetricCard
-          label="CA généré par options"
-          value={analyticsData.options.metrics.options_revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-        <MetricCard
-          label="Coût total des options"
-          value={(analyticsData.options.metrics.total_cost / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-        <MetricCard
-          label="Bénéfice total"
-          value={(analyticsData.options.metrics.total_profit / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <MetricCard
-          label="Taux d'ajout moyen"
-          value={analyticsData.options.metrics.avg_adoption_rate.toFixed(1) + '%'}
-        />
-        <MetricCard
-          label="Marge moyenne %"
-          value={analyticsData.options.metrics.avg_margin_percent.toFixed(1) + '%'}
-        />
-        <MetricCard
-          label="Impact panier moyen"
-          value={'+' + analyticsData.options.metrics.basket_impact_avg.toFixed(2) + '€'}
-        />
-      </div>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Top 10 options - Coût vs Bénéfice</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={isMobile ? 400 : 300}>
-            <BarChart
-              data={analyticsData.options.options.slice(0, 10).map(opt => ({
-                ...opt,
-                total_cost_display: opt.total_cost / 100,
-                profit_display: opt.profit / 100
-              })).reverse()}
-              layout="vertical"
-              margin={{ left: isMobile ? 100 : 150, right: 20, top: 0, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis type="number" stroke="#6b7280" />
-              <YAxis dataKey="name" type="category" stroke="#6b7280" width={isMobile ? 100 : 150} tick={{ fontSize: isMobile ? 11 : 12 }} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
-                formatter={(value: number) => `${value.toFixed(2)}€`}
-              />
-              <Legend />
-              <Bar dataKey="total_cost_display" stackId="a" fill="#ef4444" name="Coût" />
-              <Bar dataKey="profit_display" stackId="a" fill="#10b981" name="Bénéfice" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Détails des options</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={[
-              { key: 'name', label: 'Option', sortable: true },
-              { key: 'product_name', label: 'Produit parent', sortable: true },
-              {
-                key: 'count',
-                label: 'Nombre d\'ajouts',
-                sortable: true,
-                render: (v: number) => {
-                  const pct = totalCount > 0 ? Math.round((v / totalCount) * 100) : 0;
-                  return `${v} (${pct}%)`;
-                }
-              },
-              {
-                key: 'revenue',
-                label: 'CA généré (€)',
-                sortable: true,
-                render: (v: number) => {
-                  const pct = totalRevenue > 0 ? Math.round((v / totalRevenue) * 100) : 0;
-                  return `${v.toFixed(2)} (${pct}%)`;
-                }
-              },
-              { key: 'cost_per_unit', label: 'Coût unitaire (€)', sortable: true, render: (v: number) => (v / 100).toFixed(2) },
-              { key: 'total_cost', label: 'Coût total (€)', sortable: true, render: (v: number) => (v / 100).toFixed(2) },
-              { key: 'profit', label: 'Bénéfice (€)', sortable: true, render: (v: number) => <span className="text-green-600 font-medium">+{(v / 100).toFixed(2)}</span> },
-              { key: 'adoption_rate', label: 'Taux d\'ajout %', sortable: true, render: (v: number) => v.toFixed(1) + '%' },
-              { key: 'margin_percent', label: 'Marge %', sortable: true, render: (v: number) => {
-                const color = v >= 70 ? 'text-green-600' : v >= 50 ? 'text-amber-600' : 'text-red-600';
-                return <span className={`${color} font-medium`}>{v.toFixed(1)}%</span>;
-              }},
-            ]}
-            data={analyticsData.options.options}
-            sortBy="count"
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <ExportButton
-          filename="Options"
-          onExport={() => analyticsService.exportOptionsCSV(
-            dateRange.from.toISOString().split('T')[0],
-            dateRange.to.toISOString().split('T')[0],
-            optionTypes
-          )}
-        />
-      </div>
-    </div>
-    );
-  };
-
-  // ==================== ONGLET ANNULATIONS ====================
-  const renderCancellationsTab = () => (
-    <div className="space-y-6">
-      <Card className="bg-card border border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <MultiFilter
-              options={[
-                { id: 'ordering_error', label: 'Erreur de commande' },
-                { id: 'customer_wait', label: 'Client n\'a pas attendu' },
-                { id: 'kitchen_issue', label: 'Problème cuisine' },
-                { id: 'payment_issue', label: 'Problème paiement' },
-                { id: 'other', label: 'Autre' },
-              ]}
-              selectedIds={cancellationReasons}
-              onChange={setCancellationReasons}
-              label="Motif d'annulation"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Nombre d'annulations"
-          value={analyticsData.cancellations.metrics.total_cancellations}
-          change={analyticsData.cancellations.comparisons.previous_period.change}
-          isHighlighted
-        />
-        <MetricCard
-          label="Taux d'annulation"
-          value={analyticsData.cancellations.metrics.cancellation_rate.toFixed(2) + '%'}
-        />
-        <MetricCard
-          label="Montant perdu"
-          value={analyticsData.cancellations.metrics.amount_lost.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-        <MetricCard
-          label="Annulation moyenne"
-          value={analyticsData.cancellations.metrics.avg_cancellation.toFixed(2) + '€'}
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="bg-card border border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Répartition par motif</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={analyticsData.cancellations.by_reason}
-                  dataKey="count"
-                  nameKey="reason"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={100}
-                  label
-                >
-                  {analyticsData.cancellations.by_reason.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Évolution du taux d'annulation</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <ChannelToggleButtons
-                selectedChannels={cancellationChannels}
-                onChange={setCancellationChannels}
-              />
-            </div>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={analyticsData.cancellations.timeline}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-                <Legend />
-                {cancellationChannels.includes('sur_place') && (
-                  <Line type="monotone" dataKey="sur_place" stroke={CHANNEL_COLORS['dine_in']} name="Sur place" strokeWidth={2} />
-                )}
-                {cancellationChannels.includes('emporter') && (
-                  <Line type="monotone" dataKey="emporter" stroke={CHANNEL_COLORS['takeaway']} name="À emporter" strokeWidth={2} />
-                )}
-                {cancellationChannels.includes('uber_eats') && (
-                  <Line type="monotone" dataKey="uber_eats" stroke={CHANNEL_COLORS['ubereats']} name="Uber Eats" strokeWidth={2} />
-                )}
-                {cancellationChannels.includes('deliveroo') && (
-                  <Line type="monotone" dataKey="deliveroo" stroke={CHANNEL_COLORS['deliveroo']} name="Deliveroo" strokeWidth={2} />
-                )}
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Détails par serveur</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ExpandableDataTable<any>
-            columns={[
-              { key: 'server_name', label: 'Serveur', sortable: true },
-              { key: 'cancellations', label: 'Annulations', sortable: true },
-              { key: 'cancellation_rate', label: 'Taux %', sortable: true, render: (v: number) => v.toFixed(2) + '%' },
-              { key: 'amount_lost', label: 'Montant perdu (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'main_reason', label: 'Motif principal', sortable: true },
-              { key: 'evolution_percent', label: 'Évolution %', sortable: true, render: (v: number) => <EvolutionBadge percent={v} /> },
-            ]}
-            data={analyticsData.cancellations.by_server}
-            expandableRowKey="server_name"
-            initialSortBy="cancellations"
-            initialSortDir="desc"
-            renderExpandedRow={(server: any) => (
-              <div className="space-y-4">
-                <div className="text-sm font-semibold text-foreground">Commandes annulées - {server.server_name}</div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border/50">
-                        <th className="px-3 py-2 text-left">Date</th>
-                        <th className="px-3 py-2 text-left">Heure</th>
-                        <th className="px-3 py-2 text-left">Commande</th>
-                        <th className="px-3 py-2 text-left">Montant</th>
-                        <th className="px-3 py-2 text-left">Motif</th>
-                        <th className="px-3 py-2 text-left">Canal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {server.deleted_orders?.map((order: any, idx: number) => (
-                        <tr key={idx} className="border-b border-border/30 hover:bg-muted/50">
-                          <td className="px-3 py-2">{order.date}</td>
-                          <td className="px-3 py-2">{order.time}</td>
-                          <td className="px-3 py-2 font-mono text-muted-foreground">{order.order_id}</td>
-                          <td className="px-3 py-2 font-semibold">{order.amount.toFixed(2)}€</td>
-                          <td className="px-3 py-2">
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-muted text-muted-foreground">
-                              {order.reason}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2">{order.channel}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <ExportButton
-          filename="Annulations"
-          onExport={() => analyticsService.exportCancellationsCSV(
-            dateRange.from.toISOString().split('T')[0],
-            dateRange.to.toISOString().split('T')[0],
-            cancellationReasons
-          )}
-        />
-      </div>
-    </div>
-  );
-
-  // ==================== ONGLET REMISES ====================
-  const renderDiscountsTab = () => (
-    <div className="space-y-6">
-      <Card className="bg-card border border-border">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold">Filtres</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <MultiFilter
-              options={[
-                { id: 'promotion', label: 'Promotion' },
-                { id: 'happy_hour', label: 'Happy hour' },
-                { id: 'gesture', label: 'Geste commercial' },
-                { id: 'loyalty', label: 'Fidélité client' },
-                { id: 'promo_code', label: 'Codes promo' },
-              ]}
-              selectedIds={discountTypes}
-              onChange={setDiscountTypes}
-              label="Type de remise"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard
-          label="Volume remises accordées"
-          value={analyticsData.discounts.metrics.total_discounts.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-          isHighlighted
-        />
-        <MetricCard
-          label="Taux de remise moyen"
-          value={analyticsData.discounts.metrics.discount_rate.toFixed(2) + '%'}
-        />
-        <MetricCard
-          label="Impact marge"
-          value={analyticsData.discounts.metrics.margin_impact.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-        />
-        <MetricCard
-          label="Commandes avec remise"
-          value={analyticsData.discounts.metrics.orders_with_discount}
-        />
-      </div>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Répartition par type de remise</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart
-              data={analyticsData.discounts.by_type}
-              margin={{ left: 0, right: 20, bottom: 20 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="type" stroke="#6b7280" angle={-45} textAnchor="end" height={80} />
-              <YAxis stroke="#6b7280" />
-              <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-              <Bar dataKey="amount" fill="#f59e0b" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Impact sur la marge</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Marge brute sans remise</p>
-              <p className="text-3xl font-bold">{analyticsData.discounts.margin_impact.gross_margin_without.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground mb-2">Marge brute avec remise</p>
-              <p className="text-3xl font-bold text-red-600">{analyticsData.discounts.margin_impact.gross_margin_with.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Perte : {analyticsData.discounts.margin_impact.margin_loss.toFixed(2)}€ ({analyticsData.discounts.margin_impact.margin_loss_percent.toFixed(1)}%)
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Détails par type de remise</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DataTable
-            columns={[
-              { key: 'type', label: 'Type de remise', sortable: true },
-              { key: 'count', label: 'Nombres d\'utilisations', sortable: true },
-              { key: 'amount', label: 'Montant total (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'avg_discount', label: 'Remise moyenne (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'percent_of_revenue', label: '% du CA', sortable: true, render: (v: number) => v.toFixed(1) + '%' },
-              { key: 'margin_impact', label: 'Impact marge (€)', sortable: true, render: (v: number) => v.toFixed(2) },
-              { key: 'evolution_percent', label: 'Évolution %', sortable: true, render: (v: number) => <EvolutionBadge percent={v} /> },
-            ]}
-            data={analyticsData.discounts.by_type}
-            sortBy="amount"
-          />
-        </CardContent>
-      </Card>
-
-      <div className="flex justify-end">
-        <ExportButton
-          filename="Remises"
-          onExport={() => analyticsService.exportDiscountsCSV(
-            dateRange.from.toISOString().split('T')[0],
-            dateRange.to.toISOString().split('T')[0],
-            discountTypes
-          )}
-        />
-      </div>
-    </div>
-  );
-
-  // ==================== ONGLET CLIENTS ====================
-  const renderClientsTab = () => {
-    // Calcul du loyalty score et des insights
-    const totalRevenue = analyticsData.clients.new_vs_recurring.new + analyticsData.clients.new_vs_recurring.recurring;
-    const recurringRate = ((analyticsData.clients.new_vs_recurring.recurring / totalRevenue) * 100).toFixed(1);
-    const newCustomerAOV = analyticsData.clients.by_segment[0]?.avg_basket || 0;
-    const recurringCustomerAOV = analyticsData.clients.by_segment[1]?.avg_basket || 0;
-    const aovLift = recurringCustomerAOV > 0 ? (((newCustomerAOV - recurringCustomerAOV) / recurringCustomerAOV) * 100).toFixed(1) : '0';
-
-    return (
-      <div className="space-y-6">
-        {/* ========== KPI Cards ========== */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard
-            label="Nouveaux Clients"
-            value={analyticsData.clients.metrics.new_customers}
-            change={analyticsData.clients.comparisons.previous_period.change}
-            isHighlighted
-          />
-          <MetricCard
-            label="Taux de Récurrence"
-            value={recurringRate + '%'}
-          />
-          <MetricCard
-            label="AOV Nouveau vs Récurrent"
-            value={(newCustomerAOV > recurringCustomerAOV ? '+' : '') + aovLift + '%'}
-          />
-          <MetricCard
-            label="Fréquence d'achat"
-            value={analyticsData.clients.metrics.avg_frequency.toFixed(2) + 'x'}
-          />
-        </div>
-
-        {/* ========== Segment Breakdown ========== */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {analyticsData.clients.by_segment.map((seg) => (
-            <Card key={seg.segment} className="bg-card border border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-medium text-muted-foreground">{seg.segment}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div>
-                    <div className="text-2xl font-bold">{seg.count}</div>
-                    <div className="text-xs text-muted-foreground">{seg.total_orders} commandes</div>
-                  </div>
-                  <div className="pt-2 border-t border-border/50">
-                    <div className="text-sm font-semibold">{seg.revenue_percent}% CA</div>
-                    <div className="text-xs text-muted-foreground">{seg.revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* ========== Mix Client & Loyalty Score ========== */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card className="bg-card border border-border lg:col-span-2">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Évolution du mix Client</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={analyticsData.clients.timeline}>
-                  <defs>
-                    <linearGradient id="gradNew" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="gradRecur" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
-                  <XAxis dataKey="date" stroke="#6b7280" style={{ fontSize: '0.875rem' }} />
-                  <YAxis stroke="#6b7280" style={{ fontSize: '0.875rem' }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
-                  <Legend />
-                  <Area
-                    type="monotone"
-                    dataKey="new_customers"
-                    stackId="1"
-                    stroke="#3b82f6"
-                    fillOpacity={1}
-                    fill="url(#gradNew)"
-                    name="Nouveaux"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="recurring_customers"
-                    stackId="1"
-                    stroke="#10b981"
-                    fillOpacity={1}
-                    fill="url(#gradRecur)"
-                    name="Récurrents"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border border-border">
-            <CardHeader>
-              <CardTitle className="text-sm font-semibold">Santé Base Client</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center py-8">
-              <div className="relative w-40 h-40 flex items-center justify-center">
-                {/* Loyalty Score Gauge */}
-                <svg className="transform -rotate-90" width="160" height="160" viewBox="0 0 160 160">
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="70"
-                    fill="none"
-                    stroke="#e5e7eb"
-                    strokeWidth="8"
-                  />
-                  <circle
-                    cx="80"
-                    cy="80"
-                    r="70"
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="8"
-                    strokeDasharray={`${(analyticsData.clients.loyalty_score || 72) * 4.4} 440`}
-                    strokeLinecap="round"
-                  />
-                </svg>
-                <div className="absolute text-center">
-                  <div className="text-3xl font-bold">{analyticsData.clients.loyalty_score || 72}</div>
-                  <div className="text-xs text-muted-foreground">/ 100</div>
-                </div>
-              </div>
-              <div className="mt-6 text-center space-y-1">
-                <p className="text-sm font-semibold text-green-600">✓ Excellente santé</p>
-                <p className="text-xs text-muted-foreground">Base client engagée et fidèle</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* ========== Top Clients Table ========== */}
-        <Card className="bg-card border border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Top Clients</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ExpandableDataTable<any>
-              columns={[
-                { key: 'name', label: 'Client', sortable: true },
-                { 
-                  key: 'segment', 
-                  label: 'Segment', 
-                  sortable: true, 
-                  render: (val: string) => (
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      val === 'Fidèle' ? 'bg-green-100 text-green-700' :
-                      val === 'Récurrent' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {val}
-                    </span>
-                  ),
-                },
-                { key: 'orders', label: 'Commandes', sortable: true },
-                { 
-                  key: 'revenue', 
-                  label: 'CA généré', 
-                  sortable: true, 
-                  align: 'right',
-                  render: (val: number) => val.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) 
-                },
-                { key: 'last_channel', label: 'Dernier Canal', sortable: true },
-              ]}
-              data={analyticsData.clients.top_clients || []}
-              expandableRowKey="id"
-              initialSortBy="revenue"
-              initialSortDir="desc"
-              renderExpandedRow={(client: any) => (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Dernière visite</p>
-                      <p className="font-semibold">{client.last_visit}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Valeur client</p>
-                      <p className="font-semibold">{client.lifetime_value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Panier moyen</p>
-                      <p className="font-semibold">{(client.revenue / client.orders).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground">Statut</p>
-                      <p className="font-semibold text-green-600">Actif</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            />
-          </CardContent>
-        </Card>
-
-        {/* ========== Export ========== */}
-        <div className="flex justify-end">
-          <ExportButton
-            filename="Clients"
-            onExport={() => analyticsService.exportClientsCSV(
-              dateRange.from.toISOString().split('T')[0],
-              dateRange.to.toISOString().split('T')[0]
-            )}
-          />
-        </div>
-      </div>
-    );
-  };
 
   // ==================== ONGLET RESTAURANTS ====================
   const renderRestaurantsTab = () => (
@@ -1038,28 +163,38 @@ const DashboardAnalysisContent = () => {
   );
 
   // ==================== RENDU PRINCIPAL ====================
+  // Tous les onglets branchés en SQL direct reçoivent le périmètre
+  // établissements + le mode ; merchantsById leur permet de rappeler les
+  // établissements réellement utilisés (scope.merchant_ids de la réponse),
+  // sans avoir à connaître eux-mêmes la liste complète des accessibles.
+  const scopeProps = {
+    merchantIds: selectedMerchantIds,
+    comparisonMode,
+    merchantsById,
+  };
+
   const renderTabContent = () => {
     switch (activeTab) {
       case 'ca':
-        return <RevenueAnalyticsTab dateRange={dateRange} />;
+        return <RevenueAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'commandes':
-        return <OrdersAnalyticsTab dateRange={dateRange} />;
+        return <OrdersAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'produits':
-        return renderProductsTab();
+        return <ProductsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'options':
-        return renderOptionsTab();
+        return <OptionsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'annulations':
-        return renderCancellationsTab();
+        return <CancellationsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'upsell':
-        return <UpsellAnalyticsTab dateRange={dateRange} />;
+        return <UpsellAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'remises':
-        return renderDiscountsTab();
+        return <DiscountsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'clients':
-        return renderClientsTab();
+        return <ClientsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'paiements':
-        return <PaymentsAnalyticsTab dateRange={dateRange} />;
+        return <PaymentsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'tva':
-        return <VATAnalyticsTab dateRange={dateRange} />;
+        return <VATAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'restaurants':
         return renderRestaurantsTab();
       default:
@@ -1090,17 +225,39 @@ const DashboardAnalysisContent = () => {
         description="Dashboard d'analyse avec statistiques complètes, chiffres d'affaires, commandes et bien plus"
         className="space-y-6"
       >
-        {/* Période globale */}
-        <Card className="bg-card border border-border">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Période</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="w-full max-w-sm">
-              <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Période + établissements globaux */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <Card className="bg-card border border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-semibold">Période</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="w-full max-w-sm">
+                <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Le sélecteur n'a de raison d'être que pour un compte ayant
+              accès à plus d'un établissement (pos.analytics sur plusieurs
+              sites) — sinon il n'y a rien à filtrer ni comparer. */}
+          {accessibleMerchants.length > 1 && (
+            <Card className="bg-card border border-border">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Établissements</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <EstablishmentFilter
+                  merchants={accessibleMerchants}
+                  selected={selectedMerchantIds}
+                  onChange={handleMerchantSelectionChange}
+                  mode={comparisonMode}
+                  onModeChange={setComparisonMode}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         {/* Onglets avec TabSystem */}
         <TabSystem

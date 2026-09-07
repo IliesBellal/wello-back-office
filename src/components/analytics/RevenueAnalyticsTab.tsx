@@ -7,12 +7,17 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
 import { TrendingUp, TrendingDown } from 'lucide-react';
-import { analyticsService, RevenueAnalyticsResponse } from '@/services/analyticsService';
+import { analyticsService, RevenueAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS, CHANNEL_ORDER } from '@/utils/channels';
+import { ScopeSummary } from '@/components/analytics/ScopeNotice';
+import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 
 interface RevenueAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
+  merchantIds?: string[];
+  comparisonMode?: ComparisonMode;
+  merchantsById?: Record<string, string>;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -31,7 +36,7 @@ const pctChange = (currentCents: number, referenceCents: number): number | null 
   return ((currentCents - referenceCents) / referenceCents) * 100;
 };
 
-export const RevenueAnalyticsTab = ({ dateRange }: RevenueAnalyticsTabProps) => {
+export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: RevenueAnalyticsTabProps) => {
   const [data, setData] = useState<RevenueAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // RBAC lot 8 (docs/analytics/DROITS.md, §6.3 convention): a 403 on this
@@ -44,7 +49,7 @@ export const RevenueAnalyticsTab = ({ dateRange }: RevenueAnalyticsTabProps) => 
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getRevenueAnalytics(dateRange.from, dateRange.to)
+    analyticsService.getRevenueAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode })
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -61,7 +66,7 @@ export const RevenueAnalyticsTab = ({ dateRange }: RevenueAnalyticsTabProps) => 
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to]);
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
 
   // Channels present in the timeline, in the fixed display order — only
   // series that actually have data get an <Area>, never a hardcoded 7 (or
@@ -114,6 +119,8 @@ export const RevenueAnalyticsTab = ({ dateRange }: RevenueAnalyticsTabProps) => 
 
   return (
     <div className="space-y-6">
+      <ScopeSummary merchantIds={data.scope.merchant_ids} merchantsById={merchantsById} />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Tile title="CA Actuel (TTC)" value={eur(data.current_period.total_ttc_cents)} isHighlighted />
         <Tile title="Période Préc." value={eur(data.previous_period.total_ttc_cents)}>
@@ -123,6 +130,25 @@ export const RevenueAnalyticsTab = ({ dateRange }: RevenueAnalyticsTabProps) => 
           {currentVsLastYear !== null && <EvolutionBadge percent={currentVsLastYear} />}
         </Tile>
       </div>
+
+      {data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0 && (
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">CA par établissement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EstablishmentComparisonChart
+              valueLabel="CA TTC"
+              valueFormatter={eur}
+              data={data.by_merchant.map((row) => ({
+                merchantId: row.merchant_id,
+                label: merchantsById[row.merchant_id] ?? row.merchant_id,
+                value: row.total_ttc_cents,
+              }))}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {!data.ht_computed && (
         <p className="text-sm text-muted-foreground">
