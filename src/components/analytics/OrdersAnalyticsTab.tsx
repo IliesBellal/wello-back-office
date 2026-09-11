@@ -12,6 +12,8 @@ import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS, CHANNEL_ORDER } from '@/utils/channels';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
+import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
+import { usePerMerchantAnalytics } from '@/hooks/usePerMerchantAnalytics';
 
 interface OrdersAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -33,6 +35,38 @@ const pctChange = (current: number, reference: number): number | null => {
   if (reference === 0) return null;
   return ((current - reference) / reference) * 100;
 };
+
+// Plain (non-hook) helpers — same rationale as RevenueAnalyticsTab.tsx: reused
+// both for the combined `data` (via useMemo) and per establishment inside the
+// "Détail par établissement" .map (hooks can't be called there).
+const presentChannelsOf = (resp: OrdersAnalyticsResponse): string[] => {
+  const present = new Set<string>();
+  for (const point of resp.timeline) {
+    for (const channel of Object.keys(point.by_channel_orders)) {
+      present.add(channel);
+    }
+  }
+  return CHANNEL_ORDER.filter((c) => present.has(c));
+};
+
+const timelineChartDataOf = (resp: OrdersAnalyticsResponse, presentChannels: string[]) =>
+  resp.timeline.map((point) => {
+    const row: Record<string, string | number> = { date: point.local_day };
+    for (const channel of presentChannels) {
+      row[channel] = point.by_channel_orders[channel] ?? 0;
+    }
+    return row;
+  });
+
+const channelPieDataOf = (resp: OrdersAnalyticsResponse) =>
+  resp.by_channel
+    .filter((c) => c.order_count > 0)
+    .map((c) => ({
+      key: c.channel,
+      name: CHANNEL_LABELS[c.channel] ?? c.channel,
+      value: c.order_count,
+      color: CHANNEL_COLORS[c.channel],
+    }));
 
 export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: OrdersAnalyticsTabProps) => {
   const [data, setData] = useState<OrdersAnalyticsResponse | null>(null);
@@ -64,38 +98,29 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     };
   }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
 
-  const presentChannels = useMemo(() => {
-    if (!data) return [];
-    const present = new Set<string>();
-    for (const point of data.timeline) {
-      for (const channel of Object.keys(point.by_channel_orders)) {
-        present.add(channel);
-      }
-    }
-    return CHANNEL_ORDER.filter((c) => present.has(c));
-  }, [data]);
+  const presentChannels = useMemo(() => (data ? presentChannelsOf(data) : []), [data]);
 
-  const timelineChartData = useMemo(() => {
-    if (!data) return [];
-    return data.timeline.map((point) => {
-      const row: Record<string, string | number> = { date: point.local_day };
-      for (const channel of presentChannels) {
-        row[channel] = point.by_channel_orders[channel] ?? 0;
-      }
-      return row;
-    });
-  }, [data, presentChannels]);
+  const timelineChartData = useMemo(
+    () => (data ? timelineChartDataOf(data, presentChannels) : []),
+    [data, presentChannels]
+  );
 
-  const channelPieData = useMemo(() => {
-    if (!data) return [];
-    return data.by_channel
-      .filter((c) => c.order_count > 0)
-      .map((c) => ({
-        name: CHANNEL_LABELS[c.channel] ?? c.channel,
-        value: c.order_count,
-        channel: c.channel,
-      }));
-  }, [data]);
+  const channelPieData = useMemo(() => (data ? channelPieDataOf(data) : []), [data]);
+
+  // Compare mode : voir le commentaire équivalent dans RevenueAnalyticsTab.tsx
+  // — Commandes ne porte pas non plus de ventilation par établissement dans
+  // by_merchant, d'où l'appel par établissement.
+  const compareMerchantIds = useMemo(
+    () => (data?.scope.group_by === 'merchant' ? (data.by_merchant ?? []).map((m) => m.merchant_id) : []),
+    [data]
+  );
+
+  const { perMerchant } = usePerMerchantAnalytics(
+    compareMerchantIds.length > 0,
+    compareMerchantIds,
+    dateRange,
+    (from, to, merchantId) => analyticsService.getOrdersAnalytics(from, to, { merchantIds: [merchantId] })
+  );
 
   if (isForbidden) {
     return null;
@@ -165,6 +190,67 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
         </Card>
       )}
 
+      {compareMerchantIds.length > 0 && (
+        <div className="space-y-6">
+          <h3 className="text-base font-semibold text-foreground">Détail par établissement</h3>
+          <PieSyncGroup>
+            {perMerchant.map(({ merchantId, data: merchantData }) => {
+              if (!merchantData) return null;
+              const merchantPresentChannels = presentChannelsOf(merchantData);
+              const merchantTimelineData = timelineChartDataOf(merchantData, merchantPresentChannels);
+              const merchantPieData = channelPieDataOf(merchantData);
+
+              return (
+                <div key={merchantId} className="space-y-3">
+                  <EstablishmentSectionTitle merchantId={merchantId} label={merchantsById[merchantId] ?? merchantId} />
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <Card className="bg-card border border-border lg:col-span-2">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">Évolution des commandes</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <LineChart data={merchantTimelineData} syncId="orders-evolution-sync" syncMethod="value">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="date" stroke="#6b7280" />
+                            <YAxis stroke="#6b7280" />
+                            <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                            <Legend />
+                            {merchantPresentChannels.map((channel) => (
+                              <Line
+                                key={channel}
+                                type="monotone"
+                                dataKey={channel}
+                                stroke={CHANNEL_COLORS[channel]}
+                                name={CHANNEL_LABELS[channel]}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-card border border-border">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">Répartition par canal</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <SyncedPie
+                          sourceId={merchantId}
+                          data={merchantPieData}
+                          valueFormatter={(v) => `${v} commandes`}
+                          height={260}
+                        />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })}
+          </PieSyncGroup>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="bg-card border border-border lg:col-span-2">
           <CardHeader>
@@ -212,7 +298,7 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                     label
                   >
                     {channelPieData.map((entry) => (
-                      <Cell key={entry.channel} fill={CHANNEL_COLORS[entry.channel]} />
+                      <Cell key={entry.key} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip

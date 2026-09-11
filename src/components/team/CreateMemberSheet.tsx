@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Search, Link2, AlertCircle, UserPlus } from "lucide-react";
 
-import { usersApi, planningPositionsApi, planningRefsApi } from "@/services/welloApi";
+import { usersApi, planningPositionsApi, planningRefsApi, rolesApi } from "@/services/welloApi";
 import { qk } from "@/lib/queryKeys";
 import type { LinkableUser, CreateUserRequest } from "@/types/adminUsers";
 
@@ -113,8 +113,10 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
   const [admin, setAdmin] = useState(false);
   const [loginEnabled, setLoginEnabled] = useState(true);
   const [positionId, setPositionId] = useState("");
-  const [role, setRole] = useState("");
+  const [hrRole, setHrRole] = useState("");
   const [contractTypeCode, setContractTypeCode] = useState("");
+  const [roleId, setRoleId] = useState("");
+  const [roleIdTouched, setRoleIdTouched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { data: positions = [] } = useQuery({
@@ -126,6 +128,21 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
     queryKey: qk.planningRefs.contractTypes,
     queryFn: () => planningRefsApi.contractTypes(),
   });
+
+  // Same query (and cache key) AccessTab.tsx uses for its own role picker.
+  const { data: roles = [], isLoading: isLoadingRoles } = useQuery({
+    queryKey: qk.roles.list(),
+    queryFn: rolesApi.list,
+  });
+
+  // Default to the merchant's default role, but only until the admin picks
+  // one explicitly — a role list refresh must not silently override a
+  // manual choice.
+  useEffect(() => {
+    if (roleIdTouched || roleId) return;
+    const defaultRole = roles.find((r) => r.is_default);
+    if (defaultRole) setRoleId(defaultRole.id);
+  }, [roles, roleId, roleIdTouched]);
 
   const mutation = useMutation({
     mutationFn: (payload: CreateUserRequest) => usersApi.create(payload),
@@ -158,9 +175,10 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
         admin,
         login_enabled: loginEnabled,
       },
+      role_id: roleId || undefined,
       planning: {
         ...(positionId ? { position_id: positionId } : {}),
-        ...(role ? { role } : {}),
+        ...(hrRole ? { role: hrRole } : {}),
         ...(contractTypeCode ? { contract_type_code: contractTypeCode } : {}),
       },
     };
@@ -231,6 +249,29 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
           <CardTitle className="text-sm">Accès</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="create-role" className="text-xs">Rôle</Label>
+            <Select
+              value={roleId || undefined}
+              onValueChange={(v) => {
+                setRoleId(v);
+                setRoleIdTouched(true);
+              }}
+              disabled={isLoadingRoles}
+            >
+              <SelectTrigger id="create-role">
+                <SelectValue placeholder="Sélectionner un rôle…" />
+              </SelectTrigger>
+              <SelectContent>
+                {roles.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.name}
+                    {r.is_default ? " (défaut)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="create-admin" className="text-sm cursor-pointer">
               Administrateur
@@ -270,10 +311,10 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
             </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Rôle</Label>
+            <Label className="text-xs">Poste RH</Label>
             <Select
-              value={role || SENTINEL_NONE}
-              onValueChange={(v) => setRole(v === SENTINEL_NONE ? "" : v)}
+              value={hrRole || SENTINEL_NONE}
+              onValueChange={(v) => setHrRole(v === SENTINEL_NONE ? "" : v)}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Sélectionner…" />

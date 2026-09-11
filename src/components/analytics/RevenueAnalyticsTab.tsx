@@ -12,6 +12,8 @@ import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS, CHANNEL_ORDER } from '@/utils/channels';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
+import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
+import { usePerMerchantAnalytics } from '@/hooks/usePerMerchantAnalytics';
 
 interface RevenueAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -21,6 +23,9 @@ interface RevenueAnalyticsTabProps {
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+// channelPieDataOf's `value` is already in euros (cents / 100 applied once) —
+// unlike `eur` above, this formats it as-is, no second division.
+const eurValue = (value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const EvolutionBadge = ({ percent }: { percent: number }) => (
   <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -35,6 +40,39 @@ const pctChange = (currentCents: number, referenceCents: number): number | null 
   if (referenceCents === 0) return null;
   return ((currentCents - referenceCents) / referenceCents) * 100;
 };
+
+// Plain (non-hook) helpers so the same derivation can run both for the
+// combined `data` (via useMemo below) and for each establishment's own
+// response in the "Détail par établissement" section (inside a .map, where
+// hooks can't be called).
+const presentChannelsOf = (resp: RevenueAnalyticsResponse): string[] => {
+  const present = new Set<string>();
+  for (const point of resp.timeline) {
+    for (const channel of Object.keys(point.by_channel_ttc_cents)) {
+      present.add(channel);
+    }
+  }
+  return CHANNEL_ORDER.filter((c) => present.has(c));
+};
+
+const timelineChartDataOf = (resp: RevenueAnalyticsResponse, presentChannels: string[]) =>
+  resp.timeline.map((point) => {
+    const row: Record<string, string | number> = { date: point.local_day };
+    for (const channel of presentChannels) {
+      row[channel] = (point.by_channel_ttc_cents[channel] ?? 0) / 100;
+    }
+    return row;
+  });
+
+const channelPieDataOf = (resp: RevenueAnalyticsResponse) =>
+  resp.by_channel
+    .filter((c) => c.total_ttc_cents > 0)
+    .map((c) => ({
+      key: c.channel,
+      name: CHANNEL_LABELS[c.channel] ?? c.channel,
+      value: c.total_ttc_cents / 100,
+      color: CHANNEL_COLORS[c.channel],
+    }));
 
 export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: RevenueAnalyticsTabProps) => {
   const [data, setData] = useState<RevenueAnalyticsResponse | null>(null);
@@ -71,40 +109,34 @@ export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
   // Channels present in the timeline, in the fixed display order — only
   // series that actually have data get an <Area>, never a hardcoded 7 (or
   // 3) regardless of what's real (AUDIT.md I4).
-  const presentChannels = useMemo(() => {
-    if (!data) return [];
-    const present = new Set<string>();
-    for (const point of data.timeline) {
-      for (const channel of Object.keys(point.by_channel_ttc_cents)) {
-        present.add(channel);
-      }
-    }
-    return CHANNEL_ORDER.filter((c) => present.has(c));
-  }, [data]);
+  const presentChannels = useMemo(() => (data ? presentChannelsOf(data) : []), [data]);
 
-  const timelineChartData = useMemo(() => {
-    if (!data) return [];
-    return data.timeline.map((point) => {
-      const row: Record<string, string | number> = { date: point.local_day };
-      for (const channel of presentChannels) {
-        row[channel] = (point.by_channel_ttc_cents[channel] ?? 0) / 100;
-      }
-      return row;
-    });
-  }, [data, presentChannels]);
+  const timelineChartData = useMemo(
+    () => (data ? timelineChartDataOf(data, presentChannels) : []),
+    [data, presentChannels]
+  );
 
   // Real channel breakdown for the pie chart — GROUP BY on the server, not
   // hardcoded coefficients applied to the total (AUDIT.md I8).
-  const channelPieData = useMemo(() => {
-    if (!data) return [];
-    return data.by_channel
-      .filter((c) => c.total_ttc_cents > 0)
-      .map((c) => ({
-        name: CHANNEL_LABELS[c.channel] ?? c.channel,
-        value: c.total_ttc_cents / 100,
-        channel: c.channel,
-      }));
-  }, [data]);
+  const channelPieData = useMemo(() => (data ? channelPieDataOf(data) : []), [data]);
+
+  // Compare mode (2+ établissements) : CA/Commandes/Règlements ne portent
+  // pas de ventilation par établissement dans by_merchant (contrairement à
+  // TVA — voir VATMerchantTotal), donc un appel par établissement est
+  // nécessaire pour dupliquer Évolution/Répartition CA par établissement.
+  // Utilise les ids réellement renvoyés par le scope, pas ceux demandés
+  // (même convention que ScopeSummary).
+  const compareMerchantIds = useMemo(
+    () => (data?.scope.group_by === 'merchant' ? (data.by_merchant ?? []).map((m) => m.merchant_id) : []),
+    [data]
+  );
+
+  const { perMerchant } = usePerMerchantAnalytics(
+    compareMerchantIds.length > 0,
+    compareMerchantIds,
+    dateRange,
+    (from, to, merchantId) => analyticsService.getRevenueAnalytics(from, to, { merchantIds: [merchantId] })
+  );
 
   if (isForbidden) {
     return null;
@@ -148,6 +180,67 @@ export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
             />
           </CardContent>
         </Card>
+      )}
+
+      {compareMerchantIds.length > 0 && (
+        <div className="space-y-6">
+          <h3 className="text-base font-semibold text-foreground">Détail par établissement</h3>
+          <PieSyncGroup>
+            {perMerchant.map(({ merchantId, data: merchantData }) => {
+              if (!merchantData) return null;
+              const merchantPresentChannels = presentChannelsOf(merchantData);
+              const merchantTimelineData = timelineChartDataOf(merchantData, merchantPresentChannels);
+              const merchantPieData = channelPieDataOf(merchantData);
+
+              return (
+                <div key={merchantId} className="space-y-3">
+                  <EstablishmentSectionTitle merchantId={merchantId} label={merchantsById[merchantId] ?? merchantId} />
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <Card className="bg-card border border-border lg:col-span-2">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">Évolution CA</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <AreaChart data={merchantTimelineData} syncId="revenue-evolution-sync" syncMethod="value">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="date" stroke="#6b7280" />
+                            <YAxis stroke="#6b7280" />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                              formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                            />
+                            <Legend />
+                            {merchantPresentChannels.map((channel) => (
+                              <Area
+                                key={channel}
+                                type="monotone"
+                                dataKey={channel}
+                                stackId="1"
+                                stroke={CHANNEL_COLORS[channel]}
+                                fill={CHANNEL_COLORS[channel]}
+                                name={CHANNEL_LABELS[channel]}
+                              />
+                            ))}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-card border border-border">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">Répartition CA</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <SyncedPie sourceId={merchantId} data={merchantPieData} valueFormatter={eurValue} height={260} />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })}
+          </PieSyncGroup>
+        </div>
       )}
 
       {!data.ht_computed && (
@@ -208,7 +301,7 @@ export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
                     label
                   >
                     {channelPieData.map((entry) => (
-                      <Cell key={entry.channel} fill={CHANNEL_COLORS[entry.channel]} />
+                      <Cell key={entry.key} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip

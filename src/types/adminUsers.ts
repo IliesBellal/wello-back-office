@@ -150,6 +150,13 @@ export interface CreateUserRequest {
     login_enabled?: boolean;
     permissions?: Partial<MerchantUserPermissions>;
   };
+  /**
+   * RBAC role (LOT A Semaine 1, Chantier 4). Overrides the merchant's
+   * default_role_id when set. Unrelated to `planning.role` below, which is
+   * `employees.role` ("Poste RH": employee/manager/admin) and has no RBAC
+   * meaning.
+   */
+  role_id?: string;
   planning?: Partial<MerchantUserPlanningUpsertRequest>;
 }
 

@@ -12,6 +12,8 @@ import { isApiHttpError } from '@/services/apiClient';
 import { PAYMENT_METHOD_COLORS, PAYMENT_METHOD_LABELS, PAYMENT_METHOD_ORDER } from '@/utils/paymentMethods';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
+import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
+import { usePerMerchantAnalytics } from '@/hooks/usePerMerchantAnalytics';
 
 interface PaymentsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -21,6 +23,9 @@ interface PaymentsAnalyticsTabProps {
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+// methodPieDataOf's `value` is already in euros (cents / 100 applied once) —
+// unlike `eur` above, this formats it as-is, no second division.
+const eurValue = (value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const EvolutionBadge = ({ percent }: { percent: number }) => (
   <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -33,6 +38,38 @@ const pctChange = (current: number, reference: number): number | null => {
   if (reference === 0) return null;
   return ((current - reference) / reference) * 100;
 };
+
+// Plain (non-hook) helpers — same rationale as RevenueAnalyticsTab.tsx: reused
+// both for the combined `data` (via useMemo) and per establishment inside the
+// "Détail par établissement" .map (hooks can't be called there).
+const presentMethodsOf = (resp: PaymentsAnalyticsResponse): string[] => {
+  const present = new Set<string>();
+  for (const point of resp.timeline) {
+    for (const method of Object.keys(point.by_method_amount_cents)) {
+      present.add(method);
+    }
+  }
+  return PAYMENT_METHOD_ORDER.filter((m) => present.has(m));
+};
+
+const timelineChartDataOf = (resp: PaymentsAnalyticsResponse, presentMethods: string[]) =>
+  resp.timeline.map((point) => {
+    const row: Record<string, string | number> = { date: point.local_day };
+    for (const method of presentMethods) {
+      row[method] = (point.by_method_amount_cents[method] ?? 0) / 100;
+    }
+    return row;
+  });
+
+const methodPieDataOf = (resp: PaymentsAnalyticsResponse) =>
+  resp.by_method
+    .filter((m) => m.total_amount_cents > 0)
+    .map((m) => ({
+      key: m.method,
+      name: PAYMENT_METHOD_LABELS[m.method] ?? m.method,
+      value: m.total_amount_cents / 100,
+      color: PAYMENT_METHOD_COLORS[m.method],
+    }));
 
 // Ce tab n'inclut que les paiements payments.enabled=true (1,5% désactivés
 // sur PROD, AUDIT.md P13) et bucketise mop sur les 7 valeurs canoniques —
@@ -67,38 +104,29 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
     };
   }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
 
-  const presentMethods = useMemo(() => {
-    if (!data) return [];
-    const present = new Set<string>();
-    for (const point of data.timeline) {
-      for (const method of Object.keys(point.by_method_amount_cents)) {
-        present.add(method);
-      }
-    }
-    return PAYMENT_METHOD_ORDER.filter((m) => present.has(m));
-  }, [data]);
+  const presentMethods = useMemo(() => (data ? presentMethodsOf(data) : []), [data]);
 
-  const timelineChartData = useMemo(() => {
-    if (!data) return [];
-    return data.timeline.map((point) => {
-      const row: Record<string, string | number> = { date: point.local_day };
-      for (const method of presentMethods) {
-        row[method] = (point.by_method_amount_cents[method] ?? 0) / 100;
-      }
-      return row;
-    });
-  }, [data, presentMethods]);
+  const timelineChartData = useMemo(
+    () => (data ? timelineChartDataOf(data, presentMethods) : []),
+    [data, presentMethods]
+  );
 
-  const methodPieData = useMemo(() => {
-    if (!data) return [];
-    return data.by_method
-      .filter((m) => m.total_amount_cents > 0)
-      .map((m) => ({
-        name: PAYMENT_METHOD_LABELS[m.method] ?? m.method,
-        value: m.total_amount_cents / 100,
-        method: m.method,
-      }));
-  }, [data]);
+  const methodPieData = useMemo(() => (data ? methodPieDataOf(data) : []), [data]);
+
+  // Compare mode : voir le commentaire équivalent dans RevenueAnalyticsTab.tsx
+  // — Règlements ne porte pas non plus de ventilation par établissement dans
+  // by_merchant, d'où l'appel par établissement.
+  const compareMerchantIds = useMemo(
+    () => (data?.scope.group_by === 'merchant' ? (data.by_merchant ?? []).map((m) => m.merchant_id) : []),
+    [data]
+  );
+
+  const { perMerchant } = usePerMerchantAnalytics(
+    compareMerchantIds.length > 0,
+    compareMerchantIds,
+    dateRange,
+    (from, to, merchantId) => analyticsService.getPaymentsAnalytics(from, to, { merchantIds: [merchantId] })
+  );
 
   if (isForbidden) {
     return null;
@@ -143,6 +171,74 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
             />
           </CardContent>
         </Card>
+      )}
+
+      {compareMerchantIds.length > 0 && (
+        <div className="space-y-6">
+          <h3 className="text-base font-semibold text-foreground">Détail par établissement</h3>
+          <PieSyncGroup>
+            {perMerchant.map(({ merchantId, data: merchantData }) => {
+              if (!merchantData) return null;
+              const merchantPresentMethods = presentMethodsOf(merchantData);
+              const merchantTimelineData = timelineChartDataOf(merchantData, merchantPresentMethods);
+              const merchantPieData = methodPieDataOf(merchantData);
+
+              return (
+                <div key={merchantId} className="space-y-3">
+                  <EstablishmentSectionTitle merchantId={merchantId} label={merchantsById[merchantId] ?? merchantId} />
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <Card className="bg-card border border-border lg:col-span-2">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">Évolution des règlements</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <AreaChart data={merchantTimelineData} syncId="payments-evolution-sync" syncMethod="value">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="date" stroke="#6b7280" />
+                            <YAxis stroke="#6b7280" />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                              formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                            />
+                            <Legend />
+                            {merchantPresentMethods.map((method) => (
+                              <Area
+                                key={method}
+                                type="monotone"
+                                dataKey={method}
+                                stackId="1"
+                                stroke={PAYMENT_METHOD_COLORS[method]}
+                                fill={PAYMENT_METHOD_COLORS[method]}
+                                name={PAYMENT_METHOD_LABELS[method]}
+                              />
+                            ))}
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-card border border-border">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">Répartition par méthode</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <SyncedPie
+                          sourceId={merchantId}
+                          data={merchantPieData}
+                          valueFormatter={eurValue}
+                          innerRadius={45}
+                          outerRadius={80}
+                          height={260}
+                        />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })}
+          </PieSyncGroup>
+        </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -198,7 +294,7 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                     label
                   >
                     {methodPieData.map((entry) => (
-                      <Cell key={entry.method} fill={PAYMENT_METHOD_COLORS[entry.method]} />
+                      <Cell key={entry.key} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip

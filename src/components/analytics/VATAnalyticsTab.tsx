@@ -6,11 +6,14 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { analyticsService, VATAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
+import {
+  analyticsService, VATAnalyticsResponse, VATRateTotal, VATChannelTotal, ComparisonMode,
+} from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS } from '@/utils/channels';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
+import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
 
 interface VATAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -20,6 +23,33 @@ interface VATAnalyticsTabProps {
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+// byChannelPieDataOf's `value` is already in euros (cents / 100 applied once)
+// — unlike `eur` above, this formats it as-is, no second division.
+const eurValue = (value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+
+// Unlike CA/Commandes/Règlements, VATMerchantTotal already carries this
+// establishment's own by_rate/by_channel (apportioned per establishment,
+// see the interface's doc comment in analyticsService.ts) — no extra
+// per-merchant fetch needed here, the "Détail par établissement" section
+// below reads straight off data.by_merchant. Same helpers double as the
+// combined view's derivation (data.by_rate/by_channel have the same shape).
+const byRateChartDataOf = (byRate: VATRateTotal[]) =>
+  byRate.map((r) => ({
+    rate: `${r.rate}%`,
+    rateValue: r.rate,
+    base_ht: r.base_ht_cents / 100,
+    vat: r.vat_cents / 100,
+  }));
+
+const byChannelPieDataOf = (byChannel: VATChannelTotal[]) =>
+  byChannel
+    .filter((c) => c.vat_cents > 0)
+    .map((c) => ({
+      key: c.channel,
+      name: CHANNEL_LABELS[c.channel] ?? c.channel,
+      value: c.vat_cents / 100,
+      color: CHANNEL_COLORS[c.channel],
+    }));
 
 export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: VATAnalyticsTabProps) => {
   const [data, setData] = useState<VATAnalyticsResponse | null>(null);
@@ -50,26 +80,9 @@ export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 
     };
   }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
 
-  const byRateChartData = useMemo(() => {
-    if (!data) return [];
-    return data.by_rate.map((r) => ({
-      rate: `${r.rate}%`,
-      rateValue: r.rate,
-      base_ht: r.base_ht_cents / 100,
-      vat: r.vat_cents / 100,
-    }));
-  }, [data]);
+  const byRateChartData = useMemo(() => (data ? byRateChartDataOf(data.by_rate) : []), [data]);
 
-  const byChannelPieData = useMemo(() => {
-    if (!data) return [];
-    return data.by_channel
-      .filter((c) => c.vat_cents > 0)
-      .map((c) => ({
-        name: CHANNEL_LABELS[c.channel] ?? c.channel,
-        value: c.vat_cents / 100,
-        channel: c.channel,
-      }));
-  }, [data]);
+  const byChannelPieData = useMemo(() => (data ? byChannelPieDataOf(data.by_channel) : []), [data]);
 
   if (isForbidden) {
     return null;
@@ -143,7 +156,7 @@ export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 
                     label
                   >
                     {byChannelPieData.map((entry) => (
-                      <Cell key={entry.channel} fill={CHANNEL_COLORS[entry.channel]} />
+                      <Cell key={entry.key} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip
@@ -175,6 +188,64 @@ export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 
             />
           </CardContent>
         </Card>
+      )}
+
+      {data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0 && (
+        <div className="space-y-6">
+          <h3 className="text-base font-semibold text-foreground">Détail par établissement</h3>
+          <PieSyncGroup>
+            {data.by_merchant.map((merchant) => {
+              const merchantRateData = byRateChartDataOf(merchant.by_rate);
+              const merchantPieData = byChannelPieDataOf(merchant.by_channel);
+
+              return (
+                <div key={merchant.merchant_id} className="space-y-3">
+                  <EstablishmentSectionTitle
+                    merchantId={merchant.merchant_id}
+                    label={merchantsById[merchant.merchant_id] ?? merchant.merchant_id}
+                  />
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <Card className="bg-card border border-border lg:col-span-2">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">TVA par taux</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ResponsiveContainer width="100%" height={260}>
+                          <BarChart data={merchantRateData} syncId="vat-rate-sync" syncMethod="value">
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="rate" stroke="#6b7280" />
+                            <YAxis stroke="#6b7280" />
+                            <Tooltip
+                              contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                              formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                            />
+                            <Legend />
+                            <Bar dataKey="base_ht" fill="#3b82f6" name="Base HT" />
+                            <Bar dataKey="vat" fill="#f59e0b" name="TVA" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-card border border-border">
+                      <CardHeader>
+                        <CardTitle className="text-sm font-semibold">TVA par canal</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <SyncedPie
+                          sourceId={merchant.merchant_id}
+                          data={merchantPieData}
+                          valueFormatter={eurValue}
+                          height={260}
+                        />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              );
+            })}
+          </PieSyncGroup>
+        </div>
       )}
 
       <div className="flex justify-end">

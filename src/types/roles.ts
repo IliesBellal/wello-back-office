@@ -69,6 +69,8 @@ export interface Role {
 export interface RoleEntry extends Role {
   permission_count: number;
   member_count: number;
+  /** Marks the merchant's current default_role_id (LOT A Semaine 1, Chantier 4). */
+  is_default: boolean;
 }
 
 /** GET/POST/PATCH single-role responses — has permissions[], no counts. */
