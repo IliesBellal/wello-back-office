@@ -15,6 +15,8 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
+import CreerMonCompte from "./pages/signup-tunnel/CreerMonCompte";
+import SetPassword from "./pages/SetPassword";
 import Settings from "./pages/Settings";
 import Menu from "./pages/Menu";
 import CategoriesTable from './pages/CategoriesTable';
@@ -77,6 +79,10 @@ const App = () => (
               {/* Public: the visitor has lost their password, so no ProtectedRoute. */}
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
+              {/* Public: pre-account self-onboarding tunnel (LOT A Semaine 3, Chantier 14) — no session exists yet. */}
+              <Route path="/creer-mon-compte" element={<CreerMonCompte />} />
+              {/* Protected: forced on first POS access for a Google account with no password yet — see ProtectedRoute's own needsPasswordSet check. */}
+              <Route path="/set-password" element={<ProtectedRoute><SetPassword /></ProtectedRoute>} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               
               {/* Menu Management */}

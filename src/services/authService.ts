@@ -312,6 +312,46 @@ export const authService = {
   },
 
   /**
+   * GET /v1/auth/password/needs-set — LOT A Semaine 3, Chantier 14. True
+   * only for a Google-origin account with no password yet; the caller
+   * (ProtectedRoute) forces a redirect to /set-password when this is true,
+   * since the POS/kiosk have no Google sign-in path.
+   */
+  needsPasswordSet: async (): Promise<boolean> => {
+    logAPI('GET', '/v1/auth/password/needs-set');
+
+    return withMock(
+      () => false,
+      async () => {
+        const response = await apiClient.get<{ id: string; data: { needs_password_set: boolean } }>(
+          '/v1/auth/password/needs-set',
+          { suppressErrorToast: true },
+        );
+        return response.data.needs_password_set;
+      },
+    );
+  },
+
+  /**
+   * POST /v1/auth/password/set — LOT A Semaine 3, Chantier 14's forced
+   * screen. Self-service: identity comes from the caller's own session
+   * token, never from the request body.
+   */
+  setPassword: async (newPassword: string): Promise<void> => {
+    logAPI('POST', '/v1/auth/password/set');
+
+    return withMock(
+      () => undefined,
+      async () => {
+        await apiClient.post<{ id: string; data: { status: string } }>(
+          '/v1/auth/password/set',
+          { new_password: newPassword },
+        );
+      },
+    );
+  },
+
+  /**
    * POST /auth/reset-password — public, no token.
    *
    * Consumes the single-use link. A password rejected for being too short does

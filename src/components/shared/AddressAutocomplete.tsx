@@ -14,6 +14,14 @@ export interface ParsedAddress {
   country: string;
   lat: number | null;
   lng: number | null;
+  // LOT A Semaine 3, Chantier 14 additions — only populated when
+  // searchType="establishment" (Google only returns these for a business
+  // place, never for a plain address prediction).
+  place_id: string;
+  name: string | null; // Place.name — the business name, establishment results only
+  phone: string | null;
+  opening_hours: string[] | null; // Place.opening_hours.weekday_text, as-is
+  business_types: string[] | null; // Place.types (Google's own category tags)
 }
 
 interface AddressAutocompleteProps {
@@ -21,19 +29,44 @@ interface AddressAutocompleteProps {
   value: string;
   onSelect: (parsed: ParsedAddress) => void;
   placeholder?: string;
+  /**
+   * "address" (default) restricts predictions to postal addresses — the
+   * original behavior every existing call site (EstablishmentTab,
+   * ProfileTab) relies on. "establishment" searches businesses instead,
+   * which is what actually populates phone/opening_hours/business_types —
+   * Google only returns those for a place with a storefront, never for a
+   * bare address. Chantier 14's own screen 2 (établissement) needs
+   * "establishment"; nothing existing should change search type.
+   */
+  searchType?: 'address' | 'establishment';
+  /**
+   * Fires on every keystroke, independently of onSelect (which only fires
+   * once Google resolves an actual place). Without this, a visitor who
+   * types free text without picking a suggestion — the Places script
+   * failing to load, an unlisted address, or Chantier 14's own manual-entry
+   * fallback — has their typed text sitting only in this component's local
+   * state, never reaching the parent form at all. Optional: the two
+   * pre-existing call sites (EstablishmentTab, ProfileTab) don't pass it and
+   * keep their original onSelect-only behavior.
+   */
+  onInputChange?: (text: string) => void;
 }
 
-export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: AddressAutocompleteProps) => {
+export const AddressAutocomplete = ({ label, value, onSelect, placeholder, searchType = 'address', onInputChange }: AddressAutocompleteProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const onSelectRef = useRef(onSelect);
+  const onInputChangeRef = useRef(onInputChange);
   const [inputValue, setInputValue] = useState(value);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Keep callback ref fresh without re-binding the autocomplete listener
+  // Keep callback refs fresh without re-binding the autocomplete listener
   useEffect(() => {
     onSelectRef.current = onSelect;
   }, [onSelect]);
+  useEffect(() => {
+    onInputChangeRef.current = onInputChange;
+  }, [onInputChange]);
 
   // Sync external value (e.g. form reset)
   useEffect(() => {
@@ -48,8 +81,11 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: Add
         if (!inputRef.current || autocompleteRef.current) return;
 
         autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
-          types: ['address'],
-          fields: ['address_components', 'formatted_address', 'geometry'],
+          types: [searchType],
+          fields: [
+            'address_components', 'formatted_address', 'geometry', 'name',
+            'place_id', 'international_phone_number', 'opening_hours', 'types',
+          ],
         });
 
         autocompleteRef.current.addListener('place_changed', () => {
@@ -71,6 +107,11 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: Add
             country: get('country', true), // ISO 3166-1 alpha-2
             lat: place.geometry?.location?.lat() ?? null,
             lng: place.geometry?.location?.lng() ?? null,
+            place_id: place.place_id ?? '',
+            name: place.name ?? null,
+            phone: place.international_phone_number ?? null,
+            opening_hours: place.opening_hours?.weekday_text ?? null,
+            business_types: place.types ?? null,
           };
 
           setInputValue(parsed.address);
@@ -83,7 +124,10 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: Add
     };
 
     initAutocomplete();
-  }, []);
+    // The `autocompleteRef.current` guard above means a later searchType
+    // change wouldn't actually re-create the widget — callers don't change
+    // it after mount — but it's listed here since the effect does read it.
+  }, [searchType]);
 
   return (
     <div className="space-y-2">
@@ -94,7 +138,10 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder }: Add
           ref={inputRef}
           type="text"
           value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
+          onChange={(e) => {
+            setInputValue(e.target.value);
+            onInputChangeRef.current?.(e.target.value);
+          }}
           placeholder={placeholder ?? 'Rechercher une adresse...'}
           className="pl-9"
           autoComplete="off"

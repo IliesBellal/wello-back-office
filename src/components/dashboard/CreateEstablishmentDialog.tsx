@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { authService } from "@/services/authService";
+import { AddressAutocomplete } from "@/components/shared/AddressAutocomplete";
 
 /** IDs de la table `packages` — voir docs/audit-parcours-onboarding.md. */
 const PACKAGES = [
@@ -199,7 +200,15 @@ export const CreateEstablishmentDialog = ({ open, onOpenChange }: CreateEstablis
                 <FormItem>
                   <FormLabel>Adresse</FormLabel>
                   <FormControl>
-                    <Input placeholder="117 Route de lorraine" {...field} />
+                    <AddressAutocomplete
+                      value={field.value ?? ""}
+                      placeholder="117 Route de lorraine"
+                      onSelect={(parsed) => {
+                        form.setValue("address", parsed.address, { shouldValidate: true });
+                        if (parsed.postal_code) form.setValue("zip_code", parsed.postal_code);
+                        if (parsed.city) form.setValue("city", parsed.city);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

@@ -61,8 +61,10 @@ const parsePrice = (value: string) => parsePriceInput(value);
 const getOptionPrice = (opt: AttributeOption) =>
   opt.extra_price !== undefined ? opt.extra_price : (opt.price ?? 0);
 
-const getAttrType = (attr: Attribute) =>
-  attr.min === attr.max && attr.max === 1 ? 'Radio' : 'Checkbox';
+const getAttrType = (attr: Attribute) => {
+  if (attr.type === 'QUANTITY') return 'Quantité';
+  return attr.min === attr.max && attr.max === 1 ? 'Radio' : 'Checkbox';
+};
 
 const getOptionCost = (option: AttributeOption, components: any[]): number => {
   if (!option.component_id || !option.quantity) return 0;
@@ -201,6 +203,7 @@ interface SortableOptionRowProps {
   option: AttributeOption;
   components: any[];
   compatibleUnits: any[];
+  showMaxQuantity?: boolean;
   onUpdate: (field: keyof AttributeOption, value: unknown) => void;
   onRemove: () => void;
   onImageUploaded?: () => void;
@@ -214,6 +217,7 @@ function SortableOptionRow({
   option,
   components,
   compatibleUnits,
+  showMaxQuantity,
   onUpdate,
   onRemove,
   onImageUploaded,
@@ -329,6 +333,17 @@ function SortableOptionRow({
           }}
         />
       </TableCell>
+      {showMaxQuantity && (
+        <TableCell>
+          <Input
+            type="number"
+            min={1}
+            value={option.max_quantity ?? 1}
+            onChange={e => onUpdate('max_quantity', parseInt(e.target.value) || 1)}
+            placeholder="1"
+          />
+        </TableCell>
+      )}
       <TableCell>
         <Select
           value={option.component_id || 'none'}
@@ -601,8 +616,8 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
             />
           </div>
 
-          {/* Min / Max */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Min / Max / Mode de choix */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="attr-min">Sélection minimum</Label>
               <Input
@@ -623,9 +638,26 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
                 onChange={e => setFormData(prev => ({ ...prev, max: parseInt(e.target.value) || 1 }))}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="attr-choice-mode">Mode de choix</Label>
+              <Select
+                value={formData.type === 'QUANTITY' ? 'QUANTITY' : 'CHECK'}
+                onValueChange={value => setFormData(prev => ({ ...prev, type: value as 'CHECK' | 'QUANTITY' }))}
+              >
+                <SelectTrigger id="attr-choice-mode">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CHECK">Cocher les options</SelectItem>
+                  <SelectItem value="QUANTITY">Choisir une quantité par option</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground -mt-2">
-            {formData.min === formData.max && formData.max === 1
+            {formData.type === 'QUANTITY'
+              ? 'Le client choisit une quantité pour chaque option (ex : 2 boules vanille, 1 boule chocolat).'
+              : formData.min === formData.max && formData.max === 1
               ? 'Type : Radio — sélection unique obligatoire'
               : formData.min === 0
               ? 'Type : Checkbox — sélection multiple optionnelle'
@@ -634,19 +666,26 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
 
           {/* Options */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <Label>Options</Label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setShowBatchSelector(true)}
+                  className="w-full sm:w-auto"
                 >
                   <Plus className="w-4 h-4 mr-1" />
                   Sélectionner des ingrédients
                 </Button>
-                <Button type="button" variant="outline" size="sm" onClick={handleAddOption}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleAddOption}
+                  className="w-full sm:w-auto"
+                >
                   <Plus className="w-4 h-4 mr-1" />
                   Ajouter une option
                 </Button>
@@ -668,6 +707,9 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
                           <TableHead className="w-20">Image</TableHead>
                           <TableHead className="min-w-[120px]">Nom de l'option</TableHead>
                           <TableHead className="min-w-[100px]">Supplément (€)</TableHead>
+                          {formData.type === 'QUANTITY' && (
+                            <TableHead className="min-w-[110px]">Qté max. client</TableHead>
+                          )}
                           <TableHead className="min-w-[150px]">Ingrédient (optionnel)</TableHead>
                           <TableHead className="min-w-[100px]">Quantité</TableHead>
                           <TableHead className="min-w-[130px]">Unité de mesure</TableHead>
@@ -687,6 +729,7 @@ function FormView({ initial, onSave, onCancel, onOptionImageUploaded }: FormView
                                 option={option}
                                 components={components}
                                 compatibleUnits={compatibleUnits}
+                                showMaxQuantity={formData.type === 'QUANTITY'}
                                 onUpdate={(field, value) => handleUpdateOption(index, field, value)}
                                 onRemove={() => handleRemoveOption(index)}
                                 onImageUploaded={onOptionImageUploaded}
