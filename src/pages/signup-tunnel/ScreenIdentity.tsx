@@ -33,15 +33,37 @@ export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentit
   const [firstName, setFirstName] = useState(state.firstName);
   const [lastName, setLastName] = useState(state.lastName);
   const [error, setError] = useState<string | null>(null);
+  /** Set once Google returns a credential — Google's own claims (given_name/
+   * family_name) aren't guaranteed present, so first/last name are confirmed
+   * here, editable, rather than sent straight through (a blank family_name
+   * silently failed the API's required-field check with no way to fix it). */
+  const [googleIdToken, setGoogleIdToken] = useState<string | null>(null);
 
   const handleGoogleCredential = (idToken: string) => {
     const claims = decodeJwtPayload<GoogleIdTokenClaims>(idToken);
+    setError(null);
+    setGoogleIdToken(idToken);
+    setEmail(claims?.email ?? '');
+    setFirstName(claims?.given_name ?? '');
+    setLastName(claims?.family_name ?? '');
+  };
+
+  const handleGoogleContinue = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('Merci de renseigner votre prénom et votre nom.');
+      return;
+    }
+    if (!googleIdToken) return;
+
     onNext({
       provider: 'google',
-      idToken,
-      email: claims?.email ?? '',
-      firstName: claims?.given_name ?? '',
-      lastName: claims?.family_name ?? '',
+      idToken: googleIdToken,
+      email,
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
     });
   };
 
@@ -85,24 +107,18 @@ export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentit
         </div>
       )}
 
-      <GoogleSignInButton onCredential={handleGoogleCredential} />
+      {googleIdToken ? (
+        <form onSubmit={handleGoogleContinue} className="space-y-4">
+          <p className="text-sm text-slate-600 text-center">
+            Confirmez votre prénom et votre nom pour continuer.
+          </p>
 
-      {!showEmailForm ? (
-        <button
-          type="button"
-          onClick={() => setShowEmailForm(true)}
-          className="w-full text-sm text-slate-600 hover:text-slate-900 text-center underline transition-colors"
-        >
-          ou créer un compte avec mon adresse e-mail
-        </button>
-      ) : (
-        <form onSubmit={handleEmailSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="first-name">Prénom</Label>
+            <Label htmlFor="google-first-name">Prénom</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                id="first-name"
+                id="google-first-name"
                 autoComplete="given-name"
                 autoFocus
                 value={firstName}
@@ -114,47 +130,14 @@ export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentit
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="last-name">Nom</Label>
+            <Label htmlFor="google-last-name">Nom</Label>
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <Input
-                id="last-name"
+                id="google-last-name"
                 autoComplete="family-name"
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Adresse e-mail</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="pl-10"
-                required
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Mot de passe</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input
-                id="password"
-                type="password"
-                autoComplete="new-password"
-                placeholder="8 caractères minimum"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 className="pl-10"
                 required
               />
@@ -171,7 +154,106 @@ export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentit
           >
             Continuer
           </button>
+
+          <button
+            type="button"
+            onClick={() => setGoogleIdToken(null)}
+            className="w-full text-sm text-slate-500 hover:text-slate-700 text-center underline transition-colors"
+          >
+            Utiliser un autre compte
+          </button>
         </form>
+      ) : (
+        <>
+          <GoogleSignInButton onCredential={handleGoogleCredential} />
+
+          {!showEmailForm ? (
+            <button
+              type="button"
+              onClick={() => setShowEmailForm(true)}
+              className="w-full text-sm text-slate-600 hover:text-slate-900 text-center underline transition-colors"
+            >
+              ou créer un compte avec mon adresse e-mail
+            </button>
+          ) : (
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="first-name">Prénom</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="first-name"
+                    autoComplete="given-name"
+                    autoFocus
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="last-name">Nom</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="last-name"
+                    autoComplete="family-name"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="email">Adresse e-mail</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="password">Mot de passe</Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="8 caractères minimum"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              {error && <p className="text-sm text-destructive">{error}</p>}
+
+              <button
+                type="submit"
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold
+                  rounded-lg shadow-md hover:shadow-xl hover:from-blue-700 hover:to-blue-700
+                  transition-all duration-300"
+              >
+                Continuer
+              </button>
+            </form>
+          )}
+        </>
       )}
 
       <p className="text-center text-sm text-slate-500">
