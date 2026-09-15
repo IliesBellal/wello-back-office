@@ -93,6 +93,15 @@ export const ScreenEstablishment = ({ state, onNext, onBack }: ScreenEstablishme
       return;
     }
 
+    // merchant.merchanttel is varchar(15) — strip spaces/separators so a
+    // formatted "+33 3 82 51 98 08" (17 chars) fits, instead of failing the
+    // INSERT at final submit with a raw SQLSTATE 22001.
+    const normalizedPhone = phone.trim().replace(/[\s.\-()]/g, '');
+    if (normalizedPhone.length > 15) {
+      setError('Le numéro de téléphone est trop long (15 caractères maximum).');
+      return;
+    }
+
     onNext({
       businessName: businessName.trim(),
       address: address.trim(),
@@ -101,7 +110,7 @@ export const ScreenEstablishment = ({ state, onNext, onBack }: ScreenEstablishme
       country: country.trim() || 'FR',
       lat,
       lng,
-      phone: phone.trim(),
+      phone: normalizedPhone,
       siret: siret.trim(),
       naf,
       placeId,

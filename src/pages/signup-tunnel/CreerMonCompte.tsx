@@ -135,6 +135,16 @@ const CreerMonCompte = () => {
       sessionStorage.removeItem('signup-tunnel:state');
       navigate('/');
     } catch (error) {
+      // A real HTTP response means the API already resolved this
+      // Idempotency-Key to a terminal (failed) session — retrying with the
+      // SAME key would just replay this exact cached error for up to
+      // SignupSessionTTL (24h) server-side, even after the payload is fixed
+      // (see signup/handler.go's replay()). Only a network-level failure
+      // (no response reaches us at all) keeps the key, so that retry can
+      // still safely dedupe against a request that may have gone through.
+      if (isPublicApiError(error)) {
+        clearIdempotencyKey();
+      }
       if (isPublicApiError(error) && error.code === 'email_already_used') {
         setEmailTakenError(true);
         setStep(1);
