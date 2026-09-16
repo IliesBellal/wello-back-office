@@ -88,6 +88,8 @@ export default function Menu() {
     bulkAddProductsTags,
     bulkSetProductsTva,
     bulkSetProductsAvailability,
+    bulkSetProductsComponents,
+    bulkAddProductsComponents,
     bulkAssignProductsToCategory,
     bulkAssignProductsToMarketingCategory
   } = useMenuData();
@@ -504,6 +506,8 @@ export default function Menu() {
           attributes={attributes}
           categories={menuData?.products_types || []}
           tags={tags}
+          components={components}
+          units={units}
           onCreateCategory={createProductCategory}
           onDeleteProducts={bulkDeleteProducts}
           onSetStatus={bulkSetProductsStatus}
@@ -515,6 +519,8 @@ export default function Menu() {
           onAssignMarketingCategory={bulkAssignProductsToMarketingCategory}
           onSetTva={bulkSetProductsTva}
           onSetAvailability={bulkSetProductsAvailability}
+          onSetComponents={bulkSetProductsComponents}
+          onAddComponents={bulkAddProductsComponents}
           onApplied={() => setSelectedIds(new Set())}
         />
 

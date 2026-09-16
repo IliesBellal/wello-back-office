@@ -51,6 +51,8 @@ import CongesEchanges from './pages/equipe/CongesEchanges';
 import EquipeSettings from './pages/equipe/EquipeSettings';
 import RolesPage from './pages/equipe/RolesPage';
 import MyPermissionsPage from './pages/settings/MyPermissionsPage';
+import SepaSetup from './pages/settings/SepaSetup';
+import SubscriptionManagement from './pages/settings/SubscriptionManagement';
 import HacCPActivity from './pages/haccp/Activity';
 import HacCPSettings from './pages/haccp/Settings';
 import ReservationsListPage from './pages/reservations/List';
@@ -126,6 +128,9 @@ const App = () => (
               <Route path="/settings/production-profiles" element={<ProtectedRoute><ProductionProfilesTable /></ProtectedRoute>} />
               {/* Mes droits — diagnostic page, no gate: every authenticated user sees their own rights */}
               <Route path="/settings/my-permissions" element={<ProtectedRoute><MyPermissionsPage /></ProtectedRoute>} />
+              {/* LOT B chantier 3b/3c — self-gated in-page via canManageSettings, same pattern as EquipeSettings */}
+              <Route path="/settings/billing/payment-method" element={<ProtectedRoute><SepaSetup /></ProtectedRoute>} />
+              <Route path="/settings/subscription" element={<ProtectedRoute><SubscriptionManagement /></ProtectedRoute>} />
 
               {/* Dashboard Sub-pages */}
               <Route path="/dashboard/analysis" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'pos.analytics')}><DashboardAnalysis /></ProtectedRoute>} />

@@ -7,6 +7,7 @@ import { Header } from './Header';
 import { MobileHeader } from '@/components/mobile/MobileHeader';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { OfflineIndicator } from '@/components/mobile/OfflineIndicator';
+import { ActivationStatusBanner } from './ActivationStatusBanner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -37,7 +38,10 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile Header or Desktop Header */}
         {isMobile ? <MobileHeader /> : <Header />}
-        
+
+        {/* Persistent activation/trial banner (LOT B §7.6) — spans every page once, not per-route. */}
+        <ActivationStatusBanner />
+
         <main className="flex-1 overflow-auto scroll-smooth-mobile pb-20 md:pb-0">
           {children}
         </main>

@@ -15,20 +15,22 @@ import { initialTunnelState, type TunnelState } from './tunnelState';
 import { ScreenIdentity } from './ScreenIdentity';
 import { ScreenEstablishment } from './ScreenEstablishment';
 import { ScreenRestaurationType } from './ScreenRestaurationType';
+import { ScreenModules } from './ScreenModules';
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 /**
  * LOT A Semaine 3, Chantier 14 — /creer-mon-compte, the public self-onboarding
- * tunnel: three one-field-at-a-time screens (§5.2/§5.4/§5.5), submitted once
- * at the end (the API's POST /v1/signup is atomic — there is no partial
- * "save screen 1" call to make, so cross-device resume of an IN-PROGRESS
- * tunnel is not implemented here; only the ?ctx= pre-signup context from the
- * vitrine site, which IS a real per-screen backend resource, is restored).
- * State otherwise lives in memory (+ this component's own effect below
- * persists it to sessionStorage so an accidental refresh on the SAME device
- * doesn't lose progress — a smaller guarantee than the brief's "reprise sur
- * un autre appareil", called out explicitly in the chantier report).
+ * tunnel: four one-field-at-a-time screens (§5.2/§5.4/§5.5, plus LOT B
+ * chantier 4b's module-selection screen), submitted once at the end (the
+ * API's POST /v1/signup is atomic — there is no partial "save screen 1" call
+ * to make, so cross-device resume of an IN-PROGRESS tunnel is not
+ * implemented here; only the ?ctx= pre-signup context from the vitrine site,
+ * which IS a real per-screen backend resource, is restored). State otherwise
+ * lives in memory (+ this component's own effect below persists it to
+ * sessionStorage so an accidental refresh on the SAME device doesn't lose
+ * progress — a smaller guarantee than the brief's "reprise sur un autre
+ * appareil", called out explicitly in the chantier report).
  */
 const CreerMonCompte = () => {
   const [searchParams] = useSearchParams();
@@ -63,6 +65,7 @@ const CreerMonCompte = () => {
           contextToken: ctx,
           resolvedPlan: resp.resolved_plan,
           segment: resp.segment ?? null,
+          cartModules: resp.cart?.modules ?? null,
         }));
       })
       .catch(() => {
@@ -86,6 +89,11 @@ const CreerMonCompte = () => {
   const goToStep3 = (patch: Partial<TunnelState>) => {
     patchState(patch);
     setStep(3);
+  };
+
+  const goToStep4 = (archetypeCode: ArchetypeCode) => {
+    patchState({ archetypeCode });
+    setStep(4);
   };
 
   const handleFinalSubmit = async (archetypeCode: ArchetypeCode, acceptsTerms: boolean, acceptsMarketing: boolean) => {
@@ -177,7 +185,7 @@ const CreerMonCompte = () => {
       >
         <div className="bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden p-6 md:p-8">
           <div className="flex gap-1.5 mb-6" aria-hidden>
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3, 4].map((s) => (
               <div
                 key={s}
                 className={`h-1.5 flex-1 rounded-full transition-colors ${s <= step ? 'bg-blue-600' : 'bg-slate-200'}`}
@@ -192,10 +200,17 @@ const CreerMonCompte = () => {
             <ScreenEstablishment state={state} onNext={goToStep3} onBack={() => setStep(1)} />
           )}
           {step === 3 && (
-            <ScreenRestaurationType
+            <ScreenRestaurationType state={state} onNext={goToStep4} onBack={() => setStep(2)} />
+          )}
+          {step === 4 && state.archetypeCode && (
+            <ScreenModules
               state={state}
-              onSubmit={handleFinalSubmit}
-              onBack={() => setStep(2)}
+              archetypeCode={state.archetypeCode}
+              onPatchState={patchState}
+              onSubmit={(acceptsTerms, acceptsMarketing) =>
+                handleFinalSubmit(state.archetypeCode as ArchetypeCode, acceptsTerms, acceptsMarketing)
+              }
+              onBack={() => setStep(3)}
               submitting={submitting}
               submitError={submitError}
             />

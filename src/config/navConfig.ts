@@ -40,6 +40,7 @@ import {
   Settings2,
   KeyRound,
   Fingerprint,
+  CreditCard,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -503,6 +504,14 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Mes droits',
         icon: Fingerprint,
         href: '/settings/my-permissions',
+      },
+      {
+        id: 'subscription',
+        title: 'Abonnement & facturation',
+        icon: CreditCard,
+        href: '/settings/subscription',
+        // LOT B chantier 3c — matches SubscriptionManagement.tsx's self-gate.
+        visibilityCheck: (authData) => checkPermission(authData, 'settings.manage'),
       },
     ],
   },

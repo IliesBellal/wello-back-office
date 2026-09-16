@@ -153,6 +153,16 @@ export const qk = {
   // needed on login/logout/merchant-switch.
   myPermissions: (userId: string, merchantId: string) => ["me", "permissions", userId, merchantId] as const,
 
+  // ─── LOT B – Billing & Subscription ──────────────────────
+  billing: {
+    activationStatus: ["billing", "activation-status"] as const,
+  },
+  subscriptions: {
+    current: ["subscriptions", "current"] as const,
+    preview: (add: string[], remove: string[]) =>
+      ["subscriptions", "preview", [...add].sort(), [...remove].sort()] as const,
+  },
+
   // ─── Reservations / Bookings ────────────────────────────
   reservations: {
     all: ["reservations"] as const,

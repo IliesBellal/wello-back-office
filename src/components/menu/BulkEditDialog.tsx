@@ -23,7 +23,8 @@ import { SelectableChip } from '@/components/ui/selectable-chip';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CategorySelector, ConfirmDialog } from '@/components/shared';
 import { ProductOptionsTab } from '@/components/menu/ProductOptionsTab';
-import { Attribute, BulkAvailabilityFields, Category, Product, ProductAttribute, ProductStatus, Tag, TvaRate, TvaRateGroup } from '@/types/menu';
+import { ProductCompositionTab } from '@/components/menu/ProductCompositionTab';
+import { Attribute, BulkAvailabilityFields, Category, Component, Product, ProductAttribute, ProductComposition, ProductStatus, Tag, TvaRate, TvaRateGroup, UnitOfMeasure } from '@/types/menu';
 import { menuService } from '@/services/menuService';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 import {
@@ -46,6 +47,8 @@ import {
   Search,
   SlidersHorizontal,
   CircleDot,
+  Wheat,
+  CirclePlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -54,6 +57,8 @@ type BulkAction =
   | 'set_status'
   | 'set_attributes'
   | 'add_attribute'
+  | 'set_components'
+  | 'add_components'
   | 'set_tags'
   | 'add_tags'
   | 'assign_category'
@@ -151,11 +156,15 @@ interface BulkEditDialogProps {
   attributes: Attribute[];
   categories: Category[];
   tags: Tag[];
+  components: Component[];
+  units: UnitOfMeasure[];
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   onDeleteProducts: (productIds: string[]) => Promise<void>;
   onSetStatus: (productIds: string[], status: ProductStatus) => Promise<void>;
   onSetAttributes: (productIds: string[], attributeIds: string[]) => Promise<void>;
   onAddAttribute: (productIds: string[], attributeId: string) => Promise<void>;
+  onSetComponents: (productIds: string[], components: ProductComposition[]) => Promise<void>;
+  onAddComponents: (productIds: string[], components: ProductComposition[]) => Promise<void>;
   onSetTags: (productIds: string[], tagIds: string[]) => Promise<void>;
   onAddTags: (productIds: string[], tagIds: string[]) => Promise<void>;
   onAssignCategory: (productIds: string[], categoryId: string) => Promise<void>;
@@ -197,6 +206,18 @@ const ACTIONS: {
     label: 'Ajouter une option',
     hint: 'Ajoute un groupe d’options aux produits sans toucher à ceux déjà attachés.',
     icon: ListPlus,
+  },
+  {
+    value: 'set_components',
+    label: 'Définir les ingrédients',
+    hint: 'Remplace toute la composition des produits par la sélection ci-dessous.',
+    icon: Wheat,
+  },
+  {
+    value: 'add_components',
+    label: 'Ajouter des ingrédients',
+    hint: 'Ajoute les ingrédients sélectionnés aux produits sans retirer ceux déjà présents.',
+    icon: CirclePlus,
   },
   {
     value: 'set_tags',
@@ -259,6 +280,8 @@ const DETAIL_ACTIONS: BulkAction[] = [
   'set_status',
   'set_attributes',
   'add_attribute',
+  'set_components',
+  'add_components',
   'set_tags',
   'add_tags',
   'assign_category',
@@ -281,11 +304,15 @@ export const BulkEditDialog = ({
   attributes,
   categories,
   tags,
+  components,
+  units,
   onCreateCategory,
   onDeleteProducts,
   onSetStatus,
   onSetAttributes,
   onAddAttribute,
+  onSetComponents,
+  onAddComponents,
   onSetTags,
   onAddTags,
   onAssignCategory,
@@ -300,6 +327,7 @@ export const BulkEditDialog = ({
   const [statusValue, setStatusValue] = useState<ProductStatus | ''>('');
   const [selectedAttributes, setSelectedAttributes] = useState<ProductAttribute[]>([]);
   const [attributeToAdd, setAttributeToAdd] = useState('');
+  const [selectedComponents, setSelectedComponents] = useState<ProductComposition[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState('');
   const [marketingCategoryId, setMarketingCategoryId] = useState('');
@@ -330,6 +358,7 @@ export const BulkEditDialog = ({
     setStatusValue('');
     setSelectedAttributes([]);
     setAttributeToAdd('');
+    setSelectedComponents([]);
     setSelectedTagIds([]);
     setCategoryId('');
     setMarketingCategoryId('');
@@ -418,6 +447,7 @@ export const BulkEditDialog = ({
     if (step === 'choose') return true;
     if (action === 'set_status') return !!statusValue;
     if (action === 'add_attribute') return !!attributeToAdd;
+    if (action === 'add_components') return selectedComponents.length > 0;
     if (action === 'add_tags') return selectedTagIds.length > 0;
     if (action === 'assign_category') return !!categoryId;
     if (action === 'assign_marketing_category') return !!marketingCategoryId;
@@ -454,6 +484,12 @@ export const BulkEditDialog = ({
       } else if (action === 'add_attribute') {
         await onAddAttribute(productIds, attributeToAdd);
         toast.success(`Option ajoutée à ${count} produit${plural}`);
+      } else if (action === 'set_components') {
+        await onSetComponents(productIds, selectedComponents);
+        toast.success(`Ingrédients appliqués à ${count} produit${plural}`);
+      } else if (action === 'add_components') {
+        await onAddComponents(productIds, selectedComponents);
+        toast.success(`Ingrédients ajoutés à ${count} produit${plural}`);
       } else if (action === 'set_tags') {
         await onSetTags(productIds, selectedTagIds);
         toast.success(`Tags appliqués à ${count} produit${plural}`);
@@ -657,6 +693,24 @@ export const BulkEditDialog = ({
                           ))}
                         </SelectContent>
                       </Select>
+                    </div>
+                  )}
+
+                  {(action === 'set_components' || action === 'add_components') && (
+                    <div className="rounded-lg border border-border bg-card p-3">
+                      <ProductCompositionTab
+                        composition={selectedComponents}
+                        components={components}
+                        units={units}
+                        onChange={setSelectedComponents}
+                        disabled={applying}
+                      />
+                      {action === 'set_components' && selectedComponents.length === 0 && (
+                        <p className="text-xs text-muted-foreground mt-3">
+                          Aucun ingrédient sélectionné : appliquer retirera tous les ingrédients des
+                          produits.
+                        </p>
+                      )}
                     </div>
                   )}
 

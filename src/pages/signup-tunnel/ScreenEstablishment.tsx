@@ -121,7 +121,7 @@ export const ScreenEstablishment = ({ state, onNext, onBack }: ScreenEstablishme
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="text-center">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Votre établissement</h1>
-        <p className="text-sm text-slate-600">L'étape 2 sur 3 — où êtes-vous installé ?</p>
+        <p className="text-sm text-slate-600">L'étape 2 sur 4 — où êtes-vous installé ?</p>
       </div>
 
       <AddressAutocomplete

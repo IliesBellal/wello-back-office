@@ -94,7 +94,7 @@ export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentit
     <div className="space-y-6">
       <div className="text-center">
         <h1 className="text-2xl md:text-3xl font-bold text-slate-900 mb-2">Créez votre compte</h1>
-        <p className="text-sm text-slate-600">L'étape 1 sur 3 — votre identité.</p>
+        <p className="text-sm text-slate-600">L'étape 1 sur 4 — votre identité.</p>
       </div>
 
       {emailTakenError && (

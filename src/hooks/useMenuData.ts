@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { menuService } from '@/services/menuService';
-import { Menu, Product, ProductStatus, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory, Tag, ProductCreatePayload, BulkAvailabilityFields } from '@/types/menu';
+import { Menu, Product, ProductStatus, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory, Tag, ProductCreatePayload, BulkAvailabilityFields, ProductComposition } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
 
 export const useMenuData = () => {
@@ -577,6 +577,22 @@ export const useMenuData = () => {
     });
   };
 
+  // Remplace la composition (ingrédients) des produits ciblés par la même
+  // liste. Refetch plutôt que patch local : le coût/foodcost/marge affichés
+  // sont recalculés côté API à partir de la nouvelle composition.
+  const bulkSetProductsComponents = async (productIds: string[], components: ProductComposition[]) => {
+    await menuService.bulkSetProductsComponents(productIds, components);
+    await loadData();
+  };
+
+  // Ajoute des ingrédients sans retirer ceux déjà présents : un appel API par
+  // ingrédient (l'endpoint additif ne porte qu'un seul component), comme
+  // bulkAddProductsTags. Refetch pour la même raison que bulkSetProductsComponents.
+  const bulkAddProductsComponents = async (productIds: string[], components: ProductComposition[]) => {
+    await Promise.all(components.map(component => menuService.bulkAddComponentToProducts(productIds, component)));
+    await loadData();
+  };
+
   // Applique un taux de TVA à un seul type de vente (scope) pour les produits
   // ciblés. Pas de patch local fin : refetch, comme setGroupMembers /
   // deleteProductGroup, pour rester fidèle aux libellés de taux résolus côté API.
@@ -743,6 +759,8 @@ export const useMenuData = () => {
     bulkAddProductsTags,
     bulkSetProductsTva,
     bulkSetProductsAvailability,
+    bulkSetProductsComponents,
+    bulkAddProductsComponents,
     bulkAssignProductsToCategory,
     bulkAssignProductsToMarketingCategory,
     applyProductsAllergens,

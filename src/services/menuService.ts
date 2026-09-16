@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse, API_BASE_URL } from "@/services/apiClient";
-import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload, BulkAvailabilityFields } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload, BulkAvailabilityFields, ProductComposition } from "@/types/menu";
 import { getStoredAuthToken } from "@/types/auth";
 
 interface MarketingCategoryApiItem {
@@ -1485,6 +1485,28 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.post<void>('/menu/bulk/attributes/assign', payload)
+    );
+  },
+
+  // Remplace la composition (ingrédients) des produits ciblés par la même
+  // liste. Liste vide = retire tous les ingrédients.
+  async bulkSetProductsComponents(productIds: string[], components: ProductComposition[]): Promise<void> {
+    const payload = { product_ids: productIds, components };
+    logAPI('PATCH', '/menu/products/bulk/components', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>('/menu/products/bulk/components', payload)
+    );
+  },
+
+  // Ajoute un ingrédient aux produits ciblés sans toucher au reste de leur
+  // composition (additif).
+  async bulkAddComponentToProducts(productIds: string[], component: ProductComposition): Promise<void> {
+    const payload = { product_ids: productIds, component };
+    logAPI('POST', '/menu/bulk/components/assign', payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.post<void>('/menu/bulk/components/assign', payload)
     );
   },
 
