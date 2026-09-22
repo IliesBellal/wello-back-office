@@ -101,7 +101,7 @@ function CompositionCard({ current }: { current: SubscriptionAmount }) {
     <SettingsCard title="Composition actuelle" description="Ce que vous payez aujourd'hui." icon={Package}>
       <div className="space-y-2">
         {current.breakdown.length === 0 ? (
-          <p className="text-sm italic text-muted-foreground">Aucune ligne active.</p>
+          <p className="text-sm italic text-muted-foreground">Aucun produit souscrit.</p>
         ) : (
           current.breakdown.map((line) => (
             <div key={line.code} className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-3 py-2 text-sm">

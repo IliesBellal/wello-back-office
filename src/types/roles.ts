@@ -30,6 +30,7 @@ export type PermissionKey =
   | "bookings.manage"
   | "platforms.manage"
   | "kiosk.manage"
+  | "cds.manage"
   | "seating_plan.manage";
 
 /** One entry of GET /permissions — key/domain stay `string`, not

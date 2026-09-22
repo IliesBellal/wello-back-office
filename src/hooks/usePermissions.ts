@@ -30,6 +30,7 @@ import type { PermissionKey } from "@/types/roles";
  *   bookings.manage        -> canManageBookings (RBAC lot 10)
  *   platforms.manage       -> canManagePlatforms (RBAC lot 10)
  *   kiosk.manage           -> canManageKiosk (RBAC lot 10)
+ *   cds.manage             -> canManageCds (module CDS)
  *   pos.analytics          -> canViewAnalytics (RBAC lot 10)
  *   seating_plan.manage    -> canManageSeatingPlan (RBAC lot 10)
  *
@@ -66,6 +67,7 @@ export const usePermissions = () => {
       canManageBookings: has("bookings.manage"),
       canManagePlatforms: has("platforms.manage"),
       canManageKiosk: has("kiosk.manage"),
+      canManageCds: has("cds.manage"),
       canViewAnalytics: has("pos.analytics"),
       canManageSeatingPlan: has("seating_plan.manage"),
 

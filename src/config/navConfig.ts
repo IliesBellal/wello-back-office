@@ -36,6 +36,7 @@ import {
   Printer,
   ChefHat,
   MonitorSmartphone,
+  Tv,
   Tablet,
   Settings2,
   KeyRound,
@@ -464,6 +465,23 @@ export const NAV_ITEMS: NavItem[] = [
         visibilityCheck: (authData) => checkPermission(authData, 'kiosk.manage'),
       },
     ],
+  },
+
+  // ═══ AFFICHAGE CLIENT (CDS) ═══
+  // Une seule entree, sans enfant : les parametres sont PAR ECRAN (decision
+  // D2), on y entre depuis la ligne de l'ecran concerne. Une page
+  // "Parametres" globale, comme celle du Kiosk, n'aurait rien a afficher sans
+  // d'abord demander de quel ecran on parle.
+  //
+  // Pas de requiredModule non plus : l'ecran est gratuit (decision D4), il
+  // n'est adosse a aucun flag d'abonnement. Seule la permission garde
+  // l'entree.
+  {
+    id: 'cds',
+    title: 'Affichage client',
+    icon: Tv,
+    href: '/cds/displays',
+    visibilityCheck: (authData) => checkPermission(authData, 'cds.manage'),
   },
 
   // ═══ SETTINGS & ADMINISTRATION ═══

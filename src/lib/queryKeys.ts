@@ -140,6 +140,19 @@ export const qk = {
     settings: ["kiosks", "settings"] as const,
   },
 
+  // ─── CDS (écrans d'affichage client) ──────────────────────
+  // Les paramètres et les médias sont scopés PAR ÉCRAN (décision D2) : leurs
+  // clés portent donc le displayId, contrairement à qk.kiosks.settings qui
+  // est global au merchant.
+  cds: {
+    all: ["cds"] as const,
+    displays: ["cds", "displays"] as const,
+    detail: (displayId: string) => ["cds", "displays", displayId] as const,
+    enrollmentCodes: ["cds", "enrollment-codes"] as const,
+    settings: (displayId: string) => ["cds", "displays", displayId, "settings"] as const,
+    media: (displayId: string) => ["cds", "displays", displayId, "media"] as const,
+  },
+
   // ─── RBAC – Roles ───────────────────────────────────────
   roles: {
     all: ["roles"] as const,

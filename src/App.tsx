@@ -59,6 +59,8 @@ import ReservationsListPage from './pages/reservations/List';
 import ReservationsSettingsPage from './pages/reservations/Settings';
 import KiosksPage from './pages/kiosks/KiosksPage';
 import KioskSettingsPage from './pages/kiosks/KioskSettingsPage';
+import CdsDisplaysPage from './pages/cds/CdsDisplaysPage';
+import CdsSettingsPage from './pages/cds/CdsSettingsPage';
 import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
 
@@ -119,6 +121,14 @@ const App = () => (
               {/* Kiosk */}
               <Route path="/kiosk/devices" element={<ProtectedRoute requiredModule="kiosks" accessCheck={(authData) => checkPermission(authData, 'kiosk.manage')}><KiosksPage /></ProtectedRoute>} />
               <Route path="/kiosk/settings" element={<ProtectedRoute requiredModule="kiosks" accessCheck={(authData) => checkPermission(authData, 'kiosk.manage')}><KioskSettingsPage /></ProtectedRoute>} />
+
+              {/* CDS — ecrans d'affichage client.
+                  Pas de requiredModule : l'ecran est gratuit (decision D4),
+                  il n'est adosse a aucun flag d'abonnement, contrairement au
+                  Kiosk (capabilities.modules.kiosks). Seule la permission
+                  cds.manage garde ces routes. */}
+              <Route path="/cds/displays" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'cds.manage')}><CdsDisplaysPage /></ProtectedRoute>} />
+              <Route path="/cds/displays/:displayId/settings" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'cds.manage')}><CdsSettingsPage /></ProtectedRoute>} />
 
               {/* Administration */}
               <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
