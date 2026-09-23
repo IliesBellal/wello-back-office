@@ -10,6 +10,7 @@ export const useIntegrationStatus = () => {
     const deliverooLocationId = authData?.integrations.deliveroo?.location_id;
     const uberFeatureActive = authData?.capabilities.integrations.uber_eats ?? false;
     const deliverooFeatureActive = authData?.capabilities.integrations.deliveroo ?? false;
+    const kiosksFeatureActive = authData?.capabilities.modules.kiosks ?? false;
 
     const hasValue = (value: unknown) =>
       typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
@@ -25,6 +26,10 @@ export const useIntegrationStatus = () => {
       deliveroo: {
         active: deliverooFeatureActive,
         reason: hasDeliverooConfig ? 'configured' : 'missing_config',
+      },
+      kiosks: {
+        active: kiosksFeatureActive,
+        reason: kiosksFeatureActive ? 'configured' : 'missing_config',
       },
     };
   }, [authData]);

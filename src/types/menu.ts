@@ -30,6 +30,7 @@ export interface SubProduct {
   margin_percent?: number;
   is_product_group?: boolean;
   is_available_on_sno?: boolean;
+  is_available_on_kiosk?: boolean;
   status?: string;
   by_product_of?: string;  // Parent product ID
   configuration?: Record<string, unknown>;
@@ -232,6 +233,7 @@ export interface Product {
   is_group?: boolean;
   is_popular?: boolean;
   is_available_on_sno?: boolean;
+  is_available_on_kiosk?: boolean;
   order?: number;
   display_order?: number;  // Sort order for products
   status?: string | number;  // Can be string (e.g., "available", "unavailable") or number
@@ -339,6 +341,7 @@ export interface ProductCreatePayload {
   production_color?: string;
   status?: string;
   is_available_on_sno?: boolean;
+  is_available_on_kiosk?: boolean;
   configuration?: string[];          // IDs de groupes d'attributs
   components?: ProductComposition[]; // Composition
   tags?: string[];                   // IDs de tags

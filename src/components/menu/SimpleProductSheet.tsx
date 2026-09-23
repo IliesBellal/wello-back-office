@@ -38,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2 } from 'lucide-react';
+import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2, MonitorSmartphone } from 'lucide-react';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
 import { CategorySelector } from '@/components/shared/CategorySelector';
@@ -396,6 +396,7 @@ export const SimpleProductSheet = ({
       available_take_away: true,
       available_delivery: true,
       is_available_on_sno: true,
+      is_available_on_kiosk: true,
       components: [],
       attributes: [],
       tags: [],
@@ -625,6 +626,7 @@ export const SimpleProductSheet = ({
         production_color: formData.production_color || undefined,
         status: typeof formData.status === 'string' ? formData.status : undefined,
         is_available_on_sno: formData.is_available_on_sno,
+        is_available_on_kiosk: formData.is_available_on_kiosk,
         configuration: (formData.attributes || []).map((attr) => attr.attribute_id),
         components: formData.components || [],
         tags: (formData.tags || []).filter((tag): tag is string => typeof tag === 'string'),
@@ -1421,9 +1423,9 @@ export const SimpleProductSheet = ({
                           <div className="flex items-center justify-between">
                             <Label>Actif</Label>
                             {isEditMode ? (
-                              <Switch 
-                                checked={formData.is_available_on_sno || false} 
-                                onCheckedChange={(checked) => setFormData({ ...formData, is_available_on_sno: checked })} 
+                              <Switch
+                                checked={formData.is_available_on_sno || false}
+                                onCheckedChange={(checked) => setFormData({ ...formData, is_available_on_sno: checked })}
                               />
                             ) : (
                               <Badge variant={product.is_available_on_sno ? "default" : "secondary"} className="text-xs">
@@ -1433,6 +1435,33 @@ export const SimpleProductSheet = ({
                           </div>
                         </CardContent>
                       </Card>
+
+                      {/* Borne de commande (Kiosk) */}
+                      {statuses.kiosks.active && (
+                      <Card className="border">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm flex items-center gap-2">
+                            <MonitorSmartphone className="w-4 h-4" />
+                            Borne de commande
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <Label>Actif</Label>
+                            {isEditMode ? (
+                              <Switch
+                                checked={formData.is_available_on_kiosk || false}
+                                onCheckedChange={(checked) => setFormData({ ...formData, is_available_on_kiosk: checked })}
+                              />
+                            ) : (
+                              <Badge variant={product.is_available_on_kiosk ? "default" : "secondary"} className="text-xs">
+                                {product.is_available_on_kiosk ? '✓' : '✗'}
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                      )}
                     </div>
                   </div>
                 </TabsContent>
@@ -1540,6 +1569,12 @@ export const SimpleProductSheet = ({
                       <Badge variant="default" className="text-xs">
                         <img src="/scannorder_logo.png" alt="ScanNOrder" className="w-3 h-3 mr-1 object-contain rounded" />
                         ScanNOrder
+                      </Badge>
+                    )}
+                    {statuses.kiosks.active && product?.is_available_on_kiosk && (
+                      <Badge variant="default" className="text-xs">
+                        <MonitorSmartphone className="w-3 h-3 mr-1" />
+                        Borne
                       </Badge>
                     )}
                   </div>
@@ -2282,6 +2317,36 @@ export const SimpleProductSheet = ({
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Borne de commande (Kiosk) */}
+                  {statuses.kiosks.active && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <MonitorSmartphone className="w-5 h-5" />
+                        Borne de commande
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs">Actif</Label>
+                        {isEditMode ? (
+                          <Switch
+                            checked={formData.is_available_on_kiosk || false}
+                            onCheckedChange={(checked) => setFormData({
+                              ...formData,
+                              is_available_on_kiosk: checked
+                            })}
+                          />
+                        ) : (
+                          <Badge variant={product.is_available_on_kiosk ? "default" : "secondary"} className="text-xs">
+                            {product.is_available_on_kiosk ? '✓' : '✗'}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  )}
                 </div>
               </div>
           </TabsContent>

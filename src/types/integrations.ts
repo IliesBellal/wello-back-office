@@ -1,4 +1,4 @@
-export type IntegrationKey = 'uberEats' | 'deliveroo';
+export type IntegrationKey = 'uberEats' | 'deliveroo' | 'kiosks';
 
 export interface IntegrationActivationStatus {
   active: boolean;
