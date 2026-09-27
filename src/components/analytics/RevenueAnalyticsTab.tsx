@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { analyticsService, RevenueAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS, CHANNEL_ORDER } from '@/utils/channels';
+import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
@@ -20,6 +21,7 @@ interface RevenueAnalyticsTabProps {
   merchantIds?: string[];
   comparisonMode?: ComparisonMode;
   merchantsById?: Record<string, string>;
+  orderFilter?: OrderFilterSelection;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -74,7 +76,8 @@ const channelPieDataOf = (resp: RevenueAnalyticsResponse) =>
       color: CHANNEL_COLORS[c.channel],
     }));
 
-export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: RevenueAnalyticsTabProps) => {
+export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {}, orderFilter }: RevenueAnalyticsTabProps) => {
+  const filterKey = orderFilterKey(orderFilter);
   const [data, setData] = useState<RevenueAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // RBAC lot 8 (docs/analytics/DROITS.md, §6.3 convention): a 403 on this
@@ -87,7 +90,7 @@ export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getRevenueAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode })
+    analyticsService.getRevenueAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode, orderFilter })
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -104,7 +107,8 @@ export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode, filterKey]);
 
   // Channels present in the timeline, in the fixed display order — only
   // series that actually have data get an <Area>, never a hardcoded 7 (or
@@ -135,7 +139,8 @@ export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
     compareMerchantIds.length > 0,
     compareMerchantIds,
     dateRange,
-    (from, to, merchantId) => analyticsService.getRevenueAnalytics(from, to, { merchantIds: [merchantId] })
+    (from, to, merchantId) => analyticsService.getRevenueAnalytics(from, to, { merchantIds: [merchantId], orderFilter }),
+    filterKey
   );
 
   if (isForbidden) {

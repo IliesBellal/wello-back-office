@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown } from 'lucide-react';
 import { analyticsService, OrdersAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS, CHANNEL_ORDER } from '@/utils/channels';
+import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
@@ -20,6 +21,7 @@ interface OrdersAnalyticsTabProps {
   merchantIds?: string[];
   comparisonMode?: ComparisonMode;
   merchantsById?: Record<string, string>;
+  orderFilter?: OrderFilterSelection;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -68,7 +70,8 @@ const channelPieDataOf = (resp: OrdersAnalyticsResponse) =>
       color: CHANNEL_COLORS[c.channel],
     }));
 
-export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: OrdersAnalyticsTabProps) => {
+export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {}, orderFilter }: OrdersAnalyticsTabProps) => {
+  const filterKey = orderFilterKey(orderFilter);
   const [data, setData] = useState<OrdersAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // Même fusible que l'onglet CA : un 403 masque le contenu au lieu de casser la page.
@@ -79,7 +82,7 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getOrdersAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode })
+    analyticsService.getOrdersAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode, orderFilter })
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -96,7 +99,8 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode, filterKey]);
 
   const presentChannels = useMemo(() => (data ? presentChannelsOf(data) : []), [data]);
 
@@ -119,7 +123,8 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     compareMerchantIds.length > 0,
     compareMerchantIds,
     dateRange,
-    (from, to, merchantId) => analyticsService.getOrdersAnalytics(from, to, { merchantIds: [merchantId] })
+    (from, to, merchantId) => analyticsService.getOrdersAnalytics(from, to, { merchantIds: [merchantId], orderFilter }),
+    filterKey
   );
 
   if (isForbidden) {

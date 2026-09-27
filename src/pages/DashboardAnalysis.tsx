@@ -15,6 +15,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { analyticsService, AccessibleMerchant, ComparisonMode } from '@/services/analyticsService';
 import { EstablishmentFilter } from '@/components/analytics/EstablishmentFilter';
+import { OrderFilter } from '@/components/analytics/OrderFilter';
+import { DEFAULT_ORDER_FILTER, type OrderFilterSelection } from '@/utils/orderFilters';
 import { subDays, format } from 'date-fns';
 import { TrendingUp, TrendingDown, Download, ChevronRight } from 'lucide-react';
 import { UpsellAnalyticsTab } from '@/components/analytics/UpsellAnalyticsTab';
@@ -33,6 +35,11 @@ import { Tile } from '@/components/shared/Tile';
 import { toast } from 'sonner';
 
 type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'paiements' | 'tva' | 'restaurants';
+
+// Onglets dont l'endpoint accepte le filtre canal × type de commande
+// (OrderFilterRequest, internal/modules/analytics/order_filter.go). Ailleurs
+// la carte est masquée plutôt qu'affichée sans effet.
+const ORDER_FILTER_TABS: ReadonlySet<TabType> = new Set(['ca', 'commandes', 'produits', 'options', 'annulations', 'upsell']);
 
 interface DateRange {
   from: Date;
@@ -86,6 +93,7 @@ const DashboardAnalysisContent = () => {
   const [accessibleMerchants, setAccessibleMerchants] = useState<AccessibleMerchant[]>([]);
   const [selectedMerchantIds, setSelectedMerchantIds] = useState<string[]>([]);
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('cumule');
+  const [orderFilter, setOrderFilter] = useState<OrderFilterSelection>(DEFAULT_ORDER_FILTER);
 
   useEffect(() => {
     let isMounted = true;
@@ -176,17 +184,17 @@ const DashboardAnalysisContent = () => {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'ca':
-        return <RevenueAnalyticsTab dateRange={dateRange} {...scopeProps} />;
+        return <RevenueAnalyticsTab dateRange={dateRange} orderFilter={orderFilter} {...scopeProps} />;
       case 'commandes':
-        return <OrdersAnalyticsTab dateRange={dateRange} {...scopeProps} />;
+        return <OrdersAnalyticsTab dateRange={dateRange} orderFilter={orderFilter} {...scopeProps} />;
       case 'produits':
-        return <ProductsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
+        return <ProductsAnalyticsTab dateRange={dateRange} orderFilter={orderFilter} {...scopeProps} />;
       case 'options':
-        return <OptionsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
+        return <OptionsAnalyticsTab dateRange={dateRange} orderFilter={orderFilter} {...scopeProps} />;
       case 'annulations':
-        return <CancellationsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
+        return <CancellationsAnalyticsTab dateRange={dateRange} orderFilter={orderFilter} {...scopeProps} />;
       case 'upsell':
-        return <UpsellAnalyticsTab dateRange={dateRange} {...scopeProps} />;
+        return <UpsellAnalyticsTab dateRange={dateRange} orderFilter={orderFilter} {...scopeProps} />;
       case 'remises':
         return <DiscountsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'clients':
@@ -254,6 +262,17 @@ const DashboardAnalysisContent = () => {
                   mode={comparisonMode}
                   onModeChange={setComparisonMode}
                 />
+              </CardContent>
+            </Card>
+          )}
+
+          {ORDER_FILTER_TABS.has(activeTab) && (
+            <Card className="bg-card border border-border lg:col-span-2">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Canal et type de commande</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <OrderFilter value={orderFilter} onChange={setOrderFilter} />
               </CardContent>
             </Card>
           )}

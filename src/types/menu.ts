@@ -22,9 +22,13 @@ export interface SubProduct {
   price_uber_eats?: number;
   price_deliveroo?: number;
   image_url?: string;
+  bg_color?: string;
   description?: string;
   category_id?: string;
   category_name?: string;
+  available_in?: boolean;
+  available_take_away?: boolean;
+  available_delivery?: boolean;
   cost_price?: number;
   foodcost_percent?: number;
   margin_percent?: number;
@@ -166,6 +170,14 @@ export interface BulkAvailabilityFields {
   sync_deliveroo?: boolean;
 }
 
+/** Résultat de l'édition de groupe « Copier vers une catégorie ». */
+export interface BulkDuplicateProductsResult {
+  /** Copies des produits sélectionnés (sans leurs sous-produits). */
+  productIds: string[];
+  /** Copies restées sans image, faute d'avoir pu dupliquer celle de la source. */
+  imagesFailed: number;
+}
+
 export interface ProductIntegration {
   enabled?: boolean;
   id?: string;
@@ -209,6 +221,14 @@ export interface Tag {
  * `removed_from_menu` sort le produit du menu POS/SNO mais le laisse visible
  * dans le back-office ; `not_available` le garde au menu, marqué indisponible.
  */
+/**
+ * Sort des sous-produits à la suppression de leur groupe :
+ * - `detach` : ils redeviennent des produits indépendants, inchangés ;
+ * - `deactivate` : idem, mais retirés du menu de vente (removed_from_menu) ;
+ * - `delete` : supprimés avec le groupe.
+ */
+export type GroupDeleteMode = 'detach' | 'deactivate' | 'delete';
+
 export type ProductStatus =
   | 'available'
   | 'not_available'

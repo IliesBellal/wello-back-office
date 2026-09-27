@@ -28,6 +28,10 @@ interface BulkAssignProductsDialogProps {
   title?: string;
   description?: string;
   confirmLabel?: string;
+  /** Ligne secondaire sous le nom (défaut : l'ID du produit ; aucune si vide). */
+  getProductHint?: (product: Product) => string | undefined;
+  /** Vignette (image, sinon couleur du produit) devant chaque nom. */
+  showImages?: boolean;
 }
 
 export function BulkAssignProductsDialog({
@@ -41,6 +45,8 @@ export function BulkAssignProductsDialog({
   title,
   description,
   confirmLabel = 'Assigner',
+  getProductHint,
+  showImages = false,
 }: BulkAssignProductsDialogProps) {
   const [products, setProducts] = useState<Product[]>(initialProducts || []);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -109,6 +115,8 @@ export function BulkAssignProductsDialog({
       setSelectedIds(new Set());
       setSearchTerm('');
       onOpenChange(false);
+    } catch {
+      // L'appelant affiche l'erreur ; le dialogue reste ouvert pour réessayer.
     } finally {
       setIsAssigning(false);
     }
@@ -169,10 +177,30 @@ export function BulkAssignProductsDialog({
                     <Checkbox
                       checked={selectedIds.has(product.product_id)}
                       onCheckedChange={() => handleToggleProduct(product.product_id)}
+                      // Sans ça le clic remonte aussi à la ligne : double
+                      // bascule, la case ne changeait pas quand on cliquait dessus.
+                      onClick={(e) => e.stopPropagation()}
                     />
+                    {showImages && (
+                      product.image_url ? (
+                        <img
+                          src={product.image_url}
+                          alt={product.name}
+                          className="w-10 h-10 rounded object-cover shrink-0"
+                        />
+                      ) : (
+                        <div
+                          className="w-10 h-10 rounded shrink-0"
+                          style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
+                        />
+                      )
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">{product.product_id}</p>
+                      {(() => {
+                        const hint = getProductHint ? getProductHint(product) : product.product_id;
+                        return hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null;
+                      })()}
                     </div>
                   </div>
                 ))}
@@ -198,7 +226,9 @@ export function BulkAssignProductsDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={selectedIds.size === 0 || isAssigning || loading}
+            // Avec une présélection, tout décocher est un choix valide
+            // (ex. détacher tous les sous-produits d'un groupe).
+            disabled={(selectedIds.size === 0 && !initialSelectedIds?.length) || isAssigning || loading}
             className="bg-gradient-primary"
           >
             {isAssigning || loading ? (

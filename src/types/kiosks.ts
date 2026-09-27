@@ -67,6 +67,7 @@ export interface KioskSettings {
   force_fulfillment_type: ForceFulfillmentType | null;
   pager_number_required: boolean;
   show_allergens: boolean;
+  show_promo_badge: boolean;
   inactivity_timeout_sec: number;
   upsell_enabled: boolean;
   pay_at_counter_enabled: boolean;

@@ -3,22 +3,17 @@ import { Promotion, Availability, DiscountResponse, DiscountScheduleResponse, Da
 import { toUTCDateString } from '@/utils/apiDate';
 
 // ════════════════════════════════════════════════════════════════════════════
-// IMPORTANT: Day of Week Convention (Standard Unix/JavaScript - NOT ISO 8601)
+// IMPORTANT: Day of Week Convention (ISO 8601 — comme l'API)
 // ════════════════════════════════════════════════════════════════════════════
-// This service uses the following convention for day_of_week throughout:
-//   0 = Sunday (Dimanche)
-//   1 = Monday (Lundi)
-//   2 = Tuesday (Mardi)
-//   3 = Wednesday (Mercredi)
-//   4 = Thursday (Jeudi)
-//   5 = Friday (Vendredi)
-//   6 = Saturday (Samedi)
+// day_of_week des créneaux (promotions et disponibilités) :
+//   1 = Monday (Lundi) … 6 = Saturday (Samedi), 7 = Sunday (Dimanche)
 //
-// This is consistent with:
-// - JavaScript native .getDay() method (returns 0-6)
-// - Unix/POSIX standard (Sunday=0)
-// - All API responses and internal data structures
-// - NOT ISO 8601 (which uses 1-7 with Monday=1, Sunday=7)
+// C'est la convention de l'API et de toutes les évaluations (pricing, borne,
+// scannorder). L'ancienne convention JS (0 = dimanche) envoyait les créneaux
+// du dimanche en 0 : jamais actifs pour une promotion, refusés pour une
+// disponibilité. 0 reste lu comme dimanche (données antérieures à la
+// migration API 159). Les heures sont des heures locales de l'établissement,
+// sans conversion de fuseau ; créneau [début, fin[, fin 00:00 = minuit.
 // ════════════════════════════════════════════════════════════════════════════
 
 // ─── Types for API Responses ──────────────────────────────────────────────────
@@ -74,21 +69,24 @@ function mapAvailabilityResponseToAvailability(availability: AvailabilityApiResp
 }
 
 /**
- * Convert day of week number to DayOfWeek string
- * Uses standard 0-6 convention: 0=Sunday, 1=Monday, ..., 6=Saturday
+ * Convert day of week number to DayOfWeek string.
+ * Convention ISO de l'API et de toutes les évaluations (pricing, borne,
+ * scannorder) : 1 = lundi, ..., 7 = dimanche. 0 est encore lu comme dimanche
+ * (créneaux enregistrés avant la migration 159) ; un 7 s'affichait en lundi.
  */
 function dayOfWeekNumberToString(dayNum: number): DayOfWeek {
   const days: DayOfWeek[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-  return days[dayNum] ?? 'monday';
+  return days[dayNum % 7] ?? 'monday';
 }
 
 /**
- * Convert DayOfWeek string to day of week number
- * Uses standard 0-6 convention: 0=Sunday, 1=Monday, ..., 6=Saturday
+ * Convert DayOfWeek string to day of week number — convention ISO
+ * (1 = lundi, ..., 7 = dimanche). Le dimanche était envoyé en 0 : jamais
+ * actif pour une promotion, refusé pour une disponibilité.
  */
 function stringToDayOfWeekNumber(day: DayOfWeek): number {
   const mapping: Record<DayOfWeek, number> = {
-    sunday: 0,
+    sunday: 7,
     monday: 1,
     tuesday: 2,
     wednesday: 3,
@@ -137,8 +135,13 @@ function mapDiscountResponseToPromotion(discount: DiscountResponse): Promotion {
     type,
     discount_unit: discount.discount_unit,
     value: discount.discount_value ?? 0,
-    start_date: discount.valid_from,
-    end_date: discount.valid_to,
+    // Dates de calendrier (AAAA-MM-JJ) : l'API compare la date choisie (sa
+    // date UTC en base) à la date locale de l'établissement, fin incluse.
+    // Sans date de début saisie, l'API stocke l'année 1 (« depuis toujours ») :
+    // rien à afficher.
+    start_date: discount.valid_from && !discount.valid_from.startsWith('0001-') ? discount.valid_from.slice(0, 10) : undefined,
+    end_date: discount.valid_to ? discount.valid_to.slice(0, 10) : undefined,
+    no_end_date: !discount.valid_to,
     active: discount.available,
     time_slots: time_slots.length > 0 ? time_slots : undefined,
     product_ids: product_ids.length > 0 ? product_ids : undefined,
@@ -175,8 +178,10 @@ function transformPromotionForAPI(promo: Omit<Promotion, 'id'> | Partial<Omit<Pr
   if (promo.start_date !== undefined) {
     payload.valid_from = promo.start_date ? toUTCDateString(promo.start_date) : null;
   }
-  if (promo.end_date !== undefined) {
-    payload.valid_to = promo.end_date ? toUTCDateString(promo.end_date) : null;
+  // « Sans limite » : valid_to null explicite, que l'API interprète comme
+  // « retirer la date de fin » (auparavant ignoré : la date restait).
+  if (promo.end_date !== undefined || promo.no_end_date !== undefined) {
+    payload.valid_to = !promo.no_end_date && promo.end_date ? toUTCDateString(promo.end_date) : null;
   }
   // `??` (not `||`) matters here: 0 is a legitimate "no minimum" value and
   // must not be coerced to null, which the discounts table rejects
@@ -198,8 +203,11 @@ function transformPromotionForAPI(promo: Omit<Promotion, 'id'> | Partial<Omit<Pr
   if (promo.is_time_limited !== undefined) payload.is_time_limited = promo.is_time_limited;
   if (promo.active !== undefined) payload.available = promo.active;
 
-  // Transform time_slots to schedules with day_of_week numbers
-  if (promo.time_slots && promo.time_slots.length > 0) {
+  // Transform time_slots to schedules with day_of_week numbers. Une liste
+  // vide est envoyée telle quelle (retire tous les créneaux) ; la restriction
+  // horaire découle de la présence de créneaux — is_time_limited n'était
+  // jamais renseigné, les créneaux saisis étaient ignorés par la caisse.
+  if (promo.time_slots !== undefined) {
     payload.schedules = promo.time_slots.map(slot => {
       return {
         day_of_week: stringToDayOfWeekNumber(slot.day),
@@ -207,6 +215,7 @@ function transformPromotionForAPI(promo: Omit<Promotion, 'id'> | Partial<Omit<Pr
         available_to: slot.end_time,     // HH:mm format
       };
     });
+    payload.is_time_limited = promo.time_slots.length > 0;
   }
 
   // Combine product_ids and product_prices into products array
@@ -234,9 +243,11 @@ function transformAvailabilityForAPI(avail: Omit<Availability, 'id'> | Partial<O
 
   if (avail.unavailable_message !== undefined) payload.unavailable_message = avail.unavailable_message;
 
-  // Transform time_slots to schedules with day_of_week numbers
-  if (avail.time_slots && avail.time_slots.length > 0) {
-    payload.schedules = avail.time_slots.map(slot => {
+  // Transform time_slots to schedules with day_of_week numbers. Une liste vide
+  // est envoyée ([]) : tous les créneaux retirés — elle était omise, l'API
+  // gardait les anciens. time_slots absent (toggle actif) = inchangé.
+  if (avail.time_slots !== undefined) {
+    payload.schedules = (avail.time_slots ?? []).map(slot => {
       return {
         day_of_week: stringToDayOfWeekNumber(slot.day),
         start_time: slot.start_time,  // HH:mm format
@@ -247,9 +258,11 @@ function transformAvailabilityForAPI(avail: Omit<Availability, 'id'> | Partial<O
 
   if (avail.active !== undefined) payload.available = avail.active;
 
-  // Product IDs
+  // Product IDs — [] = tous les produits retirés. null était envoyé et ignoré
+  // par l'API : impossible de retirer le dernier produit (API :
+  // docs/AVAILABILITIES_EMPTY_LISTS.md).
   if (avail.product_ids !== undefined) {
-    payload.product_ids = avail.product_ids && avail.product_ids.length > 0 ? avail.product_ids : null;
+    payload.product_ids = avail.product_ids ?? [];
   }
 
   return payload;

@@ -15,12 +15,17 @@ export interface PerMerchantAnalytics<T> {
  * that single establishment as scope. Only enabled while `enabled` is true
  * (comparison mode, 2+ establishments) — the calling tab already has its own
  * combined-scope fetch for the aggregate view, this hook is purely additive.
+ *
+ * `refreshKey` covers any other request input `fetchOne` closes over (e.g.
+ * the canal × type de commande filter): a change refetches every
+ * establishment, same as a period change.
  */
 export function usePerMerchantAnalytics<T>(
   enabled: boolean,
   merchantIds: string[],
   dateRange: { from: Date; to: Date },
-  fetchOne: (from: Date, to: Date, merchantId: string) => Promise<T>
+  fetchOne: (from: Date, to: Date, merchantId: string) => Promise<T>,
+  refreshKey = ''
 ): { perMerchant: PerMerchantAnalytics<T>[]; isLoading: boolean } {
   const [perMerchant, setPerMerchant] = useState<PerMerchantAnalytics<T>[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -50,7 +55,7 @@ export function usePerMerchantAnalytics<T>(
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, merchantIds.join(','), dateRange.from.getTime(), dateRange.to.getTime()]);
+  }, [enabled, merchantIds.join(','), dateRange.from.getTime(), dateRange.to.getTime(), refreshKey]);
 
   return { perMerchant, isLoading };
 }

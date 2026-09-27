@@ -1,6 +1,7 @@
 import { apiClient, withMock, WelloApiResponse } from './apiClient';
 import type { Order } from './ordersService';
 import { toLocalDateString } from '../utils/apiDate';
+import { orderFilterToRequestFields, type OrderFilterSelection } from '../utils/orderFilters';
 import {
   mapBrandFilterForApi,
   mapOrderTypeFilterForApi,
@@ -38,11 +39,15 @@ export type ComparisonMode = 'cumule' | 'compare';
 export interface AnalyticsScopeOptions {
   merchantIds?: string[];
   groupBy?: ComparisonMode;
+  // Canal × type de commande (utils/orderFilters.ts) — accepté par CA/
+  // Commandes/Annulations uniquement ; Règlements/TVA ne le passent pas.
+  orderFilter?: OrderFilterSelection;
 }
 
 const scopeToRequestFields = (options?: AnalyticsScopeOptions) => ({
   merchant_ids: options?.merchantIds && options.merchantIds.length > 0 ? options.merchantIds : undefined,
   group_by: options?.groupBy === 'compare' && (options?.merchantIds?.length ?? 0) > 1 ? 'merchant' : undefined,
+  ...orderFilterToRequestFields(options?.orderFilter),
 });
 
 // Shapes below mirror internal/modules/analytics (ib-welloresto-api repo)
@@ -296,6 +301,7 @@ export interface ProductsAnalyticsFilters {
   // of the 5 comparable tabs, so a multi-establishment selection always
   // aggregates.
   merchantIds?: string[];
+  orderFilter?: OrderFilterSelection;
 }
 
 // Mock fixture for getProductsAnalytics's withMock branch — some rows
@@ -435,6 +441,7 @@ export interface OptionsAnalyticsFilters {
   pageSize?: number;
   // See ProductsAnalyticsFilters.merchantIds's doc comment — same posture.
   merchantIds?: string[];
+  orderFilter?: OrderFilterSelection;
 }
 
 const mockOptionRows: OptionRow[] = [
@@ -1303,7 +1310,7 @@ class AnalyticsService {
   ): Promise<ProductsAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
-    const { categoryId, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds } = filters;
+    const { categoryId, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds, orderFilter } = filters;
 
     const mockPeriod = (from: string, to: string): ProductsPeriodTotals => ({
       from, to, quantity_sold: 1725, revenue_ttc_cents: 1482500, revenue_ht_cents: 1268500,
@@ -1344,6 +1351,7 @@ class AnalyticsService {
             sort_by: sortBy, sort_dir: sortDir,
             page, page_size: pageSize,
             merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+            ...orderFilterToRequestFields(orderFilter),
           }
         );
         return response.data;
@@ -1386,7 +1394,7 @@ class AnalyticsService {
   ): Promise<OptionsAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
-    const { optionTypes, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds } = filters;
+    const { optionTypes, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds, orderFilter } = filters;
 
     const mockPeriod = (from: string, to: string): OptionsPeriodTotals => ({
       from, to, quantity_sold: 466, revenue_ttc_cents: 114700,
@@ -1421,6 +1429,7 @@ class AnalyticsService {
             sort_by: sortBy, sort_dir: sortDir,
             page, page_size: pageSize,
             merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+            ...orderFilterToRequestFields(orderFilter),
           }
         );
         return response.data;
@@ -1500,7 +1509,8 @@ class AnalyticsService {
   async getCancellationsByStaff(
     startDate: string | Date,
     endDate: string | Date,
-    merchantIds?: string[]
+    merchantIds?: string[],
+    orderFilter?: OrderFilterSelection
   ): Promise<CancellationsByStaffResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
@@ -1519,7 +1529,11 @@ class AnalyticsService {
       async () => {
         const response = await apiClient.post<{ id: string; data: CancellationsByStaffResponse }>(
           '/analytics/cancellations/by-staff',
-          { date_from: dateFrom, date_to: dateTo, merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined }
+          {
+            date_from: dateFrom, date_to: dateTo,
+            merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+            ...orderFilterToRequestFields(orderFilter),
+          }
         );
         return response.data;
       }
@@ -1948,7 +1962,8 @@ class AnalyticsService {
     startDate: string | Date,
     endDate: string | Date,
     channels?: string[],
-    merchantIds?: string[]
+    merchantIds?: string[],
+    orderFilter?: OrderFilterSelection
   ): Promise<UpsellAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
@@ -1977,6 +1992,7 @@ class AnalyticsService {
             date_from: dateFrom, date_to: dateTo,
             channels: channels && channels.length > 0 ? channels : undefined,
             merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+            ...orderFilterToRequestFields(orderFilter),
           }
         );
         return response.data;
@@ -1993,7 +2009,8 @@ class AnalyticsService {
     startDate: string | Date,
     endDate: string | Date,
     channels?: string[],
-    merchantIds?: string[]
+    merchantIds?: string[],
+    orderFilter?: OrderFilterSelection
   ): Promise<UpsellByStaffResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
@@ -2014,6 +2031,7 @@ class AnalyticsService {
             date_from: dateFrom, date_to: dateTo,
             channels: channels && channels.length > 0 ? channels : undefined,
             merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+            ...orderFilterToRequestFields(orderFilter),
           }
         );
         return response.data;

@@ -23,6 +23,14 @@ export const toUTCDateString = (value: Date | string): string => {
   return `${date.getUTCFullYear()}-${pad2(date.getUTCMonth() + 1)}-${pad2(date.getUTCDate())}`;
 };
 
+// Affiche une date de calendrier (« AAAA-MM-JJ », ou ISO dont seule la date
+// est gardée) en JJ/MM/AAAA, sans conversion de fuseau — cohérent avec
+// l'API, qui évalue ces dates en dates calendaires (ex. validité des promos).
+export const formatCalendarDate = (value: string): string => {
+  const [year, month, day] = value.slice(0, 10).split('-');
+  return `${day}/${month}/${year}`;
+};
+
 // Date de calendrier "nue", sans aucune conversion de fuseau. Réservée aux
 // endpoints dont la borne est interprétée côté API dans le fuseau de
 // l'établissement (export comptable) : y appliquer toUTCDateString reculerait

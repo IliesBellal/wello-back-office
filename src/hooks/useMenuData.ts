@@ -1,7 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { menuService } from '@/services/menuService';
-import { Menu, Product, ProductStatus, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory, Tag, ProductCreatePayload, BulkAvailabilityFields, ProductComposition } from '@/types/menu';
+import { Menu, Product, ProductStatus, UnitOfMeasure, Component, Attribute, MenuData, Category, ComponentCategory, Tag, ProductCreatePayload, BulkAvailabilityFields, ProductComposition, SubProduct, GroupDeleteMode } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
+
+// Même règle que l'API (sortSubProducts) et la caisse : display_order
+// (absent = 0), puis le nom, puis l'ID — comparaisons brutes et non
+// localeCompare, pour que les trois apps affichent exactement le même ordre.
+// L'API trie déjà ; ce tri couvre les réponses d'une API pas encore à jour.
+const compareRaw = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const sortSubProducts = (subProducts: SubProduct[]): SubProduct[] =>
+  [...subProducts].sort((a, b) => {
+    const orderA = a.display_order ?? 0;
+    const orderB = b.display_order ?? 0;
+    if (orderA !== orderB) return orderA - orderB;
+    return (
+      compareRaw(a.name || '', b.name || '') ||
+      compareRaw(a.product_id || a.id || '', b.product_id || b.id || '')
+    );
+  });
 
 export const useMenuData = () => {
   const [menuData, setMenuData] = useState<MenuData>({ products_types: [], products: [] });
@@ -11,6 +27,7 @@ export const useMenuData = () => {
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -20,7 +37,13 @@ export const useMenuData = () => {
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      // Seul le premier chargement affiche l'écran « Chargement... » : la page
+      // Produits le rend à la place de tout son contenu, donc un rechargement
+      // (rattachement de sous-produits, TVA groupée, import…) démontait les
+      // fiches ouvertes — elles se refermaient ou revenaient vierges.
+      if (!hasLoadedRef.current) {
+        setLoading(true);
+      }
       // ✅ CONSOLIDATED: Single API call to getMenuData()
       // Now returns categories with nested products directly
       const [categoriesData, unitsData, componentsData, attributesData, tagsData] = await Promise.all([
@@ -43,7 +66,11 @@ export const useMenuData = () => {
         order: cat.order || 0,
         bg_color: cat.bg_color,
         available: cat.available ?? cat.availability,
-        products: cat.products || []
+        products: (cat.products || []).map((product: Product) =>
+          product.sub_products?.length
+            ? { ...product, sub_products: sortSubProducts(product.sub_products) }
+            : product
+        )
       }));
 
       // Flatten all products from categories (including sub-products)
@@ -70,6 +97,7 @@ export const useMenuData = () => {
       setComponentCategories(componentCategoriesFromApi);
       setAttributes(attributesData);
       setTags(tagsData ?? []);
+      hasLoadedRef.current = true;
     } catch (error) {
       console.error('Erreur lors du chargement du menu:', error);
       toast({
@@ -118,32 +146,14 @@ export const useMenuData = () => {
     }
   };
 
+  // Pas de toast ici : les fiches (produit, groupe) affichent déjà le leur, et
+  // l'erreur doit leur remonter — sinon elles annonçaient un succès et
+  // quittaient le mode édition alors que rien n'avait été enregistré.
+  // patchProducts couvre aussi les sous-produits imbriqués dans leur groupe,
+  // qui alimentent les lignes dépliées du tableau et la fiche groupe.
   const updateProduct = async (productId: string, data: Partial<Product>) => {
-    try {
-      await menuService.updateProduct(productId, data);
-      setMenuData(prev => ({
-        ...prev,
-        products: prev.products?.map(p => 
-          p.product_id === productId ? { ...p, ...data } : p
-        ),
-        products_types: prev.products_types.map(c => ({
-          ...c,
-          products: c.products?.map(p => 
-            p.product_id === productId ? { ...p, ...data } : p
-          )
-        }))
-      }));
-      toast({
-        title: "Succès",
-        description: "Produit mis à jour avec succès"
-      });
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de mettre à jour le produit",
-        variant: "destructive"
-      });
-    }
+    await menuService.updateProduct(productId, data);
+    patchProducts([productId], p => ({ ...p, ...data }));
   };
 
   // Errors (e.g. duplicate name) are intentionally left to propagate: the caller
@@ -390,17 +400,34 @@ export const useMenuData = () => {
     }
   };
 
-  // Un groupe supprimé détache ses sous-produits plutôt que de les supprimer
-  // en cascade : ce sont de vrais produits du catalogue, ils restent
-  // vendables de façon autonome après la suppression du groupe.
-  const deleteProductGroup = async (groupId: string, subProductIds: string[]) => {
+  // L'utilisateur choisit le sort des sous-produits (cf. GroupDeleteMode).
+  // Hors suppression, ils sont détachés AVANT la suppression du groupe : un
+  // sous-produit resté rattaché à un groupe supprimé n'apparaît plus nulle
+  // part (ni racine ni imbriqué côté API). Si un détachement échoue, le
+  // groupe n'est pas supprimé.
+  const deleteProductGroup = async (groupId: string, subProductIds: string[], mode: GroupDeleteMode) => {
     try {
-      await Promise.all(subProductIds.map(id => menuService.updateProduct(id, { by_product_of: '' })));
-      await menuService.deleteProduct(groupId);
+      if (mode === 'delete') {
+        // La suppression groupée de l'API désactive aussi les sous-produits.
+        await menuService.bulkDeleteProducts([groupId, ...subProductIds]);
+      } else {
+        const detachPatch = mode === 'deactivate'
+          ? { by_product_of: '', status: 'removed_from_menu' as ProductStatus }
+          : { by_product_of: '' };
+        await Promise.all(subProductIds.map(id => menuService.updateProduct(id, detachPatch)));
+        await menuService.deleteProduct(groupId);
+      }
       await loadData();
+      const count = subProductIds.length;
       toast({
         title: "Succès",
-        description: "Groupe supprimé, les sous-produits ont été conservés"
+        description: count === 0
+          ? "Groupe supprimé"
+          : mode === 'delete'
+            ? `Groupe et ${count} sous-produit${count > 1 ? 's' : ''} supprimés`
+            : mode === 'deactivate'
+              ? `Groupe supprimé, ${count} sous-produit${count > 1 ? 's' : ''} retiré${count > 1 ? 's' : ''} du menu`
+              : `Groupe supprimé, ${count} sous-produit${count > 1 ? 's' : ''} conservé${count > 1 ? 's' : ''}`
       });
     } catch (error) {
       toast({
@@ -493,13 +520,27 @@ export const useMenuData = () => {
   // autre moyen de rafraîchir le tableau.
 
   // Applique une transformation aux produits ciblés, dans la liste à plat comme
-  // dans les produits imbriqués sous leur catégorie (les deux alimentent l'UI).
+  // dans les produits imbriqués sous leur catégorie (les deux alimentent l'UI),
+  // y compris les sous-produits portés par chaque groupe (sub_products).
   const patchProducts = (
     productIds: string[],
     patch: (product: Product) => Product
   ) => {
     const targeted = new Set(productIds);
-    const applyToProduct = (p: Product) => (targeted.has(p.product_id) ? patch(p) : p);
+    const applyToProduct = (p: Product): Product => {
+      const patched = targeted.has(p.product_id) ? patch(p) : p;
+      if (!patched.sub_products?.some(sp => targeted.has(sp.product_id || sp.id || ''))) {
+        return patched;
+      }
+      return {
+        ...patched,
+        sub_products: patched.sub_products.map(sp =>
+          targeted.has(sp.product_id || sp.id || '')
+            ? (patch(sp as Product) as SubProduct)
+            : sp
+        )
+      };
+    };
 
     setMenuData(prev => ({
       ...prev,
@@ -653,6 +694,22 @@ export const useMenuData = () => {
     });
   };
 
+  // Copie complète vers une catégorie caisse. Refetch plutôt que patch local :
+  // les copies ont de nouveaux IDs, leurs sous-produits et une image dupliquée
+  // côté API.
+  const bulkDuplicateProducts = async (productIds: string[], categoryId: string, status: ProductStatus) => {
+    const result = await menuService.bulkDuplicateProducts(productIds, categoryId, status);
+    await loadData();
+    return result;
+  };
+
+  // Annule une copie de groupe. Supprimer ce qui vient d'être créé suffit
+  // (l'API retire les sous-produits avec leur groupe) ; refetch comme la copie.
+  const undoBulkDuplicateProducts = async (copyIds: string[]) => {
+    await menuService.bulkDeleteProducts(copyIds);
+    await loadData();
+  };
+
   // Catégorie marketing : rattachement additif, la catégorie caisse du produit
   // n'est pas touchée — rien à refléter dans menuData, qui ne la porte pas.
   const bulkAssignProductsToMarketingCategory = async (productIds: string[], categoryId: string) => {
@@ -762,6 +819,8 @@ export const useMenuData = () => {
     bulkSetProductsComponents,
     bulkAddProductsComponents,
     bulkAssignProductsToCategory,
+    bulkDuplicateProducts,
+    undoBulkDuplicateProducts,
     bulkAssignProductsToMarketingCategory,
     applyProductsAllergens,
     applyProductsAttributes,

@@ -12,6 +12,7 @@ import {
   ComparisonMode,
 } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
+import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
 
 interface ProductsAnalyticsTabProps {
@@ -19,6 +20,7 @@ interface ProductsAnalyticsTabProps {
   merchantIds?: string[];
   comparisonMode?: ComparisonMode;
   merchantsById?: Record<string, string>;
+  orderFilter?: OrderFilterSelection;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -39,7 +41,8 @@ const SORT_LABELS: Record<SortBy, string> = {
   margin: 'Marge',
 };
 
-export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: ProductsAnalyticsTabProps) => {
+export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {}, orderFilter }: ProductsAnalyticsTabProps) => {
+  const filterKey = orderFilterKey(orderFilter);
   const [data, setData] = useState<ProductsAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -54,7 +57,7 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
   // retrouver hors bornes une fois la catégorie changée.
   useEffect(() => {
     setPage(1);
-  }, [categoryId, sortBy, sortDir, dateRange.from, dateRange.to]);
+  }, [categoryId, sortBy, sortDir, dateRange.from, dateRange.to, filterKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -68,6 +71,7 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
       page,
       pageSize,
       merchantIds,
+      orderFilter,
     })
       .then((result) => {
         if (!isMounted) return;
@@ -85,7 +89,8 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to, categoryId, sortBy, sortDir, page, merchantIds.join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.from, dateRange.to, categoryId, sortBy, sortDir, page, merchantIds.join(','), filterKey]);
 
   const handleSort = (column: SortBy) => {
     if (sortBy === column) {

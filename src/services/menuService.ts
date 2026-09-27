@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse, API_BASE_URL } from "@/services/apiClient";
-import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload, BulkAvailabilityFields, ProductComposition } from "@/types/menu";
+import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload, BulkAvailabilityFields, BulkDuplicateProductsResult, ProductComposition } from "@/types/menu";
 import { getStoredAuthToken } from "@/types/auth";
 
 interface MarketingCategoryApiItem {
@@ -1463,6 +1463,32 @@ export const menuService = {
     return withMock(
       () => undefined,
       () => apiClient.post<void>('/menu/products/bulk/delete', payload)
+    );
+  },
+
+  // Copie complète des produits (options, composition, tags, allergènes,
+  // promos, disponibilités, profils de production, image…) dans une catégorie
+  // caisse, groupes compris avec leurs sous-produits. Retourne les IDs des
+  // copies racines, de quoi annuler via bulkDeleteProducts.
+  async bulkDuplicateProducts(
+    productIds: string[],
+    categoryId: string,
+    status: ProductStatus
+  ): Promise<BulkDuplicateProductsResult> {
+    const payload = { product_ids: productIds, category_id: categoryId, status };
+    logAPI('POST', '/menu/products/bulk/duplicate', payload);
+    return withMock(
+      () => ({ productIds: [], imagesFailed: 0 }),
+      async () => {
+        const response = await apiClient.post<WelloApiResponse<{ product_ids?: string[]; images_failed?: number }>>(
+          '/menu/products/bulk/duplicate',
+          payload
+        );
+        return {
+          productIds: response.data?.product_ids ?? [],
+          imagesFailed: response.data?.images_failed ?? 0,
+        };
+      }
     );
   },
 

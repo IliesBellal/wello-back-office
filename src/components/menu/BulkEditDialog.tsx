@@ -24,7 +24,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { CategorySelector, ConfirmDialog } from '@/components/shared';
 import { ProductOptionsTab } from '@/components/menu/ProductOptionsTab';
 import { ProductCompositionTab } from '@/components/menu/ProductCompositionTab';
-import { Attribute, BulkAvailabilityFields, Category, Component, Product, ProductAttribute, ProductComposition, ProductStatus, Tag, TvaRate, TvaRateGroup, UnitOfMeasure } from '@/types/menu';
+import { Attribute, BulkAvailabilityFields, BulkDuplicateProductsResult, Category, Component, Product, ProductAttribute, ProductComposition, ProductStatus, Tag, TvaRate, TvaRateGroup, UnitOfMeasure } from '@/types/menu';
 import { menuService } from '@/services/menuService';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 import {
@@ -37,6 +37,8 @@ import {
   ListChecks,
   ListPlus,
   FolderInput,
+  Copy,
+  Info,
   Megaphone,
   Tags as TagsIcon,
   TagIcon,
@@ -62,6 +64,7 @@ type BulkAction =
   | 'set_tags'
   | 'add_tags'
   | 'assign_category'
+  | 'duplicate_to_category'
   | 'assign_marketing_category'
   | 'set_tva_on_site'
   | 'set_tva_take_away'
@@ -135,6 +138,9 @@ const STATUS_CHOICES: { value: ProductStatus; label: string; hint: string; icon:
   },
 ];
 
+/** Statuts proposés pour les copies de « Copier vers une catégorie caisse ». */
+type DuplicateStatus = Extract<ProductStatus, 'available' | 'removed_from_menu'>;
+
 /** Scope attendu par l'API pour chaque action de TVA de groupe. */
 const TVA_SCOPE_BY_ACTION: Partial<Record<BulkAction, 'on_site' | 'take_away' | 'delivery'>> = {
   set_tva_on_site: 'on_site',
@@ -168,6 +174,13 @@ interface BulkEditDialogProps {
   onSetTags: (productIds: string[], tagIds: string[]) => Promise<void>;
   onAddTags: (productIds: string[], tagIds: string[]) => Promise<void>;
   onAssignCategory: (productIds: string[], categoryId: string) => Promise<void>;
+  onDuplicateToCategory: (
+    productIds: string[],
+    categoryId: string,
+    status: ProductStatus
+  ) => Promise<BulkDuplicateProductsResult>;
+  /** Annule une copie depuis le toast de confirmation (IDs des copies). */
+  onUndoDuplicate: (copyIds: string[]) => Promise<void>;
   onAssignMarketingCategory: (productIds: string[], categoryId: string) => Promise<void>;
   onSetTva: (productIds: string[], scope: 'on_site' | 'take_away' | 'delivery', tvaId: string) => Promise<void>;
   onSetAvailability: (productIds: string[], fields: BulkAvailabilityFields) => Promise<void>;
@@ -233,9 +246,15 @@ const ACTIONS: {
   },
   {
     value: 'assign_category',
-    label: 'Ajouter à la catégorie caisse',
+    label: 'Déplacer vers la catégorie caisse',
     hint: 'Un produit n’appartient qu’à une seule catégorie caisse : il quitte la précédente.',
     icon: FolderInput,
+  },
+  {
+    value: 'duplicate_to_category',
+    label: 'Copier vers une catégorie caisse',
+    hint: 'Duplique les produits avec tout leur paramétrage dans la catégorie choisie. Les originaux ne bougent pas.',
+    icon: Copy,
   },
   {
     value: 'assign_marketing_category',
@@ -285,6 +304,7 @@ const DETAIL_ACTIONS: BulkAction[] = [
   'set_tags',
   'add_tags',
   'assign_category',
+  'duplicate_to_category',
   'assign_marketing_category',
   'set_tva_on_site',
   'set_tva_take_away',
@@ -316,6 +336,8 @@ export const BulkEditDialog = ({
   onSetTags,
   onAddTags,
   onAssignCategory,
+  onDuplicateToCategory,
+  onUndoDuplicate,
   onAssignMarketingCategory,
   onSetTva,
   onSetAvailability,
@@ -330,6 +352,8 @@ export const BulkEditDialog = ({
   const [selectedComponents, setSelectedComponents] = useState<ProductComposition[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [categoryId, setCategoryId] = useState('');
+  const [copyCategoryId, setCopyCategoryId] = useState('');
+  const [copyStatus, setCopyStatus] = useState<DuplicateStatus>('available');
   const [marketingCategoryId, setMarketingCategoryId] = useState('');
   const [marketingCategories, setMarketingCategories] = useState<Category[] | null>(null);
   const [loadingMarketing, setLoadingMarketing] = useState(false);
@@ -361,6 +385,8 @@ export const BulkEditDialog = ({
     setSelectedComponents([]);
     setSelectedTagIds([]);
     setCategoryId('');
+    setCopyCategoryId('');
+    setCopyStatus('available');
     setMarketingCategoryId('');
     setTvaRateId('');
     setTvaAllRateIds({ on_site: '', take_away: '', delivery: '' });
@@ -450,6 +476,7 @@ export const BulkEditDialog = ({
     if (action === 'add_components') return selectedComponents.length > 0;
     if (action === 'add_tags') return selectedTagIds.length > 0;
     if (action === 'assign_category') return !!categoryId;
+    if (action === 'duplicate_to_category') return !!copyCategoryId;
     if (action === 'assign_marketing_category') return !!marketingCategoryId;
     if (action === 'set_tva_all') {
       return !!tvaAllRateIds.on_site && !!tvaAllRateIds.take_away && !!tvaAllRateIds.delivery;
@@ -499,6 +526,41 @@ export const BulkEditDialog = ({
       } else if (action === 'assign_category') {
         await onAssignCategory(productIds, categoryId);
         toast.success(`${count} produit${plural} déplacé${plural}`);
+      } else if (action === 'duplicate_to_category') {
+        const { productIds: copyIds, imagesFailed } = await onDuplicateToCategory(
+          productIds,
+          copyCategoryId,
+          copyStatus
+        );
+        // Un sous-produit coché avec son groupe est copié avec lui, pas en
+        // double : on annonce le nombre réel de copies.
+        const copied = copyIds.length;
+        const copiedPlural = copied > 1 ? 's' : '';
+        const target = categories.find((c) => c.category_id === copyCategoryId);
+        const targetName = target?.category_name || target?.category || target?.name;
+        toast.success(
+          `${copied} produit${copiedPlural} copié${copiedPlural}${targetName ? ` dans ${targetName}` : ''}`,
+          {
+            description:
+              imagesFailed > 0
+                ? `${imagesFailed} image${imagesFailed > 1 ? 's n’ont' : ' n’a'} pas pu être copiée${imagesFailed > 1 ? 's' : ''} : ajoutez-la depuis la fiche produit.`
+                : undefined,
+            duration: 8000,
+            action:
+              copied > 0
+                ? {
+                    label: 'Annuler',
+                    onClick: () => {
+                      onUndoDuplicate(copyIds)
+                        .then(() => toast.success('Copie annulée'))
+                        .catch(() => {
+                          // apiClient a déjà affiché le détail de l'erreur.
+                        });
+                    },
+                  }
+                : undefined,
+          }
+        );
       } else if (action === 'assign_marketing_category') {
         await onAssignMarketingCategory(productIds, marketingCategoryId);
         toast.success(`${count} produit${plural} rattaché${plural}`);
@@ -547,7 +609,9 @@ export const BulkEditDialog = ({
     ? 'Application…'
     : step === 'choose' && needsDetailStep(action)
       ? 'Continuer'
-      : 'Appliquer';
+      : action === 'duplicate_to_category'
+        ? 'Copier'
+        : 'Appliquer';
 
   return (
     <>
@@ -749,6 +813,53 @@ export const BulkEditDialog = ({
                       onCreateCategory={onCreateCategory}
                       placeholder="Sélectionner une catégorie caisse…"
                     />
+                  )}
+
+                  {action === 'duplicate_to_category' && (
+                    <div className="space-y-3">
+                      <CategorySelector
+                        categories={categories}
+                        value={copyCategoryId}
+                        onValueChange={setCopyCategoryId}
+                        onCreateCategory={onCreateCategory}
+                        placeholder="Sélectionner la catégorie de destination…"
+                      />
+                      <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
+                        <span className="text-sm">Statut des copies</span>
+                        <ToggleGroup
+                          type="single"
+                          size="sm"
+                          value={copyStatus}
+                          onValueChange={(value) => value && setCopyStatus(value as DuplicateStatus)}
+                          disabled={applying}
+                          className="shrink-0"
+                        >
+                          <ToggleGroupItem value="available" className="text-xs">
+                            Disponible
+                          </ToggleGroupItem>
+                          <ToggleGroupItem value="removed_from_menu" className="text-xs">
+                            Retiré du menu
+                          </ToggleGroupItem>
+                        </ToggleGroup>
+                      </div>
+                      <div className="flex gap-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">
+                        <Info className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p>
+                            <span className="font-medium text-foreground">Tout est copié :</span> nom,
+                            description, image, prix et TVA, options, ingrédients, tags, allergènes,
+                            catégorie marketing, disponibilités (canaux et créneaux), promotions,
+                            fidélité et envoi en production. Les groupes sont copiés avec leurs
+                            sous-produits.
+                          </p>
+                          <p>
+                            Les copies gardent le même nom et deviennent des produits indépendants :
+                            modifier l’un ne change pas l’autre, et leurs ventes sont comptées
+                            séparément.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   )}
 
                   {action === 'assign_marketing_category' && (

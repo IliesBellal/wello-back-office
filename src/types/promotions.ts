@@ -22,7 +22,7 @@ export interface DiscountProductResponse {
 export interface DiscountScheduleResponse {
   schedule_id: number;
   discount_id: number;
-  day_of_week: number; // 0=Sunday, 1=Monday, ..., 6=Saturday
+  day_of_week: number; // ISO : 1=Monday, ..., 7=Sunday (0 = Sunday, legacy)
   available_from: string; // HH:mm format
   available_to: string; // HH:mm format
   enabled: boolean;

@@ -16,6 +16,7 @@ import {
   ComparisonMode,
 } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
+import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
 
 interface OptionsAnalyticsTabProps {
@@ -23,6 +24,7 @@ interface OptionsAnalyticsTabProps {
   merchantIds?: string[];
   comparisonMode?: ComparisonMode;
   merchantsById?: Record<string, string>;
+  orderFilter?: OrderFilterSelection;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -42,7 +44,8 @@ const SORT_LABELS: Record<SortBy, string> = {
   margin: 'Marge',
 };
 
-export const OptionsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: OptionsAnalyticsTabProps) => {
+export const OptionsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {}, orderFilter }: OptionsAnalyticsTabProps) => {
+  const filterKey = orderFilterKey(orderFilter);
   const [data, setData] = useState<OptionsAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -57,7 +60,7 @@ export const OptionsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
   // fois les types d'option changés (même règle que ProductsAnalyticsTab).
   useEffect(() => {
     setPage(1);
-  }, [optionTypes, sortBy, sortDir, dateRange.from, dateRange.to]);
+  }, [optionTypes, sortBy, sortDir, dateRange.from, dateRange.to, filterKey]);
 
   useEffect(() => {
     let isMounted = true;
@@ -71,6 +74,7 @@ export const OptionsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
       page,
       pageSize,
       merchantIds,
+      orderFilter,
     })
       .then((result) => {
         if (!isMounted) return;
@@ -88,7 +92,8 @@ export const OptionsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to, optionTypes, sortBy, sortDir, page, merchantIds.join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.from, dateRange.to, optionTypes, sortBy, sortDir, page, merchantIds.join(','), filterKey]);
 
   const handleSort = (column: SortBy) => {
     if (sortBy === column) {

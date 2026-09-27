@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tile } from '@/components/shared/Tile';
 import { ExpandableDataTable, ColumnConfig } from '@/components/shared/ExpandableDataTable';
-import { ChannelFilter } from '@/components/analytics/ChannelFilter';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -14,7 +13,7 @@ import {
   ComparisonMode,
 } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
-import { CHANNEL_ORDER, CHANNEL_LABELS } from '@/utils/channels';
+import { orderFilterKey, ORDER_TYPE_OPTIONS, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
 
 interface UpsellAnalyticsTabProps {
@@ -22,6 +21,7 @@ interface UpsellAnalyticsTabProps {
   merchantIds?: string[];
   comparisonMode?: ComparisonMode;
   merchantsById?: Record<string, string>;
+  orderFilter?: OrderFilterSelection;
 }
 
 const UPSELL_BAR_COLOR = '#8b5cf6';
@@ -29,15 +29,13 @@ const TOP_SERVERS_LIMIT = 10;
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
-const CHANNEL_FILTER_OPTIONS = CHANNEL_ORDER.map((c) => ({ id: c, label: CHANNEL_LABELS[c] ?? c }));
-
-export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: UpsellAnalyticsTabProps) => {
-  // Vide = tous les canaux (même convention que Clients) — ne filtre que les
-  // chiffres issus d'orderitems (lignes/CA/classement), jamais le bloc
-  // Suggestions (upsell_suggestions.channel est POS/SNO/KIOSK, une autre
-  // nomenclature, voir analyticsService.ts).
-  const [channels, setChannels] = useState<string[]>([...CHANNEL_ORDER]);
-
+export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {}, orderFilter }: UpsellAnalyticsTabProps) => {
+  const filterKey = orderFilterKey(orderFilter);
+  // Filtré par le filtre de page canal × type de commande (orderFilter).
+  // L'ancien filtre `channels` de l'endpoint (brand × type) reste à "tous" :
+  // il recouvrait les mêmes dimensions. Côté Suggestions (upsell_suggestions,
+  // aucune commande rattachée tant qu'elle n'est pas acceptée), seul le canal
+  // s'applique — POS/SNO/KIOSK, voir order_filter.go côté API.
   const [data, setData] = useState<UpsellAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isForbidden, setIsForbidden] = useState(false);
@@ -53,7 +51,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getUpsellAnalytics(dateRange.from, dateRange.to, channels, merchantIds)
+    analyticsService.getUpsellAnalytics(dateRange.from, dateRange.to, undefined, merchantIds, orderFilter)
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -71,7 +69,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateRange.from, dateRange.to, channels.join(','), merchantIds.join(',')]);
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), filterKey]);
 
   // Bloc nominatif : toujours fusionné quel que soit le mode (PROMPT 24) —
   // merchantIds transmis (le serveur exige reports.staff_performance.read sur
@@ -81,7 +79,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     setIsStaffLoading(true);
     setIsStaffForbidden(false);
 
-    analyticsService.getUpsellByStaff(dateRange.from, dateRange.to, channels, merchantIds)
+    analyticsService.getUpsellByStaff(dateRange.from, dateRange.to, undefined, merchantIds, orderFilter)
       .then((result) => {
         if (!isMounted) return;
         setStaffData(result);
@@ -99,7 +97,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateRange.from, dateRange.to, channels.join(','), merchantIds.join(',')]);
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), filterKey]);
 
   const staffColumns: ColumnConfig<UpsellStaffRow>[] = [
     { key: 'name', label: 'Serveur', sortable: true },
@@ -130,14 +128,6 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     <div className="space-y-6">
       <ScopeSummary merchantIds={data.scope.merchant_ids} merchantsById={merchantsById} />
       {comparisonMode === 'compare' && merchantIds.length > 1 && <AggregationNotice />}
-
-      <ChannelFilter
-        label="Canaux inclus (lignes de commande upsell)"
-        options={CHANNEL_FILTER_OPTIONS}
-        selected={channels}
-        onChange={setChannels}
-        columns={4}
-      />
 
       {/* PROMPT 19 : message principal tant que la collecte n'est pas active
           — jamais une note en bas de page, jamais des zéros affichés comme
@@ -179,6 +169,9 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
             Mesure indépendante de ce qui précède : chaque suggestion de vente additionnelle proposée
             au client, et si elle a effectivement été ajoutée à la commande — fonctionne dès
             aujourd'hui sur POS, Kiosk et ScanNOrder.
+            {orderFilter && orderFilter.orderTypes.length < ORDER_TYPE_OPTIONS.length && (
+              <> Le filtre de type de commande ne s'applique pas à ce bloc (une suggestion non acceptée n'est rattachée à aucune commande) : seul le canal est pris en compte.</>
+            )}
           </p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Tile title="Suggestions proposées" value={suggestions.proposed_count} />

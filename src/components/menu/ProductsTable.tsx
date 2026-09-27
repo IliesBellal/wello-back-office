@@ -119,8 +119,11 @@ export const ProductsTable = ({
     );
   }
 
-  const renderTableRows = (productList: Product[], isSubProduct = false, parentIndent = 0) => {
-    
+  // Un sous-produit est un produit à part entière : il passe par le même rendu
+  // (image, catégorie, tags, allergènes, disponibilités, statut), seule sa
+  // place change — imbriqué sous son groupe déplié, sans case de sélection.
+  const renderTableRows = (productList: Product[], isSubProduct = false): JSX.Element[] => {
+
     return productList.flatMap((product) => {
       const status = getProductStatus(product);
       const productTags = product.tags || [];
@@ -130,23 +133,25 @@ export const ProductsTable = ({
 
       const rows: JSX.Element[] = [];
 
-      // Main row with unique key combining productId and rowIndex
-      const mainRowKey = `${product.product_id}`;
+      const mainRowKey = isSubProduct ? `sub-${product.product_id}` : product.product_id;
       rows.push(
         <TableRow
           key={mainRowKey}
-          className={`${isSubProduct ? 'bg-muted/30' : ''} ${
-            selectedIds?.has(product.product_id) ? 'bg-primary/5' : ''
+          className={`${isSubProduct ? 'bg-muted/30 border-l-2 border-l-muted-foreground/20' : ''} ${
+            !isSubProduct && selectedIds?.has(product.product_id) ? 'bg-primary/5' : ''
           } hover:bg-muted/50 transition-colors`}
         >
-          {/* Sélection pour l'édition de groupe */}
+          {/* Sélection pour l'édition de groupe — pas de case sur un
+              sous-produit : il suit son groupe côté API. */}
           {selectable && (
             <TableCell className="w-10">
-              <Checkbox
-                checked={selectedIds.has(product.product_id)}
-                onCheckedChange={() => onToggleSelect(product.product_id)}
-                aria-label={`Sélectionner ${product.name}`}
-              />
+              {!isSubProduct && (
+                <Checkbox
+                  checked={selectedIds.has(product.product_id)}
+                  onCheckedChange={() => onToggleSelect(product.product_id)}
+                  aria-label={`Sélectionner ${product.name}`}
+                />
+              )}
             </TableCell>
           )}
 
@@ -183,9 +188,9 @@ export const ProductsTable = ({
           </TableCell>
 
           {/* Nom */}
-          <TableCell 
-            className="font-medium cursor-pointer hover:underline"
-            onClick={() => !product.is_product_group && onProductClick(product)}
+          <TableCell
+            className={`font-medium cursor-pointer hover:underline ${isSubProduct ? 'pl-8' : ''}`}
+            onClick={() => onProductClick(product)}
           >
             <div className="flex items-center gap-2">
               <span>{product.name}</span>
@@ -300,97 +305,14 @@ export const ProductsTable = ({
         </TableRow>
       );
 
-      // Sub-products rows if group is expanded
+      // Lignes des sous-produits d'un groupe déplié
       // (ces lignes supplémentaires sont comptées par countProductRows — cf. productRows.ts)
       if (product.is_product_group && isExpanded && product.sub_products && product.sub_products.length > 0) {
-        product.sub_products.forEach((subProduct) => {
-          // L'API renvoie product_id ; id n'existe que dans l'ancien format
-          const subProductId = subProduct.product_id || subProduct.id || '';
-          const subProductData: Product = {
-            product_id: subProductId,
-            name: subProduct.name,
-            price: subProduct.price,
-            is_product_group: false,
-            available: true,
-            tags: [],
-            allergens: [],
-          };
-
-          const subStatus = getProductStatus(subProductData);
-
-          rows.push(
-            <TableRow
-              key={`sub-${subProductId}`}
-              className="bg-muted/30 border-l-2 border-muted-foreground/20 hover:bg-muted/50 transition-colors"
-            >
-              {/* Pas de case : un sous-produit suit son groupe */}
-              {selectable && <TableCell className="w-10"></TableCell>}
-
-              {/* Chevron cell - empty for sub-products */}
-              <TableCell className="w-12"></TableCell>
-
-              {/* Nom */}
-              <TableCell 
-                className="font-medium text-sm cursor-pointer hover:underline pl-6"
-                onClick={() => onProductClick(subProductData)}
-              >
-                {subProduct.name}
-              </TableCell>
-
-              {/* Catégorie caisse */}
-              <TableCell
-                onClick={() => onProductClick(subProductData)}
-                className="cursor-pointer"
-              >
-                <span className="text-muted-foreground">—</span>
-              </TableCell>
-
-              {/* Tags */}
-              <TableCell
-                onClick={() => onProductClick(subProductData)}
-                className="cursor-pointer"
-              >
-                <span className="text-muted-foreground text-sm">—</span>
-              </TableCell>
-
-              {/* Allergènes */}
-              <TableCell
-                onClick={() => onProductClick(subProductData)}
-                className="cursor-pointer"
-              >
-                <span className="text-muted-foreground text-sm">Aucun</span>
-              </TableCell>
-
-              {/* Disponible sur place */}
-              <TableCell className="text-center">
-                {subProductData.available_in && <Check className="w-4 h-4 text-green-600 mx-auto" />}
-              </TableCell>
-
-              {/* Disponible à emporter */}
-              <TableCell className="text-center">
-                {subProductData.available_take_away && <Check className="w-4 h-4 text-green-600 mx-auto" />}
-              </TableCell>
-
-              {/* Disponible en livraison */}
-              <TableCell className="text-center">
-                {subProductData.available_delivery && <Check className="w-4 h-4 text-green-600 mx-auto" />}
-              </TableCell>
-
-              {/* Statut */}
-              <TableCell
-                onClick={() => onProductClick(subProductData)}
-                className="cursor-pointer"
-              >
-                <Badge
-                  className={`text-xs ${subStatus.color}`}
-                  variant="outline"
-                >
-                  {subStatus.label}
-                </Badge>
-              </TableCell>
-            </TableRow>
-          );
-        });
+        // L'API renvoie product_id ; id n'existe que dans l'ancien format
+        const subProducts = product.sub_products.map(
+          (subProduct) => ({ ...subProduct, product_id: subProduct.product_id || subProduct.id || '' }) as Product
+        );
+        rows.push(...renderTableRows(subProducts, true));
       }
 
       return rows;

@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { ImageIcon, Loader2, Trash2, Video } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -46,6 +46,7 @@ const commandFormSchema = z.object({
   force_fulfillment_type: z.union([z.enum(['DINE_IN', 'TAKE_AWAY']), z.null()]),
   pager_number_required: z.boolean(),
   show_allergens: z.boolean(),
+  show_promo_badge: z.boolean(),
   inactivity_timeout_sec: z.number(),
   upsell_enabled: z.boolean(),
   pay_at_counter_enabled: z.boolean(),
@@ -68,6 +69,7 @@ const defaultCommandValues: CommandFormValues = {
   force_fulfillment_type: null,
   pager_number_required: false,
   show_allergens: true,
+  show_promo_badge: true,
   inactivity_timeout_sec: 90,
   upsell_enabled: true,
   pay_at_counter_enabled: true,
@@ -119,6 +121,7 @@ function KioskSettingsPageContent() {
         force_fulfillment_type: settings.force_fulfillment_type,
         pager_number_required: settings.pager_number_required,
         show_allergens: settings.show_allergens,
+        show_promo_badge: settings.show_promo_badge,
         inactivity_timeout_sec: settings.inactivity_timeout_sec,
         upsell_enabled: settings.upsell_enabled,
         pay_at_counter_enabled: settings.pay_at_counter_enabled,
@@ -271,6 +274,7 @@ function KioskSettingsPageContent() {
       force_fulfillment_type: values.force_fulfillment_type,
       pager_number_required: values.pager_number_required,
       show_allergens: values.show_allergens,
+      show_promo_badge: values.show_promo_badge,
       inactivity_timeout_sec: values.inactivity_timeout_sec,
       upsell_enabled: values.upsell_enabled,
       pay_at_counter_enabled: values.pay_at_counter_enabled,
@@ -287,6 +291,7 @@ function KioskSettingsPageContent() {
       force_fulfillment_type: commandForm.getValues('force_fulfillment_type'),
       pager_number_required: commandForm.getValues('pager_number_required'),
       show_allergens: commandForm.getValues('show_allergens'),
+      show_promo_badge: commandForm.getValues('show_promo_badge'),
       inactivity_timeout_sec: commandForm.getValues('inactivity_timeout_sec'),
       upsell_enabled: commandForm.getValues('upsell_enabled'),
       pay_at_counter_enabled: commandForm.getValues('pay_at_counter_enabled'),
@@ -412,6 +417,24 @@ function KioskSettingsPageContent() {
                       render={({ field }) => (
                         <FormItem className="flex items-center justify-between rounded-md border p-3">
                           <FormLabel className="font-normal">Afficher les allergènes</FormLabel>
+                          <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={commandForm.control}
+                      name="show_promo_badge"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between rounded-md border p-3">
+                          <div className="space-y-0.5">
+                            <FormLabel className="font-normal">Badge « Promo » sur les produits</FormLabel>
+                            <FormDescription>
+                              Signale les produits visés par une promotion en cours.
+                            </FormDescription>
+                          </div>
                           <FormControl>
                             <Switch checked={field.value} onCheckedChange={field.onChange} />
                           </FormControl>

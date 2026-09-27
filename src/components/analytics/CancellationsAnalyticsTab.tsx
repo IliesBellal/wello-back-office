@@ -17,6 +17,7 @@ import {
 } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS } from '@/utils/channels';
+import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 
@@ -25,6 +26,7 @@ interface CancellationsAnalyticsTabProps {
   merchantIds?: string[];
   comparisonMode?: ComparisonMode;
   merchantsById?: Record<string, string>;
+  orderFilter?: OrderFilterSelection;
 }
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -76,7 +78,8 @@ const rateWithVolume = (numerator: number, denominator: number): string => {
   return `${pct} (${numerator} sur ${denominator})`;
 };
 
-export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: CancellationsAnalyticsTabProps) => {
+export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {}, orderFilter }: CancellationsAnalyticsTabProps) => {
+  const filterKey = orderFilterKey(orderFilter);
   const [data, setData] = useState<CancellationsAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   // 403 sur l'agrégat masque l'onglet entier (même consigne que les 4 autres
@@ -95,7 +98,7 @@ export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], compari
     setIsLoading(true);
     setIsForbidden(false);
 
-    analyticsService.getCancellationsAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode })
+    analyticsService.getCancellationsAnalytics(dateRange.from, dateRange.to, { merchantIds, groupBy: comparisonMode, orderFilter })
       .then((result) => {
         if (!isMounted) return;
         setData(result);
@@ -112,7 +115,8 @@ export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], compari
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), comparisonMode, filterKey]);
 
   // Bloc nominatif : toujours fusionné quel que soit le mode (PROMPT 24,
   // décision explicite) — merchantIds est transmis (le serveur exige
@@ -123,7 +127,7 @@ export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], compari
     setIsStaffLoading(true);
     setIsStaffForbidden(false);
 
-    analyticsService.getCancellationsByStaff(dateRange.from, dateRange.to, merchantIds)
+    analyticsService.getCancellationsByStaff(dateRange.from, dateRange.to, merchantIds, orderFilter)
       .then((result) => {
         if (!isMounted) return;
         setStaffData(result);
@@ -140,7 +144,8 @@ export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], compari
     return () => {
       isMounted = false;
     };
-  }, [dateRange.from, dateRange.to, merchantIds.join(',')]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange.from, dateRange.to, merchantIds.join(','), filterKey]);
 
   const authorTypeChartData = useMemo(() => {
     if (!data) return [];

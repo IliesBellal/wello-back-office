@@ -23,7 +23,7 @@ import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
 import { ProductImportDialog } from '@/components/menu/import/ProductImportDialog';
 import type { ImportDoor } from '@/hooks/useProductImport';
 import { CreateProductCategoryDialog } from '@/components/menu/CreateProductCategoryDialog';
-import { Product } from '@/types/menu';
+import { GroupDeleteMode, Product } from '@/types/menu';
 import { menuService } from '@/services/menuService';
 import { toast } from 'sonner';
 
@@ -91,6 +91,8 @@ export default function Menu() {
     bulkSetProductsComponents,
     bulkAddProductsComponents,
     bulkAssignProductsToCategory,
+    bulkDuplicateProducts,
+    undoBulkDuplicateProducts,
     bulkAssignProductsToMarketingCategory
   } = useMenuData();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -142,7 +144,8 @@ export default function Menu() {
   // (bascule automatique : SimpleProductSheet/GroupProductSheet se répartissent
   // l'affichage selon is_product_group du produit sélectionné).
   const handleOpenSubProduct = (productId: string) => {
-    handleProductClick({ product_id: productId, name: '', is_product_group: false } as Product);
+    const subProduct = menuData?.products?.find(p => p.product_id === productId);
+    handleProductClick(subProduct ?? ({ product_id: productId, name: '', is_product_group: false } as Product));
   };
 
   const handleToggleGroup = (productId: string) => {
@@ -217,8 +220,8 @@ export default function Menu() {
     }
   };
 
-  const handleDeleteProductGroup = async (groupId: string, subProductIds: string[]) => {
-    await deleteProductGroup(groupId, subProductIds);
+  const handleDeleteProductGroup = async (groupId: string, subProductIds: string[], mode: GroupDeleteMode) => {
+    await deleteProductGroup(groupId, subProductIds, mode);
     setSelectedProduct(null);
     setSheetOpen(false);
   };
@@ -230,6 +233,22 @@ export default function Menu() {
       acc[cat.category_id] = cat.category_name || cat.category;
       return acc;
     }, {} as Record<string, string>);
+  }, [menuData]);
+
+  // Produits effectivement imbriqués sous un groupe. On se fie à cette
+  // imbrication plutôt qu'à by_product_of : des données héritées portent
+  // by_product_of = "0" ou l'ID du produit lui-même, que l'API traite comme des
+  // produits racines — un test sur by_product_of les faisait disparaître.
+  const nestedSubProductIds = useMemo(() => {
+    const ids = new Set<string>();
+    (menuData?.products || []).forEach(p => {
+      if (!p.is_product_group) return;
+      p.sub_products?.forEach(sp => {
+        const id = sp.product_id || sp.id;
+        if (id) ids.add(id);
+      });
+    });
+    return ids;
   }, [menuData]);
 
   // Get all products and apply filters/sorting
@@ -252,7 +271,7 @@ export default function Menu() {
       // une fois comme ligne racine ordinaire, une fois imbriqué sous son
       // groupe déplié. Hors recherche, seuls les produits racines s'affichent
       // ; les sous-produits ne sont visibles qu'imbriqués sous leur groupe.
-      result = result.filter(p => !p.by_product_of);
+      result = result.filter(p => !nestedSubProductIds.has(p.product_id));
     }
 
     // Filtre catégorie
@@ -273,7 +292,7 @@ export default function Menu() {
       const nb = vb as number;
       return sortDir === 'asc' ? na - nb : nb - na;
     });
-  }, [menuData, search, categoryFilter, sortKey, sortDir, categoryMap]);
+  }, [menuData, search, categoryFilter, sortKey, sortDir, categoryMap, nestedSubProductIds]);
 
   // Un groupe déplié ajoute une ligne par sous-produit : le compteur doit
   // refléter les lignes affichées, pas seulement les produits filtrés.
@@ -516,6 +535,8 @@ export default function Menu() {
           onSetTags={bulkSetProductsTags}
           onAddTags={bulkAddProductsTags}
           onAssignCategory={bulkAssignProductsToCategory}
+          onDuplicateToCategory={bulkDuplicateProducts}
+          onUndoDuplicate={undoBulkDuplicateProducts}
           onAssignMarketingCategory={bulkAssignProductsToMarketingCategory}
           onSetTva={bulkSetProductsTva}
           onSetAvailability={bulkSetProductsAvailability}

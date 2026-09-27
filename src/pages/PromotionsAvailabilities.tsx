@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import {
   Dialog,
@@ -36,7 +37,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { DatePicker } from '@/components/ui/date-picker';
-import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X, Search, UtensilsCrossed } from 'lucide-react';
+import { formatCalendarDate } from '@/utils/apiDate';
+import { isValidTimeSlot, TIME_SLOT_ERROR } from '@/utils/timeSlots';
+import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X, Search, UtensilsCrossed, Info, AlertTriangle } from 'lucide-react';
 import { useState as useStateBase } from 'react';
 import { promotionsService } from '@/services/promotionsService';
 import { menuService } from '@/services/menuService';
@@ -91,6 +94,73 @@ const emptyAvailability = (): Omit<Availability, 'id'> => ({
   active: true,
   product_ids: [],
 });
+
+// ─── Explications & avertissements ────────────────────────────────────────────
+
+// Encart en tête d'onglet : à quoi sert l'outil. Promotions et disponibilités
+// sont souvent confondues — une promotion ne masque jamais un produit.
+function ToolExplainer({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <Alert className="bg-primary/5 border-primary/20">
+      <Info className="h-4 w-4" />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription className="text-muted-foreground space-y-1">{children}</AlertDescription>
+    </Alert>
+  );
+}
+
+interface AvailabilityWarning {
+  key: 'no_products' | 'no_slots';
+  title: string;
+  description: string;
+}
+
+// Une disponibilité sans produit ou sans créneau est autorisée (API comprise)
+// mais ses effets surprennent : on les décrit avant d'enregistrer.
+// Règle appliquée par l'API (borne et Scan & Order, pas la caisse) : un
+// produit associé à une disponibilité active n'est proposé que pendant un de
+// ses créneaux.
+function getAvailabilityWarnings(avail: Pick<Availability, 'product_ids' | 'time_slots' | 'active'>): AvailabilityWarning[] {
+  const warnings: AvailabilityWarning[] = [];
+  if ((avail.product_ids ?? []).length === 0) {
+    warnings.push({
+      key: 'no_products',
+      title: 'Aucun produit associé',
+      description:
+        "Cette disponibilité n'aura aucun effet : aucun produit ne sera masqué sur la borne ni sur le Scan & Order, quels que soient ses créneaux. Les produits retirés redeviennent visibles en permanence (sauf s'ils sont associés à une autre disponibilité active).",
+    });
+  }
+  if ((avail.time_slots ?? []).length === 0) {
+    warnings.push({
+      key: 'no_slots',
+      title: 'Aucun créneau horaire',
+      description: avail.active
+        ? "Les produits associés seront masqués en permanence sur la borne et le Scan & Order : sans créneau, ils ne sont jamais proposés tant que cette disponibilité est active (sauf pendant un créneau d'une autre disponibilité active qui les contient). Ajoutez au moins un créneau, ou désactivez la disponibilité pour lever la restriction."
+        : "La disponibilité est désactivée, elle est donc sans effet pour l'instant. Si vous l'activez sans créneau, ses produits seront masqués en permanence sur la borne et le Scan & Order.",
+    });
+  }
+  return warnings;
+}
+
+function AvailabilityWarnings({ warnings }: { warnings: AvailabilityWarning[] }) {
+  if (warnings.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      {warnings.map(w => (
+        <div
+          key={w.key}
+          className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-3 py-2 text-sm text-amber-900 dark:text-amber-200"
+        >
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-medium">{w.title}</p>
+            <p className="text-xs leading-relaxed">{w.description}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 // ─── Delete confirmation dialog ───────────────────────────────────────────────
 
@@ -183,7 +253,10 @@ function PromotionFormDialog({
   const set = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
-  const isValid = form.name.trim().length > 0 && form.value > 0;
+  const isValid =
+    form.name.trim().length > 0 &&
+    form.value > 0 &&
+    (form.time_slots ?? []).every(isValidTimeSlot);
 
   const handleSubmit = async () => {
     setSaving(true);
@@ -541,35 +614,40 @@ function PromotionFormDialog({
               {isEnabled && (
                 <div className="space-y-2">
                   {schedules.map((schedule, idx) => (
-                    <div key={`${dayObj.key}-${idx}`} className="flex gap-2 items-end">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">Début</Label>
-                        <Input
-                          type="time"
-                          value={schedule.start_time}
-                          onChange={e => updateSchedule(dayObj.key, idx, 'start_time', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                    <div key={`${dayObj.key}-${idx}`} className="space-y-1">
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Début</Label>
+                          <Input
+                            type="time"
+                            value={schedule.start_time}
+                            onChange={e => updateSchedule(dayObj.key, idx, 'start_time', e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
 
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">Fin</Label>
-                        <Input
-                          type="time"
-                          value={schedule.end_time}
-                          onChange={e => updateSchedule(dayObj.key, idx, 'end_time', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Fin</Label>
+                          <Input
+                            type="time"
+                            value={schedule.end_time}
+                            onChange={e => updateSchedule(dayObj.key, idx, 'end_time', e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => removeSchedule(dayObj.key, idx)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removeSchedule(dayObj.key, idx)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {!isValidTimeSlot(schedule) && (
+                        <p className="text-xs text-destructive">{TIME_SLOT_ERROR}</p>
+                      )}
                     </div>
                   ))}
 
@@ -819,6 +897,18 @@ function PromotionsTab() {
 
   return (
     <div className="space-y-4">
+      <ToolExplainer title="À quoi servent les promotions ?">
+        <p>
+          Une promotion <strong>modifie le prix</strong> (remise en %, en €, ou nouveau prix) des produits ciblés, pendant sa
+          période de validité et ses éventuels créneaux horaires. Elle s'applique automatiquement, ou via un code promo.
+        </p>
+        <p>
+          Elle <strong>ne retire jamais un produit du menu</strong> : en dehors de la promotion, le produit reste proposé à son
+          prix normal. Pour masquer un produit à certaines heures sur la borne ou le Scan &amp; Order, utilisez l'onglet
+          <strong> Disponibilités</strong>.
+        </p>
+      </ToolExplainer>
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {promotions.length} promotion{promotions.length !== 1 ? 's' : ''}
@@ -906,8 +996,8 @@ function PromotionsTab() {
                 {(promo.start_date || promo.end_date) && (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <CalendarDays className="w-3.5 h-3.5" />
-                    {promo.start_date && <span>Du {new Date(promo.start_date).toLocaleDateString('fr-FR')}</span>}
-                    {promo.end_date && <span>au {new Date(promo.end_date).toLocaleDateString('fr-FR')}</span>}
+                    {promo.start_date && <span>Du {formatCalendarDate(promo.start_date)}</span>}
+                    {promo.end_date && <span>au {formatCalendarDate(promo.end_date)}</span>}
                   </div>
                 )}
 
@@ -1000,11 +1090,17 @@ function AvailabilityFormDialog({
   const set = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
 
+  // Sans créneau ni produit : autorisé, mais averti et confirmé
+  // (getAvailabilityWarnings).
   const isValid =
     form.name.trim().length > 0 &&
-    (form.time_slots?.length ?? 0) > 0;
+    (form.time_slots ?? []).every(isValidTimeSlot);
+
+  const warnings = getAvailabilityWarnings(form);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const handleSubmit = async () => {
+    setConfirmOpen(false);
     setSaving(true);
     try {
       await onSave(form);
@@ -1012,6 +1108,14 @@ function AvailabilityFormDialog({
     } finally {
       setSaving(false);
     }
+  };
+
+  const requestSubmit = () => {
+    if (warnings.length > 0) {
+      setConfirmOpen(true);
+      return;
+    }
+    handleSubmit();
   };
 
   // ─── TAB: GÉNÉRAL ──────────────────────────────────────────────────────────
@@ -1149,35 +1253,40 @@ function AvailabilityFormDialog({
               {isEnabled && (
                 <div className="space-y-2">
                   {schedules.map((schedule, idx) => (
-                    <div key={`${dayObj.key}-${idx}`} className="flex gap-2 items-end">
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">Début</Label>
-                        <Input
-                          type="time"
-                          value={schedule.start_time}
-                          onChange={e => updateSchedule(dayObj.key, idx, 'start_time', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                    <div key={`${dayObj.key}-${idx}`} className="space-y-1">
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Début</Label>
+                          <Input
+                            type="time"
+                            value={schedule.start_time}
+                            onChange={e => updateSchedule(dayObj.key, idx, 'start_time', e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
 
-                      <div className="flex-1 space-y-1">
-                        <Label className="text-xs">Fin</Label>
-                        <Input
-                          type="time"
-                          value={schedule.end_time}
-                          onChange={e => updateSchedule(dayObj.key, idx, 'end_time', e.target.value)}
-                          className="h-8 text-sm"
-                        />
-                      </div>
+                        <div className="flex-1 space-y-1">
+                          <Label className="text-xs">Fin</Label>
+                          <Input
+                            type="time"
+                            value={schedule.end_time}
+                            onChange={e => updateSchedule(dayObj.key, idx, 'end_time', e.target.value)}
+                            className="h-8 text-sm"
+                          />
+                        </div>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => removeSchedule(dayObj.key, idx)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removeSchedule(dayObj.key, idx)}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {!isValidTimeSlot(schedule) && (
+                        <p className="text-xs text-destructive">{TIME_SLOT_ERROR}</p>
+                      )}
                     </div>
                   ))}
 
@@ -1326,19 +1435,44 @@ function AvailabilityFormDialog({
         </Tabs>
 
         {/* Fixed Action Buttons */}
-        <div className="px-6 py-4 border-t flex gap-3 flex-shrink-0">
-          <Button variant="outline" onClick={onClose} className="flex-1" disabled={saving}>
-            Annuler
-          </Button>
-          <Button
-            onClick={handleSubmit}
-            className="flex-1 bg-gradient-primary"
-            disabled={!isValid || saving}
-          >
-            {saving ? 'Enregistrement…' : initial ? 'Enregistrer' : 'Créer'}
-          </Button>
+        <div className="px-6 py-4 border-t space-y-3 flex-shrink-0">
+          <AvailabilityWarnings warnings={warnings} />
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={onClose} className="flex-1" disabled={saving}>
+              Annuler
+            </Button>
+            <Button
+              onClick={requestSubmit}
+              className="flex-1 bg-gradient-primary"
+              disabled={!isValid || saving}
+            >
+              {saving ? 'Enregistrement…' : initial ? 'Enregistrer' : 'Créer'}
+            </Button>
+          </div>
         </div>
       </DialogContent>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {initial ? 'Enregistrer' : 'Créer'} « {form.name.trim()} » quand même ?
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>Voici ce qui se passera si vous validez :</p>
+                <AvailabilityWarnings warnings={warnings} />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Revenir au formulaire</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSubmit}>
+              {initial ? 'Enregistrer' : 'Créer'} quand même
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
@@ -1392,6 +1526,19 @@ function AvailabilitiesTab() {
 
   return (
     <div className="space-y-4">
+      <ToolExplainer title="À quoi servent les disponibilités ?">
+        <p>
+          Une disponibilité <strong>limite les horaires</strong> auxquels des produits sont proposés sur la{' '}
+          <strong>borne</strong> et le <strong>Scan &amp; Order</strong> (la caisse n'est pas concernée). En dehors de ses
+          créneaux, les produits associés sont <strong>masqués</strong> et ne peuvent pas être commandés.
+        </p>
+        <p>
+          Un produit associé à aucune disponibilité est toujours proposé. Associé à plusieurs disponibilités actives, il est
+          proposé dès qu'un de leurs créneaux est en cours. Désactiver une disponibilité lève sa restriction. Les promotions
+          n'ont aucun effet sur la visibilité des produits.
+        </p>
+      </ToolExplainer>
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
           {availabilities.length} disponibilité{availabilities.length !== 1 ? 's' : ''}
@@ -1469,6 +1616,20 @@ function AvailabilitiesTab() {
                     {avail.product_ids.length} produit{avail.product_ids.length !== 1 ? 's' : ''} associé{avail.product_ids.length !== 1 ? 's' : ''}
                   </div>
                 )}
+
+                {/* Listes vides : autorisées, mais l'effet doit rester visible */}
+                {getAvailabilityWarnings(avail).map(w => (
+                  <div key={w.key} className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                    <span>
+                      {w.key === 'no_products'
+                        ? 'Aucun produit : sans effet'
+                        : avail.active
+                          ? 'Aucun créneau : produits masqués en permanence'
+                          : 'Aucun créneau'}
+                    </span>
+                  </div>
+                ))}
 
                 <div className="flex items-center justify-between pt-1 border-t border-border">
                   <span className="text-xs text-muted-foreground">
