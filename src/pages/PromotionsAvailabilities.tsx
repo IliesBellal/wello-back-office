@@ -44,7 +44,8 @@ import { useState as useStateBase } from 'react';
 import { promotionsService } from '@/services/promotionsService';
 import { menuService } from '@/services/menuService';
 import { Promotion, Availability, DayOfWeek, TimeSlot } from '@/types/promotions';
-import { Product } from '@/types/menu';
+import { Category, Product } from '@/types/menu';
+import { CategorizedProductPicker } from '@/components/shared/CategorizedProductPicker';
 import { useToast } from '@/hooks/use-toast';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1066,7 +1067,9 @@ function AvailabilityFormDialog({
   );
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
-  const [products, setProducts] = useState<Product[]>([]);
+  // Catégories caisse avec leurs produits imbriqués : le choix des produits
+  // se fait catégorie par catégorie (CategorizedProductPicker).
+  const [productCategories, setProductCategories] = useState<Category[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productSearch, setProductSearch] = useState('');
 
@@ -1078,14 +1081,14 @@ function AvailabilityFormDialog({
 
   // Load products when dialog opens
   useEffect(() => {
-    if (open && products.length === 0) {
+    if (open && productCategories.length === 0) {
       setLoadingProducts(true);
-      menuService.getProducts().then(data => {
-        setProducts(data);
+      menuService.getMenuData().then(data => {
+        setProductCategories(data);
         setLoadingProducts(false);
       }).catch(() => setLoadingProducts(false));
     }
-  }, [open, products.length]);
+  }, [open, productCategories.length]);
 
   const set = <K extends keyof typeof form>(key: K, value: typeof form[K]) =>
     setForm(prev => ({ ...prev, [key]: value }));
@@ -1309,10 +1312,6 @@ function AvailabilityFormDialog({
   };
 
   // ─── TAB: PRODUITS ────────────────────────────────────────────────────────
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase())
-  );
-
   const renderProduitsTabContent = () => (
     <>
       {loadingProducts ? (
@@ -1322,41 +1321,12 @@ function AvailabilityFormDialog({
           ))}
         </div>
       ) : (
-        <div className="border border-border rounded-lg p-2 space-y-1">
-          {filteredProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              {products.length === 0 ? 'Aucun produit disponible' : 'Aucun résultat pour votre recherche'}
-            </p>
-          ) : (
-            filteredProducts.map(product => (
-              <div
-                key={product.product_id}
-                className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarImage src={product.image_url} alt={product.name} />
-                  <AvatarFallback
-                    style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
-                  />
-                </Avatar>
-                <span className="text-sm font-medium flex-1 truncate">{product.name}</span>
-                <Switch
-                  checked={(form.product_ids ?? []).includes(product.product_id)}
-                  onCheckedChange={checked => {
-                    const updated = [...(form.product_ids ?? [])];
-                    if (checked && !updated.includes(product.product_id)) {
-                      updated.push(product.product_id);
-                    } else if (!checked) {
-                      const idx = updated.indexOf(product.product_id);
-                      if (idx > -1) updated.splice(idx, 1);
-                    }
-                    set('product_ids', updated);
-                  }}
-                />
-              </div>
-            ))
-          )}
-        </div>
+        <CategorizedProductPicker
+          categories={productCategories}
+          selectedIds={form.product_ids ?? []}
+          onChange={ids => set('product_ids', ids)}
+          search={productSearch}
+        />
       )}
     </>
   );
