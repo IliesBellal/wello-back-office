@@ -19,8 +19,8 @@ import { PageContainer } from "@/components/shared";
 import { SettingsCard, SettingsGrid, SettingsPageContainer } from "@/components/settings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ModuleOfferCard } from "@/components/subscription/ModuleOfferCard";
 
 import { usePermissions } from "@/hooks/usePermissions";
 import { qk } from "@/lib/queryKeys";
@@ -79,11 +79,11 @@ function SubscriptionManagementContent() {
           <SettingsPageContainer>
             <SettingsGrid>
               <CompositionCard current={currentQ.data} />
-              <ModulesCard current={currentQ.data} />
               <BillingCard
                 activationState={activationQ.data?.activation_state}
                 subscriptionStatus={activationQ.data?.subscription_status}
               />
+              <ModulesCard current={currentQ.data} />
             </SettingsGrid>
           </SettingsPageContainer>
         )}
@@ -98,7 +98,12 @@ function SubscriptionManagementContent() {
 
 function CompositionCard({ current }: { current: SubscriptionAmount }) {
   return (
-    <SettingsCard title="Composition actuelle" description="Ce que vous payez aujourd'hui." icon={Package}>
+    <SettingsCard
+      title="Composition actuelle"
+      description="Ce que vous payez aujourd'hui."
+      icon={Package}
+      className="lg:col-span-2"
+    >
       <div className="space-y-2">
         {current.breakdown.length === 0 ? (
           <p className="text-sm italic text-muted-foreground">Aucun produit souscrit.</p>
@@ -189,16 +194,22 @@ function ModulesCard({ current }: { current: SubscriptionAmount }) {
       icon={Sparkles}
       colSpan="full"
     >
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {SUBSCRIPTION_MODULE_CODES.map((m) => (
-          <label
-            key={m.code}
-            className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-sm"
-          >
-            <Checkbox checked={selected.has(m.code)} onCheckedChange={(v) => toggle(m.code, v === true)} />
-            {m.label}
-          </label>
-        ))}
+      <div className="grid gap-4 lg:grid-cols-2">
+        {SUBSCRIPTION_MODULE_CODES.map((m) => {
+          const line = current.breakdown.find((l) => l.kind === "module" && l.code === m.code);
+          return (
+            <ModuleOfferCard
+              key={m.code}
+              code={m.code}
+              fallbackLabel={m.label}
+              active={activeModuleCodes.has(m.code)}
+              selected={selected.has(m.code)}
+              billedPrice={line ? formatPrice(line.amount_cents) : undefined}
+              billingCycleSuffix={current.billing_cycle === "annual" ? "/ an" : "/ mois"}
+              onToggle={(checked) => toggle(m.code, checked)}
+            />
+          );
+        })}
       </div>
 
       {dirty && (
