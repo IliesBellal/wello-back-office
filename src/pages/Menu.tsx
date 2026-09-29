@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Plus, ChevronDown, CopyPlus, Upload, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon, PencilRuler, FolderPlus, Boxes } from 'lucide-react';
+import { MoreVertical, Plus, ChevronDown, CopyPlus, Upload, Camera, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon, PencilRuler, FolderPlus, Boxes } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { useProductCreateSheet } from '@/contexts/ProductCreateSheetContext';
 import { useOrganizeModal } from '@/contexts/OrganizeModalContext';
@@ -105,6 +106,17 @@ export default function Menu() {
   // Porte ouverte directement quand l'import est lancé depuis un raccourci
   // (« Créer plusieurs produits ») plutôt que depuis l'écran de choix.
   const [importInitialDoor, setImportInitialDoor] = useState<ImportDoor | undefined>(undefined);
+  // `?import=photo` (encart du tableau de bord) ouvre directement la porte
+  // photo, puis le paramètre est retiré pour qu'un rechargement ne la rouvre pas.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('import') !== 'photo') return;
+    setImportInitialDoor('photo');
+    setImportOpen(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('import');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
   const { isOpen: productCreateOpen, setIsOpen: setProductCreateOpen } = useProductCreateSheet();
   const { isOpen: organizeModalOpen, setIsOpen: setOrganizeModalOpen } = useOrganizeModal();
@@ -372,6 +384,15 @@ export default function Menu() {
                       >
                         <CopyPlus className="w-4 h-4 mr-2" />
                         Créer plusieurs produits
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => {
+                          setImportInitialDoor('photo');
+                          setImportOpen(true);
+                        }}
+                      >
+                        <Camera className="w-4 h-4 mr-2" />
+                        Importer ma carte en photos
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={() => {

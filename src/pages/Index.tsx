@@ -5,6 +5,7 @@ import { PageContainer } from '@/components/shared';
 import { DashboardHero } from '@/components/dashboard/DashboardHero';
 import { RevenueEvolutionChart } from '@/components/dashboard/RevenueEvolutionChart';
 import { QuickProductSheet } from '@/components/dashboard/QuickProductSheet';
+import { MenuPhotoImportBanner } from '@/components/dashboard/MenuPhotoImportBanner';
 import { isApiHttpError } from '@/services/apiClient';
 import { getDashboardSummary } from '@/services/dashboardService';
 
@@ -50,6 +51,9 @@ const Index = () => {
             </div>
           }
         >
+          {/* ── Onboarding : carte encore vide ── */}
+          <MenuPhotoImportBanner />
+
           {/* ── Metric Cards ── */}
           {!isForbidden && (
             <>
