@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GoogleSignInButton } from '@/components/signup-tunnel/GoogleSignInButton';
-import { AuthProviderButton } from '@/components/signup-tunnel/AuthProviderButton';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { AuthProviderButton } from '@/components/auth/AuthProviderButton';
 import { decodeJwtPayload } from '@/lib/decodeJwtPayload';
 import { Mail, User, Lock } from 'lucide-react';
 import type { TunnelState } from './tunnelState';
@@ -19,6 +19,9 @@ interface ScreenIdentityProps {
   onNext: (patch: Partial<TunnelState>) => void;
   /** Set when the final submission (screen 3) came back "email already used" — sends the visitor back here. */
   emailTakenError?: boolean;
+  /** id_token of a Google account /login found no account for — opens the
+   * screen directly on the name confirmation, as if Google had just answered. */
+  initialGoogleIdToken?: string | null;
 }
 
 /**
@@ -27,7 +30,7 @@ interface ScreenIdentityProps {
  * request and is NOT a visually-demoted fallback (same input sizing,
  * same button weight, once shown).
  */
-export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentityProps) => {
+export const ScreenIdentity = ({ state, onNext, emailTakenError, initialGoogleIdToken }: ScreenIdentityProps) => {
   const [showEmailForm, setShowEmailForm] = useState(state.provider === 'password' && !!state.email);
   const [email, setEmail] = useState(state.email);
   const [password, setPassword] = useState(state.password);
@@ -48,6 +51,11 @@ export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentit
     setFirstName(claims?.given_name ?? '');
     setLastName(claims?.family_name ?? '');
   };
+
+  useEffect(() => {
+    if (initialGoogleIdToken) handleGoogleCredential(initialGoogleIdToken);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGoogleContinue = (e: React.FormEvent) => {
     e.preventDefault();

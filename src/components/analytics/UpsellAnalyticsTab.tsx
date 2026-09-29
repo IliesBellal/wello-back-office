@@ -5,6 +5,7 @@ import { ExpandableDataTable, ColumnConfig } from '@/components/shared/Expandabl
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
+import { chartTooltipProps } from '@/components/analytics/chartTooltip';
 import {
   analyticsService,
   UpsellAnalyticsResponse,
@@ -205,7 +206,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                     <XAxis type="number" stroke="#6b7280" />
                     <YAxis type="category" dataKey="name" stroke="#6b7280" width={120} />
                     <Tooltip
-                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                      {...chartTooltipProps}
                       formatter={(value: number) => eur(value)}
                     />
                     <Bar dataKey="upsell_revenue_ht_cents" fill={UPSELL_BAR_COLOR} name="CA upsell HT" />

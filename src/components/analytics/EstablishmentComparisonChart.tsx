@@ -1,6 +1,7 @@
 import {
   BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { chartTooltipProps } from '@/components/analytics/chartTooltip';
 import { merchantColor } from '@/utils/merchantColors';
 
 export interface EstablishmentComparisonPoint {
@@ -45,7 +46,7 @@ export function EstablishmentComparisonChart({ data, valueLabel, valueFormatter 
         <XAxis type="number" stroke="#6b7280" />
         <YAxis dataKey="label" type="category" stroke="#6b7280" width={140} />
         <Tooltip
-          contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+          {...chartTooltipProps}
           formatter={(value: number) => valueFormatter(value)}
         />
         <Legend payload={legendPayload} />

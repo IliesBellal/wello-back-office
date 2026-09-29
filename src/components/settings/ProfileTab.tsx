@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { useUserProfile } from "@/hooks/useSettings";
 import { SettingsSection } from "./SettingsSection";
 import { ChangePasswordDialog } from "./ChangePasswordDialog";
+import { GoogleLinkCard } from "./GoogleLinkCard";
 import { OTPVerification } from "@/components/auth/OTPVerification";
 import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressAutocomplete";
 import { UserProfile } from "@/types/settings";
@@ -296,6 +297,8 @@ export const ProfileTab = () => {
             </Button>
           </CardContent>
         </Card>
+
+        <GoogleLinkCard />
       </div>
 
       <ChangePasswordDialog

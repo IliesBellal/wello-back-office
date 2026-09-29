@@ -8,7 +8,10 @@ import { authService } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { OTPVerification } from '@/components/auth';
-import { AuthData } from '@/types/auth';
+import { AuthData, type AuthResponse } from '@/types/auth';
+import { publicTunnelApi, isPublicApiError } from '@/services/publicTunnelApi';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+import { decodeJwtPayload } from '@/lib/decodeJwtPayload';
 import { Mail, Lock, Eye, EyeOff, Shield, Check, type LucideIcon } from 'lucide-react';
 
 // Animated background component
@@ -186,63 +189,107 @@ const Login = () => {
     });
   };
 
+  /** Shared by the password and Google paths: both end on an /auth/login
+   * response, which may still require MFA. */
+  const handleAuthResponse = (response: AuthResponse) => {
+    switch (response.data.status) {
+      case '0':
+      case 'user_not_found':
+        toast({
+          title: 'Compte introuvable',
+          description: 'Email ou mot de passe incorrect',
+          variant: 'destructive',
+        });
+        break;
+
+      case '3':
+      case 'account_disabled':
+        toast({
+          title: 'Compte désactivé',
+          description: 'Votre compte a été désactivé.',
+          variant: 'destructive',
+        });
+        break;
+
+      case 'user_not_allowed':
+        toast({
+          title: 'Accès refusé',
+          description: 'Vous n\'avez pas la permission d\'accéder à cette application.',
+          variant: 'destructive',
+        });
+        break;
+
+      case '1':
+      case 'success':
+        if (response.data.session.mfa_status === 'pending') {
+          setPendingAuthData(response.data);
+          setShowMFAModal(true);
+          toast({
+            title: 'Vérification requise',
+            description: 'Veuillez saisir le code de sécurité envoyé à votre email.',
+          });
+        } else {
+          setAuthData(response.data);
+          toast({
+            title: 'Connexion réussie',
+            description: `Bienvenue ${response.data.user.first_name}!`,
+          });
+          navigate('/');
+        }
+        break;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const response = await authService.login({ email, password });
-
-      switch (response.data.status) {
-        case '0':
-        case 'user_not_found':
-          toast({
-            title: 'Compte introuvable',
-            description: 'Email ou mot de passe incorrect',
-            variant: 'destructive',
-          });
-          break;
-
-        case '3':
-        case 'account_disabled':
-          toast({
-            title: 'Compte désactivé',
-            description: 'Votre compte a été désactivé.',
-            variant: 'destructive',
-          });
-          break;
-
-        case 'user_not_allowed':
-          toast({
-            title: 'Accès refusé',
-            description: 'Vous n\'avez pas la permission d\'accéder à cette application.',
-            variant: 'destructive',
-          });
-          break;
-
-        case '1':
-        case 'success':
-          if (response.data.session.mfa_status === 'pending') {
-            setPendingAuthData(response.data);
-            setShowMFAModal(true);
-            toast({
-              title: 'Vérification requise',
-              description: 'Veuillez saisir le code de sécurité envoyé à votre email.',
-            });
-          } else {
-            setAuthData(response.data);
-            toast({
-              title: 'Connexion réussie',
-              description: `Bienvenue ${response.data.user.first_name}!`,
-            });
-            navigate('/');
-          }
-          break;
-      }
+      handleAuthResponse(await authService.login({ email, password }));
     } catch (error) {
       toast({
         title: 'Erreur de connexion',
         description: 'Email ou mot de passe incorrect',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * POST /v1/auth/google (ib-welloresto-api googleauth module). An unknown
+   * Google identity goes straight into the signup tunnel with that same
+   * id_token, landing on its "confirm your name" step.
+   */
+  const handleGoogleCredential = async (idToken: string) => {
+    setIsLoading(true);
+    try {
+      const { token } = await publicTunnelApi.post<{ token: string }>('/v1/auth/google', { id_token: idToken });
+      handleAuthResponse(await authService.loginWithToken(token));
+    } catch (error) {
+      const code = isPublicApiError(error) ? error.code : undefined;
+      if (code === 'google_account_not_found') {
+        navigate('/creer-mon-compte', { state: { googleIdToken: idToken } });
+        return;
+      }
+      if (code === 'google_account_has_password') {
+        const claimedEmail = decodeJwtPayload<{ email?: string }>(idToken)?.email;
+        if (claimedEmail) setEmail(claimedEmail);
+        toast({
+          title: 'Connectez-vous avec votre mot de passe',
+          description:
+            'Un compte existe déjà avec cette adresse e-mail. Connectez-vous avec votre mot de passe, puis associez Google depuis Paramètres > Mon Profil.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      toast({
+        title: 'Connexion Google impossible',
+        description:
+          code === 'google_email_not_verified'
+            ? "L'adresse e-mail de ce compte Google n'est pas vérifiée."
+            : 'La connexion avec Google a échoué. Réessayez ou connectez-vous avec votre e-mail.',
         variant: 'destructive',
       });
     } finally {
@@ -393,6 +440,16 @@ const Login = () => {
                   )}
                 </span>
               </motion.button>
+            </motion.div>
+
+            {/* Google sign-in */}
+            <motion.div variants={itemVariants} className="space-y-5">
+              <div className="flex items-center gap-3 text-xs text-slate-400" aria-hidden>
+                <span className="h-px flex-1 bg-slate-200" />
+                ou
+                <span className="h-px flex-1 bg-slate-200" />
+              </div>
+              <GoogleSignInButton onCredential={handleGoogleCredential} disabled={isLoading} />
             </motion.div>
 
             {/* Password recovery */}

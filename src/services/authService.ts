@@ -37,6 +37,13 @@ export interface CreateMerchantRequest {
   admin?: boolean;
 }
 
+/** Payload of GET/POST/DELETE /v1/auth/google/link. `can_unlink` is false
+ * when Google is the account's only login method (no password). */
+export interface GoogleLinkStatus {
+  linked: boolean;
+  can_unlink: boolean;
+}
+
 /** Envelope of POST /pos/create. */
 interface CreateMerchantResponse {
   id: string;
@@ -329,6 +336,49 @@ export const authService = {
         );
         return response.data.needs_password_set;
       },
+    );
+  },
+
+  /**
+   * GET/POST/DELETE /v1/auth/google/link — rattachement du compte Google de
+   * l'utilisateur connecté (paramètres du compte). Self-service: identity
+   * comes from the session token. Error toasts are suppressed: the caller
+   * maps the API's codes (google_account_linked_elsewhere,
+   * google_already_linked, google_unlink_requires_password…) itself.
+   */
+  getGoogleLink: async (): Promise<GoogleLinkStatus> => {
+    logAPI('GET', '/v1/auth/google/link');
+
+    return withMock(
+      () => ({ linked: false, can_unlink: false }),
+      async () =>
+        (await apiClient.get<{ id: string; data: GoogleLinkStatus }>('/v1/auth/google/link', { suppressErrorToast: true })).data,
+    );
+  },
+
+  linkGoogle: async (idToken: string): Promise<GoogleLinkStatus> => {
+    logAPI('POST', '/v1/auth/google/link');
+
+    return withMock(
+      () => ({ linked: true, can_unlink: true }),
+      async () =>
+        (
+          await apiClient.post<{ id: string; data: GoogleLinkStatus }>(
+            '/v1/auth/google/link',
+            { id_token: idToken },
+            { suppressErrorToast: true },
+          )
+        ).data,
+    );
+  },
+
+  unlinkGoogle: async (): Promise<GoogleLinkStatus> => {
+    logAPI('DELETE', '/v1/auth/google/link');
+
+    return withMock(
+      () => ({ linked: false, can_unlink: false }),
+      async () =>
+        (await apiClient.delete<{ id: string; data: GoogleLinkStatus }>('/v1/auth/google/link', { suppressErrorToast: true })).data,
     );
   },
 

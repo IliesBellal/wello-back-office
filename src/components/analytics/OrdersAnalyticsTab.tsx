@@ -6,6 +6,7 @@ import {
   LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { chartTooltipProps } from '@/components/analytics/chartTooltip';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { analyticsService, OrdersAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
@@ -219,7 +220,7 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                             <XAxis dataKey="date" stroke="#6b7280" />
                             <YAxis stroke="#6b7280" />
-                            <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                            <Tooltip {...chartTooltipProps} />
                             <Legend />
                             {merchantPresentChannels.map((channel) => (
                               <Line
@@ -267,7 +268,7 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                 <XAxis dataKey="date" stroke="#6b7280" />
                 <YAxis stroke="#6b7280" />
-                <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                <Tooltip {...chartTooltipProps} />
                 <Legend />
                 {presentChannels.map((channel) => (
                   <Line
@@ -307,7 +308,7 @@ export const OrdersAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                    {...chartTooltipProps}
                     formatter={(value: number) => `${value} commandes`}
                   />
                   <Legend />

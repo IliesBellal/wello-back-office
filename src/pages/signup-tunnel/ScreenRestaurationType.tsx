@@ -1,7 +1,21 @@
 import { useEffect, useState } from 'react';
 import { RESTAURATION_ARCHETYPES, archetypeFromNAF, type ArchetypeCode } from '@/types/signupTunnel';
-import { CheckCircle2 } from 'lucide-react';
+import { Beer, CheckCircle2, Croissant, Pizza, Sandwich, ShoppingBag, UtensilsCrossed, type LucideIcon } from 'lucide-react';
 import type { TunnelState } from './tunnelState';
+
+const ARCHETYPE_VISUALS: Record<ArchetypeCode, { icon: LucideIcon; tint: string }> = {
+  traditional: { icon: UtensilsCrossed, tint: 'bg-blue-50 text-blue-600' },
+  brasserie: { icon: Beer, tint: 'bg-amber-50 text-amber-600' },
+  pizzeria: { icon: Pizza, tint: 'bg-red-50 text-red-600' },
+  fast_food: { icon: Sandwich, tint: 'bg-orange-50 text-orange-600' },
+  snack: { icon: ShoppingBag, tint: 'bg-emerald-50 text-emerald-600' },
+  bakery: { icon: Croissant, tint: 'bg-yellow-50 text-yellow-700' },
+};
+
+const ArchetypeIcon = ({ code }: { code: ArchetypeCode }) => {
+  const Icon = ARCHETYPE_VISUALS[code].icon;
+  return <Icon className="h-6 w-6" strokeWidth={1.75} />;
+};
 
 interface ScreenRestaurationTypeProps {
   state: TunnelState;
@@ -44,11 +58,14 @@ export const ScreenRestaurationType = ({ state, onNext, onBack }: ScreenRestaura
             key={a.code}
             type="button"
             onClick={() => setSelected(a.code)}
-            className={`relative text-left rounded-xl border p-4 transition-colors ${
+            className={`relative flex flex-col items-center gap-3 rounded-xl border p-4 text-center transition-colors ${
               selected === a.code ? 'border-primary bg-primary/5' : 'border-slate-200 hover:bg-slate-50'
             }`}
           >
             {selected === a.code && <CheckCircle2 className="absolute top-3 right-3 w-4 h-4 text-primary" />}
+            <span className={`flex h-12 w-12 items-center justify-center rounded-full ${ARCHETYPE_VISUALS[a.code].tint}`}>
+              <ArchetypeIcon code={a.code} />
+            </span>
             <span className="font-semibold text-sm text-slate-900">{a.label}</span>
           </button>
         ))}

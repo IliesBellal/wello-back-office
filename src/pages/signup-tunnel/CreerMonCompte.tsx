@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { authService } from '@/services/authService';
 import { publicTunnelApi, isPublicApiError } from '@/services/publicTunnelApi';
@@ -45,6 +45,21 @@ const CreerMonCompte = () => {
 
   const { setAuthData } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // /login hands over the id_token of a Google account that has no Wello
+  // account yet, so the visitor lands directly on the "confirm your name"
+  // step. Read once, then dropped from the history entry: a Google id_token
+  // expires after an hour, a later refresh must not resurrect it.
+  const [initialGoogleIdToken] = useState<string | null>(
+    () => (location.state as { googleIdToken?: string } | null)?.googleIdToken ?? null,
+  );
+  useEffect(() => {
+    if (initialGoogleIdToken) {
+      navigate({ pathname: location.pathname, search: location.search }, { replace: true, state: null });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     sessionStorage.setItem('signup-tunnel:state', JSON.stringify(state));
@@ -194,7 +209,12 @@ const CreerMonCompte = () => {
           </div>
 
           {step === 1 && (
-            <ScreenIdentity state={state} onNext={goToStep2} emailTakenError={emailTakenError} />
+            <ScreenIdentity
+              state={state}
+              onNext={goToStep2}
+              emailTakenError={emailTakenError}
+              initialGoogleIdToken={initialGoogleIdToken}
+            />
           )}
           {step === 2 && (
             <ScreenEstablishment state={state} onNext={goToStep3} onBack={() => setStep(1)} />

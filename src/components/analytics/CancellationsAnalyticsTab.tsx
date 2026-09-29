@@ -7,6 +7,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { chartTooltipProps } from '@/components/analytics/chartTooltip';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import {
   analyticsService,
@@ -273,7 +274,7 @@ export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], compari
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
                   <XAxis type="number" stroke="#6b7280" />
                   <YAxis dataKey="name" type="category" stroke="#6b7280" width={100} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                  <Tooltip {...chartTooltipProps} />
                   <Bar dataKey="count" name="Annulations">
                     {authorTypeChartData.map((entry) => (
                       <Cell key={entry.author_type} fill={AUTHOR_TYPE_COLORS[entry.author_type] ?? '#9ca3af'} />
@@ -300,7 +301,7 @@ export const CancellationsAnalyticsTab = ({ dateRange, merchantIds = [], compari
                       <Cell key={entry.channel} fill={CHANNEL_COLORS[entry.channel] ?? CHANNEL_COLORS.unknown} />
                     ))}
                   </Pie>
-                  <Tooltip contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }} />
+                  <Tooltip {...chartTooltipProps} />
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>

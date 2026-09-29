@@ -28,6 +28,11 @@ export const qk = {
     linkableSearch: (search: string) => ["users", "linkable-search", search] as const,
   },
 
+  // Rattachement Google du compte connecté (GET /v1/auth/google/link).
+  googleLink: {
+    all: ["auth", "google-link"] as const,
+  },
+
   // ─── Planning – Settings ──────────────────────────────────
   planningSettings: {
     all: ["planning", "settings"] as const,

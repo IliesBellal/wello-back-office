@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { publicTunnelApi, isPublicApiError } from '@/services/publicTunnelApi';
+import { ModuleMockup } from '@/components/subscription/ModuleMockup';
+import { MODULE_OFFERS } from '@/components/subscription/moduleOffers';
 import { formatPrice } from '@/utils/priceInputUtils';
 import type { ArchetypeCode, CreateSignupContextResponse } from '@/types/signupTunnel';
 import type { TunnelState } from './tunnelState';
@@ -153,30 +155,41 @@ export const ScreenModules = ({
       </div>
 
       <div className="space-y-2">
-        {MODULE_OPTIONS.map((m) => (
-          <label
-            key={m.code}
-            className={`flex flex-col gap-1.5 rounded-xl border p-3 cursor-pointer transition-colors ${
-              selected.has(m.code) ? 'border-primary bg-primary/5' : 'border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            <span className="flex items-center gap-2 text-sm font-medium text-slate-900">
-              <input
-                type="checkbox"
-                checked={selected.has(m.code)}
-                onChange={() => toggle(m.code)}
-                className="h-4 w-4"
-              />
-              {m.label}
-            </span>
-            {suggested.has(m.code) && (
-              <span className="ml-6 inline-flex w-fit items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">
-                <Sparkles className="w-3 h-3 flex-shrink-0" />
-                fréquemment choisi pour ce type d'établissement
+        {MODULE_OPTIONS.map((m) => {
+          const offer = MODULE_OFFERS[m.code];
+          return (
+            <label
+              key={m.code}
+              className={`flex flex-col gap-2 rounded-xl border p-3 cursor-pointer transition-colors ${
+                selected.has(m.code) ? 'border-primary bg-primary/5' : 'border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                <input
+                  type="checkbox"
+                  checked={selected.has(m.code)}
+                  onChange={() => toggle(m.code)}
+                  className="h-4 w-4"
+                />
+                {offer?.name ?? m.label}
               </span>
-            )}
-          </label>
-        ))}
+              {suggested.has(m.code) && (
+                <span className="ml-6 inline-flex w-fit items-center gap-1 text-[11px] font-medium text-primary bg-primary/10 rounded-full px-2 py-0.5">
+                  <Sparkles className="w-3 h-3 flex-shrink-0" />
+                  fréquemment choisi pour ce type d'établissement
+                </span>
+              )}
+              {offer && (
+                <span className="ml-6 flex items-stretch gap-3">
+                  <span className="flex-1 min-w-0 text-xs text-slate-600">{offer.description}</span>
+                  <span className="w-28 sm:w-32 shrink-0">
+                    <ModuleMockup code={m.code} />
+                  </span>
+                </span>
+              )}
+            </label>
+          );
+        })}
       </div>
 
       <div className="rounded-lg bg-slate-50 border border-slate-200 p-4 text-sm">

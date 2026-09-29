@@ -6,6 +6,7 @@ import {
   AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
+import { chartTooltipProps } from '@/components/analytics/chartTooltip';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { analyticsService, PaymentsAnalyticsResponse, ComparisonMode } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
@@ -198,7 +199,7 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                             <XAxis dataKey="date" stroke="#6b7280" />
                             <YAxis stroke="#6b7280" />
                             <Tooltip
-                              contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                              {...chartTooltipProps}
                               formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                             />
                             <Legend />
@@ -253,7 +254,7 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                 <XAxis dataKey="date" stroke="#6b7280" />
                 <YAxis stroke="#6b7280" />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                  {...chartTooltipProps}
                   formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                 />
                 <Legend />
@@ -298,7 +299,7 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                     ))}
                   </Pie>
                   <Tooltip
-                    contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+                    {...chartTooltipProps}
                     formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                   />
                   <Legend />

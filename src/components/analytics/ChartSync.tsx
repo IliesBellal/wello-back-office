@@ -1,5 +1,6 @@
 import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { chartTooltipProps, chartTooltipStyle } from '@/components/analytics/chartTooltip';
 import { merchantColor } from '@/utils/merchantColors';
 
 /**
@@ -111,7 +112,7 @@ export function SyncedPie({
             ))}
           </Pie>
           <Tooltip
-            contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+            {...chartTooltipProps}
             formatter={(value: number) => valueFormatter(value)}
           />
           <Legend />
@@ -119,8 +120,8 @@ export function SyncedPie({
       </ResponsiveContainer>
       {showBadge && (
         <div
-          className="absolute top-2 right-2 rounded-md px-2 py-1 text-xs text-white pointer-events-none"
-          style={{ backgroundColor: '#1f2937', border: '1px solid #374151' }}
+          className="absolute top-2 right-2 rounded-md px-2 py-1 text-xs pointer-events-none"
+          style={chartTooltipStyle}
         >
           {matched ? (
             <>
