@@ -12,8 +12,10 @@
  */
 
 import {
+  AI_PHOTO_PROVIDER,
   tvaMappingKey,
   type ImportDecisions,
+  type ImportProductKind,
   type ImportPreviewProduct,
   type ImportPreviewResult,
   type ImportPreviewTvaRate,
@@ -167,11 +169,74 @@ export const alreadyImportedProducts = (
     .filter((product) => product.action === 'already_imported')
     .sort((a, b) => Number(Boolean(b.mapping_stale)) - Number(Boolean(a.mapping_stale)));
 
+// ─── Porte photo ────────────────────────────────────────────
+
+/** La prévisualisation vient de photos lues par l'IA. */
+export const isPhotoPreview = (preview: ImportPreviewResult): boolean =>
+  preview.provider === AI_PHOTO_PROVIDER;
+
+/** Nature retenue : décision, sinon proposition de la lecture. */
+export const effectiveKind = (
+  product: ImportPreviewProduct,
+  decisions: ImportDecisions,
+): ImportProductKind | undefined => decisions.kind_per_product?.[product.external_id] ?? product.kind;
+
+/** Groupe retenu (`""` = racine) : décision, sinon proposition de la lecture. */
+export const effectiveParent = (product: ImportPreviewProduct, decisions: ImportDecisions): string => {
+  const decided = decisions.group_per_product?.[product.external_id];
+  return decided !== undefined ? decided : product.parent_external_id ?? '';
+};
+
+/**
+ * Déclinaisons qui seront réellement rattachées à chaque groupe — miroir de
+ * `resolveGroups` côté API : un groupe n'est créé que s'il garde au moins deux
+ * déclinaisons créées ; sinon sa déclinaison éventuelle passe à la racine.
+ */
+export const groupVariants = (
+  preview: ImportPreviewResult,
+  decisions: ImportDecisions,
+): Map<string, ImportPreviewProduct[]> => {
+  const groups = new Map<string, ImportPreviewProduct[]>();
+  for (const product of preview.products) {
+    if (product.is_group && isMaterializable(product, decisions)) groups.set(product.external_id, []);
+  }
+  for (const product of preview.products) {
+    if (product.is_group || !isMaterializable(product, decisions)) continue;
+    groups.get(effectiveParent(product, decisions))?.push(product);
+  }
+  return groups;
+};
+
+/** Groupes qui seront créés (au moins deux déclinaisons). */
+export const createdGroupIds = (preview: ImportPreviewResult, decisions: ImportDecisions): Set<string> =>
+  new Set(
+    [...groupVariants(preview, decisions).entries()]
+      .filter(([, variants]) => variants.length >= 2)
+      .map(([groupId]) => groupId),
+  );
+
+/** Produits créés dont la nature reste à préciser (aucun taux proposé). */
+export const productsNeedingKind = (
+  preview: ImportPreviewResult,
+  decisions: ImportDecisions,
+): ImportPreviewProduct[] =>
+  isPhotoPreview(preview)
+    ? preview.products.filter((product) => {
+        if (product.is_group || !isMaterializable(product, decisions)) return false;
+        const kind = effectiveKind(product, decisions);
+        return !kind || kind === 'other';
+      })
+    : [];
+
 export interface ImportPrecheck {
   canCommit: boolean;
   needsCategory: ImportPreviewProduct[];
   unresolvedTva: ImportPreviewTvaRate[];
   unresolvedCollisions: ImportPreviewProduct[];
+  /** Porte photo : produits dont la nature (donc la TVA) reste à préciser. */
+  needsKind: ImportPreviewProduct[];
+  /** Porte photo : les taux proposés n'ont pas encore été confirmés. */
+  tvaNotConfirmed: boolean;
   /** Produits qui seront réellement créés, une fois les arbitrages appliqués. */
   materializableCount: number;
 }
@@ -185,18 +250,34 @@ export const importPrecheck = (
   preview: ImportPreviewResult,
   decisions: ImportDecisions,
 ): ImportPrecheck => {
+  const photo = isPhotoPreview(preview);
   const needsCategory = productsNeedingCategory(preview, decisions);
   const unresolvedTva = unresolvedTvaRates(preview, decisions);
   const collisions = unresolvedCollisions(preview, decisions);
+  const needsKind = productsNeedingKind(preview, decisions);
+  const tvaNotConfirmed = photo && !decisions.tva_confirmed;
+
+  // Un groupe réduit à moins de deux déclinaisons ne sera pas créé.
+  const createdGroups = photo ? createdGroupIds(preview, decisions) : null;
+  const materializableCount = preview.products.filter(
+    (product) =>
+      isMaterializable(product, decisions) &&
+      (!product.is_group || !createdGroups || createdGroups.has(product.external_id)),
+  ).length;
 
   return {
     canCommit:
-      needsCategory.length === 0 && unresolvedTva.length === 0 && collisions.length === 0,
+      needsCategory.length === 0 &&
+      unresolvedTva.length === 0 &&
+      collisions.length === 0 &&
+      needsKind.length === 0 &&
+      !tvaNotConfirmed,
     needsCategory,
     unresolvedTva,
     unresolvedCollisions: collisions,
-    materializableCount: preview.products.filter((product) => isMaterializable(product, decisions))
-      .length,
+    needsKind,
+    tvaNotConfirmed,
+    materializableCount,
   };
 };
 
@@ -243,7 +324,7 @@ export const buildImportDecisions = (
     }
   }
 
-  return {
+  const built: ImportDecisions = {
     tag_classification: tagClassification,
     category_per_product: categoryPerProduct,
     tva_mapping: { ...decisions.tva_mapping },
@@ -254,6 +335,23 @@ export const buildImportDecisions = (
     // uniquement un choix de l'utilisateur qui transite tel quel.
     excluded_products: { ...decisions.excluded_products },
   };
+
+  if (isPhotoPreview(preview)) {
+    // Nature et groupe explicites pour chaque produit, comme la
+    // classification : ce qui est affiché est exactement ce qui est appliqué.
+    const kindPerProduct: Record<string, ImportProductKind> = {};
+    const groupPerProduct: Record<string, string> = {};
+    for (const product of preview.products) {
+      const kind = effectiveKind(product, decisions);
+      if (kind) kindPerProduct[product.external_id] = kind;
+      if (!product.is_group) groupPerProduct[product.external_id] = effectiveParent(product, decisions);
+    }
+    built.kind_per_product = kindPerProduct;
+    built.group_per_product = groupPerProduct;
+    built.tva_confirmed = Boolean(decisions.tva_confirmed);
+  }
+
+  return built;
 };
 
 /** Indexe les blocages d'un 422 par entité, pour les rendre au bon endroit. */

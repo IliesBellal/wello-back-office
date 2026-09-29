@@ -162,6 +162,17 @@ export interface ImportPreviewProduct {
   reimport?: ImportReimportResolution;
   /** Reflète la décision courante `excluded_products` — porte « autre établissement » uniquement. */
   excluded?: boolean;
+
+  // Porte photo (provider `ai_photo`) uniquement — absents ailleurs.
+  /** Nature proposée par la lecture, qui détermine la TVA proposée. */
+  kind?: ImportProductKind;
+  /** Produit groupe (sans prix) dont les déclinaisons le citent en `parent_external_id`. */
+  is_group?: boolean;
+  parent_external_id?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  issues?: string[];
+  /** Numéro de la photo (à partir de 1) où la ligne a été lue. */
+  source_photo?: number;
 }
 
 /** Porte « autre établissement » uniquement. */
@@ -219,6 +230,12 @@ export interface ImportDecisions {
    * arbitrage — porte « autre établissement » uniquement (`{}` ailleurs).
    */
   excluded_products: Record<string, boolean>;
+  /** Porte photo : nature par produit — ses trois taux de TVA en découlent. */
+  kind_per_product?: Record<string, ImportProductKind>;
+  /** Porte photo : groupe de rattachement par produit, `""` = à la racine. */
+  group_per_product?: Record<string, string>;
+  /** Porte photo : le restaurateur a vérifié les taux proposés. Exigé au commit. */
+  tva_confirmed?: boolean;
 }
 
 export interface ImportPreviewResult {
@@ -247,6 +264,9 @@ export const IMPORT_BLOCKER_CODES = {
   collisionUnresolved: 'product_name_collision_unresolved',
   invalidTvaMapping: 'invalid_tva_mapping',
   invalidCategoryDecision: 'invalid_category_decision',
+  tvaNotConfirmed: 'tva_not_confirmed',
+  invalidKindDecision: 'invalid_kind_decision',
+  invalidGroupDecision: 'invalid_group_decision',
 } as const;
 
 export interface ImportCommitBlocker {
@@ -324,4 +344,109 @@ export interface ImportManualProductPayload {
   tva_take_away: number | null;
   tva_delivery: number | null;
   tags: string[];
+}
+
+// ─── Porte photo (lecture de carte par l'IA) ────────────────
+
+/** Provider des prévisualisations issues de photos. */
+export const AI_PHOTO_PROVIDER = 'ai_photo';
+
+/**
+ * Nature d'un produit lu sur une photo. Elle ne sert qu'à proposer la TVA :
+ * une carte n'affiche jamais les taux (internal/modules/menu/importer/kind.go).
+ */
+export type ImportProductKind =
+  | 'food'
+  | 'hot_drink'
+  | 'soft_drink_served'
+  | 'soft_drink_sealed'
+  | 'packaged_food'
+  | 'alcohol'
+  | 'other';
+
+export interface ImportProductKindOption {
+  value: ImportProductKind;
+  label: string;
+  /** Taux proposés sur place / à emporter / en livraison ; `null` = à saisir. */
+  rates: { in: number; take_away: number; delivery: number } | null;
+}
+
+/**
+ * Natures et taux proposés — miroir de `KindTvaRates` côté API (table validée
+ * le 2026-09-29). Affiché pour que le restaurateur voie ce que son choix
+ * implique ; c'est l'API qui applique.
+ */
+export const PRODUCT_KINDS: ImportProductKindOption[] = [
+  { value: 'food', label: 'Plat, dessert, snack', rates: { in: 10, take_away: 10, delivery: 10 } },
+  { value: 'hot_drink', label: 'Boisson chaude', rates: { in: 10, take_away: 10, delivery: 10 } },
+  {
+    value: 'soft_drink_served',
+    label: 'Boisson sans alcool servie (verre, carafe, jus pressé)',
+    rates: { in: 10, take_away: 10, delivery: 10 },
+  },
+  {
+    value: 'soft_drink_sealed',
+    label: 'Boisson sans alcool fermée (canette, bouteille)',
+    rates: { in: 10, take_away: 5.5, delivery: 5.5 },
+  },
+  {
+    value: 'packaged_food',
+    label: 'Produit emballé à consommer plus tard',
+    rates: { in: 10, take_away: 5.5, delivery: 5.5 },
+  },
+  { value: 'alcohol', label: 'Boisson alcoolisée', rates: { in: 20, take_away: 20, delivery: 20 } },
+  { value: 'other', label: 'À préciser', rates: null },
+];
+
+export const productKindOption = (kind: string | undefined): ImportProductKindOption | undefined =>
+  PRODUCT_KINDS.find((option) => option.value === kind);
+
+export type ImportPhotoDraftStatus =
+  | 'pending'
+  | 'processing'
+  | 'ready'
+  | 'failed'
+  | 'committed'
+  | 'expired';
+
+export interface ImportPhotoDraftPhoto {
+  photo: number;
+  status: 'pending' | 'done' | 'failed';
+  error?: string;
+  /** Lien signé, valable une heure. */
+  url?: string;
+}
+
+/** `GET /menu/import/ai/{id}` — `preview` présent une fois les photos lues. */
+export interface ImportPhotoDraft {
+  id: string;
+  status: ImportPhotoDraftStatus;
+  error?: string;
+  created_at: string;
+  expires_at: string;
+  photos_total: number;
+  photos_done: number;
+  photos: ImportPhotoDraftPhoto[];
+  preview?: ImportPreviewResult;
+}
+
+export interface ImportPhotoDraftSummary {
+  id: string;
+  status: ImportPhotoDraftStatus;
+  created_at: string;
+  expires_at: string;
+  photos_total: number;
+  photos_done: number;
+}
+
+export interface ImportPhotoCredits {
+  total: number;
+  used: number;
+  remaining: number;
+}
+
+/** `GET /menu/import/drafts`. */
+export interface ImportPhotoDrafts {
+  drafts: ImportPhotoDraftSummary[];
+  credits: ImportPhotoCredits;
 }
