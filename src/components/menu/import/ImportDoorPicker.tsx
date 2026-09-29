@@ -1,9 +1,11 @@
-import { Building2, ChevronRight, Download, FileSpreadsheet, Keyboard, Loader2 } from 'lucide-react';
+import { Building2, Camera, ChevronRight, Download, FileSpreadsheet, Keyboard, Loader2 } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 
 interface ImportDoorPickerProps {
+  onChoosePhoto: () => void;
   onChooseProvider: () => void;
   onChooseManual: () => void;
   onChooseMerchant: () => void;
@@ -12,19 +14,42 @@ interface ImportDoorPickerProps {
 }
 
 /**
- * Première étape : les trois façons d'entrer des produits en masse.
+ * Première étape : les façons d'entrer des produits en masse.
  *
  * Les libellés sont écrits du point de vue du restaurateur — « ma caisse
- * actuelle », pas « provider » — parce que c'est lui qui choisit ici.
+ * actuelle », pas « provider » — parce que c'est lui qui choisit ici. La
+ * porte photo vient en premier : c'est la plus rapide pour un établissement
+ * qui démarre avec une simple carte papier.
  */
 export const ImportDoorPicker = ({
+  onChoosePhoto,
   onChooseProvider,
   onChooseManual,
   onChooseMerchant,
   onDownloadTemplate,
   isDownloadingTemplate,
 }: ImportDoorPickerProps) => (
-  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <Card className="flex flex-col gap-4 border-primary/40 p-6">
+      <div className="flex items-center justify-between">
+        <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
+          <Camera className="h-5 w-5 text-primary" />
+        </div>
+        <Badge variant="secondary">Nouveau</Badge>
+      </div>
+      <div className="flex-1 space-y-1">
+        <h3 className="font-semibold">J’ai des photos de ma carte</h3>
+        <p className="text-sm text-muted-foreground">
+          Photographiez votre carte : nous lisons les produits, les prix et les catégories, puis
+          vous vérifiez tout avant d’enregistrer quoi que ce soit.
+        </p>
+      </div>
+      <Button className="w-full" onClick={onChoosePhoto}>
+        Envoyer des photos
+        <ChevronRight className="ml-2 h-4 w-4" />
+      </Button>
+    </Card>
+
     <Card className="flex flex-col gap-4 p-6">
       <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
         <FileSpreadsheet className="h-5 w-5 text-primary" />

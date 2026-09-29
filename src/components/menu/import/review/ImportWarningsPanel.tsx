@@ -22,6 +22,12 @@ const WARNING_TITLES: Record<string, string> = {
   product_removed_from_menu: 'Produits sans prix, retirés de la carte',
   label_dropped: 'Libellés non retenus',
   tag_synthesized: 'Libellés absents du fichier',
+  // Porte photo (internal/modules/menu/importer/ai_menu.go).
+  ai_low_confidence: 'Lignes à relire sur la photo',
+  ai_formula_not_created: 'Formules détectées, non créées',
+  ai_duplicate_merged: 'Produits présents sur plusieurs photos',
+  ai_group_dissolved: 'Groupes à une seule déclinaison, non créés',
+  ai_photo_warning: 'Remarques sur les photos',
 };
 
 /**
