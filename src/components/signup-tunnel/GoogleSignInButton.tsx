@@ -1,21 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadGoogleIdentityServices, getGoogleClientId } from '@/lib/googleIdentityLoader';
+import { cn } from '@/lib/utils';
+import { AuthProviderButton, GoogleLogo } from './AuthProviderButton';
 
 interface GoogleSignInButtonProps {
   onCredential: (idToken: string) => void;
   disabled?: boolean;
 }
 
+type GsiStatus = 'loading' | 'ready' | 'unavailable';
+
 /**
  * Renders Google's own button (not a custom-styled one — GSI requires its
  * button to be rendered by Google's script for the credential flow to work)
  * inside a full-width container, matching screen 1's "action principale,
  * pleine largeur" requirement (LOT A Semaine 3, Chantier 14, §5.2).
+ *
+ * Until GSI is ready — or when it can't load (missing client id, script
+ * blocked) — a look-alike placeholder with the Google logo is shown instead,
+ * greyed out and flagged "Indisponible pour le moment" on failure.
  */
 export const GoogleSignInButton = ({ onCredential, disabled }: GoogleSignInButtonProps) => {
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const onCredentialRef = useRef(onCredential);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [status, setStatus] = useState<GsiStatus>('loading');
 
   useEffect(() => {
     onCredentialRef.current = onCredential;
@@ -39,10 +48,14 @@ export const GoogleSignInButton = ({ onCredential, disabled }: GoogleSignInButto
           size: 'large',
           text: 'continue_with',
           shape: 'rectangular',
-          width: containerRef.current.offsetWidth || 400,
+          // Measured on the always-visible wrapper: the GSI container itself is
+          // hidden until ready. GSI caps the width at 400px.
+          width: Math.min(wrapperRef.current?.offsetWidth || 400, 400),
         });
+        setStatus('ready');
       } catch (error) {
-        setLoadError("Impossible de charger la connexion Google. Réessayez ou créez un compte avec votre e-mail.");
+        if (cancelled) return;
+        setStatus('unavailable');
         console.error('Google Identity Services initialization failed', error);
       }
     };
@@ -54,13 +67,22 @@ export const GoogleSignInButton = ({ onCredential, disabled }: GoogleSignInButto
   }, []);
 
   return (
-    <div>
+    <div ref={wrapperRef}>
       <div
         ref={containerRef}
-        className={disabled ? 'pointer-events-none opacity-50' : ''}
-        style={{ width: '100%' }}
+        className={cn(status === 'ready' ? 'flex justify-center' : 'hidden', disabled && 'pointer-events-none opacity-50')}
       />
-      {loadError && <p className="text-xs text-destructive mt-2">{loadError}</p>}
+      {status === 'loading' && (
+        <AuthProviderButton icon={<GoogleLogo />} label="Continuer avec Google" />
+      )}
+      {status === 'unavailable' && (
+        <AuthProviderButton
+          icon={<GoogleLogo />}
+          label="Continuer avec Google"
+          hint="Indisponible pour le moment"
+          disabled
+        />
+      )}
     </div>
   );
 };

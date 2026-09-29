@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GoogleSignInButton } from '@/components/signup-tunnel/GoogleSignInButton';
+import { AuthProviderButton } from '@/components/signup-tunnel/AuthProviderButton';
 import { decodeJwtPayload } from '@/lib/decodeJwtPayload';
 import { Mail, User, Lock } from 'lucide-react';
 import type { TunnelState } from './tunnelState';
@@ -165,17 +166,18 @@ export const ScreenIdentity = ({ state, onNext, emailTakenError }: ScreenIdentit
         </form>
       ) : (
         <>
-          <GoogleSignInButton onCredential={handleGoogleCredential} />
+          <div className="space-y-3">
+            <GoogleSignInButton onCredential={handleGoogleCredential} />
+            {!showEmailForm && (
+              <AuthProviderButton
+                icon={<Mail className="w-[18px] h-[18px] text-slate-600" />}
+                label="Continuer avec mon adresse e-mail"
+                onClick={() => setShowEmailForm(true)}
+              />
+            )}
+          </div>
 
-          {!showEmailForm ? (
-            <button
-              type="button"
-              onClick={() => setShowEmailForm(true)}
-              className="w-full text-sm text-slate-600 hover:text-slate-900 text-center underline transition-colors"
-            >
-              ou créer un compte avec mon adresse e-mail
-            </button>
-          ) : (
+          {showEmailForm && (
             <form onSubmit={handleEmailSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="first-name">Prénom</Label>
