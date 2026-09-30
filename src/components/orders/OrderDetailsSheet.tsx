@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/responsive-sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { UpsellBadge } from "@/components/orders/UpsellBadge";
 import { Button } from "@/components/ui/button";
 import { Phone, Calendar, MapPin, X } from "lucide-react";
 import { ordersService, Order } from "@/services/ordersService";
@@ -243,6 +244,7 @@ export const OrderDetailsSheet = () => {
                             <Badge variant="secondary" className="text-xs">
                               x{product.quantity}
                             </Badge>
+                            {product.is_upsell && <UpsellBadge />}
                           </div>
                           {product.description && (
                             <div className="mt-1 text-xs text-muted-foreground">
@@ -347,6 +349,7 @@ export const OrderDetailsSheet = () => {
                           <Badge variant="secondary" className="text-xs">
                             x{product.quantity}
                           </Badge>
+                          {product.is_upsell && <UpsellBadge />}
                         </div>
                         {product.description && (
                           <div className="mt-1 text-xs text-muted-foreground">

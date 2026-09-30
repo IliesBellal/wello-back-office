@@ -57,6 +57,8 @@ export interface OrderProduct {
   discount_id?: string | null;
   discount_name?: string | null;
   discounted_price?: unknown;
+  // Ligne ajoutée depuis une suggestion de vente additionnelle. Absent quand false.
+  is_upsell?: boolean;
   production_color?: string;
   extra?: unknown[];
   without?: unknown[];

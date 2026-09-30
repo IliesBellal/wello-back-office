@@ -21,6 +21,7 @@ import { ExportButton } from '@/components/analytics';
 import { analyticsService, type OrderHistoryResponse } from '@/services/analyticsService';
 import { useOrderHistorySearchParams } from '@/hooks/useOrderHistorySearchParams';
 import { ordersService, type Order } from '@/services/ordersService';
+import { UpsellBadge } from '@/components/orders/UpsellBadge';
 import {
   ORDER_HISTORY_BRAND_LABELS,
   ORDER_HISTORY_TYPE_LABELS,
@@ -448,7 +449,10 @@ export const OrderDetailModal = ({ isOpen, onClose, orderId, zIndex = 50 }: Orde
               {orderDetail.products.map((item) => (
                 <div key={item.order_item_id} className="flex justify-between text-sm gap-4">
                   <div>
-                    <div>{item.name} x{item.quantity}</div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span>{item.name} x{item.quantity}</span>
+                      {item.is_upsell && <UpsellBadge />}
+                    </div>
                     {item.description && (
                       <div className="text-xs text-muted-foreground">{item.description}</div>
                     )}
