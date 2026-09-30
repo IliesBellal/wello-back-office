@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tile } from '@/components/shared/Tile';
 import { ExpandableDataTable, ColumnConfig } from '@/components/shared/ExpandableDataTable';
 import {
@@ -124,25 +125,25 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
   const rate = current.total_orders_count > 0 ? (current.orders_with_upsell_count / current.total_orders_count) * 100 : null;
   const transformationRate = suggestions.proposed_count > 0 ? (suggestions.accepted_count / suggestions.proposed_count) * 100 : 0;
   const chartData = (staffData?.staff ?? []).slice(0, TOP_SERVERS_LIMIT);
+  // `?? []` : réponse en cache côté navigateur antérieure à top_products.
+  const topProducts = data.top_products ?? [];
 
   return (
     <div className="space-y-6">
       <ScopeSummary merchantIds={data.scope.merchant_ids} merchantsById={merchantsById} />
       {comparisonMode === 'compare' && merchantIds.length > 1 && <AggregationNotice />}
 
-      {/* PROMPT 19 : message principal tant que la collecte n'est pas active
-          — jamais une note en bas de page, jamais des zéros affichés comme
-          un résultat. Remplace les tuiles d'agrégat, pas juste un warning
-          à côté. */}
+      {/* Tant qu'aucune ligne upsell n'existe pour l'établissement (upsell
+          désactivé ou jamais accepté), ce message remplace les tuiles : des
+          zéros laisseraient croire à un résultat mesuré. */}
       {!data.instrumentation_active ? (
         <div className="rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 px-4 py-4 text-sm text-amber-900 dark:text-amber-200">
-          <p className="font-semibold mb-1">Donnée non collectée sur cet établissement</p>
+          <p className="font-semibold mb-1">Aucune vente additionnelle enregistrée sur cet établissement</p>
           <p>
-            Aucune ligne de commande n'a jamais été marquée comme issue d'une suggestion de vente
-            additionnelle ici — pas parce qu'il n'y a pas eu de vente additionnelle, mais parce que
-            l'instrumentation qui l'enregistre (canaux Kiosk et ScanNOrder) n'est pas encore branchée
-            sur ce canal de commande. Les chiffres ci-dessous ne seraient que des zéros trompeurs ;
-            cet écran s'allumera de lui-même, sans mise à jour, dès que la collecte démarrera.
+            Aucune ligne de commande n'a encore été ajoutée depuis une suggestion de vente
+            additionnelle ici : l'upsell n'est pas activé sur la caisse, la borne ou Scan&amp;Order,
+            ou aucune suggestion n'a encore été acceptée. Les indicateurs s'afficheront d'eux-mêmes
+            dès la première vente additionnelle.
           </p>
         </div>
       ) : (
@@ -157,6 +158,53 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
         </div>
       )}
 
+      {/* Top articles : dérivé de is_upsell comme les tuiles ci-dessus, donc
+          masqué tant que la collecte n'est pas active. Classement fait côté
+          serveur (unités vendues, puis CA HT) — pas de tri client. */}
+      {data.instrumentation_active && (
+        <Card className="bg-card border border-border">
+          <CardHeader>
+            <CardTitle className="text-sm font-semibold">Top des articles vendus en vente additionnelle</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {topProducts.length === 0 ? (
+              <div className="text-center py-8 text-sm text-muted-foreground">
+                Aucun article vendu en vente additionnelle sur cette période.
+              </div>
+            ) : (
+              <div className="w-full overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-12">#</TableHead>
+                      <TableHead>Article</TableHead>
+                      <TableHead className="text-right">Unités vendues</TableHead>
+                      <TableHead className="text-right">CA upsell HT</TableHead>
+                      <TableHead className="text-right">Part du CA upsell</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {topProducts.map((row, idx) => (
+                      <TableRow key={row.product_id} className="hover:bg-muted/50">
+                        <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
+                        <TableCell className="font-medium">{row.name}</TableCell>
+                        <TableCell className="text-right">{row.quantity_sold}</TableCell>
+                        <TableCell className="text-right">{eur(row.upsell_revenue_ht_cents)}</TableCell>
+                        <TableCell className="text-right">
+                          {current.upsell_revenue_ht_cents > 0
+                            ? `${((row.upsell_revenue_ht_cents / current.upsell_revenue_ht_cents) * 100).toFixed(1)}%`
+                            : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Bloc Suggestions : indépendant d'instrumentation_active — lit
           upsell_suggestions, un chemin d'écriture différent, déjà actif sur
           tous les canaux. C'est la métrique la plus utile de cet onglet
@@ -168,8 +216,8 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
         <CardContent>
           <p className="text-xs text-muted-foreground mb-3">
             Mesure indépendante de ce qui précède : chaque suggestion de vente additionnelle proposée
-            au client, et si elle a effectivement été ajoutée à la commande — fonctionne dès
-            aujourd'hui sur POS, Kiosk et ScanNOrder.
+            au client, et si elle a effectivement été ajoutée à la commande — sur la caisse, la borne
+            et Scan&amp;Order.
             {orderFilter && orderFilter.orderTypes.length < ORDER_TYPE_OPTIONS.length && (
               <> Le filtre de type de commande ne s'applique pas à ce bloc (une suggestion non acceptée n'est rattachée à aucune commande) : seul le canal est pris en compte.</>
             )}
@@ -225,7 +273,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                 <div className="text-center py-8 text-muted-foreground">Chargement...</div>
               ) : !staffData.instrumentation_active ? (
                 <div className="text-center py-8 text-sm text-muted-foreground">
-                  Donnée non collectée sur cet établissement — voir le message en haut de l'onglet.
+                  Aucune vente additionnelle enregistrée sur cet établissement — voir le message en haut de l'onglet.
                 </div>
               ) : (
                 <ExpandableDataTable<UpsellStaffRow>

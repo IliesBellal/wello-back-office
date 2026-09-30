@@ -579,14 +579,11 @@ export interface CancellationsByStaffResponse {
 // reports.sales.read) and getUpsellByStaff (classement nominatif,
 // reports.staff_performance.read).
 //
-// instrumentation_active is the central fact this tab is built around:
-// orderitems.is_upsell is false on every line in this system today (only the
-// POS channel writes it — Kiosk/ScanNOrder both have working upsell UIs but
-// neither serializes the flag yet). While false, current_period/
-// previous_period/staff MUST NOT be rendered as real zeros — the tab's
-// primary message is then "donnée non collectée," not a KPI row of 0s. It
-// flips to true on its own, no redeploy, once any channel starts writing
-// is_upsell = true.
+// instrumentation_active: true once at least one orderitems line of the scope
+// has ever carried is_upsell = true (written by POS, Kiosk and ScanNOrder).
+// While false (upsell disabled or never accepted), current_period/
+// previous_period/top_products/staff MUST NOT be rendered as real zeros —
+// the tab's primary message replaces them.
 //
 // suggestions is the one block NOT gated by instrumentation_active: it reads
 // upsell_suggestions, a different, already-working write path (populated
@@ -618,7 +615,21 @@ export interface UpsellAnalyticsResponse {
   instrumentation_active: boolean;
   current_period: UpsellPeriodTotals;
   previous_period: UpsellPeriodTotals;
+  // Top des articles vendus en upsell sur la période courante (10 au plus),
+  // classés par unités vendues puis CA HT. Dérivé de is_upsell, donc soumis à
+  // instrumentation_active comme current_period.
+  top_products: UpsellProductRow[];
   suggestions: UpsellSuggestionsTotals;
+}
+
+// quantity_sold compte des unités, upsell_lines des lignes de commande (une
+// ligne « x2 » = 2 unités, 1 ligne).
+export interface UpsellProductRow {
+  product_id: string;
+  name: string;
+  quantity_sold: number;
+  upsell_lines: number;
+  upsell_revenue_ht_cents: number;
 }
 
 // user_id/name mirror StaffCancellationRow's naming (renamed from the old
@@ -1979,6 +1990,7 @@ class AnalyticsService {
         instrumentation_active: false,
         current_period: mockPeriod(dateFrom, dateTo),
         previous_period: mockPeriod(dateFrom, dateTo),
+        top_products: [] as UpsellProductRow[],
         suggestions: {
           from: dateFrom, to: dateTo,
           proposed_count: 287, accepted_count: 1,
