@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, ExternalLink } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Plus, X } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,7 +12,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { effectiveParent, effectivePrice, effectiveTvaId, groupVariants } from '@/lib/importDecisions';
+import {
+  effectiveIngredients,
+  effectiveParent,
+  effectivePrice,
+  effectiveTvaId,
+  groupVariants,
+  usedIngredientIds,
+} from '@/lib/importDecisions';
 import { parseDecimalInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import {
   IMPORT_CHANNELS,
@@ -36,6 +43,7 @@ interface ImportPhotoProductsProps {
   onGroup: (productExternalId: string, groupExternalId: string) => void;
   onPrice: (product: ImportPreviewProduct, channel: ImportChannel, cents: number) => void;
   onTva: (productExternalId: string, channel: ImportChannel, tvaId: number) => void;
+  onIngredient: (product: ImportPreviewProduct, componentExternalId: string, kept: boolean) => void;
 }
 
 /** Valeur du select de groupe pour « aucun groupe » : Radix refuse la chaîne vide. */
@@ -93,6 +101,47 @@ const PriceInput = ({
 };
 
 /**
+ * Ingrédients d'un produit : un clic retire, un second clic rétablit. Les
+ * retirés restent visibles, barrés, pour pouvoir revenir en arrière.
+ */
+const IngredientChips = ({
+  product,
+  kept,
+  names,
+  disabled,
+  onToggle,
+}: {
+  product: ImportPreviewProduct;
+  kept: Set<string>;
+  names: Map<string, string>;
+  disabled: boolean;
+  onToggle: (product: ImportPreviewProduct, componentExternalId: string, kept: boolean) => void;
+}) => (
+  <div className="mt-1 flex flex-wrap gap-1">
+    {(product.component_external_ids ?? []).map((id) => {
+      const isKept = kept.has(id);
+      const name = names.get(id) ?? id;
+      return (
+        <button
+          key={id}
+          type="button"
+          disabled={disabled}
+          aria-label={isKept ? `Retirer ${name} de ${product.name}` : `Rétablir ${name} dans ${product.name}`}
+          onClick={() => onToggle(product, id, !isKept)}
+          className={[
+            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs transition-colors disabled:opacity-50',
+            isKept ? 'bg-muted hover:bg-muted/60' : 'text-muted-foreground line-through hover:bg-muted/40',
+          ].join(' ')}
+        >
+          {name}
+          {isKept ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
+        </button>
+      );
+    })}
+  </div>
+);
+
+/**
  * Relecture propre à la porte photo : ce que l'IA a lu, ligne par ligne.
  *
  * - inclure ou écarter une ligne mal lue (`excluded_products`) ;
@@ -100,7 +149,9 @@ const PriceInput = ({
  *   s'il garde au moins deux déclinaisons — la règle de l'API ;
  * - prix (`price_per_product`) et TVA (`tva_per_product`) de chaque canal. La
  *   TVA est pré-remplie d'après la nature lue par l'IA ; une nature
- *   indéterminée laisse la TVA à choisir.
+ *   indéterminée laisse la TVA à choisir ;
+ * - ingrédients lus dans la description, si demandés
+ *   (`ingredients_per_product`) : on peut en retirer, puis les rétablir.
  *
  * La confirmation de la TVA (`tva_confirmed`) est en fin de page
  * (`ImportTvaConfirmation`). Les lignes à faible confiance ou signalées par
@@ -119,6 +170,7 @@ export const ImportPhotoProducts = ({
   onGroup,
   onPrice,
   onTva,
+  onIngredient,
 }: ImportPhotoProductsProps) => {
   const groups = useMemo(() => preview.products.filter((product) => product.is_group), [preview.products]);
   const variants = useMemo(() => groupVariants(preview, decisions), [preview, decisions]);
@@ -140,6 +192,18 @@ export const ImportPhotoProducts = ({
     }
     return rates;
   }, [tvaGroups]);
+  const ingredientNames = useMemo(
+    () => new Map((preview.components ?? []).map((component) => [component.external_id, component.name])),
+    [preview.components],
+  );
+  // Ingrédients réellement écrits, et parmi eux ceux déjà dans la caisse.
+  const ingredientCounts = useMemo(() => {
+    const used = usedIngredientIds(preview, decisions);
+    const reused = (preview.components ?? []).filter(
+      (component) => used.has(component.external_id) && component.action !== 'create',
+    ).length;
+    return { created: used.size - reused, reused };
+  }, [preview, decisions]);
   const photoUrl = (photo?: number) => photoDraft?.photos.find((entry) => entry.photo === photo)?.url;
   const toCheck = products.filter((product) => product.confidence === 'low' || (product.issues?.length ?? 0) > 0);
 
@@ -172,6 +236,14 @@ export const ImportPhotoProducts = ({
         <p className="flex items-center gap-2 text-sm text-amber-700">
           <AlertTriangle className="h-4 w-4" />
           {toCheck.length} ligne(s) à relire de près : la lecture n’en est pas sûre.
+        </p>
+      )}
+
+      {ingredientNames.size > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Ingrédients : {ingredientCounts.created} à créer
+          {ingredientCounts.reused > 0 && `, ${ingredientCounts.reused} déjà dans votre caisse`}. Cliquez
+          sur un ingrédient pour le retirer d’un produit.
         </p>
       )}
 
@@ -250,6 +322,15 @@ export const ImportPhotoProducts = ({
                     )}
                     {(product.issues?.length ?? 0) > 0 && (
                       <p className="text-xs text-amber-700">{product.issues?.join(' · ')}</p>
+                    )}
+                    {(product.component_external_ids?.length ?? 0) > 0 && (
+                      <IngredientChips
+                        product={product}
+                        kept={new Set(effectiveIngredients(product, decisions))}
+                        names={ingredientNames}
+                        disabled={disabled || excluded}
+                        onToggle={onIngredient}
+                      />
                     )}
                     {blockers?.map((message) => (
                       <p key={message} className="text-xs text-destructive">

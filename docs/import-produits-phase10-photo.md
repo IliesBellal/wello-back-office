@@ -97,6 +97,19 @@ Le test sur staging a fonctionné. La relecture d'Ilies a donné ces changements
   
   Les messages eux-mêmes viennent de l'API et ont été reformulés dans le même sens.
 
+### D8 — Ingrédients lus dans les descriptions (2026-09-30)
+Côté API : `ib-welloresto-api/docs/import-carte-ia-03-porte-ia.md`, § 9 (D16 à D18).
+- **Étape photo.** Nouvelle case « Créer aussi les ingrédients d'après les descriptions », **décochée par défaut**. Cochée, elle envoie `ingredients=true` avec les photos. Le texte rappelle trois choses :
+  - seuls les ingrédients écrits sur la carte sont repris ;
+  - ils le sont sans quantité, donc sans effet sur le stock ;
+  - on peut en retirer à la vérification.
+- **Relecture.**
+  - Sous le nom de chaque produit, ses ingrédients en pastilles. Un clic retire l'ingrédient, qui reste visible barré ; un second clic le rétablit.
+  - Au-dessus du tableau : « Ingrédients : N à créer, M déjà dans votre caisse ». Le compte ne retient que les ingrédients encore utilisés par un produit créé, comme `pruneUnusedComponents` côté API.
+- **Décision `ingredients_per_product`.** Elle est envoyée explicitement pour chaque produit qui a des ingrédients lus, dans l'ordre de lecture. Rien n'est envoyé si aucun ingrédient n'a été lu.
+- **Logique** (`importDecisions.ts`) : `effectiveIngredients` (la décision, sinon tous les ingrédients lus) et `usedIngredientIds` (miroir de l'élagage de l'API).
+- **Pas d'éditeur d'ingrédients dans l'import** : renommer, changer l'unité ou la catégorie se fait ensuite dans la page ingrédients.
+
 ## 3. Implémentation
 
 | Fichier | Contenu |
@@ -123,6 +136,8 @@ Le test sur staging a fonctionné. La relecture d'Ilies a donné ces changements
 | **Logique de décision contre une preview réelle de l'API** | La preview a été produite par le code Go (`BuildAIMenuImport` + `BuildPreview`), puis passée aux fonctions de `importDecisions.ts`, empaquetées avec esbuild. **21 vérifications OK** : présence des champs photo ; nature « À préciser » et TVA non confirmée bloquent ; commit possible une fois réglées ; 8 produits comptés ; corps du commit (nature et groupe de chaque produit, racine en `""`, `tva_confirmed`) ; groupe non compté sous deux déclinaisons ; dégroupage |
 | **Retours du test (D7) : logique contre la même preview** | Script mis à jour, **32 vérifications OK**. Il couvre : Veggie (nature « other ») bloqué faute de TVA, y compris avec un seul canal choisi ; aucun couple taux + canal à trancher pour la porte photo ; TVA proposée pré-remplie (2/4/7) ; commit possible une fois la TVA de Veggie choisie ; prix et TVA envoyés pour chaque produit vendu et jamais pour le groupe ; prix saisi sur un canal, les autres conservés |
 | **Retours du test (D7) : corps relu par l'API** | Le corps construit par `buildImportDecisions` a été passé à `BuildCommitPlan` (Go), qui l'a accepté sans blocage. Résultats : prix saisi appliqué (350/290/350) ; TVA choisie de Veggie appliquée (2/5/8) ; groupe créé, avec la TVA de sa première déclinaison ; dégroupage appliqué |
+| **Ingrédients (D8) : logique contre une preview réelle** | Preview produite par le code Go (deux photos, 5 ingrédients écrits de plusieurs façons). **10 vérifications OK**. Elles couvrent : ingrédients et composition exposés ; tous gardés par défaut ; ingrédient retiré partout, non compté ; produit exclu, ses ingrédients propres non comptés ; décision envoyée pour chaque produit qui a des ingrédients, dans l'ordre de lecture ; rien d'envoyé sans ingrédients lus. Le script des retours D7 repasse aussi |
+| **Ingrédients (D8) : corps relu par l'API** | `BuildCommitPlan` accepte le corps sans blocage. Tomate retirée partout : 4 ingrédients créés (Mozzarella, Jambon, Œufs, Crème) et 2 catégories ; la catégorie Légumes n'est plus créée |
 | **Décisions du back-office relues par l'API** | Le corps construit par `buildImportDecisions` a été passé à `BuildCommitPlan` (Go) : **plan accepté sans blocage**, groupe créé, dégroupage appliqué, TVA résolue. C'est la vérification du contrat JSON dans les deux sens |
 | Parcours dans un navigateur | **Non fait** : il faut une API déployée avec la porte IA (clé Anthropic, R2 privé, tâche ouverte). C'est le test de bout en bout du § 5 |
 | Préparation des photos (`menuPhotos.ts`) sur de vrais appareils | **Non testée** : conversion HEIC par Safari, orientation EXIF, poids après compression. À observer pendant le test |

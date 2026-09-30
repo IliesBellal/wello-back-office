@@ -260,6 +260,23 @@ export const productsNeedingTva = (
       )
     : [];
 
+/** Ingrédients retenus pour un produit : décision, sinon tous ceux lus. */
+export const effectiveIngredients = (product: ImportPreviewProduct, decisions: ImportDecisions): string[] =>
+  decisions.ingredients_per_product?.[product.external_id] ?? product.component_external_ids ?? [];
+
+/**
+ * Ingrédients qui seront réellement écrits — miroir de `pruneUnusedComponents`
+ * côté API : seuls ceux qu'un produit créé garde encore.
+ */
+export const usedIngredientIds = (preview: ImportPreviewResult, decisions: ImportDecisions): Set<string> => {
+  const used = new Set<string>();
+  for (const product of preview.products) {
+    if (product.is_group || !isMaterializable(product, decisions)) continue;
+    for (const id of effectiveIngredients(product, decisions)) used.add(id);
+  }
+  return used;
+};
+
 export interface ImportPrecheck {
   canCommit: boolean;
   needsCategory: ImportPreviewProduct[];
@@ -397,6 +414,15 @@ export const buildImportDecisions = (
     built.group_per_product = groupPerProduct;
     built.price_per_product = pricePerProduct;
     built.tva_per_product = tvaPerProduct;
+
+    // Ingrédients gardés, explicites pour chaque produit qui en a lu.
+    const ingredientsPerProduct: Record<string, string[]> = {};
+    for (const product of preview.products) {
+      if ((product.component_external_ids?.length ?? 0) > 0) {
+        ingredientsPerProduct[product.external_id] = effectiveIngredients(product, decisions);
+      }
+    }
+    if (Object.keys(ingredientsPerProduct).length > 0) built.ingredients_per_product = ingredientsPerProduct;
     built.tva_confirmed = Boolean(decisions.tva_confirmed);
   }
 

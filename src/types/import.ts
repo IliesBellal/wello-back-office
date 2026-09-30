@@ -173,6 +173,8 @@ export interface ImportPreviewProduct {
   issues?: string[];
   /** Numéro de la photo (à partir de 1) où la ligne a été lue. */
   source_photo?: number;
+  /** Ingrédients lus dans la description (entrées de `components`), si demandés. */
+  component_external_ids?: string[];
 }
 
 /** Porte « autre établissement » uniquement. */
@@ -240,6 +242,11 @@ export interface ImportDecisions {
   price_per_product?: Record<string, ImportChannelPrices>;
   /** Porte photo : `tva_id` choisi par canal ; il prime sur le taux proposé. */
   tva_per_product?: Record<string, ImportChannelTvaIds>;
+  /**
+   * Porte photo : ingrédients gardés par produit, parmi ceux lus. Produit
+   * absent = tous gardés.
+   */
+  ingredients_per_product?: Record<string, string[]>;
 }
 
 /** Canaux de vente d'un produit, dans l'ordre des colonnes de la relecture. */
@@ -284,6 +291,7 @@ export const IMPORT_BLOCKER_CODES = {
   invalidKindDecision: 'invalid_kind_decision',
   invalidGroupDecision: 'invalid_group_decision',
   invalidPriceDecision: 'invalid_price_decision',
+  invalidIngredientDecision: 'invalid_ingredient_decision',
 } as const;
 
 export interface ImportCommitBlocker {

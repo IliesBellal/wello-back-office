@@ -187,13 +187,15 @@ export const menuImportService = {
   /**
    * Dépose les photos (JPEG déjà préparés par `normalizeMenuPhotos`) et lance
    * leur lecture par l'IA en arrière-plan. Consomme un crédit, rendu si
-   * aucune photo n'est lue.
+   * aucune photo n'est lue. `withIngredients` demande aussi les ingrédients
+   * écrits dans les descriptions.
    */
-  async startPhotoImport(photos: Blob[]): Promise<ImportPhotoDraft> {
-    logAPI('POST', '/menu/import/ai', { photos: photos.length });
+  async startPhotoImport(photos: Blob[], withIngredients: boolean): Promise<ImportPhotoDraft> {
+    logAPI('POST', '/menu/import/ai', { photos: photos.length, ingredients: withIngredients });
 
     const formData = new FormData();
     photos.forEach((photo, index) => formData.append('photos', photo, `photo-${index + 1}.jpg`));
+    if (withIngredients) formData.append('ingredients', 'true');
 
     const response = await apiClient.post<WelloApiResponse<ImportPhotoDraft>>('/menu/import/ai', formData);
     return normalizePhotoDraft(response.data);

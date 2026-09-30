@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { MAX_MENU_PHOTOS, MENU_PHOTO_ACCEPT } from '@/lib/menuPhotos';
 import type { UseProductImport } from '@/hooks/useProductImport';
 import type { ImportPhotoDraftStatus } from '@/types/import';
@@ -38,6 +39,7 @@ export const ImportPhotoStep = ({ wizard }: ImportPhotoStepProps) => {
     isUploadingPhotos,
     addPhotos,
     removePhoto,
+    setPhotoIngredients,
     submitPhotos,
     resumePhotoDraft,
     abandonPhotoDraft,
@@ -176,6 +178,22 @@ export const ImportPhotoStep = ({ wizard }: ImportPhotoStepProps) => {
           ))}
         </div>
       )}
+
+      <label className="flex items-start gap-3 rounded-lg border bg-card p-4 text-sm">
+        <Checkbox
+          checked={state.photoIngredients}
+          disabled={isUploadingPhotos}
+          onCheckedChange={(checked) => setPhotoIngredients(checked === true)}
+          className="mt-0.5"
+        />
+        <span>
+          <span className="font-medium">Créer aussi les ingrédients d’après les descriptions</span>
+          <span className="block text-muted-foreground">
+            Seuls les ingrédients écrits sur la carte sont repris, sans quantité : la composition
+            décrit le produit sans toucher à votre stock. Vous pourrez en retirer à la vérification.
+          </span>
+        </span>
+      </label>
 
       {state.error && (
         <Alert variant="destructive">
