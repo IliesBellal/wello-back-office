@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { AlertTriangle, ExternalLink } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -11,35 +12,85 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { effectiveKind, effectiveParent, groupVariants } from '@/lib/importDecisions';
+import { effectiveParent, effectivePrice, effectiveTvaId, groupVariants } from '@/lib/importDecisions';
+import { parseDecimalInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import {
-  PRODUCT_KINDS,
-  productKindOption,
+  IMPORT_CHANNELS,
+  type ImportChannel,
   type ImportDecisions,
   type ImportPhotoDraft,
+  type ImportPreviewProduct,
   type ImportPreviewResult,
-  type ImportProductKind,
 } from '@/types/import';
+import type { TvaRate, TvaRateGroup } from '@/types/menu';
 
 interface ImportPhotoProductsProps {
   preview: ImportPreviewResult;
   decisions: ImportDecisions;
   photoDraft: ImportPhotoDraft | null;
+  tvaGroups: TvaRateGroup[];
+  loadingRates: boolean;
   blockersByRef: Map<string, string[]>;
   disabled: boolean;
   onExclude: (productExternalId: string, excluded: boolean) => void;
-  onKind: (productExternalId: string, kind: ImportProductKind) => void;
   onGroup: (productExternalId: string, groupExternalId: string) => void;
-  onTvaConfirmed: (confirmed: boolean) => void;
+  onPrice: (product: ImportPreviewProduct, channel: ImportChannel, cents: number) => void;
+  onTva: (productExternalId: string, channel: ImportChannel, tvaId: number) => void;
 }
 
 /** Valeur du select de groupe pour « aucun groupe » : Radix refuse la chaîne vide. */
 const NO_GROUP = '__none__';
 
-const euros = (cents: number): string =>
-  (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+/** Borne d'un prix saisi, comme l'API (10 000 €). */
+const MAX_PRICE_CENTS = 1_000_000;
 
-const formatRate = (rate: number): string => `${rate.toLocaleString('fr-FR')} %`;
+/**
+ * Prix d'un canal, en euros. La saisie reste libre pendant la frappe et n'est
+ * appliquée qu'à la sortie du champ ; une valeur illisible ou hors bornes
+ * rend le prix précédent.
+ */
+const PriceInput = ({
+  cents,
+  label,
+  disabled,
+  onCommit,
+}: {
+  cents: number;
+  label: string;
+  disabled: boolean;
+  onCommit: (cents: number) => void;
+}) => {
+  const [draft, setDraft] = useState<string | null>(null);
+
+  const commit = () => {
+    if (draft === null) return;
+    const euros = parseDecimalInput(draft);
+    setDraft(null);
+    if (euros === undefined) return;
+    const next = Math.round(euros * 100);
+    if (next >= 0 && next <= MAX_PRICE_CENTS && next !== cents) onCommit(next);
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        value={draft ?? priceToDisplayValue(cents)}
+        inputMode="decimal"
+        aria-label={label}
+        disabled={disabled}
+        className="h-8 pr-6 text-right tabular-nums"
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') event.currentTarget.blur();
+        }}
+      />
+      <span className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+        €
+      </span>
+    </div>
+  );
+};
 
 /**
  * Relecture propre à la porte photo : ce que l'IA a lu, ligne par ligne.
@@ -47,22 +98,27 @@ const formatRate = (rate: number): string => `${rate.toLocaleString('fr-FR')} %`
  * - inclure ou écarter une ligne mal lue (`excluded_products`) ;
  * - groupe de déclinaisons (`group_per_product`) : un groupe n'est créé que
  *   s'il garde au moins deux déclinaisons — la règle de l'API ;
- * - nature (`kind_per_product`), qui fixe la TVA proposée affichée à côté ;
- * - confirmation de la TVA (`tva_confirmed`), exigée au commit.
+ * - prix (`price_per_product`) et TVA (`tva_per_product`) de chaque canal. La
+ *   TVA est pré-remplie d'après la nature lue par l'IA ; une nature
+ *   indéterminée laisse la TVA à choisir.
  *
- * Les lignes à faible confiance ou signalées par la lecture sont mises en
- * avant, avec le numéro et le lien de la photo où les relire.
+ * La confirmation de la TVA (`tva_confirmed`) est en fin de page
+ * (`ImportTvaConfirmation`). Les lignes à faible confiance ou signalées par
+ * la lecture sont mises en avant, avec le numéro et le lien de la photo où
+ * les relire.
  */
 export const ImportPhotoProducts = ({
   preview,
   decisions,
   photoDraft,
+  tvaGroups,
+  loadingRates,
   blockersByRef,
   disabled,
   onExclude,
-  onKind,
   onGroup,
-  onTvaConfirmed,
+  onPrice,
+  onTva,
 }: ImportPhotoProductsProps) => {
   const groups = useMemo(() => preview.products.filter((product) => product.is_group), [preview.products]);
   const variants = useMemo(() => groupVariants(preview, decisions), [preview, decisions]);
@@ -76,6 +132,14 @@ export const ImportPhotoProducts = ({
         .map(({ product }) => product),
     [preview.products],
   );
+  // Taux configurés dans la caisse, par canal : seuls choix possibles.
+  const ratesByChannel = useMemo(() => {
+    const rates = {} as Record<ImportChannel, TvaRate[]>;
+    for (const { key, deliveryType } of IMPORT_CHANNELS) {
+      rates[key] = tvaGroups.find((group) => group.delivery_type === deliveryType)?.rates ?? [];
+    }
+    return rates;
+  }, [tvaGroups]);
   const photoUrl = (photo?: number) => photoDraft?.photos.find((entry) => entry.photo === photo)?.url;
   const toCheck = products.filter((product) => product.confidence === 'low' || (product.issues?.length ?? 0) > 0);
 
@@ -90,13 +154,13 @@ export const ImportPhotoProducts = ({
                 href={photo.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 hover:bg-muted"
+                className="inline-flex items-center gap-1 rounded-md border bg-card px-2 py-1 hover:bg-muted"
               >
                 Photo {photo.photo}
                 <ExternalLink className="h-3 w-3" />
               </a>
             ) : (
-              <span key={photo.photo} className="rounded-md border px-2 py-1 text-muted-foreground">
+              <span key={photo.photo} className="rounded-md border bg-card px-2 py-1 text-muted-foreground">
                 Photo {photo.photo} ({photo.status === 'failed' ? 'non lue' : 'indisponible'})
               </span>
             ),
@@ -125,29 +189,30 @@ export const ImportPhotoProducts = ({
         </ul>
       )}
 
-      <div className="max-h-[28rem] overflow-auto rounded-lg border">
+      <div className="max-h-[32rem] overflow-auto rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
               <TableHead className="w-10" />
-              <TableHead className="w-16">Photo</TableHead>
-              <TableHead className="min-w-[220px]">Produit</TableHead>
-              <TableHead className="w-24 text-right">Prix</TableHead>
-              {groups.length > 0 && <TableHead className="min-w-[160px]">Groupe</TableHead>}
-              <TableHead className="min-w-[220px]">Nature</TableHead>
-              <TableHead className="min-w-[150px]">TVA proposée</TableHead>
+              <TableHead className="w-14">Photo</TableHead>
+              <TableHead className="min-w-[200px]">Produit</TableHead>
+              {groups.length > 0 && <TableHead className="min-w-[150px]">Groupe</TableHead>}
+              {IMPORT_CHANNELS.map((channel) => (
+                <TableHead key={channel.key} className="min-w-[150px]">
+                  {channel.label}
+                  <span className="block text-xs font-normal">Prix · TVA</span>
+                </TableHead>
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
             {products.map((product) => {
               const excluded = Boolean(decisions.excluded_products[product.external_id]);
-              const kind = effectiveKind(product, decisions);
-              const option = productKindOption(kind);
               const parent = effectiveParent(product, decisions);
               const blockers = blockersByRef.get(product.external_id);
               const flagged = product.confidence === 'low' || (product.issues?.length ?? 0) > 0;
               const url = photoUrl(product.source_photo);
-              const noPrice = product.status === 'removed_from_menu';
+              const noPrice = IMPORT_CHANNELS.every(({ key }) => effectivePrice(product, key, decisions) === 0);
 
               return (
                 <TableRow
@@ -180,6 +245,9 @@ export const ImportPhotoProducts = ({
                         </Badge>
                       )}
                     </div>
+                    {noPrice && !excluded && (
+                      <p className="text-xs text-muted-foreground">Sans prix : sera retiré de la carte</p>
+                    )}
                     {(product.issues?.length ?? 0) > 0 && (
                       <p className="text-xs text-amber-700">{product.issues?.join(' · ')}</p>
                     )}
@@ -188,13 +256,6 @@ export const ImportPhotoProducts = ({
                         {message}
                       </p>
                     ))}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {noPrice ? (
-                      <span className="text-xs text-muted-foreground">Sans prix</span>
-                    ) : (
-                      euros(product.channels.in.price)
-                    )}
                   </TableCell>
                   {groups.length > 0 && (
                     <TableCell>
@@ -217,58 +278,47 @@ export const ImportPhotoProducts = ({
                       </Select>
                     </TableCell>
                   )}
-                  <TableCell>
-                    <Select
-                      value={kind ?? 'other'}
-                      disabled={disabled || excluded}
-                      onValueChange={(value) => onKind(product.external_id, value as ImportProductKind)}
-                    >
-                      <SelectTrigger className={`h-8 ${!option?.rates && !excluded ? 'border-destructive' : ''}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PRODUCT_KINDS.map((entry) => (
-                          <SelectItem key={entry.value} value={entry.value}>
-                            {entry.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                  <TableCell className="text-sm tabular-nums">
-                    {option?.rates ? (
-                      <span title="Sur place · À emporter · En livraison">
-                        {formatRate(option.rates.in)} · {formatRate(option.rates.take_away)} ·{' '}
-                        {formatRate(option.rates.delivery)}
-                      </span>
-                    ) : (
-                      <span className="text-destructive">Nature à préciser</span>
-                    )}
-                  </TableCell>
+                  {IMPORT_CHANNELS.map((channel) => {
+                    const tvaId = effectiveTvaId(product, channel.key, decisions);
+                    const missing = tvaId === undefined && !excluded;
+                    return (
+                      <TableCell key={channel.key} className="space-y-1">
+                        <PriceInput
+                          cents={effectivePrice(product, channel.key, decisions)}
+                          label={`Prix ${channel.label.toLowerCase()} de ${product.name}`}
+                          disabled={disabled || excluded}
+                          onCommit={(cents) => onPrice(product, channel.key, cents)}
+                        />
+                        <Select
+                          value={tvaId !== undefined ? String(tvaId) : ''}
+                          disabled={disabled || excluded || loadingRates}
+                          onValueChange={(value) => onTva(product.external_id, channel.key, Number(value))}
+                        >
+                          <SelectTrigger
+                            aria-label={`TVA ${channel.label.toLowerCase()} de ${product.name}`}
+                            className={`h-8 ${missing ? 'border-destructive' : ''}`}
+                          >
+                            <SelectValue placeholder={loadingRates ? 'Chargement…' : 'TVA à choisir'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {ratesByChannel[channel.key].map((rate, _, rates) => (
+                              <SelectItem key={rate.id} value={String(rate.id)}>
+                                {rate.value.toLocaleString('fr-FR')} %
+                                {/* Deux TVA au même taux : le libellé les distingue. */}
+                                {rates.filter((other) => other.value === rate.value).length > 1 && ` — ${rate.label}`}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
       </div>
-
-      <label className="flex items-start gap-3 rounded-lg border p-4 text-sm">
-        <Checkbox
-          checked={Boolean(decisions.tva_confirmed)}
-          disabled={disabled}
-          onCheckedChange={(checked) => onTvaConfirmed(checked === true)}
-          className="mt-0.5"
-        />
-        <span>
-          <span className="font-medium">J’ai vérifié la nature de chaque produit et les taux de TVA proposés.</span>
-          <span className="block text-muted-foreground">
-            Une carte n’indique jamais la TVA : les taux sont déduits de la nature du produit (sur
-            place · à emporter · en livraison). 10 % pour ce qui se consomme tout de suite ; 5,5 % à
-            emporter et en livraison pour les boissons fermées et les produits emballés ; 20 % pour
-            l’alcool.
-          </span>
-        </span>
-      </label>
     </div>
   );
 };

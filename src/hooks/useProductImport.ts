@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { buildImportDecisions, importPrecheck } from '@/lib/importDecisions';
+import { buildImportDecisions, effectivePrice, importPrecheck } from '@/lib/importDecisions';
 import { MAX_MENU_PHOTOS, normalizeMenuPhotos } from '@/lib/menuPhotos';
 import {
   buildManualPayload,
@@ -21,17 +21,20 @@ import {
   readCommitBlockers,
 } from '@/services/menuImportService';
 import {
+  IMPORT_CHANNELS,
   TEMPLATE_PROVIDER,
   tvaMappingKey,
+  type ImportChannel,
+  type ImportChannelPrices,
   type ImportCollisionResolution,
   type ImportCommitBlocker,
   type ImportCommitResponse,
   type ImportDecisions,
+  type ImportPreviewProduct,
   type ImportPreviewResult,
   type ImportManualProductPayload,
   type ImportPhotoDraft,
   type ImportPhotoDraftStatus,
-  type ImportProductKind,
   type ImportProviderSlug,
   type ImportReimportResolution,
   type ImportTagClass,
@@ -364,11 +367,32 @@ export const useProductImport = () => {
 
   // ─── Porte photo : décisions ────────────────────────────
 
-  const setProductKind = useCallback(
-    (productExternalId: string, kind: ImportProductKind) => {
+  /** Prix saisi sur un canal, en centimes ; les deux autres canaux gardent le leur. */
+  const setProductPrice = useCallback(
+    (product: ImportPreviewProduct, channel: ImportChannel, cents: number) => {
+      patchDecisions((current) => {
+        const prices = {} as ImportChannelPrices;
+        for (const { key } of IMPORT_CHANNELS) {
+          prices[key] = key === channel ? cents : effectivePrice(product, key, current);
+        }
+        return {
+          ...current,
+          price_per_product: { ...current.price_per_product, [product.external_id]: prices },
+        };
+      });
+    },
+    [patchDecisions],
+  );
+
+  /** TVA choisie sur un canal (`tva_id` de la caisse du marchand). */
+  const setProductTva = useCallback(
+    (productExternalId: string, channel: ImportChannel, tvaId: number) => {
       patchDecisions((current) => ({
         ...current,
-        kind_per_product: { ...current.kind_per_product, [productExternalId]: kind },
+        tva_per_product: {
+          ...current.tva_per_product,
+          [productExternalId]: { ...current.tva_per_product?.[productExternalId], [channel]: tvaId },
+        },
       }));
     },
     [patchDecisions],
@@ -689,7 +713,8 @@ export const useProductImport = () => {
     retryPhotos,
     reviewPhotoDraft,
     abandonPhotoDraft: photoAbandonMutation.mutate,
-    setProductKind,
+    setProductPrice,
+    setProductTva,
     setProductGroup,
     setTvaConfirmed,
   };

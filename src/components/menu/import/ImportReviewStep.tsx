@@ -25,6 +25,7 @@ import { ImportNameCollisions } from './review/ImportNameCollisions';
 import { ImportPhotoProducts } from './review/ImportPhotoProducts';
 import { ImportProductSelection } from './review/ImportProductSelection';
 import { ImportTagClassification } from './review/ImportTagClassification';
+import { ImportTvaConfirmation } from './review/ImportTvaConfirmation';
 import { ImportTvaResolution } from './review/ImportTvaResolution';
 import { ImportWarningsPanel } from './review/ImportWarningsPanel';
 
@@ -200,20 +201,22 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         <>
           <Section
             title="Produits lus sur vos photos"
-            description="Décochez ce qui a été mal lu, ajustez les groupes et la nature de chaque produit : c’est elle qui fixe la TVA."
-            count={precheck.needsKind.length}
+            description="Décochez ce qui a été mal lu, ajustez les groupes, puis le prix et la TVA de chaque canal."
+            count={precheck.needsTva.length}
             tone="attention"
           >
             <ImportPhotoProducts
               preview={preview}
               decisions={decisions}
               photoDraft={wizard.photoDraft}
+              tvaGroups={tvaGroups}
+              loadingRates={loadingRates}
               blockersByRef={blockersByRef}
               disabled={isCommitting}
               onExclude={wizard.setProductExcluded}
-              onKind={wizard.setProductKind}
               onGroup={wizard.setProductGroup}
-              onTvaConfirmed={wizard.setTvaConfirmed}
+              onPrice={wizard.setProductPrice}
+              onTva={wizard.setProductTva}
             />
           </Section>
 
@@ -241,24 +244,29 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         </>
       )}
 
-      <Section
-        title="TVA"
-        description="Les taux du fichier doivent correspondre à ceux configurés dans votre caisse."
-        count={precheck.unresolvedTva.length}
-        tone="attention"
-      >
-        <ImportTvaResolution
-          preview={preview}
-          tvaMapping={decisions.tva_mapping}
-          tvaGroups={tvaGroups}
-          loadingRates={loadingRates}
-          blockersByRef={blockersByRef}
-          disabled={isCommitting}
-          onChange={wizard.setTvaId}
-        />
-      </Section>
+      {/* Porte photo : la TVA se choisit produit par produit, plus haut. */}
+      {!isPhoto && (
+        <>
+          <Section
+            title="TVA"
+            description="Les taux du fichier doivent correspondre à ceux configurés dans votre caisse."
+            count={precheck.unresolvedTva.length}
+            tone="attention"
+          >
+            <ImportTvaResolution
+              preview={preview}
+              tvaMapping={decisions.tva_mapping}
+              tvaGroups={tvaGroups}
+              loadingRates={loadingRates}
+              blockersByRef={blockersByRef}
+              disabled={isCommitting}
+              onChange={wizard.setTvaId}
+            />
+          </Section>
 
-      <Separator />
+          <Separator />
+        </>
+      )}
 
       <Section
         title="Produits sans catégorie"
@@ -316,6 +324,14 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         <ImportWarningsPanel warnings={preview.warnings} />
       </Section>
 
+      {isPhoto && (
+        <ImportTvaConfirmation
+          confirmed={Boolean(decisions.tva_confirmed)}
+          disabled={isCommitting}
+          onChange={wizard.setTvaConfirmed}
+        />
+      )}
+
       <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 border-t bg-background px-1 py-3">
         <Button variant="ghost" onClick={wizard.back} disabled={isCommitting}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -332,8 +348,8 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
                   `${precheck.unresolvedTva.length} TVA à choisir`,
                 precheck.unresolvedCollisions.length > 0 &&
                   `${precheck.unresolvedCollisions.length} doublon(s) à trancher`,
-                precheck.needsKind.length > 0 &&
-                  `${precheck.needsKind.length} nature(s) à préciser`,
+                precheck.needsTva.length > 0 &&
+                  `${precheck.needsTva.length} produit(s) sans TVA`,
                 precheck.tvaNotConfirmed && 'TVA à confirmer',
               ]
                 .filter(Boolean)

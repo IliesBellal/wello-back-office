@@ -236,7 +236,23 @@ export interface ImportDecisions {
   group_per_product?: Record<string, string>;
   /** Porte photo : le restaurateur a vérifié les taux proposés. Exigé au commit. */
   tva_confirmed?: boolean;
+  /** Porte photo : prix saisis par canal, en centimes. Jamais sur un produit groupe. */
+  price_per_product?: Record<string, ImportChannelPrices>;
+  /** Porte photo : `tva_id` choisi par canal ; il prime sur le taux proposé. */
+  tva_per_product?: Record<string, ImportChannelTvaIds>;
 }
+
+/** Canaux de vente d'un produit, dans l'ordre des colonnes de la relecture. */
+export type ImportChannel = 'in' | 'take_away' | 'delivery';
+
+export const IMPORT_CHANNELS: { key: ImportChannel; label: string; deliveryType: string }[] = [
+  { key: 'in', label: 'Sur place', deliveryType: 'IN' },
+  { key: 'take_away', label: 'À emporter', deliveryType: 'TAKE_AWAY' },
+  { key: 'delivery', label: 'En livraison', deliveryType: 'DELIVERY' },
+];
+
+export type ImportChannelPrices = Record<ImportChannel, number>;
+export type ImportChannelTvaIds = Partial<Record<ImportChannel, number>>;
 
 export interface ImportPreviewResult {
   token: string;
@@ -267,6 +283,7 @@ export const IMPORT_BLOCKER_CODES = {
   tvaNotConfirmed: 'tva_not_confirmed',
   invalidKindDecision: 'invalid_kind_decision',
   invalidGroupDecision: 'invalid_group_decision',
+  invalidPriceDecision: 'invalid_price_decision',
 } as const;
 
 export interface ImportCommitBlocker {
@@ -363,43 +380,6 @@ export type ImportProductKind =
   | 'packaged_food'
   | 'alcohol'
   | 'other';
-
-export interface ImportProductKindOption {
-  value: ImportProductKind;
-  label: string;
-  /** Taux proposés sur place / à emporter / en livraison ; `null` = à saisir. */
-  rates: { in: number; take_away: number; delivery: number } | null;
-}
-
-/**
- * Natures et taux proposés — miroir de `KindTvaRates` côté API (table validée
- * le 2026-09-29). Affiché pour que le restaurateur voie ce que son choix
- * implique ; c'est l'API qui applique.
- */
-export const PRODUCT_KINDS: ImportProductKindOption[] = [
-  { value: 'food', label: 'Plat, dessert, snack', rates: { in: 10, take_away: 10, delivery: 10 } },
-  { value: 'hot_drink', label: 'Boisson chaude', rates: { in: 10, take_away: 10, delivery: 10 } },
-  {
-    value: 'soft_drink_served',
-    label: 'Boisson sans alcool servie (verre, carafe, jus pressé)',
-    rates: { in: 10, take_away: 10, delivery: 10 },
-  },
-  {
-    value: 'soft_drink_sealed',
-    label: 'Boisson sans alcool fermée (canette, bouteille)',
-    rates: { in: 10, take_away: 5.5, delivery: 5.5 },
-  },
-  {
-    value: 'packaged_food',
-    label: 'Produit emballé à consommer plus tard',
-    rates: { in: 10, take_away: 5.5, delivery: 5.5 },
-  },
-  { value: 'alcohol', label: 'Boisson alcoolisée', rates: { in: 20, take_away: 20, delivery: 20 } },
-  { value: 'other', label: 'À préciser', rates: null },
-];
-
-export const productKindOption = (kind: string | undefined): ImportProductKindOption | undefined =>
-  PRODUCT_KINDS.find((option) => option.value === kind);
 
 export type ImportPhotoDraftStatus =
   | 'pending'
