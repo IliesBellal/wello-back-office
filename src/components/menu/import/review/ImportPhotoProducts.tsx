@@ -246,7 +246,7 @@ export const ImportPhotoProducts = ({
                       )}
                     </div>
                     {noPrice && !excluded && (
-                      <p className="text-xs text-muted-foreground">Sans prix : sera retiré de la carte</p>
+                      <p className="text-xs text-muted-foreground">Sans prix : importé en « Retiré du menu »</p>
                     )}
                     {(product.issues?.length ?? 0) > 0 && (
                       <p className="text-xs text-amber-700">{product.issues?.join(' · ')}</p>

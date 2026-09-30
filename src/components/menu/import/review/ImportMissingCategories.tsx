@@ -120,7 +120,7 @@ export const ImportMissingCategories = ({
                     {product.name}
                     {product.status === 'removed_from_menu' && (
                       <p className="text-xs text-muted-foreground">
-                        Sans prix : sera importé mais retiré de la carte.
+                        Sans prix : sera importé avec le statut « Retiré du menu ».
                       </p>
                     )}
                     {errors?.map((message, index) => (

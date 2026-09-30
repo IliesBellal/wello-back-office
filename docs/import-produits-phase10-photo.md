@@ -91,6 +91,12 @@ Le test sur staging a fonctionné. La relecture d'Ilies a donné ces changements
 - **Formules** : sans changement côté back-office. Une formule à choix simples arrive comme un produit ordinaire, avec ses groupes d'options et la mention « À vérifier ». Les autres restent dans « Points d'attention », avec la suggestion de créer une promotion ou un produit « Menu … ».
 - `PRODUCT_KINDS` et `setProductKind` sont supprimés, car plus rien ne les affichait. Le type `ImportProductKind` reste, pour `kind_per_product`, toujours envoyé.
 
+- **Libellés fonctionnels** (second retour) :
+  - un produit sans prix est annoncé « Retiré du menu », le libellé de la page produits, et non plus par son statut technique ;
+  - la famille des formules s'intitule « Formules à configurer manuellement ».
+  
+  Les messages eux-mêmes viennent de l'API et ont été reformulés dans le même sens.
+
 ## 3. Implémentation
 
 | Fichier | Contenu |
