@@ -55,7 +55,7 @@ export const ImportTvaResolution = ({
   onChange,
 }: ImportTvaResolutionProps) => {
   if (preview.tva_rates.length === 0) {
-    return <p className="text-sm text-muted-foreground">Aucun taux de TVA dans ce fichier.</p>;
+    return <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">Aucun taux de TVA dans ce fichier.</p>;
   }
 
   // delivery_type vaut 'IN', 'TAKE_AWAY' ou 'DELIVERY' — les mêmes chaînes des

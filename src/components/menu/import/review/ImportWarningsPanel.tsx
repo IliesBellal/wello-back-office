@@ -49,11 +49,11 @@ export const ImportWarningsPanel = ({ warnings }: ImportWarningsPanelProps) => {
   }, [warnings]);
 
   if (groups.length === 0) {
-    return <p className="text-sm text-muted-foreground">Aucun point d’attention.</p>;
+    return <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">Aucun point d’attention.</p>;
   }
 
   return (
-    <Accordion type="multiple" className="rounded-lg border px-4">
+    <Accordion type="multiple" className="rounded-lg border bg-card px-4">
       {groups.map(([code, entries]) => (
         <AccordionItem key={code} value={code}>
           <AccordionTrigger className="text-sm">

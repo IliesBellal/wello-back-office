@@ -56,7 +56,7 @@ export const ImportProductSelection = ({
         </Button>
       </div>
 
-      <div className="max-h-72 overflow-auto rounded-lg border">
+      <div className="max-h-72 overflow-auto rounded-lg border bg-card">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
