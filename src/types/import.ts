@@ -162,6 +162,17 @@ export interface ImportPreviewProduct {
   reimport?: ImportReimportResolution;
   /** Reflète la décision courante `excluded_products` — porte « autre établissement » uniquement. */
   excluded?: boolean;
+
+  // Porte photo (provider `ai_photo`) uniquement — absents ailleurs.
+  /** Nature proposée par la lecture, qui détermine la TVA proposée. */
+  kind?: ImportProductKind;
+  /** Produit groupe (sans prix) dont les déclinaisons le citent en `parent_external_id`. */
+  is_group?: boolean;
+  parent_external_id?: string;
+  confidence?: 'high' | 'medium' | 'low';
+  issues?: string[];
+  /** Numéro de la photo (à partir de 1) où la ligne a été lue. */
+  source_photo?: number;
 }
 
 /** Porte « autre établissement » uniquement. */
@@ -219,7 +230,29 @@ export interface ImportDecisions {
    * arbitrage — porte « autre établissement » uniquement (`{}` ailleurs).
    */
   excluded_products: Record<string, boolean>;
+  /** Porte photo : nature par produit — ses trois taux de TVA en découlent. */
+  kind_per_product?: Record<string, ImportProductKind>;
+  /** Porte photo : groupe de rattachement par produit, `""` = à la racine. */
+  group_per_product?: Record<string, string>;
+  /** Porte photo : le restaurateur a vérifié les taux proposés. Exigé au commit. */
+  tva_confirmed?: boolean;
+  /** Porte photo : prix saisis par canal, en centimes. Jamais sur un produit groupe. */
+  price_per_product?: Record<string, ImportChannelPrices>;
+  /** Porte photo : `tva_id` choisi par canal ; il prime sur le taux proposé. */
+  tva_per_product?: Record<string, ImportChannelTvaIds>;
 }
+
+/** Canaux de vente d'un produit, dans l'ordre des colonnes de la relecture. */
+export type ImportChannel = 'in' | 'take_away' | 'delivery';
+
+export const IMPORT_CHANNELS: { key: ImportChannel; label: string; deliveryType: string }[] = [
+  { key: 'in', label: 'Sur place', deliveryType: 'IN' },
+  { key: 'take_away', label: 'À emporter', deliveryType: 'TAKE_AWAY' },
+  { key: 'delivery', label: 'En livraison', deliveryType: 'DELIVERY' },
+];
+
+export type ImportChannelPrices = Record<ImportChannel, number>;
+export type ImportChannelTvaIds = Partial<Record<ImportChannel, number>>;
 
 export interface ImportPreviewResult {
   token: string;
@@ -247,6 +280,10 @@ export const IMPORT_BLOCKER_CODES = {
   collisionUnresolved: 'product_name_collision_unresolved',
   invalidTvaMapping: 'invalid_tva_mapping',
   invalidCategoryDecision: 'invalid_category_decision',
+  tvaNotConfirmed: 'tva_not_confirmed',
+  invalidKindDecision: 'invalid_kind_decision',
+  invalidGroupDecision: 'invalid_group_decision',
+  invalidPriceDecision: 'invalid_price_decision',
 } as const;
 
 export interface ImportCommitBlocker {
@@ -324,4 +361,72 @@ export interface ImportManualProductPayload {
   tva_take_away: number | null;
   tva_delivery: number | null;
   tags: string[];
+}
+
+// ─── Porte photo (lecture de carte par l'IA) ────────────────
+
+/** Provider des prévisualisations issues de photos. */
+export const AI_PHOTO_PROVIDER = 'ai_photo';
+
+/**
+ * Nature d'un produit lu sur une photo. Elle ne sert qu'à proposer la TVA :
+ * une carte n'affiche jamais les taux (internal/modules/menu/importer/kind.go).
+ */
+export type ImportProductKind =
+  | 'food'
+  | 'hot_drink'
+  | 'soft_drink_served'
+  | 'soft_drink_sealed'
+  | 'packaged_food'
+  | 'alcohol'
+  | 'other';
+
+export type ImportPhotoDraftStatus =
+  | 'pending'
+  | 'processing'
+  | 'ready'
+  | 'failed'
+  | 'committed'
+  | 'expired';
+
+export interface ImportPhotoDraftPhoto {
+  photo: number;
+  status: 'pending' | 'done' | 'failed';
+  error?: string;
+  /** Lien signé, valable une heure. */
+  url?: string;
+}
+
+/** `GET /menu/import/ai/{id}` — `preview` présent une fois les photos lues. */
+export interface ImportPhotoDraft {
+  id: string;
+  status: ImportPhotoDraftStatus;
+  error?: string;
+  created_at: string;
+  expires_at: string;
+  photos_total: number;
+  photos_done: number;
+  photos: ImportPhotoDraftPhoto[];
+  preview?: ImportPreviewResult;
+}
+
+export interface ImportPhotoDraftSummary {
+  id: string;
+  status: ImportPhotoDraftStatus;
+  created_at: string;
+  expires_at: string;
+  photos_total: number;
+  photos_done: number;
+}
+
+export interface ImportPhotoCredits {
+  total: number;
+  used: number;
+  remaining: number;
+}
+
+/** `GET /menu/import/drafts`. */
+export interface ImportPhotoDrafts {
+  drafts: ImportPhotoDraftSummary[];
+  credits: ImportPhotoCredits;
 }

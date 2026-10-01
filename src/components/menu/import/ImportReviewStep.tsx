@@ -8,7 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { qk } from '@/lib/queryKeys';
-import { alreadyImportedProducts, categoryOptions, indexBlockersByRef } from '@/lib/importDecisions';
+import {
+  alreadyImportedProducts,
+  categoryOptions,
+  indexBlockersByRef,
+  isPhotoPreview,
+} from '@/lib/importDecisions';
 import { menuService } from '@/services/menuService';
 import { useAuth } from '@/contexts/AuthContext';
 import type { UseProductImport } from '@/hooks/useProductImport';
@@ -17,8 +22,10 @@ import type { ImportPreviewResult } from '@/types/import';
 import { ImportAlreadyImported } from './review/ImportAlreadyImported';
 import { ImportMissingCategories } from './review/ImportMissingCategories';
 import { ImportNameCollisions } from './review/ImportNameCollisions';
+import { ImportPhotoProducts } from './review/ImportPhotoProducts';
 import { ImportProductSelection } from './review/ImportProductSelection';
 import { ImportTagClassification } from './review/ImportTagClassification';
+import { ImportTvaConfirmation } from './review/ImportTvaConfirmation';
 import { ImportTvaResolution } from './review/ImportTvaResolution';
 import { ImportWarningsPanel } from './review/ImportWarningsPanel';
 
@@ -100,6 +107,10 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
   const previouslyImported = useMemo(() => alreadyImportedProducts(preview), [preview]);
 
   if (!decisions || !precheck) return null;
+
+  // Porte photo : relecture ligne à ligne de ce que l'IA a lu, avant les
+  // sections communes à toutes les portes.
+  const isPhoto = isPhotoPreview(preview);
 
   const { summary } = preview;
 
@@ -186,39 +197,76 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         </>
       )}
 
-      <Section
-        title="Catégories et tags"
-        description="Chaque libellé du fichier devient soit une catégorie de caisse, soit un tag."
-      >
-        <ImportTagClassification
-          preview={preview}
-          classification={decisions.tag_classification}
-          blockersByRef={blockersByRef}
-          disabled={isCommitting}
-          onChange={wizard.setTagClass}
-        />
-      </Section>
+      {isPhoto && (
+        <>
+          <Section
+            title="Produits lus sur vos photos"
+            description="Décochez ce qui a été mal lu, ajustez les groupes, puis le prix et la TVA de chaque canal."
+            count={precheck.needsTva.length}
+            tone="attention"
+          >
+            <ImportPhotoProducts
+              preview={preview}
+              decisions={decisions}
+              photoDraft={wizard.photoDraft}
+              tvaGroups={tvaGroups}
+              loadingRates={loadingRates}
+              blockersByRef={blockersByRef}
+              disabled={isCommitting}
+              onExclude={wizard.setProductExcluded}
+              onGroup={wizard.setProductGroup}
+              onPrice={wizard.setProductPrice}
+              onTva={wizard.setProductTva}
+            />
+          </Section>
 
-      <Separator />
+          <Separator />
+        </>
+      )}
 
-      <Section
-        title="TVA"
-        description="Les taux du fichier doivent correspondre à ceux configurés dans votre caisse."
-        count={precheck.unresolvedTva.length}
-        tone="attention"
-      >
-        <ImportTvaResolution
-          preview={preview}
-          tvaMapping={decisions.tva_mapping}
-          tvaGroups={tvaGroups}
-          loadingRates={loadingRates}
-          blockersByRef={blockersByRef}
-          disabled={isCommitting}
-          onChange={wizard.setTvaId}
-        />
-      </Section>
+      {/* Une lecture de photos ne produit que des catégories, jamais de libellés à classer. */}
+      {(!isPhoto || preview.tags.length > 0) && (
+        <>
+          <Section
+            title="Catégories et tags"
+            description="Chaque libellé du fichier devient soit une catégorie de caisse, soit un tag."
+          >
+            <ImportTagClassification
+              preview={preview}
+              classification={decisions.tag_classification}
+              blockersByRef={blockersByRef}
+              disabled={isCommitting}
+              onChange={wizard.setTagClass}
+            />
+          </Section>
 
-      <Separator />
+          <Separator />
+        </>
+      )}
+
+      {/* Porte photo : la TVA se choisit produit par produit, plus haut. */}
+      {!isPhoto && (
+        <>
+          <Section
+            title="TVA"
+            description="Les taux du fichier doivent correspondre à ceux configurés dans votre caisse."
+            count={precheck.unresolvedTva.length}
+            tone="attention"
+          >
+            <ImportTvaResolution
+              preview={preview}
+              tvaMapping={decisions.tva_mapping}
+              tvaGroups={tvaGroups}
+              loadingRates={loadingRates}
+              blockersByRef={blockersByRef}
+              disabled={isCommitting}
+              onChange={wizard.setTvaId}
+            />
+          </Section>
+
+          <Separator />
+        </>
+      )}
 
       <Section
         title="Produits sans catégorie"
@@ -276,10 +324,18 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         <ImportWarningsPanel warnings={preview.warnings} />
       </Section>
 
+      {isPhoto && (
+        <ImportTvaConfirmation
+          confirmed={Boolean(decisions.tva_confirmed)}
+          disabled={isCommitting}
+          onChange={wizard.setTvaConfirmed}
+        />
+      )}
+
       <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 border-t bg-background px-1 py-3">
         <Button variant="ghost" onClick={wizard.back} disabled={isCommitting}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Changer de fichier
+          {isPhoto ? 'Revenir aux photos' : 'Changer de fichier'}
         </Button>
 
         <div className="flex items-center gap-3">
@@ -292,6 +348,9 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
                   `${precheck.unresolvedTva.length} TVA à choisir`,
                 precheck.unresolvedCollisions.length > 0 &&
                   `${precheck.unresolvedCollisions.length} doublon(s) à trancher`,
+                precheck.needsTva.length > 0 &&
+                  `${precheck.needsTva.length} produit(s) sans TVA`,
+                precheck.tvaNotConfirmed && 'TVA à confirmer',
               ]
                 .filter(Boolean)
                 .join(' · ')}

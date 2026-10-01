@@ -11,6 +11,8 @@ import type {
   ImportManualProductPayload,
   ImportCommitResponse,
   ImportDecisions,
+  ImportPhotoDraft,
+  ImportPhotoDrafts,
   ImportPreviewResult,
   ImportProviderSlug,
 } from '@/types/import';
@@ -83,6 +85,7 @@ const normalizePreview = (preview: ImportPreviewResult): ImportPreviewResult => 
     ...product,
     tag_external_ids: asArray(product.tag_external_ids),
     dropped_label_external_ids: asArray(product.dropped_label_external_ids),
+    issues: asArray(product.issues),
   })),
   decisions: {
     tag_classification: asRecord(preview.decisions?.tag_classification),
@@ -91,7 +94,16 @@ const normalizePreview = (preview: ImportPreviewResult): ImportPreviewResult => 
     name_collisions: asRecord(preview.decisions?.name_collisions),
     already_imported: asRecord(preview.decisions?.already_imported),
     excluded_products: asRecord(preview.decisions?.excluded_products),
+    kind_per_product: asRecord(preview.decisions?.kind_per_product),
+    group_per_product: asRecord(preview.decisions?.group_per_product),
+    tva_confirmed: Boolean(preview.decisions?.tva_confirmed),
   },
+});
+
+const normalizePhotoDraft = (draft: ImportPhotoDraft): ImportPhotoDraft => ({
+  ...draft,
+  photos: asArray(draft.photos),
+  preview: draft.preview ? normalizePreview(draft.preview) : undefined,
 });
 
 export const menuImportService = {
@@ -168,6 +180,54 @@ export const menuImportService = {
     );
 
     return response.data;
+  },
+
+  // ─── Porte photo ────────────────────────────────────────
+
+  /**
+   * Dépose les photos (JPEG déjà préparés par `normalizeMenuPhotos`) et lance
+   * leur lecture par l'IA en arrière-plan. Consomme un crédit, rendu si
+   * aucune photo n'est lue.
+   */
+  async startPhotoImport(photos: Blob[]): Promise<ImportPhotoDraft> {
+    logAPI('POST', '/menu/import/ai', { photos: photos.length });
+
+    const formData = new FormData();
+    photos.forEach((photo, index) => formData.append('photos', photo, `photo-${index + 1}.jpg`));
+
+    const response = await apiClient.post<WelloApiResponse<ImportPhotoDraft>>('/menu/import/ai', formData);
+    return normalizePhotoDraft(response.data);
+  },
+
+  /** État du brouillon ; `preview` une fois les photos lues. */
+  async getPhotoDraft(id: string): Promise<ImportPhotoDraft> {
+    const response = await apiClient.get<WelloApiResponse<ImportPhotoDraft>>(
+      `/menu/import/ai/${encodeURIComponent(id)}`,
+    );
+    return normalizePhotoDraft(response.data);
+  },
+
+  /** Relit les photos en échec (gratuit). */
+  async retryPhotoDraft(id: string): Promise<ImportPhotoDraft> {
+    logAPI('POST', '/menu/import/ai/{id}/retry', { id });
+    const response = await apiClient.post<WelloApiResponse<ImportPhotoDraft>>(
+      `/menu/import/ai/${encodeURIComponent(id)}/retry`,
+    );
+    return normalizePhotoDraft(response.data);
+  },
+
+  /** Brouillons encore ouverts et solde de crédits. */
+  async listPhotoDrafts(): Promise<ImportPhotoDrafts> {
+    const response = await apiClient.get<WelloApiResponse<ImportPhotoDrafts>>('/menu/import/drafts');
+    return {
+      drafts: asArray(response.data?.drafts),
+      credits: response.data?.credits ?? { total: 0, used: 0, remaining: 0 },
+    };
+  },
+
+  async abandonPhotoDraft(id: string): Promise<void> {
+    logAPI('DELETE', '/menu/import/drafts/{id}', { id });
+    await apiClient.delete(`/menu/import/drafts/${encodeURIComponent(id)}`);
   },
 
   /**
@@ -261,6 +321,27 @@ export const describeImportError = (error: unknown): string => {
 
     case 'source_merchant_not_found':
       return "Cet établissement n'est plus accessible depuis votre compte.";
+
+    // Porte photo (internal/modules/menu/import_ai_handler.go).
+    case 'missing_photos':
+      return 'Ajoutez au moins une photo de votre carte.';
+    case 'too_many_photos':
+      return '10 photos au maximum par import.';
+    case 'photo_too_large':
+    case 'photos_too_large_or_invalid':
+      return 'Les photos sont trop lourdes : envoyez-en moins à la fois.';
+    case 'photo_not_jpeg':
+      return 'Une photo n’est pas dans un format accepté. Reprenez-la ou choisissez une image JPEG ou PNG.';
+    case 'import_ai_no_credits':
+      return 'Vous avez utilisé tous vos imports par photo. Contactez-nous pour en obtenir d’autres.';
+    case 'import_ai_already_running':
+      return 'Une lecture de photos est déjà en cours : reprenez-la ci-dessous ou attendez qu’elle se termine.';
+    case 'import_ai_disabled':
+      return 'L’import par photo n’est pas disponible pour le moment.';
+    case 'import_ai_draft_not_found':
+      return 'Ce brouillon n’existe plus.';
+    case 'import_ai_draft_not_retryable':
+      return 'Il n’y a rien à relancer pour ce brouillon.';
   }
 
   if (apiError.status === 413) {

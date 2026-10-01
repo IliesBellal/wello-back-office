@@ -22,6 +22,12 @@ const WARNING_TITLES: Record<string, string> = {
   product_removed_from_menu: 'Produits sans prix, retirés de la carte',
   label_dropped: 'Libellés non retenus',
   tag_synthesized: 'Libellés absents du fichier',
+  // Porte photo (internal/modules/menu/importer/ai_menu.go).
+  ai_low_confidence: 'Lignes à relire sur la photo',
+  ai_formula_not_created: 'Formules détectées, non créées',
+  ai_duplicate_merged: 'Produits présents sur plusieurs photos',
+  ai_group_dissolved: 'Groupes à une seule déclinaison, non créés',
+  ai_photo_warning: 'Remarques sur les photos',
 };
 
 /**
@@ -43,11 +49,11 @@ export const ImportWarningsPanel = ({ warnings }: ImportWarningsPanelProps) => {
   }, [warnings]);
 
   if (groups.length === 0) {
-    return <p className="text-sm text-muted-foreground">Aucun point d’attention.</p>;
+    return <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">Aucun point d’attention.</p>;
   }
 
   return (
-    <Accordion type="multiple" className="rounded-lg border px-4">
+    <Accordion type="multiple" className="rounded-lg border bg-card px-4">
       {groups.map(([code, entries]) => (
         <AccordionItem key={code} value={code}>
           <AccordionTrigger className="text-sm">

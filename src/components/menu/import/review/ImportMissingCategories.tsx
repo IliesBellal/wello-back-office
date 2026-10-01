@@ -51,7 +51,7 @@ export const ImportMissingCategories = ({
 
   if (products.length === 0) {
     return (
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 rounded-lg border bg-card p-4 text-sm text-muted-foreground">
         <CheckCircle2 className="h-4 w-4 text-primary" />
         Tous les produits ont une catégorie.
       </div>

@@ -34,7 +34,7 @@ export const ImportTagClassification = ({
 }: ImportTagClassificationProps) => {
   if (preview.tags.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">
+      <p className="rounded-lg border bg-card p-4 text-sm text-muted-foreground">
         Ce fichier ne contient aucun libellé à classer.
       </p>
     );

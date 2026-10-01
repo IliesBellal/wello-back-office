@@ -16,6 +16,8 @@ import { ImportDoneStep } from './ImportDoneStep';
 import { ImportDoorPicker } from './ImportDoorPicker';
 import { ImportManualStep } from './ImportManualStep';
 import { ImportMerchantSourceStep } from './ImportMerchantSourceStep';
+import { ImportPhotoReadingStep } from './ImportPhotoReadingStep';
+import { ImportPhotoStep } from './ImportPhotoStep';
 import { ImportReviewStep } from './ImportReviewStep';
 import { ImportProviderStep } from './ImportProviderStep';
 
@@ -66,6 +68,14 @@ const STEP_TITLES: Record<string, { title: string; description: string }> = {
     title: 'Copier un autre établissement',
     description: 'Choisissez l’établissement source, puis analysez son catalogue.',
   },
+  photo: {
+    title: 'Importer ma carte en photos',
+    description: 'Envoyez les photos de votre carte : rien n’est enregistré avant vérification.',
+  },
+  photo_reading: {
+    title: 'Lecture de votre carte',
+    description: 'Nous lisons chaque photo ; vous vérifierez tout à l’étape suivante.',
+  },
 };
 
 /**
@@ -80,6 +90,8 @@ const STEP_DIALOG_CLASS: Record<string, string> = {
   preview: 'max-w-7xl h-[90vh]',
   done: 'max-w-2xl max-h-[85vh]',
   merchant: 'max-w-2xl max-h-[85vh]',
+  photo: 'max-w-3xl max-h-[90vh]',
+  photo_reading: 'max-w-3xl max-h-[90vh]',
 };
 
 /**
@@ -185,9 +197,16 @@ export const ProductImportDialog = ({
           />
         );
 
+      case 'photo':
+        return <ImportPhotoStep wizard={wizard} />;
+
+      case 'photo_reading':
+        return <ImportPhotoReadingStep wizard={wizard} />;
+
       default:
         return (
           <ImportDoorPicker
+            onChoosePhoto={() => goToDoor('photo')}
             onChooseProvider={() => goToDoor('provider')}
             onChooseManual={() => goToDoor('manual')}
             onChooseMerchant={() => goToDoor('merchant')}

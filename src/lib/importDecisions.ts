@@ -12,8 +12,14 @@
  */
 
 import {
+  AI_PHOTO_PROVIDER,
+  IMPORT_CHANNELS,
   tvaMappingKey,
+  type ImportChannel,
+  type ImportChannelPrices,
+  type ImportChannelTvaIds,
   type ImportDecisions,
+  type ImportProductKind,
   type ImportPreviewProduct,
   type ImportPreviewResult,
   type ImportPreviewTvaRate,
@@ -167,11 +173,102 @@ export const alreadyImportedProducts = (
     .filter((product) => product.action === 'already_imported')
     .sort((a, b) => Number(Boolean(b.mapping_stale)) - Number(Boolean(a.mapping_stale)));
 
+// ─── Porte photo ────────────────────────────────────────────
+
+/** La prévisualisation vient de photos lues par l'IA. */
+export const isPhotoPreview = (preview: ImportPreviewResult): boolean =>
+  preview.provider === AI_PHOTO_PROVIDER;
+
+/** Nature retenue : décision, sinon proposition de la lecture. */
+export const effectiveKind = (
+  product: ImportPreviewProduct,
+  decisions: ImportDecisions,
+): ImportProductKind | undefined => decisions.kind_per_product?.[product.external_id] ?? product.kind;
+
+/** Groupe retenu (`""` = racine) : décision, sinon proposition de la lecture. */
+export const effectiveParent = (product: ImportPreviewProduct, decisions: ImportDecisions): string => {
+  const decided = decisions.group_per_product?.[product.external_id];
+  return decided !== undefined ? decided : product.parent_external_id ?? '';
+};
+
+/**
+ * Déclinaisons qui seront réellement rattachées à chaque groupe — miroir de
+ * `resolveGroups` côté API : un groupe n'est créé que s'il garde au moins deux
+ * déclinaisons créées ; sinon sa déclinaison éventuelle passe à la racine.
+ */
+export const groupVariants = (
+  preview: ImportPreviewResult,
+  decisions: ImportDecisions,
+): Map<string, ImportPreviewProduct[]> => {
+  const groups = new Map<string, ImportPreviewProduct[]>();
+  for (const product of preview.products) {
+    if (product.is_group && isMaterializable(product, decisions)) groups.set(product.external_id, []);
+  }
+  for (const product of preview.products) {
+    if (product.is_group || !isMaterializable(product, decisions)) continue;
+    groups.get(effectiveParent(product, decisions))?.push(product);
+  }
+  return groups;
+};
+
+/** Groupes qui seront créés (au moins deux déclinaisons). */
+export const createdGroupIds = (preview: ImportPreviewResult, decisions: ImportDecisions): Set<string> =>
+  new Set(
+    [...groupVariants(preview, decisions).entries()]
+      .filter(([, variants]) => variants.length >= 2)
+      .map(([groupId]) => groupId),
+  );
+
+/** Prix retenu sur un canal, en centimes : saisie, sinon lecture. */
+export const effectivePrice = (
+  product: ImportPreviewProduct,
+  channel: ImportChannel,
+  decisions: ImportDecisions,
+): number => decisions.price_per_product?.[product.external_id]?.[channel] ?? product.channels[channel].price;
+
+/**
+ * `tva_id` retenu sur un canal : choix de la relecture, sinon le taux proposé
+ * d'après la nature quand la prévisualisation a su le résoudre. `undefined` =
+ * à choisir. Test de présence, pas de vérité : 0 et -1 sont des identifiants.
+ */
+export const effectiveTvaId = (
+  product: ImportPreviewProduct,
+  channel: ImportChannel,
+  decisions: ImportDecisions,
+): number | undefined => {
+  const chosen = decisions.tva_per_product?.[product.external_id]?.[channel];
+  if (chosen !== undefined) return chosen;
+  const proposed = product.channels[channel];
+  return proposed.resolved ? proposed.tva_id : undefined;
+};
+
+/**
+ * Produits créés dont au moins un canal n'a pas de TVA (nature « autre », ou
+ * taux absent de la caisse). Les groupes ne sont jamais vendus : l'API leur
+ * donne la TVA de leur première déclinaison.
+ */
+export const productsNeedingTva = (
+  preview: ImportPreviewResult,
+  decisions: ImportDecisions,
+): ImportPreviewProduct[] =>
+  isPhotoPreview(preview)
+    ? preview.products.filter(
+        (product) =>
+          !product.is_group &&
+          isMaterializable(product, decisions) &&
+          IMPORT_CHANNELS.some(({ key }) => effectiveTvaId(product, key, decisions) === undefined),
+      )
+    : [];
+
 export interface ImportPrecheck {
   canCommit: boolean;
   needsCategory: ImportPreviewProduct[];
   unresolvedTva: ImportPreviewTvaRate[];
   unresolvedCollisions: ImportPreviewProduct[];
+  /** Porte photo : produits dont un canal au moins n'a pas de TVA. */
+  needsTva: ImportPreviewProduct[];
+  /** Porte photo : les taux proposés n'ont pas encore été confirmés. */
+  tvaNotConfirmed: boolean;
   /** Produits qui seront réellement créés, une fois les arbitrages appliqués. */
   materializableCount: number;
 }
@@ -185,18 +282,36 @@ export const importPrecheck = (
   preview: ImportPreviewResult,
   decisions: ImportDecisions,
 ): ImportPrecheck => {
+  const photo = isPhotoPreview(preview);
   const needsCategory = productsNeedingCategory(preview, decisions);
-  const unresolvedTva = unresolvedTvaRates(preview, decisions);
+  // Porte photo : la TVA se choisit produit par produit (tva_per_product,
+  // toujours envoyé) ; les couples taux + canal ne servent plus.
+  const unresolvedTva = photo ? [] : unresolvedTvaRates(preview, decisions);
   const collisions = unresolvedCollisions(preview, decisions);
+  const needsTva = productsNeedingTva(preview, decisions);
+  const tvaNotConfirmed = photo && !decisions.tva_confirmed;
+
+  // Un groupe réduit à moins de deux déclinaisons ne sera pas créé.
+  const createdGroups = photo ? createdGroupIds(preview, decisions) : null;
+  const materializableCount = preview.products.filter(
+    (product) =>
+      isMaterializable(product, decisions) &&
+      (!product.is_group || !createdGroups || createdGroups.has(product.external_id)),
+  ).length;
 
   return {
     canCommit:
-      needsCategory.length === 0 && unresolvedTva.length === 0 && collisions.length === 0,
+      needsCategory.length === 0 &&
+      unresolvedTva.length === 0 &&
+      collisions.length === 0 &&
+      needsTva.length === 0 &&
+      !tvaNotConfirmed,
     needsCategory,
     unresolvedTva,
     unresolvedCollisions: collisions,
-    materializableCount: preview.products.filter((product) => isMaterializable(product, decisions))
-      .length,
+    needsTva,
+    tvaNotConfirmed,
+    materializableCount,
   };
 };
 
@@ -243,7 +358,7 @@ export const buildImportDecisions = (
     }
   }
 
-  return {
+  const built: ImportDecisions = {
     tag_classification: tagClassification,
     category_per_product: categoryPerProduct,
     tva_mapping: { ...decisions.tva_mapping },
@@ -254,6 +369,38 @@ export const buildImportDecisions = (
     // uniquement un choix de l'utilisateur qui transite tel quel.
     excluded_products: { ...decisions.excluded_products },
   };
+
+  if (isPhotoPreview(preview)) {
+    // Nature, groupe, prix et TVA explicites pour chaque produit, comme la
+    // classification : ce qui est affiché est exactement ce qui est appliqué.
+    const kindPerProduct: Record<string, ImportProductKind> = {};
+    const groupPerProduct: Record<string, string> = {};
+    const pricePerProduct: Record<string, ImportChannelPrices> = {};
+    const tvaPerProduct: Record<string, ImportChannelTvaIds> = {};
+    for (const product of preview.products) {
+      const kind = effectiveKind(product, decisions);
+      if (kind) kindPerProduct[product.external_id] = kind;
+      // Un groupe n'a ni prix ni TVA propres (refusés par l'API).
+      if (product.is_group) continue;
+      groupPerProduct[product.external_id] = effectiveParent(product, decisions);
+      const prices = {} as ImportChannelPrices;
+      const tvaIds: ImportChannelTvaIds = {};
+      for (const { key } of IMPORT_CHANNELS) {
+        prices[key] = effectivePrice(product, key, decisions);
+        const tvaId = effectiveTvaId(product, key, decisions);
+        if (tvaId !== undefined) tvaIds[key] = tvaId;
+      }
+      pricePerProduct[product.external_id] = prices;
+      tvaPerProduct[product.external_id] = tvaIds;
+    }
+    built.kind_per_product = kindPerProduct;
+    built.group_per_product = groupPerProduct;
+    built.price_per_product = pricePerProduct;
+    built.tva_per_product = tvaPerProduct;
+    built.tva_confirmed = Boolean(decisions.tva_confirmed);
+  }
+
+  return built;
 };
 
 /** Indexe les blocages d'un 422 par entité, pour les rendre au bon endroit. */
