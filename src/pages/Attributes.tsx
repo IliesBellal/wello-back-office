@@ -124,7 +124,10 @@ function ListView({ attributes, components, onNew, onEdit, onDelete }: ListViewP
             <Card key={attr.id} className="flex flex-col">
               <CardHeader className="flex flex-row items-start justify-between pb-2">
                 <div className="space-y-1">
-                  <CardTitle className="text-base">{attr.title}</CardTitle>
+                  <CardTitle className="text-base">{attr.name?.trim() || attr.title}</CardTitle>
+                  {attr.name?.trim() && attr.title && attr.title !== attr.name && (
+                    <p className="text-sm text-muted-foreground">{attr.title}</p>
+                  )}
                   <div className="flex items-center gap-2">
                     <Badge variant="secondary" className="text-xs">
                       {getAttrType(attr)}
