@@ -166,6 +166,7 @@ export interface BulkAvailabilityFields {
   available_take_away?: boolean;
   available_delivery?: boolean;
   is_available_on_sno?: boolean;
+  is_available_on_kiosk?: boolean;
   sync_uber_eats?: boolean;
   sync_deliveroo?: boolean;
 }

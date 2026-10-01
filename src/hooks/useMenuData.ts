@@ -653,6 +653,7 @@ export const useMenuData = () => {
       if (fields.available_take_away !== undefined) next.available_take_away = fields.available_take_away;
       if (fields.available_delivery !== undefined) next.available_delivery = fields.available_delivery;
       if (fields.is_available_on_sno !== undefined) next.is_available_on_sno = fields.is_available_on_sno;
+      if (fields.is_available_on_kiosk !== undefined) next.is_available_on_kiosk = fields.is_available_on_kiosk;
       if (fields.sync_uber_eats !== undefined || fields.sync_deliveroo !== undefined) {
         next.integrations = {
           ...p.integrations,

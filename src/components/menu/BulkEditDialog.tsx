@@ -45,6 +45,7 @@ import {
   Store,
   ShoppingBag,
   Truck,
+  MonitorSmartphone,
   Percent,
   Search,
   SlidersHorizontal,
@@ -76,7 +77,7 @@ type BulkAction =
 type AvailabilityValue = 'unchanged' | 'enable' | 'disable';
 
 /** Canal de disponibilité piloté par l'écran « Définir les disponibilités ». */
-type AvailabilityChannel = 'on_site' | 'take_away' | 'delivery' | 'scannorder' | 'uber_eats' | 'deliveroo';
+type AvailabilityChannel = 'on_site' | 'take_away' | 'delivery' | 'scannorder' | 'kiosk' | 'uber_eats' | 'deliveroo';
 
 const AVAILABILITY_CHANNELS: {
   key: AvailabilityChannel;
@@ -88,6 +89,7 @@ const AVAILABILITY_CHANNELS: {
   { key: 'take_away', label: 'Emporter', icon: ShoppingBag },
   { key: 'delivery', label: 'Livraison', icon: Truck },
   { key: 'scannorder', label: 'ScanNOrder', imageSrc: '/scannorder_logo.png' },
+  { key: 'kiosk', label: 'Borne de commande', icon: MonitorSmartphone },
   { key: 'uber_eats', label: 'Uber Eats', imageSrc: '/uber_eats_logo.png' },
   { key: 'deliveroo', label: 'Deliveroo', imageSrc: '/deliveroo_logo.png' },
 ];
@@ -97,6 +99,7 @@ const DEFAULT_AVAILABILITY_FIELDS: Record<AvailabilityChannel, AvailabilityValue
   take_away: 'unchanged',
   delivery: 'unchanged',
   scannorder: 'unchanged',
+  kiosk: 'unchanged',
   uber_eats: 'unchanged',
   deliveroo: 'unchanged',
 };
@@ -111,6 +114,7 @@ const toBulkAvailabilityFields = (
     available_take_away: toBool(values.take_away),
     available_delivery: toBool(values.delivery),
     is_available_on_sno: toBool(values.scannorder),
+    is_available_on_kiosk: toBool(values.kiosk),
     sync_uber_eats: toBool(values.uber_eats),
     sync_deliveroo: toBool(values.deliveroo),
   };
@@ -289,7 +293,7 @@ const ACTIONS: {
   {
     value: 'set_availability',
     label: 'Définir les disponibilités',
-    hint: 'Active ou désactive sur place, emporter, livraison, ScanNOrder et les plateformes de livraison, canal par canal.',
+    hint: 'Active ou désactive sur place, emporter, livraison, ScanNOrder, borne de commande et les plateformes de livraison, canal par canal.',
     icon: SlidersHorizontal,
   },
 ];
@@ -952,6 +956,7 @@ export const BulkEditDialog = ({
                     <div className="space-y-2">
                       {AVAILABILITY_CHANNELS.filter(
                         ({ key }) =>
+                          (key !== 'kiosk' || statuses.kiosks.active) &&
                           (key !== 'uber_eats' || statuses.uberEats.active) &&
                           (key !== 'deliveroo' || statuses.deliveroo.active)
                       ).map(({ key, label, icon: Icon, imageSrc }) => (
