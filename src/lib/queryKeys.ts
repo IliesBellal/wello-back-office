@@ -136,6 +136,11 @@ export const qk = {
   menuProducts: {
     all: ["menu", "products"] as const,
   },
+  // Catégories de caisse (menuService.getMenuData) : la relecture de l'import
+  // par photo les propose comme catégories cibles.
+  menuCategories: {
+    all: ["menu", "categories"] as const,
+  },
 
   // ─── Kiosks ───────────────────────────────────────────────
   kiosks: {

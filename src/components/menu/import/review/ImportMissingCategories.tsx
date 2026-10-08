@@ -1,14 +1,5 @@
-import { useState } from 'react';
-import { CheckCircle2, Wand2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -17,17 +8,23 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { ImportCategoryOption } from '@/lib/importDecisions';
+import type { ImportCategoryOption, ImportCategoryTarget } from '@/lib/importDecisions';
 import type { ImportPreviewProduct } from '@/types/import';
+
+import { ImportCategorySelect } from './ImportCategorySelect';
 
 interface ImportMissingCategoriesProps {
   products: ImportPreviewProduct[];
   options: ImportCategoryOption[];
-  categoryPerProduct: Record<string, string>;
+  /**
+   * Porte photo : catégories de la caisse proposées, et création d'une
+   * nouvelle catégorie possible.
+   */
+  merchantCategories?: string[];
+  allowCreate?: boolean;
   blockersByRef: Map<string, string[]>;
   disabled: boolean;
-  onAssign: (productExternalId: string, categoryExternalId: string) => void;
-  onAssignAll: (productExternalIds: string[], categoryExternalId: string) => void;
+  onAssign: (productExternalIds: string[], target: ImportCategoryTarget) => void;
 }
 
 /**
@@ -41,14 +38,12 @@ interface ImportMissingCategoriesProps {
 export const ImportMissingCategories = ({
   products,
   options,
-  categoryPerProduct,
+  merchantCategories,
+  allowCreate = false,
   blockersByRef,
   disabled,
   onAssign,
-  onAssignAll,
 }: ImportMissingCategoriesProps) => {
-  const [bulkCategory, setBulkCategory] = useState('');
-
   if (products.length === 0) {
     return (
       <div className="flex items-center gap-2 rounded-lg border bg-card p-4 text-sm text-muted-foreground">
@@ -58,7 +53,7 @@ export const ImportMissingCategories = ({
     );
   }
 
-  if (options.length === 0) {
+  if (options.length === 0 && !allowCreate) {
     return (
       <p className="text-sm text-destructive">
         Aucune catégorie disponible. Classez au moins un libellé en « Catégorie » dans la section
@@ -69,37 +64,25 @@ export const ImportMissingCategories = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border border-dashed p-4 sm:flex-row sm:items-end">
-        <div className="flex-1 space-y-1.5">
-          <p className="text-sm font-medium">
-            Affecter la même catégorie aux {products.length} produit(s) sans catégorie
-          </p>
-          <Select value={bulkCategory} onValueChange={setBulkCategory} disabled={disabled}>
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Choisir une catégorie" />
-            </SelectTrigger>
-            <SelectContent>
-              {options.map((option) => (
-                <SelectItem key={option.externalId} value={option.externalId}>
-                  {option.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button
-          variant="secondary"
-          disabled={disabled || !bulkCategory}
-          onClick={() =>
-            onAssignAll(
+      <div className="space-y-1.5 rounded-lg border border-dashed p-4">
+        <p className="text-sm font-medium">
+          Affecter la même catégorie aux {products.length} produit(s) sans catégorie
+        </p>
+        <ImportCategorySelect
+          value={null}
+          options={options}
+          merchantCategories={merchantCategories}
+          allowCreate={allowCreate}
+          disabled={disabled}
+          className="h-9"
+          ariaLabel="Catégorie de tous les produits sans catégorie"
+          onChange={(target) =>
+            onAssign(
               products.map((product) => product.external_id),
-              bulkCategory,
+              target,
             )
           }
-        >
-          <Wand2 className="mr-2 h-4 w-4" />
-          Tout affecter
-        </Button>
+        />
       </div>
 
       <div className="overflow-auto rounded-lg border bg-card">
@@ -131,22 +114,16 @@ export const ImportMissingCategories = ({
                   </TableCell>
 
                   <TableCell>
-                    <Select
-                      value={categoryPerProduct[product.external_id] ?? ''}
+                    <ImportCategorySelect
+                      value={null}
+                      options={options}
+                      merchantCategories={merchantCategories}
+                      allowCreate={allowCreate}
                       disabled={disabled}
-                      onValueChange={(value) => onAssign(product.external_id, value)}
-                    >
-                      <SelectTrigger className="h-9">
-                        <SelectValue placeholder="Choisir une catégorie" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {options.map((option) => (
-                          <SelectItem key={option.externalId} value={option.externalId}>
-                            {option.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      className="h-9"
+                      ariaLabel={`Catégorie de ${product.name}`}
+                      onChange={(target) => onAssign([product.external_id], target)}
+                    />
                   </TableCell>
                 </TableRow>
               );

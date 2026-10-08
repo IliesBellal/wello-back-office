@@ -1,6 +1,7 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from '@/services/apiClient';
 import { getStoredAuthToken } from '@/types/auth';
 import { toUTCDateString } from '@/utils/apiDate';
+import type { ClosingMode } from '@/services/financialReportsService';
 
 // ============= TYPES =============
 export interface CashRegisterHistoryRecord {
@@ -24,6 +25,8 @@ export interface CashRegisterHistoryRecord {
   total_revenue: number; // en centimes
   transaction_count: number;
   payment_methods?: CashRegisterPaymentMethod[];
+  /** MANUAL (relevé de caisse) ou AUTO (clôture automatique, sans relevé). */
+  closing_mode?: ClosingMode;
 }
 
 export interface CashRegisterPaymentMethod {
@@ -98,6 +101,7 @@ interface CashRegisterApiRecord {
   total_revenu?: number;
   transaction_count?: number;
   payment_methods?: CashRegisterPaymentMethod[];
+  closing_mode?: string;
 }
 
 // ============= MOCK DATA =============
@@ -147,6 +151,9 @@ const generateMockRegisters = (): CashRegisterHistoryRecord[] => {
 
 const mockRegisters = generateMockRegisters();
 
+const toClosingMode = (value?: string): ClosingMode =>
+  String(value ?? '').toUpperCase() === 'AUTO' ? 'AUTO' : 'MANUAL';
+
 const mapApiRegisterToHistoryRecord = (register: CashRegisterApiRecord): CashRegisterHistoryRecord => ({
   id: register.cash_register_id,
   register_number: register.cash_register_id,
@@ -165,6 +172,7 @@ const mapApiRegisterToHistoryRecord = (register: CashRegisterApiRecord): CashReg
   total_revenue: register.total_revenu ?? 0,
   transaction_count: register.transaction_count ?? 0,
   payment_methods: register.payment_methods,
+  closing_mode: toClosingMode(register.closing_mode),
 });
 
 export const getCashRegisterById = async (
@@ -195,6 +203,7 @@ export const getCashRegisterById = async (
             total_revenu: number;
             transaction_count: number;
             payment_methods: CashRegisterPaymentMethod[];
+            closing_mode?: string;
             hash_prefix: string;
             cash_desk: {
               cash_desk_id: string;
@@ -225,6 +234,7 @@ export const getCashRegisterById = async (
         total_revenue: payload.total_revenu,
         transaction_count: payload.transaction_count,
         payment_methods: payload.payment_methods,
+        closing_mode: toClosingMode(payload.closing_mode),
       };
     }
   );

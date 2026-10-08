@@ -13,18 +13,15 @@ import {
   exportVATCSV,
   generateVATExportFilename,
   downloadCSV,
+  vatChannels,
   vatOrderTypes,
   type VATCalculationResponse,
 } from '@/services/vatService';
-import { toUTCDateString } from '@/utils/apiDate';
+import { toLocalDateString } from '@/utils/apiDate';
 import { Download, AlertCircle, DollarSign, Percent, Search } from 'lucide-react';
 
-const vatSalesChannelOptions = [
-  { id: 'restaurant', label: 'Restaurant' },
-  { id: 'ubereats', label: 'Uber Eats' },
-  { id: 'deliveroo', label: 'Deliveroo' },
-  { id: 'scannorder', label: 'ScannOrder' },
-];
+// Mêmes canaux que l'export comptable (orders.order_source).
+const vatSalesChannelOptions = vatChannels;
 
 const vatOrderTypeLabels: Record<string, string> = {
   in: 'Sur place',
@@ -121,8 +118,8 @@ const VAT = () => {
         parsedOrderTypes.length > 0 ? parsedOrderTypes : undefined
       );
       const filename = generateVATExportFilename(
-        toUTCDateString(dateRange.from),
-        toUTCDateString(dateRange.to)
+        toLocalDateString(dateRange.from),
+        toLocalDateString(dateRange.to)
       );
 
       downloadCSV(blob, filename);
@@ -194,7 +191,9 @@ const VAT = () => {
             <div className="space-y-2">
               <h1 className="text-3xl font-bold">Déclaration de TVA</h1>
               <p className="text-sm text-muted-foreground">
-                Visualisez et exportez les données de TVA collectée
+                Visualisez et exportez les données de TVA collectée — mêmes montants que l'export
+                comptable (remises de caisse déduites ; en clôture automatique, TVA ventilée à partir
+                des encaissements)
               </p>
             </div>
             <Button

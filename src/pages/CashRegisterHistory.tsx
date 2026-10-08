@@ -18,6 +18,7 @@ import {
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { ExpandableDataTable } from '@/components/shared/ExpandableDataTable';
 import { ClosureModal } from '@/components/cash/ClosureModal';
+import { AccountingExportDialog } from '@/components/cash/AccountingExportDialog';
 import { Tile } from '@/components/shared/Tile';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -26,7 +27,6 @@ import {
   getCashRegisterHistory,
 } from '@/services/cashRegisterHistoryService';
 import { closeCashRegister } from '@/services/cashRegisterService';
-import { financialReportsService } from '@/services/financialReportsService';
 import { getCashRegisterStatus } from '@/lib/cashRegisterStatus';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -73,6 +73,7 @@ const CashRegisterHistory = () => {
   const [selectedRegisterToClose, setSelectedRegisterToClose] = useState<CashRegisterHistoryRecord | null>(null);
   const [closeConfirmDialogOpen, setCloseConfirmDialogOpen] = useState(false);
   const [closingRegisterId, setClosingRegisterId] = useState<string | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
 
   const { toast } = useToast();
 
@@ -122,9 +123,13 @@ const CashRegisterHistory = () => {
         )
       );
 
+      // Clôture automatique : l'API valide le registre dès sa fermeture, il
+      // n'y a pas de relevé de caisse à saisir.
       toast({
         title: 'Succès',
-        description: 'Registre fermé avec succès',
+        description: updatedRegister.enclosed
+          ? 'Registre fermé et clôturé automatiquement (aucun relevé à saisir).'
+          : 'Registre fermé avec succès',
       });
 
       setCloseConfirmDialogOpen(false);
@@ -140,20 +145,8 @@ const CashRegisterHistory = () => {
     }
   };
 
-  const handleExportGlobal = async () => {
-    try {
-      const result = await financialReportsService.exportGlobal(
-        dateRange.from,
-        dateRange.to
-      );
-      window.open(result.download_url, '_blank');
-    } catch (error) {
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de générer l\'export comptable',
-        variant: 'destructive',
-      });
-    }
+  const handleExportGlobal = () => {
+    setExportDialogOpen(true);
   };
 
   const handleEncloseSuccess = async () => {
@@ -413,6 +406,12 @@ const CashRegisterHistory = () => {
                           <span className="text-muted-foreground">Clôturé par :</span>
                           <span className="font-medium">{register.closed_by_name || '-'}</span>
                         </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Mode de clôture :</span>
+                          <span className="font-medium">
+                            {register.closing_mode === 'AUTO' ? 'Automatique' : 'Manuelle (relevé de caisse)'}
+                          </span>
+                        </div>
                         <div className="flex justify-between md:col-span-2">
                           <span className="text-muted-foreground">Commentaire de clôture :</span>
                           <span className="font-medium text-right">{register.closure_comment || '-'}</span>
@@ -475,6 +474,12 @@ const CashRegisterHistory = () => {
         </div>
         </div>
       </PageContainer>
+
+      <AccountingExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        dateRange={dateRange}
+      />
 
       <ClosureModal
         register={selectedRegisterForEnclose}

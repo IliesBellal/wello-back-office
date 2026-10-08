@@ -12,7 +12,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { effectiveParent, effectivePrice, effectiveTvaId, groupVariants } from '@/lib/importDecisions';
+import {
+  effectiveParent,
+  effectivePrice,
+  effectiveTvaId,
+  groupVariants,
+  resolveProductCategory,
+  type ImportCategoryOption,
+  type ImportCategoryTarget,
+} from '@/lib/importDecisions';
 import { parseDecimalInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import {
   IMPORT_CHANNELS,
@@ -24,15 +32,21 @@ import {
 } from '@/types/import';
 import type { TvaRate, TvaRateGroup } from '@/types/menu';
 
+import { ImportCategorySelect } from './ImportCategorySelect';
+
 interface ImportPhotoProductsProps {
   preview: ImportPreviewResult;
   decisions: ImportDecisions;
   photoDraft: ImportPhotoDraft | null;
   tvaGroups: TvaRateGroup[];
   loadingRates: boolean;
+  categoryOptions: ImportCategoryOption[];
+  /** Noms des catégories déjà présentes dans la caisse. */
+  merchantCategories: string[];
   blockersByRef: Map<string, string[]>;
   disabled: boolean;
   onExclude: (productExternalId: string, excluded: boolean) => void;
+  onCategory: (productExternalId: string, target: ImportCategoryTarget) => void;
   onGroup: (productExternalId: string, groupExternalId: string) => void;
   onPrice: (product: ImportPreviewProduct, channel: ImportChannel, cents: number) => void;
   onTva: (productExternalId: string, channel: ImportChannel, tvaId: number) => void;
@@ -96,6 +110,8 @@ const PriceInput = ({
  * Relecture propre à la porte photo : ce que l'IA a lu, ligne par ligne.
  *
  * - inclure ou écarter une ligne mal lue (`excluded_products`) ;
+ * - catégorie (`category_per_product`) : une catégorie lue, une catégorie de
+ *   la caisse ou une nouvelle (`added_categories`) ;
  * - groupe de déclinaisons (`group_per_product`) : un groupe n'est créé que
  *   s'il garde au moins deux déclinaisons — la règle de l'API ;
  * - prix (`price_per_product`) et TVA (`tva_per_product`) de chaque canal. La
@@ -113,9 +129,12 @@ export const ImportPhotoProducts = ({
   photoDraft,
   tvaGroups,
   loadingRates,
+  categoryOptions,
+  merchantCategories,
   blockersByRef,
   disabled,
   onExclude,
+  onCategory,
   onGroup,
   onPrice,
   onTva,
@@ -196,6 +215,7 @@ export const ImportPhotoProducts = ({
               <TableHead className="w-10" />
               <TableHead className="w-14">Photo</TableHead>
               <TableHead className="min-w-[200px]">Produit</TableHead>
+              <TableHead className="min-w-[170px]">Catégorie</TableHead>
               {groups.length > 0 && <TableHead className="min-w-[150px]">Groupe</TableHead>}
               {IMPORT_CHANNELS.map((channel) => (
                 <TableHead key={channel.key} className="min-w-[150px]">
@@ -209,6 +229,7 @@ export const ImportPhotoProducts = ({
             {products.map((product) => {
               const excluded = Boolean(decisions.excluded_products[product.external_id]);
               const parent = effectiveParent(product, decisions);
+              const category = resolveProductCategory(product, preview, decisions);
               const blockers = blockersByRef.get(product.external_id);
               const flagged = product.confidence === 'low' || (product.issues?.length ?? 0) > 0;
               const url = photoUrl(product.source_photo);
@@ -256,6 +277,18 @@ export const ImportPhotoProducts = ({
                         {message}
                       </p>
                     ))}
+                  </TableCell>
+                  <TableCell>
+                    <ImportCategorySelect
+                      value={category}
+                      options={categoryOptions}
+                      merchantCategories={merchantCategories}
+                      allowCreate
+                      disabled={disabled || excluded}
+                      invalid={category === null && !excluded}
+                      ariaLabel={`Catégorie de ${product.name}`}
+                      onChange={(target) => onCategory(product.external_id, target)}
+                    />
                   </TableCell>
                   {groups.length > 0 && (
                     <TableCell>

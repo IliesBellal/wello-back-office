@@ -34,55 +34,37 @@ const getMonthLabel = (monthStr: string): string => {
   }
 };
 
+// Libellé d'un taux renvoyé par l'API (« 10.0 », « 5.5 », « 20 »).
+const formatRateLabel = (rateKey: string): string => {
+  const rate = Number.parseFloat(rateKey);
+  if (!Number.isFinite(rate)) return `TVA ${rateKey}%`;
+  return `TVA ${rate.toLocaleString('fr-FR', { maximumFractionDigits: 1 })}%`;
+};
+
 export const VATBreakdownTable = ({ data, loading = false }: VATBreakdownTableProps) => {
-  // Calculate totals
+  // Colonnes de TVA par taux : celles présentes dans les données (vat_by_rate),
+  // triées par taux. Jusqu'au 2026-10-05 le tableau lisait des champs vat_10 /
+  // vat_5_5… que l'API ne renvoie pas : ces colonnes restaient à 0.
+  const rateKeys = Array.from(
+    new Set(data.flatMap((row) => Object.keys(row.vat_by_rate ?? {})))
+  ).sort((a, b) => Number.parseFloat(a) - Number.parseFloat(b));
+
+  const rateValue = (row: MonthlyBreakdown, rateKey: string) => row.vat_by_rate?.[rateKey] ?? 0;
+
   const totals = {
     revenue_ht: 0,
-    vat_10: 0,
-    vat_5_5: 0,
-    vat_20: 0,
-    vat_2_1: 0,
     vat_total: 0,
     revenue_ttc: 0,
+    byRate: {} as Record<string, number>,
   };
-
   data.forEach((row) => {
     totals.revenue_ht += row.revenue_ht;
-    totals.vat_10 += row.vat_10 || 0;
-    totals.vat_5_5 += row.vat_5_5 || 0;
-    totals.vat_20 += row.vat_20 || 0;
-    totals.vat_2_1 += row.vat_2_1 || 0;
     totals.vat_total += row.vat_total;
     totals.revenue_ttc += row.revenue_ttc;
+    rateKeys.forEach((rateKey) => {
+      totals.byRate[rateKey] = (totals.byRate[rateKey] ?? 0) + rateValue(row, rateKey);
+    });
   });
-
-  // Determine which VAT columns to show
-  const vatRates = [
-    {
-      key: 'vat_10',
-      label: 'TVA 10%',
-      value: (row: MonthlyBreakdown) => row.vat_10 || 0,
-    },
-    {
-      key: 'vat_5_5',
-      label: 'TVA 5.5%',
-      value: (row: MonthlyBreakdown) => row.vat_5_5 || 0,
-    },
-    {
-      key: 'vat_20',
-      label: 'TVA 20%',
-      value: (row: MonthlyBreakdown) => row.vat_20 || 0,
-    },
-    {
-      key: 'vat_2_1',
-      label: 'TVA 2.1%',
-      value: (row: MonthlyBreakdown) => row.vat_2_1 || 0,
-    },
-  ];
-
-  const activeRates = vatRates.filter(
-    (rate) => data.some((row) => rate.value(row) > 0) || totals[rate.key as keyof typeof totals] > 0
-  );
 
   if (loading) {
     return (
@@ -109,9 +91,9 @@ export const VATBreakdownTable = ({ data, loading = false }: VATBreakdownTablePr
           <TableRow className="bg-muted/50">
             <TableHead className="font-semibold min-w-40">Période</TableHead>
             <TableHead className="text-right">CA HT</TableHead>
-            {activeRates.map((rate) => (
-              <TableHead key={rate.key} className="text-right">
-                {rate.label}
+            {rateKeys.map((rateKey) => (
+              <TableHead key={rateKey} className="text-right">
+                {formatRateLabel(rateKey)}
               </TableHead>
             ))}
             <TableHead className="text-right font-semibold">TVA Totale</TableHead>
@@ -122,14 +104,19 @@ export const VATBreakdownTable = ({ data, loading = false }: VATBreakdownTablePr
           {data.map((row, idx) => (
             <TableRow key={idx} className="hover:bg-muted/30">
               <TableCell className="font-medium">
-                {getMonthLabel(row.month)}
+                <p>{getMonthLabel(row.month)}</p>
+                {row.closing_mode && (
+                  <p className="text-xs font-normal text-muted-foreground">
+                    {row.closing_mode === 'AUTO' ? 'Clôture automatique' : 'Clôture manuelle'}
+                  </p>
+                )}
               </TableCell>
               <TableCell className="text-right font-mono">
                 {formatCurrency(row.revenue_ht)}
               </TableCell>
-              {activeRates.map((rate) => (
-                <TableCell key={rate.key} className="text-right font-mono text-sm">
-                  {formatCurrency(rate.value(row))}
+              {rateKeys.map((rateKey) => (
+                <TableCell key={rateKey} className="text-right font-mono text-sm">
+                  {formatCurrency(rateValue(row, rateKey))}
                 </TableCell>
               ))}
               <TableCell className="text-right font-semibold font-mono text-primary">
@@ -152,11 +139,11 @@ export const VATBreakdownTable = ({ data, loading = false }: VATBreakdownTablePr
               {formatCurrency(totals.revenue_ht)}
             </p>
           </div>
-          {activeRates.map((rate) => (
-            <div key={rate.key}>
-              <p className="text-xs text-muted-foreground mb-1">{rate.label}</p>
+          {rateKeys.map((rateKey) => (
+            <div key={rateKey}>
+              <p className="text-xs text-muted-foreground mb-1">{formatRateLabel(rateKey)}</p>
               <p className="text-lg font-bold font-mono">
-                {formatCurrency(totals[rate.key as keyof typeof totals] as number)}
+                {formatCurrency(totals.byRate[rateKey] ?? 0)}
               </p>
             </div>
           ))}

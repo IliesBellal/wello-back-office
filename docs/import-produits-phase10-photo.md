@@ -91,6 +91,16 @@ Le test sur staging a fonctionné. La relecture d'Ilies a donné ces changements
 - **Formules** : sans changement côté back-office. Une formule à choix simples arrive comme un produit ordinaire, avec ses groupes d'options et la mention « À vérifier ». Les autres restent dans « Points d'attention », avec la suggestion de créer une promotion ou un produit « Menu … ».
 - `PRODUCT_KINDS` et `setProductKind` sont supprimés, car plus rien ne les affichait. Le type `ImportProductKind` reste, pour `kind_per_product`, toujours envoyé.
 
+### D8 — Catégorie modifiable en relecture (2026-10-06)
+Retour d'Ilies : impossible de renseigner une catégorie non lue, ni de corriger une catégorie mal lue. Côté API : `ib-welloresto-api/docs/import-carte-ia-03-porte-ia.md`, D19.
+- **Colonne « Catégorie »** dans le tableau des produits lus (`ImportCategorySelect`). La liste propose :
+  - les catégories de l'import (lues, ou ajoutées en relecture) ;
+  - les catégories déjà présentes dans la caisse (`GET /menu/products`, porte photo seulement), sauf celles qui portent déjà le nom d'une catégorie de l'import ;
+  - « Nouvelle catégorie… », qui ouvre une saisie du nom.
+- **Décision envoyée :** `added_categories` (`{référence: nom}`), avec des références locales `added-N` citées dans `category_per_product`. Un nom déjà proposé est réutilisé plutôt que dupliqué (`resolveCategoryTarget`). Seules les catégories ajoutées encore affectées à un produit partent au commit.
+- **Section « Produits sans catégorie »** : mêmes choix pour la porte photo, y compris quand aucune catégorie n'a été lue. Le choix groupé s'applique dès la sélection (le bouton « Tout affecter » disparaît).
+- `setProductCategory` et `assignCategoryToAll` sont remplacés par `assignCategory(produits, cible)`, la cible étant une catégorie de l'import ou un nom.
+
 ## 3. Implémentation
 
 | Fichier | Contenu |

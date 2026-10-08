@@ -691,7 +691,7 @@ export const GroupProductSheet = ({
   if (isMobile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="!h-screen !max-h-screen !w-screen !p-0 !gap-0 !rounded-none flex flex-col overflow-y-auto px-4 py-4">
+        <DialogContent className="!h-dvh !max-h-dvh !w-screen !p-0 !gap-0 !rounded-none flex flex-col overflow-y-auto px-4 py-4">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-sm font-semibold truncate">{title}</h2>
             <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="h-8 w-8">

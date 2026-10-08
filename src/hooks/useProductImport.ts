@@ -2,7 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
-import { buildImportDecisions, effectivePrice, importPrecheck } from '@/lib/importDecisions';
+import {
+  buildImportDecisions,
+  effectivePrice,
+  importPrecheck,
+  resolveCategoryTarget,
+  type ImportCategoryTarget,
+} from '@/lib/importDecisions';
 import { MAX_MENU_PHOTOS, normalizeMenuPhotos } from '@/lib/menuPhotos';
 import {
   buildManualPayload,
@@ -259,37 +265,37 @@ export const useProductImport = () => {
     [patchDecisions],
   );
 
-  const setProductCategory = useCallback(
-    (productExternalId: string, categoryExternalId: string) => {
-      patchDecisions((current) => ({
-        ...current,
-        category_per_product: {
-          ...current.category_per_product,
-          [productExternalId]: categoryExternalId,
-        },
-      }));
-    },
-    [patchDecisions],
-  );
-
   /**
-   * Affecte une catégorie à tous les produits qui en manquent.
+   * Affecte une catégorie à un ou plusieurs produits. Une cible par nom
+   * (catégorie de la caisse, nouvelle catégorie — porte photo) est d'abord
+   * ajoutée aux décisions.
    *
-   * Indispensable en pratique : un export réel arrive avec une poignée de
-   * lignes sans libellé (frais de livraison, frais de service) qu'on ne veut
-   * pas trancher une par une.
+   * L'affectation groupée est indispensable en pratique : un export réel
+   * arrive avec une poignée de lignes sans libellé (frais de livraison, frais
+   * de service) qu'on ne veut pas trancher une par une.
    */
-  const assignCategoryToAll = useCallback(
-    (productExternalIds: string[], categoryExternalId: string) => {
-      patchDecisions((current) => {
-        const next = { ...current.category_per_product };
+  const assignCategory = useCallback(
+    (productExternalIds: string[], target: ImportCategoryTarget) => {
+      setState((previous) => {
+        if (!previous.preview || !previous.decisions) return previous;
+        const { decisions, externalId } = resolveCategoryTarget(
+          previous.preview,
+          previous.decisions,
+          target,
+        );
+        const next = { ...decisions.category_per_product };
         for (const productId of productExternalIds) {
-          next[productId] = categoryExternalId;
+          next[productId] = externalId;
         }
-        return { ...current, category_per_product: next };
+        return {
+          ...previous,
+          decisions: { ...decisions, category_per_product: next },
+          blockers: [],
+          error: null,
+        };
       });
     },
-    [patchDecisions],
+    [],
   );
 
   const setTvaId = useCallback(
@@ -690,8 +696,7 @@ export const useProductImport = () => {
     submitMerchantSource,
 
     setTagClass,
-    setProductCategory,
-    assignCategoryToAll,
+    assignCategory,
     setTvaId,
     setCollisionResolution,
     setReimportResolution,

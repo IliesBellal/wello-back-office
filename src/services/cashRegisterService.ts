@@ -1,5 +1,6 @@
 import { apiClient, withMock, logAPI } from '@/services/apiClient';
 import { toUTCDateString } from '@/utils/apiDate';
+import type { ClosingMode } from '@/services/financialReportsService';
 
 // ============= Types =============
 export interface CashRegister {
@@ -33,12 +34,21 @@ export interface ServerSummary {
 export interface CashRegisterSummary {
   cash_fund: number;
   final_cash_fund?: number;
+  /** Théorique : encaissements par moyen de paiement, remises exclues. */
   items: SummaryItem[];
+  /** Relevé de caisse saisi, remises exclues. */
   custom_items: CustomItem[];
   closed?: boolean;
   enclosed: boolean;
   enclose_comment?: string;
   users_summary?: ServerSummary[];
+  /**
+   * Mode de clôture inscrit sur le registre : MANUAL (relevé de caisse) ou
+   * AUTO (fermeture sans relevé, validée automatiquement). Ancienne API : MANUAL.
+   */
+  closing_mode: ClosingMode;
+  /** Remises de caisse accordées (centimes), hors encaissements — information. */
+  discounts: number;
 }
 
 export interface TvaDetailItem {
@@ -84,6 +94,9 @@ export interface CashRegisterTvaBreakdown {
   cash_report: CashRegisterTvaDeliveryGroup[];
   mop: { mop: string; amount: number; label?: string }[];
   cash_report_type: string;
+  /** Ventes brutes TTC et remises de caisse : TTC = ventes nettes (base de la TVA). */
+  gross_ttc?: number;
+  discounts?: number;
 }
 
 interface ApiEnvelope<T> {
@@ -133,6 +146,8 @@ interface ApiCashRegisterSummaryPayload {
   items?: ApiSummaryItem[];
   custom_items?: ApiCustomItem[] | null;
   payments?: ApiPaymentItem[];
+  closing_mode?: string;
+  discounts?: number;
 }
 
 type SummaryApiShape =
@@ -176,6 +191,8 @@ const mockRegisters: CashRegister[] = [
 ];
 
 const mockSummary: CashRegisterSummary = {
+  closing_mode: 'MANUAL',
+  discounts: 0,
   cash_fund: 15000,
   final_cash_fund: 31900,
   items: [
@@ -268,6 +285,27 @@ const toBool = (value: unknown): boolean => {
   return false;
 };
 
+// Remises de caisse enregistrées comme des « paiements » par l'app de caisse
+// (« Réduction montant / pourcentage ») : ce ne sont pas des encaissements.
+// Comme Square ou Lightspeed, elles n'apparaissent ni dans le théorique, ni
+// dans le relevé, ni dans l'écart. L'API les retire déjà du résumé ; filtrage
+// gardé ici pour une API qui ne le ferait pas encore. Reconnues par code
+// serveur ou par libellé (une ligne de relevé « Réduction montant » n'a pas
+// de code).
+const DISCOUNT_CODES = new Set(['CURRENCY', 'PERCENTAGE', 'DISCOUNT']);
+const DISCOUNT_LABELS = new Set([
+  'CURRENCY',
+  'PERCENTAGE',
+  'DISCOUNT',
+  'RÉDUCTION MONTANT',
+  'RÉDUCTION POURCENTAGE',
+  'RÉDUCTION MONTA.',
+]);
+
+export const isDiscountPayment = (code?: string, label?: string): boolean =>
+  DISCOUNT_CODES.has((code ?? '').trim().toUpperCase()) ||
+  DISCOUNT_LABELS.has((label ?? '').trim().toUpperCase());
+
 const normalizeMopCode = (value: string | undefined): string => {
   const raw = (value ?? '').toUpperCase();
   if (raw === 'ES' || raw === 'CASH') return 'CASH';
@@ -321,6 +359,8 @@ const buildUsersSummaryFromPayments = (
 
   payments.forEach((payment) => {
     if (!toBool(payment.enabled ?? true)) return;
+    // Une remise n'est pas un encaissement collecté par un serveur.
+    if (isDiscountPayment(payment.mop)) return;
 
     const mopCode = normalizeMopCode(payment.mop);
     const userId = payment.collected_by?.user_id ? String(payment.collected_by.user_id) : '__unknown__';
@@ -364,10 +404,18 @@ const normalizeSummary = (payload: SummaryApiShape): CashRegisterSummary => {
   const source = (cashRegister ?? nested ?? payload) as Partial<CashRegisterSummary> &
     ApiCashRegisterSummaryPayload;
 
-  const normalizedItems = normalizeSummaryItems(source.items as ApiSummaryItem[] | SummaryItem[] | undefined);
-  const normalizedCustomItems = normalizeCustomItems(
-    source.custom_items as ApiCustomItem[] | CustomItem[] | null | undefined
+  const rawItems = (Array.isArray(source.items) ? source.items : []) as ApiSummaryItem[];
+  const discountItems = rawItems.filter((item) => isDiscountPayment(item.mop_code ?? item.mop, item.label));
+  const normalizedItems = normalizeSummaryItems(
+    rawItems.filter((item) => !isDiscountPayment(item.mop_code ?? item.mop, item.label))
   );
+  const rawCustomItems = (Array.isArray(source.custom_items) ? source.custom_items : []) as ApiCustomItem[];
+  const normalizedCustomItems = normalizeCustomItems(
+    rawCustomItems.filter((item) => !isDiscountPayment(item.mop_code ?? item.mop, item.label))
+  );
+  const discounts =
+    Number(source.discounts ?? 0) ||
+    discountItems.reduce((acc, item) => acc + Number(item.amount ?? 0), 0);
 
   const usersSummaryFromPayload =
     source.users_summary ??
@@ -389,6 +437,8 @@ const normalizeSummary = (payload: SummaryApiShape): CashRegisterSummary => {
     enclosed: toBool(source.enclosed),
     enclose_comment: source.enclose_comment ?? source.closure_comment,
     users_summary: Array.isArray(usersSummary) ? usersSummary : [],
+    closing_mode: String(source.closing_mode ?? '').toUpperCase() === 'AUTO' ? 'AUTO' : 'MANUAL',
+    discounts,
   };
 };
 

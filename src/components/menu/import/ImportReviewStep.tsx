@@ -95,6 +95,23 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
     staleTime: 5 * 60 * 1000,
   });
 
+  // Porte photo : relecture ligne à ligne de ce que l'IA a lu, avant les
+  // sections communes à toutes les portes. Elle seule peut ajouter des
+  // catégories en relecture — dont celles déjà présentes dans la caisse.
+  const isPhoto = isPhotoPreview(preview);
+  const { data: menuCategories } = useQuery({
+    queryKey: qk.menuCategories.all,
+    queryFn: () => menuService.getMenuData(),
+    enabled: isPhoto,
+  });
+  const merchantCategories = useMemo(
+    () =>
+      (menuCategories ?? [])
+        .map((category) => category.name ?? category.category_name ?? category.category)
+        .filter((name): name is string => Boolean(name?.trim())),
+    [menuCategories],
+  );
+
   const blockersByRef = useMemo(() => indexBlockersByRef(state.blockers), [state.blockers]);
   const options = useMemo(
     () => (decisions ? categoryOptions(preview, decisions) : []),
@@ -107,10 +124,6 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
   const previouslyImported = useMemo(() => alreadyImportedProducts(preview), [preview]);
 
   if (!decisions || !precheck) return null;
-
-  // Porte photo : relecture ligne à ligne de ce que l'IA a lu, avant les
-  // sections communes à toutes les portes.
-  const isPhoto = isPhotoPreview(preview);
 
   const { summary } = preview;
 
@@ -201,7 +214,7 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         <>
           <Section
             title="Produits lus sur vos photos"
-            description="Décochez ce qui a été mal lu, ajustez les groupes, puis le prix et la TVA de chaque canal."
+            description="Décochez ce qui a été mal lu, corrigez la catégorie et les groupes, puis le prix et la TVA de chaque canal."
             count={precheck.needsTva.length}
             tone="attention"
           >
@@ -211,9 +224,14 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
               photoDraft={wizard.photoDraft}
               tvaGroups={tvaGroups}
               loadingRates={loadingRates}
+              categoryOptions={options}
+              merchantCategories={merchantCategories}
               blockersByRef={blockersByRef}
               disabled={isCommitting}
               onExclude={wizard.setProductExcluded}
+              onCategory={(productExternalId, target) =>
+                wizard.assignCategory([productExternalId], target)
+              }
               onGroup={wizard.setProductGroup}
               onPrice={wizard.setProductPrice}
               onTva={wizard.setProductTva}
@@ -277,11 +295,11 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         <ImportMissingCategories
           products={precheck.needsCategory}
           options={options}
-          categoryPerProduct={decisions.category_per_product}
+          merchantCategories={isPhoto ? merchantCategories : undefined}
+          allowCreate={isPhoto}
           blockersByRef={blockersByRef}
           disabled={isCommitting}
-          onAssign={wizard.setProductCategory}
-          onAssignAll={wizard.assignCategoryToAll}
+          onAssign={wizard.assignCategory}
         />
       </Section>
 

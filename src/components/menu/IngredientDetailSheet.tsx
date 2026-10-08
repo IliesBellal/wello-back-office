@@ -928,7 +928,7 @@ export const IngredientDetailSheet = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full h-screen max-w-full rounded-none flex flex-col gap-0 p-0 [&>button]:hidden">
+        <DialogContent className="w-full h-dvh max-h-dvh max-w-full rounded-none flex flex-col gap-0 p-0 [&>button]:hidden">
           {/* Fixed Header */}
           <DialogHeader className="border-b px-6 py-4 flex-shrink-0">
             <div className="flex items-center justify-between gap-4">

@@ -147,6 +147,10 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
   const [comment, setComment] = useState('');
 
   const isEnclosed = Boolean(summary?.enclosed);
+  // Clôture automatique : pas de relevé de caisse, le registre est validé dès
+  // sa fermeture. Seuls les encaissements sont affichés (ni réel, ni écart).
+  const isAutoClosing = summary?.closing_mode === 'AUTO';
+  const discountsTotal = summary?.discounts ?? 0;
   const isClosed = register ? getCashRegisterStatus(register) !== 'open' : false;
 
   const loadSummary = useCallback(async () => {
@@ -313,7 +317,8 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
   };
 
   const startEncloseFlow = () => {
-    if (Math.abs(sumAbsVariance) > 500) {
+    // Clôture automatique : pas de relevé, donc pas d'écart à contrôler.
+    if (!isAutoClosing && Math.abs(sumAbsVariance) > 500) {
       setWarningOpen(true);
       return;
     }
@@ -401,10 +406,12 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
                 <div className="rounded-md border border-green-300 bg-green-50 p-3 text-sm text-green-900">
                   <div className="flex items-center gap-2 font-semibold">
                     <Lock className="h-4 w-4" />
-                    Registre clôturé
+                    {isAutoClosing ? 'Registre clôturé automatiquement' : 'Registre clôturé'}
                   </div>
                   <p className="mt-1">
-                    Clôturé par {register?.closed_by_name || '-'}
+                    {isAutoClosing
+                      ? `Fermé par ${register?.closed_by_name || '-'} · aucun relevé de caisse à saisir`
+                      : `Clôturé par ${register?.closed_by_name || '-'}`}
                   </p>
                   {summary.enclose_comment && (
                     <p className="mt-1 rounded bg-white/60 px-2 py-1">{summary.enclose_comment}</p>
@@ -428,12 +435,18 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
                 </CardContent>
               </Card>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* --- THÉORIQUE --- */}
+              <div className={cn('grid grid-cols-1 gap-4', !isAutoClosing && 'md:grid-cols-2')}>
+                {/* --- THÉORIQUE (ENCAISSEMENTS EN CLÔTURE AUTOMATIQUE) --- */}
                 <Card className="border-blue-200">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-base text-blue-700">Théorique</CardTitle>
-                    <p className="text-xs text-muted-foreground">Montants enregistrés sur le registre</p>
+                    <CardTitle className="text-base text-blue-700">
+                      {isAutoClosing ? 'Encaissements' : 'Théorique'}
+                    </CardTitle>
+                    <p className="text-xs text-muted-foreground">
+                      {isAutoClosing
+                        ? 'Clôture automatique : aucun relevé à saisir'
+                        : 'Montants enregistrés sur le registre'}
+                    </p>
                     <div className="flex gap-1 rounded-md bg-blue-50 p-1 w-fit">
                       <button
                         type="button"
@@ -467,7 +480,7 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
                             key={item.mop_code}
                             item={item}
                             onCopyToReal={handleCopyToReal}
-                            copyDisabled={isEnclosed}
+                            copyDisabled={isEnclosed || isAutoClosing}
                           />
                         ))
                       )
@@ -501,7 +514,8 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
                   </CardContent>
                 </Card>
 
-                {/* --- RÉEL --- */}
+                {/* --- RÉEL (clôture manuelle uniquement) --- */}
+                {!isAutoClosing && (
                 <Card className="border-orange-200">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between gap-3">
@@ -542,21 +556,33 @@ export const ClosureModal = ({ register, open, onOpenChange, onSuccess }: Closur
                     )}
                   </CardContent>
                 </Card>
+                )}
               </div>
 
               <div className="flex items-center justify-between rounded-md border border-border bg-muted/20 px-4 py-3">
                 <div>
-                  <p className="text-xs text-muted-foreground">Total théorique</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isAutoClosing ? 'Total encaissé' : 'Total théorique'}
+                  </p>
                   <p className="text-lg font-semibold text-blue-700">{formatCurrency(theoreticalTotal)}</p>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-muted-foreground">Écart</p>
-                  <p className={cn('text-lg font-semibold', sumAbsVariance === 0 ? 'text-green-600' : 'text-red-600')}>
-                    {sumAbsVariance > 0 ? '+' : ''}
-                    {formatCurrency(sumAbsVariance)}
-                  </p>
-                </div>
+                {!isAutoClosing && (
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Écart</p>
+                    <p className={cn('text-lg font-semibold', sumAbsVariance === 0 ? 'text-green-600' : 'text-red-600')}>
+                      {sumAbsVariance > 0 ? '+' : ''}
+                      {formatCurrency(sumAbsVariance)}
+                    </p>
+                  </div>
+                )}
               </div>
+              {discountsTotal !== 0 && (
+                // Information seulement : une remise n'est pas un encaissement,
+                // elle n'entre ni dans le total ni dans l'écart.
+                <p className="px-1 text-xs text-muted-foreground">
+                  Remises accordées : {formatCurrency(discountsTotal)} (hors encaissements)
+                </p>
+              )}
             </div>
           ) : null}
 

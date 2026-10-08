@@ -220,7 +220,7 @@ export const ProductImportDialog = ({
   if (isMobile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="!h-screen !max-h-screen !w-screen !gap-0 !rounded-none !p-0 flex flex-col [&_button[aria-label='Close']]:hidden">
+        <DialogContent className="!h-dvh !max-h-dvh !w-screen !gap-0 !rounded-none !p-0 flex flex-col [&_button[aria-label='Close']]:hidden">
           <div className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-4 py-3">
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onOpenChange(false)}>
               <X className="h-5 w-5" />

@@ -43,7 +43,55 @@ export interface ExportResponse {
   status: string;
   filename: string;
   download_url: string;
+  /** Export comptable : identifiant de l'export archivé (retéléchargeable). */
+  export_id?: number;
+  /** Renseigné quand status === '0' : message de refus de l'API. */
+  error?: string;
 }
+
+/** Mode de clôture des registres : relevé de caisse (MANUAL) ou clôture automatique (AUTO). */
+export type ClosingMode = 'MANUAL' | 'AUTO';
+
+export interface ExportChannel {
+  /** Valeur de orders.order_source, à renvoyer telle quelle dans `channels`. */
+  value: string;
+  label: string;
+}
+
+/**
+ * GET /pos/accounting/export-options : mode de clôture de l'établissement au
+ * premier jour de la période, et canaux filtrables (vides en clôture
+ * manuelle, où l'export comptable n'est pas configurable).
+ */
+export interface AccountingExportOptions {
+  closing_mode: ClosingMode;
+  channels: ExportChannel[];
+}
+
+/** Export comptable archivé (GET /pos/accounting/exports). */
+export interface AccountingExportRecord {
+  id: number;
+  period_from: string;
+  period_to: string;
+  closing_mode: ClosingMode;
+  /** Canaux retenus ; vide = tous les canaux. */
+  channels: string[];
+  filename: string;
+  sha256: string;
+  size_bytes: number;
+  generated_by: string;
+  generated_at: string;
+}
+
+export interface AccountingExportLink {
+  export_id: number;
+  filename: string;
+  /** Lien signé, valable une heure. */
+  download_url: string;
+}
+
+/** Refus métier de l'export comptable (HTTP 200, status '0') : message affichable tel quel. */
+export class AccountingExportRefusedError extends Error {}
 
 // ============= Mock Data =============
 const mockVATData = (): VATReportResponse => {
@@ -149,22 +197,104 @@ export const financialReportsService = {
     );
   },
 
-  async exportGlobal(dateFrom: Date | string, dateTo: Date | string): Promise<ExportResponse> {
+  /**
+   * Génère l'export comptable PDF de la période. `channels` (valeurs de
+   * {@link AccountingExportOptions.channels}) ne vaut qu'en clôture
+   * automatique ; omis ou vide = tous les canaux. Un refus de l'API (période à
+   * cheval sur un changement de mode, mois non clôturé, filtre en clôture
+   * manuelle…) lève {@link AccountingExportRefusedError} avec son message.
+   * Le lien renvoyé est signé et valable une heure.
+   */
+  async exportGlobal(
+    dateFrom: Date | string,
+    dateTo: Date | string,
+    channels?: string[]
+  ): Promise<ExportResponse> {
     // Dates locales et non UTC : l'API les interprète dans le fuseau de
     // l'établissement (1er jour 00:00:00 -> dernier jour 23:59:59 heure locale).
     const dateFromLocal = toLocalDateString(dateFrom);
     const dateToLocal = toLocalDateString(dateTo);
+    const payload: { date_from: string; date_to: string; channels?: string[] } = {
+      date_from: dateFromLocal,
+      date_to: dateToLocal,
+    };
+    if (channels && channels.length > 0) {
+      payload.channels = channels;
+    }
 
-    logAPI('POST', '/pos/accounting/export', { date_from: dateFromLocal, date_to: dateToLocal });
+    logAPI('POST', '/pos/accounting/export', payload);
 
-    return withMock(
+    const result = await withMock<ExportResponse>(
       () => ({
         status: '1',
-        filename: `WR_rapport_comptable_${new Date().getFullYear()}_${String(new Date().getMonth() + 1).padStart(2, '0')}.pdf`,
+        export_id: 1,
+        filename: `WR_rapport_comptable_${dateFromLocal.replace(/-/g, '')}_${dateToLocal.replace(/-/g, '')}.pdf`,
         download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_comptable.pdf'
       }),
       async () => {
-        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/accounting/export', { date_from: dateFromLocal, date_to: dateToLocal });
+        const response = await apiClient.post<{ id: string; data: ExportResponse }>('/pos/accounting/export', payload);
+        return response.data;
+      }
+    );
+    if (result.status !== '1' || !result.download_url) {
+      throw new AccountingExportRefusedError(result.error || "L'export comptable n'a pas pu être généré.");
+    }
+    return result;
+  },
+
+  async getAccountingExportOptions(dateFrom: Date | string): Promise<AccountingExportOptions> {
+    const dateFromLocal = toLocalDateString(dateFrom);
+    const endpoint = `/pos/accounting/export-options?date_from=${encodeURIComponent(dateFromLocal)}`;
+    logAPI('GET', endpoint);
+
+    return withMock<AccountingExportOptions>(
+      () => ({
+        closing_mode: 'AUTO' as ClosingMode,
+        channels: [
+          { value: 'WELLO_RESTO_POS', label: 'Caisse' },
+          { value: 'KIOSK', label: 'Borne de commande' },
+          { value: 'SCANNORDER', label: 'ScanNOrder' },
+          { value: 'UBER_EATS', label: 'Uber Eats' },
+          { value: 'DELIVEROO', label: 'Deliveroo' },
+        ],
+      }),
+      async () => {
+        const response = await apiClient.get<{ id: string; data: AccountingExportOptions }>(endpoint);
+        return {
+          closing_mode: response.data.closing_mode === 'AUTO' ? 'AUTO' : 'MANUAL',
+          channels: response.data.channels ?? [],
+        };
+      }
+    );
+  },
+
+  async listAccountingExports(): Promise<AccountingExportRecord[]> {
+    logAPI('GET', '/pos/accounting/exports');
+
+    return withMock<AccountingExportRecord[]>(
+      () => [],
+      async () => {
+        const response = await apiClient.get<{ id: string; data: { status: string; exports: AccountingExportRecord[] } }>(
+          '/pos/accounting/exports'
+        );
+        return response.data.exports ?? [];
+      }
+    );
+  },
+
+  /** Nouveau lien signé (une heure) vers un export archivé. */
+  async getAccountingExportLink(exportId: number): Promise<AccountingExportLink> {
+    const endpoint = `/pos/accounting/exports/${exportId}/download`;
+    logAPI('GET', endpoint);
+
+    return withMock<AccountingExportLink>(
+      () => ({
+        export_id: exportId,
+        filename: 'WR_rapport_comptable.pdf',
+        download_url: 'https://r2.example.com/wello_resto_accounting/merchants/demo/reports/WR_rapport_comptable.pdf',
+      }),
+      async () => {
+        const response = await apiClient.get<{ id: string; data: AccountingExportLink }>(endpoint);
         return response.data;
       }
     );

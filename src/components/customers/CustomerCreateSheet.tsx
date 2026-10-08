@@ -339,7 +339,7 @@ export function CustomerCreateSheet({ open, onOpenChange, onCreated }: CustomerC
   if (isMobile) {
     return (
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="!h-screen !max-h-screen !w-screen !p-0 !gap-0 !rounded-none flex flex-col [&_button[aria-label='Close']]:hidden">
+        <DialogContent className="!h-dvh !max-h-dvh !w-screen !p-0 !gap-0 !rounded-none flex flex-col [&_button[aria-label='Close']]:hidden">
           <div className="bg-white border-b border-border px-4 py-3 flex items-center justify-between gap-2 flex-shrink-0">
             <Button variant="ghost" size="icon" onClick={() => handleOpenChange(false)} className="h-8 w-8">
               <X className="h-5 w-5" />

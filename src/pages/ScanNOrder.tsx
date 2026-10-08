@@ -70,9 +70,12 @@ function ImageUploadField({
           <img
             src={preview}
             alt={label}
-            className={`max-h-full max-w-full rounded-lg object-contain ${
-              isLogo ? 'h-20 w-20' : 'h-32 w-full'
-            }`}
+            // Bannière : recadrage 4:1 identique à l'affichage desktop du ScanNOrder.
+            className={
+              isLogo
+                ? 'h-20 w-20 max-h-full max-w-full rounded-lg object-contain'
+                : 'aspect-[4/1] w-full rounded-lg object-cover'
+            }
           />
         ) : (
           <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
@@ -330,7 +333,7 @@ export default function ScanNOrder() {
           <CardHeader>
             <CardTitle>Bannière</CardTitle>
             <CardDescription>
-              Téléchargez la bannière de votre plateforme
+              Format paysage, 1600 × 450 px minimum. Sujet centré.
             </CardDescription>
           </CardHeader>
           <CardContent>

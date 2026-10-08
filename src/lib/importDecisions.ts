@@ -34,8 +34,20 @@ export interface ImportCategoryOption {
 }
 
 /**
+ * Cible d'une affectation de catégorie : une catégorie de l'import, ou un nom
+ * — catégorie de la caisse ou nouvelle catégorie, ajoutée en relecture (porte
+ * photo).
+ */
+export type ImportCategoryTarget = { externalId: string } | { name: string };
+
+/** Clé de rapprochement d'un nom de catégorie — miroir de `NormalizeLabel` côté API. */
+export const normalizeCategoryName = (name: string): string =>
+  name.trim().toLowerCase().split(/\s+/).filter(Boolean).join(' ');
+
+/**
  * Identifiants utilisables comme catégorie : celles que la source désigne
- * explicitement, plus les libellés classés « catégorie ».
+ * explicitement, plus les libellés classés « catégorie », plus les catégories
+ * ajoutées en relecture.
  */
 export const categoryLabelIds = (
   preview: ImportPreviewResult,
@@ -48,6 +60,10 @@ export const categoryLabelIds = (
     if (classification === 'category') {
       ids.add(tag.external_id);
     }
+  }
+
+  for (const ref of Object.keys(decisions.added_categories ?? {})) {
+    ids.add(ref);
   }
 
   return ids;
@@ -71,8 +87,40 @@ export const categoryOptions = (
       options.push({ externalId: tag.external_id, name: tag.name, fromLabel: true });
     }
   }
+  for (const [ref, name] of Object.entries(decisions.added_categories ?? {})) {
+    options.push({ externalId: ref, name, fromLabel: false });
+  }
 
   return options.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+};
+
+/**
+ * Traduit une cible en identifiant de catégorie, en ajoutant au besoin la
+ * catégorie aux décisions. Un nom déjà proposé (lu, ou ajouté plus tôt) est
+ * réutilisé plutôt que dupliqué — l'API ferait de même.
+ */
+export const resolveCategoryTarget = (
+  preview: ImportPreviewResult,
+  decisions: ImportDecisions,
+  target: ImportCategoryTarget,
+): { decisions: ImportDecisions; externalId: string } => {
+  if ('externalId' in target) return { decisions, externalId: target.externalId };
+
+  const key = normalizeCategoryName(target.name);
+  const existing = categoryOptions(preview, decisions).find(
+    (option) => normalizeCategoryName(option.name) === key,
+  );
+  if (existing) return { decisions, externalId: existing.externalId };
+
+  const added = decisions.added_categories ?? {};
+  let index = Object.keys(added).length + 1;
+  while (`added-${index}` in added) index += 1;
+  const ref = `added-${index}`;
+
+  return {
+    decisions: { ...decisions, added_categories: { ...added, [ref]: target.name.trim() } },
+    externalId: ref,
+  };
 };
 
 /**
@@ -398,6 +446,12 @@ export const buildImportDecisions = (
     built.price_per_product = pricePerProduct;
     built.tva_per_product = tvaPerProduct;
     built.tva_confirmed = Boolean(decisions.tva_confirmed);
+
+    // Seules les catégories ajoutées encore affectées à un produit partent.
+    const referenced = new Set(Object.values(categoryPerProduct));
+    built.added_categories = Object.fromEntries(
+      Object.entries(decisions.added_categories ?? {}).filter(([ref]) => referenced.has(ref)),
+    );
   }
 
   return built;

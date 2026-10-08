@@ -53,7 +53,7 @@ export function ResponsiveProductSheet({
   if (isMobile) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="!h-screen !max-h-screen !w-screen !p-0 !gap-0 !rounded-none flex flex-col [&_button[aria-label='Close']]:hidden">
+        <DialogContent className="!h-dvh !max-h-dvh !w-screen !p-0 !gap-0 !rounded-none flex flex-col [&_button[aria-label='Close']]:hidden">
           {/* Mobile Header - Fixed */}
           <div className="bg-white border-b border-border px-4 py-3 flex items-center justify-between gap-2 flex-shrink-0">
             <Button

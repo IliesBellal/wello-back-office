@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
 import { getStoredAuthToken } from '@/types/auth';
-import { toUTCDateString } from '@/utils/apiDate';
+import { toLocalDateString } from '@/utils/apiDate';
 
 export interface VATRate {
   [rate: string]: {
@@ -18,11 +18,15 @@ export interface ChannelVAT {
 
 export interface MonthlyBreakdown {
   month: string;
+  /**
+   * Mode de clôture du mois : MANUAL (TVA sur les ventes, remises de caisse
+   * déduites) ou AUTO (TVA ventilée à partir des encaissements) — même méthode
+   * que l'export comptable.
+   */
+  closing_mode?: 'MANUAL' | 'AUTO';
   revenue_ht: number;
-  vat_10?: number;
-  vat_5_5?: number;
-  vat_20?: number;
-  vat_2_1?: number;
+  /** TVA du mois par taux (clé : « 10.0 », « 5.5 », « 20 »…), en centimes. */
+  vat_by_rate?: Record<string, number>;
   vat_total: number;
   revenue_ttc: number;
 }
@@ -40,12 +44,17 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
+/**
+ * Canaux de vente de la déclaration de TVA : valeurs de orders.order_source,
+ * les mêmes que l'export comptable. (Les anciennes valeurs restaurant /
+ * scannorder / ubereats / deliveroo restent acceptées par l'API.)
+ */
 export const vatChannels = [
-  { id: 'restaurant', label: 'Ventes en restaurant' },
-  { id: 'takeaway', label: 'Ventes à emporter' },
-  { id: 'scannorder', label: 'Ventes ScannOrder (site)' },
-  { id: 'ubereats', label: 'Ventes Uber Eats' },
-  { id: 'deliveroo', label: 'Ventes Deliveroo' },
+  { id: 'WELLO_RESTO_POS', label: 'Caisse' },
+  { id: 'KIOSK', label: 'Borne de commande' },
+  { id: 'SCANNORDER', label: 'ScanNOrder' },
+  { id: 'UBER_EATS', label: 'Uber Eats' },
+  { id: 'DELIVEROO', label: 'Deliveroo' },
 ];
 
 export const vatOrderTypes = [
@@ -60,14 +69,17 @@ export const calculateVAT = async (
   channels: string[],
   orderTypes?: string[]
 ): Promise<VATCalculationResponse> => {
-  const startDateUTC = toUTCDateString(startDate);
-  const endDateUTC = toUTCDateString(endDate);
+  // Dates de calendrier locales (et non UTC) : l'API les interprète dans le
+  // fuseau de l'établissement, comme l'export comptable. toUTCDateString
+  // décalait d'un jour une date choisie à minuit heure de Paris.
+  const startDateLocal = toLocalDateString(startDate);
+  const endDateLocal = toLocalDateString(endDate);
 
   const response = await apiClient.post<ApiEnvelope<VATCalculationResponse> | VATCalculationResponse>(
     '/accounting/vat/calculate',
     {
-      start_date: startDateUTC,
-      end_date: endDateUTC,
+      start_date: startDateLocal,
+      end_date: endDateLocal,
       channels,
       ...(orderTypes && orderTypes.length > 0 && { order_types: orderTypes }),
     }
@@ -93,8 +105,9 @@ export const exportVATCSV = async (
   channels: string[],
   orderTypes?: string[]
 ): Promise<Blob> => {
-  const startDateUTC = toUTCDateString(startDate);
-  const endDateUTC = toUTCDateString(endDate);
+  // Dates de calendrier locales, cf. calculateVAT.
+  const startDateLocal = toLocalDateString(startDate);
+  const endDateLocal = toLocalDateString(endDate);
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com";
   const authToken = getStoredAuthToken();
 
@@ -108,8 +121,8 @@ export const exportVATCSV = async (
         ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
       },
       body: JSON.stringify({
-        start_date: startDateUTC,
-        end_date: endDateUTC,
+        start_date: startDateLocal,
+        end_date: endDateLocal,
         channels,
         ...(orderTypes && orderTypes.length > 0 && { order_types: orderTypes }),
       }),

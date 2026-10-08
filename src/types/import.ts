@@ -240,6 +240,13 @@ export interface ImportDecisions {
   price_per_product?: Record<string, ImportChannelPrices>;
   /** Porte photo : `tva_id` choisi par canal ; il prime sur le taux proposé. */
   tva_per_product?: Record<string, ImportChannelTvaIds>;
+  /**
+   * Porte photo : catégories ajoutées en relecture (non lues, ou déjà dans la
+   * caisse), par référence locale → nom. La référence est citable dans
+   * `category_per_product` ; l'API la traduit et se rattache par nom à une
+   * catégorie existante.
+   */
+  added_categories?: Record<string, string>;
 }
 
 /** Canaux de vente d'un produit, dans l'ordre des colonnes de la relecture. */

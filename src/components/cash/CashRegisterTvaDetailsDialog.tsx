@@ -101,6 +101,20 @@ export const CashRegisterTvaDetailsDialog = ({
                 <span className="text-muted-foreground">Fond de caisse : </span>
                 {formatCurrency(breakdown.cash_fund)}
               </p>
+              {(breakdown.discounts ?? 0) !== 0 && (
+                // Ventes brutes − remises = ventes nettes (TTC ci-dessous),
+                // base de la TVA.
+                <>
+                  <p>
+                    <span className="text-muted-foreground">Ventes brutes : </span>
+                    {formatCurrency(breakdown.gross_ttc ?? breakdown.TTC)}
+                  </p>
+                  <p>
+                    <span className="text-muted-foreground">Remises : </span>
+                    {formatCurrency(-(breakdown.discounts ?? 0))}
+                  </p>
+                </>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-3">
