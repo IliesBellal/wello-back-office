@@ -38,7 +38,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2, MonitorSmartphone } from 'lucide-react';
+import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2, MonitorSmartphone, MoreVertical, Copy } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
 import { CategorySelector } from '@/components/shared/CategorySelector';
@@ -65,6 +71,12 @@ interface SimpleProductSheetProps {
    * d'elle-même sur le comportement habituel (consultation/modification).
    */
   createMode?: boolean;
+  /**
+   * Produit source d'une copie : en mode création, préremplit le formulaire
+   * avec toutes ses informations (image, composition, options, tags,
+   * allergènes...) plutôt que de partir d'un brouillon vierge.
+   */
+  copySource?: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   units: UnitOfMeasure[];
@@ -78,6 +90,8 @@ interface SimpleProductSheetProps {
   onCreate?: (data: ProductCreatePayload) => Promise<Product>;
   onDelete?: (productId: string) => Promise<void>;
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
+  /** Ouvre une fiche de création préremplie avec les données de ce produit. */
+  onCopy?: (product: Product) => void;
 }
 
 // Socle de lecture en création : la fiche est rendue avant qu'aucun produit
@@ -163,6 +177,7 @@ export const SimpleProductSheet = ({
   productId,
   product: initialProduct = null,
   createMode = false,
+  copySource = null,
   open,
   onOpenChange,
   units,
@@ -175,6 +190,7 @@ export const SimpleProductSheet = ({
   onCreate,
   onDelete,
   onCreateCategory,
+  onCopy,
 }: SimpleProductSheetProps) => {
   // Load product data if productId is provided
   const { product: loadedProduct, loading } = useProductData(productId || null, open);
@@ -384,6 +400,51 @@ export const SimpleProductSheet = ({
     setIsEditMode(true);
     setActiveTab('general');
     setHasAttemptedCreate(false);
+
+    // Copie d'un produit existant : on repart de ses données plutôt que d'un
+    // brouillon vierge. L'image passe par un fetch + re-upload (l'API ne sait
+    // pas copier une image par URL), le reste suit buildFormDataFromProduct
+    // comme pour une édition normale.
+    if (copySource) {
+      setFormData({
+        ...buildFormDataFromProduct(copySource),
+        product_id: undefined,
+        name: `${copySource.name} (copie)`,
+        // Les intégrations livraison sont liées à l'identifiant externe du
+        // produit d'origine : les désactiver évite de créer un doublon
+        // fantôme sur Uber Eats/Deliveroo tant qu'elles n'ont pas été
+        // reconfigurées explicitement.
+        integrations: {
+          uber_eats: { enabled: false },
+          deliveroo: { enabled: false },
+        },
+      });
+      setPriceDisplayValues({
+        price: priceToDisplayValue(copySource.price),
+        price_take_away: priceToDisplayValue(copySource.price_take_away),
+        price_delivery: priceToDisplayValue(copySource.price_delivery),
+      });
+      setDefaultPriceDisplay('');
+      setDefaultTvaValue('');
+      setSelectedImageFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      if (copySource.image_url) {
+        fetch(copySource.image_url)
+          .then((res) => res.blob())
+          .then((blob) => {
+            const filename = copySource.image_url!.split('/').pop()?.split('?')[0] || 'image.jpg';
+            setSelectedImageFile(new File([blob], filename, { type: blob.type || 'image/jpeg' }));
+          })
+          .catch(() => {
+            // Pas bloquant : la fiche reste utilisable sans image préremplie,
+            // l'utilisateur peut toujours en choisir une manuellement.
+          });
+      }
+      return;
+    }
+
     setFormData({
       name: '',
       description: '',
@@ -417,19 +478,21 @@ export const SimpleProductSheet = ({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [createMode, open]);
+  }, [createMode, open, copySource]);
 
   // Les taux de TVA arrivent de façon asynchrone : on présélectionne le taux
-  // du produit dès que la liste est disponible.
+  // du produit dès que la liste est disponible (produit en cours d'édition,
+  // ou produit source d'une copie en création).
   useEffect(() => {
-    if (isCreateMode || !baseProduct || tvaRates.length === 0) return;
+    const tvaSource = isCreateMode ? copySource : baseProduct;
+    if (!tvaSource || tvaRates.length === 0) return;
     setTvaSelection({
-      in: resolveTvaRateId(onSiteRates, baseProduct.tva_rate_in ?? baseProduct.tva_ids?.on_site),
-      takeAway: resolveTvaRateId(takeAwayRates, baseProduct.tva_rate_take_away ?? baseProduct.tva_ids?.takeaway),
-      delivery: resolveTvaRateId(deliveryRates, baseProduct.tva_rate_delivery ?? baseProduct.tva_ids?.delivery),
+      in: resolveTvaRateId(onSiteRates, tvaSource.tva_rate_in ?? tvaSource.tva_ids?.on_site),
+      takeAway: resolveTvaRateId(takeAwayRates, tvaSource.tva_rate_take_away ?? tvaSource.tva_ids?.takeaway),
+      delivery: resolveTvaRateId(deliveryRates, tvaSource.tva_rate_delivery ?? tvaSource.tva_ids?.delivery),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseProduct, tvaRates, isCreateMode]);
+  }, [baseProduct, copySource, tvaRates, isCreateMode]);
 
   const handleSave = async () => {
     if (!product) return;
@@ -831,26 +894,37 @@ export const SimpleProductSheet = ({
                 {loading ? <Skeleton className="h-4 w-32" /> : (isCreateMode ? (formData.name || 'Nouveau produit') : (isEditMode ? (formData.name || 'Produit') : (product?.name || 'Produit')))}
               </h2>
               {!loading && !isEditMode && (
-                <div className="flex gap-1">
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setIsEditMode(true)}
-                    title="Modifier le produit"
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                    onClick={() => setShowDeleteDialog(true)}
-                    title="Supprimer le produit"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      title="Actions"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => setIsEditMode(true)}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Modifier
+                    </DropdownMenuItem>
+                    {onCopy && product && (
+                      <DropdownMenuItem onClick={() => onCopy(product)}>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copier
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuItem
+                      onClick={() => setShowDeleteDialog(true)}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Supprimer
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
             </div>
 
@@ -1579,25 +1653,32 @@ export const SimpleProductSheet = ({
                     )}
                   </div>
                   {!loading && !isEditMode && (
-                    <div className="flex gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setIsEditMode(true)}
-                      >
-                        <Edit className="w-4 h-4 mr-2" />
-                        Modifier
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => setShowDeleteDialog(true)}
-                        title="Supprimer le produit"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" title="Actions">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setIsEditMode(true)}>
+                          <Edit className="w-4 h-4 mr-2" />
+                          Modifier
+                        </DropdownMenuItem>
+                        {onCopy && product && (
+                          <DropdownMenuItem onClick={() => onCopy(product)}>
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copier
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          onClick={() => setShowDeleteDialog(true)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Supprimer
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   )}
                 </div>
 

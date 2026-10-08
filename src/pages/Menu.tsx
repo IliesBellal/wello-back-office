@@ -126,6 +126,8 @@ export default function Menu() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [groupCreateOpen, setGroupCreateOpen] = useState(false);
+  const [copySourceProduct, setCopySourceProduct] = useState<Product | null>(null);
+  const [copyCreateOpen, setCopyCreateOpen] = useState(false);
 
   // Filtres et tri
   const [search, setSearch] = useState('');
@@ -236,6 +238,15 @@ export default function Menu() {
     await deleteProductGroup(groupId, subProductIds, mode);
     setSelectedProduct(null);
     setSheetOpen(false);
+  };
+
+  // Ouvre une fiche de création préremplie avec les données du produit copié
+  // (image, composition, options, tags, allergènes...), dans une fiche
+  // dédiée indépendante de celle en consultation.
+  const handleCopyProduct = (product: Product) => {
+    setSheetOpen(false);
+    setCopySourceProduct(product);
+    setCopyCreateOpen(true);
   };
 
   // Build category mapping
@@ -575,6 +586,27 @@ export default function Menu() {
           attributes={attributes}
           categories={menuData?.products_types || []}
           onSave={updateProduct}
+          onDelete={handleDeleteProduct}
+          onCreateCategory={createProductCategory}
+          onCopy={handleCopyProduct}
+        />
+
+        {/* Copie : fiche de création dédiée, préremplie avec les données du
+            produit copié (cf. handleCopyProduct). */}
+        <SimpleProductSheet
+          createMode
+          copySource={copySourceProduct}
+          open={copyCreateOpen}
+          onOpenChange={(next) => {
+            setCopyCreateOpen(next);
+            if (!next) setCopySourceProduct(null);
+          }}
+          units={units}
+          components={components}
+          attributes={attributes}
+          categories={menuData?.products_types || []}
+          onSave={updateProduct}
+          onCreate={createProduct}
           onDelete={handleDeleteProduct}
           onCreateCategory={createProductCategory}
         />
