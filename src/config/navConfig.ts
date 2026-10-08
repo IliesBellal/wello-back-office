@@ -42,6 +42,7 @@ import {
   KeyRound,
   Fingerprint,
   CreditCard,
+  Archive,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -346,6 +347,14 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Rapports financiers',
         icon: BarChart3,
         href: '/accounting/report',
+      },
+      {
+        id: 'fiscal-archives',
+        title: 'Archives fiscales',
+        icon: Archive,
+        href: '/accounting/fiscal-archives',
+        // Matches the route guard and the API (/accounting/* : reports.financial.read).
+        visibilityCheck: (authData) => checkPermission(authData, 'reports.financial.read'),
       },
     ],
   },
