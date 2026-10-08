@@ -40,6 +40,43 @@ export interface FiscalArchiveLink {
 
 const ENDPOINT = '/accounting/fiscal-archives';
 
+/** Contrôle d'intégrité (conformité caisse, lot E) : rapport de POST /accounting/fiscal-integrity. */
+export interface FiscalIntegrityCheck {
+  controle: string;
+  libelle: string;
+  elements_controles: number;
+  erreurs: number;
+  avertissements: number;
+}
+
+export interface FiscalIntegrityFinding {
+  gravite: 'ERREUR' | 'AVERTISSEMENT';
+  controle: string;
+  message: string;
+}
+
+export interface FiscalIntegrityReport {
+  logiciel: string;
+  version: string;
+  raison_sociale: string;
+  siret: string;
+  du: string;
+  au: string;
+  version_attestee_depuis: string | null;
+  genere_le: string;
+  duree: string;
+  controles: FiscalIntegrityCheck[];
+  anomalies: FiscalIntegrityFinding[] | null;
+  erreurs: number;
+  avertissements: number;
+}
+
+export interface FiscalIntegrityResult {
+  report: FiscalIntegrityReport;
+  /** Rapport en clair, à télécharger. */
+  text: string;
+}
+
 export const fiscalArchivesService = {
   async list(): Promise<FiscalArchive[]> {
     logAPI('GET', ENDPOINT);
@@ -74,6 +111,37 @@ export const fiscalArchivesService = {
       async () => {
         const response = await apiClient.post<{ id: string; data: { status: string; archive: FiscalArchive } }>(ENDPOINT, payload);
         return response.data.archive;
+      }
+    );
+  },
+
+  /** Contrôle d'intégrité des données fiscales sur une période de 31 jours au plus (lecture seule). */
+  async verifyIntegrity(dateFrom: Date, dateTo: Date): Promise<FiscalIntegrityResult> {
+    const endpoint = '/accounting/fiscal-integrity';
+    const payload = { date_from: toLocalDateString(dateFrom), date_to: toLocalDateString(dateTo) };
+    logAPI('POST', endpoint, payload);
+    return withMock<FiscalIntegrityResult>(
+      () => ({
+        report: {
+          logiciel: 'WelloResto',
+          version: '2.0.0',
+          raison_sociale: 'Démo',
+          siret: '',
+          du: payload.date_from,
+          au: payload.date_to,
+          version_attestee_depuis: null,
+          genere_le: new Date().toISOString(),
+          duree: '0s',
+          controles: [],
+          anomalies: [],
+          erreurs: 0,
+          avertissements: 0,
+        },
+        text: '',
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: { status: string } & FiscalIntegrityResult }>(endpoint, payload);
+        return { report: response.data.report, text: response.data.text };
       }
     );
   },

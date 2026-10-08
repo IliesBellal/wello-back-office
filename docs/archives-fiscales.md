@@ -45,3 +45,21 @@ routes de l'API (`/accounting/*`).
   un mois chargé. Le résultat apparaît dans la liste, rechargée après la
   génération.
 
+## Contrôle d'intégrité (lot E, 2026-10-08)
+
+Carte « Contrôle d'intégrité » en bas de la même page
+(`src/components/fiscal/FiscalIntegrityCard.tsx`), sur
+`POST /accounting/fiscal-integrity`, avec le même droit.
+
+- Période de 31 jours au plus, vérifiée par la page et par l'API.
+- L'API rejoue, sans rien modifier : les chaînes signées (tickets, paiements,
+  registres, journal, clôtures, archives), la numérotation des tickets, les
+  clôtures recalculées et les commandes recoupées avec leurs tickets.
+- Affichage :
+  - verdict (Conforme = aucune erreur) ;
+  - tableau des contrôles (éléments, erreurs, avertissements) ;
+  - anomalies, avec l'explication des avertissements (données antérieures à
+    la version attestée, écarts connus et tracés) ;
+  - bouton « Télécharger le rapport » (fichier texte rendu par l'API).
+- Un second contrôle lancé pendant le premier est refusé par l'API (409,
+  message affiché par `apiClient`).

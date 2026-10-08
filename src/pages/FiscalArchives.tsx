@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DateRangePicker } from '@/components/reports/DateRangePicker';
+import { FiscalIntegrityCard } from '@/components/fiscal/FiscalIntegrityCard';
 import { FiscalArchive, fiscalArchivesService } from '@/services/fiscalArchivesService';
 
 /** Même borne que l'API (fiscalArchiveMaxDays) : vérifiée ici pour guider, refusée là-bas sinon. */
@@ -207,6 +208,8 @@ const FiscalArchives = () => {
               )}
             </CardContent>
           </Card>
+
+          <FiscalIntegrityCard />
         </div>
       </PageContainer>
     </DashboardLayout>
