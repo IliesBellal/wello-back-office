@@ -64,7 +64,7 @@ export const attestationsService = {
         available: false,
         unavailable_reason: 'Mode démonstration.',
         software: 'WelloResto',
-        version: '2.0.0',
+        version: '2.1.6',
         major_root: '2',
         prefill: { company_name: '', siret: '', address: '', city: '', acquisition_date: '', usage_start_date: '' },
         attestations: [],

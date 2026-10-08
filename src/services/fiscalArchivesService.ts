@@ -103,7 +103,7 @@ export const fiscalArchivesService = {
         sha256: '0'.repeat(64),
         manifest_sha256: '0'.repeat(64),
         size_bytes: 0,
-        software_version: '2.0.0',
+        software_version: '2.1.6',
         generated_by: 'demo',
         generated_at: new Date().toISOString(),
         hash: '0'.repeat(64),
@@ -124,7 +124,7 @@ export const fiscalArchivesService = {
       () => ({
         report: {
           logiciel: 'WelloResto',
-          version: '2.0.0',
+          version: '2.1.6',
           raison_sociale: 'Démo',
           siret: '',
           du: payload.date_from,
