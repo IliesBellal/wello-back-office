@@ -44,6 +44,7 @@ import {
   CreditCard,
   Archive,
   FileSignature,
+  Landmark,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -364,6 +365,14 @@ export const NAV_ITEMS: NavItem[] = [
         href: '/accounting/attestation',
         // Consultation : reports.financial.read ; la génération exige aussi
         // settings.manage côté API.
+        visibilityCheck: (authData) => checkPermission(authData, 'reports.financial.read'),
+      },
+      {
+        id: 'payouts',
+        title: 'Versements',
+        icon: Landmark,
+        href: '/accounting/payouts',
+        // Matches the route guard and the API (/accounting/* : reports.financial.read).
         visibilityCheck: (authData) => checkPermission(authData, 'reports.financial.read'),
       },
     ],

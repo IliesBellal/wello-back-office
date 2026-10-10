@@ -593,6 +593,7 @@ export interface UpsellPeriodTotals {
   to: string;
   upsell_lines: number;
   upsell_revenue_ht_cents: number;
+  upsell_revenue_ttc_cents: number;
   orders_with_upsell_count: number;
   total_orders_count: number;
 }
@@ -616,7 +617,7 @@ export interface UpsellAnalyticsResponse {
   current_period: UpsellPeriodTotals;
   previous_period: UpsellPeriodTotals;
   // Top des articles vendus en upsell sur la période courante (10 au plus),
-  // classés par unités vendues puis CA HT. Dérivé de is_upsell, donc soumis à
+  // classés par unités vendues puis CA TTC. Dérivé de is_upsell, donc soumis à
   // instrumentation_active comme current_period.
   top_products: UpsellProductRow[];
   suggestions: UpsellSuggestionsTotals;
@@ -630,16 +631,19 @@ export interface UpsellProductRow {
   quantity_sold: number;
   upsell_lines: number;
   upsell_revenue_ht_cents: number;
+  upsell_revenue_ttc_cents: number;
 }
 
 // user_id/name mirror StaffCancellationRow's naming (renamed from the old
 // stats.UpsellServerStat's server_id/server_name for consistency within this
-// package's own contracts).
+// package's own contracts). ScanNOrder et la borne y figurent comme des
+// vendeurs à part entière (user_id « SCANNORDER » / « KIOSK »).
 export interface UpsellStaffRow {
   user_id: string;
   name: string;
   upsell_lines: number;
   upsell_revenue_ht_cents: number;
+  upsell_revenue_ttc_cents: number;
 }
 
 export interface UpsellByStaffResponse {
@@ -1980,7 +1984,7 @@ class AnalyticsService {
     const dateTo = toLocalDateString(endDate);
 
     const mockPeriod = (from: string, to: string): UpsellPeriodTotals => ({
-      from, to, upsell_lines: 0, upsell_revenue_ht_cents: 0, orders_with_upsell_count: 0, total_orders_count: 1935,
+      from, to, upsell_lines: 0, upsell_revenue_ht_cents: 0, upsell_revenue_ttc_cents: 0, orders_with_upsell_count: 0, total_orders_count: 1935,
     });
 
     return withMock(

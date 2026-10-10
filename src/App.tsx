@@ -29,6 +29,7 @@ import ComponentCategoriesTable from './pages/ComponentCategoriesTable';
 import FinancialReports from './pages/FinancialReports';
 import FiscalArchives from './pages/FiscalArchives';
 import Attestation from './pages/Attestation';
+import PayoutDocuments from './pages/PayoutDocuments';
 import Locations from './pages/Locations';
 import CashRegisterHistory from './pages/CashRegisterHistory';
 import VAT from './pages/TVA';
@@ -118,6 +119,7 @@ const App = () => (
               <Route path="/accounting/report" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
               <Route path="/accounting/fiscal-archives" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'reports.financial.read')}><FiscalArchives /></ProtectedRoute>} />
               <Route path="/accounting/attestation" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'reports.financial.read')}><Attestation /></ProtectedRoute>} />
+              <Route path="/accounting/payouts" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'reports.financial.read')}><PayoutDocuments /></ProtectedRoute>} />
               
               {/* Reports & Analytics */}
               {/* Consolidated under Accounting section */}

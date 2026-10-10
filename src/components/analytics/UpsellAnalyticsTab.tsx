@@ -105,8 +105,8 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
     { key: 'name', label: 'Serveur', sortable: true },
     { key: 'upsell_lines', label: 'Lignes upsell', sortable: true, align: 'right' },
     {
-      key: 'upsell_revenue_ht_cents',
-      label: 'CA upsell HT',
+      key: 'upsell_revenue_ttc_cents',
+      label: 'CA upsell TTC',
       sortable: true,
       align: 'right',
       render: (v: number) => eur(v),
@@ -149,7 +149,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Tile title="Lignes upsell" value={current.upsell_lines} isHighlighted />
-          <Tile title="CA upsell HT" value={eur(current.upsell_revenue_ht_cents)} />
+          <Tile title="CA upsell TTC" value={eur(current.upsell_revenue_ttc_cents)} />
           <Tile
             title="Taux de commandes avec upsell"
             value={rate !== null ? `${rate.toFixed(1)}%` : '—'}
@@ -160,7 +160,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
 
       {/* Top articles : dérivé de is_upsell comme les tuiles ci-dessus, donc
           masqué tant que la collecte n'est pas active. Classement fait côté
-          serveur (unités vendues, puis CA HT) — pas de tri client. */}
+          serveur (unités vendues, puis CA TTC) — pas de tri client. */}
       {data.instrumentation_active && (
         <Card className="bg-card border border-border">
           <CardHeader>
@@ -179,7 +179,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                       <TableHead className="w-12">#</TableHead>
                       <TableHead>Article</TableHead>
                       <TableHead className="text-right">Unités vendues</TableHead>
-                      <TableHead className="text-right">CA upsell HT</TableHead>
+                      <TableHead className="text-right">CA upsell TTC</TableHead>
                       <TableHead className="text-right">Part du CA upsell</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -189,10 +189,10 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="font-medium">{row.name}</TableCell>
                         <TableCell className="text-right">{row.quantity_sold}</TableCell>
-                        <TableCell className="text-right">{eur(row.upsell_revenue_ht_cents)}</TableCell>
+                        <TableCell className="text-right">{eur(row.upsell_revenue_ttc_cents)}</TableCell>
                         <TableCell className="text-right">
-                          {current.upsell_revenue_ht_cents > 0
-                            ? `${((row.upsell_revenue_ht_cents / current.upsell_revenue_ht_cents) * 100).toFixed(1)}%`
+                          {current.upsell_revenue_ttc_cents > 0
+                            ? `${((row.upsell_revenue_ttc_cents / current.upsell_revenue_ttc_cents) * 100).toFixed(1)}%`
                             : '—'}
                         </TableCell>
                       </TableRow>
@@ -257,7 +257,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                       {...chartTooltipProps}
                       formatter={(value: number) => eur(value)}
                     />
-                    <Bar dataKey="upsell_revenue_ht_cents" fill={UPSELL_BAR_COLOR} name="CA upsell HT" />
+                    <Bar dataKey="upsell_revenue_ttc_cents" fill={UPSELL_BAR_COLOR} name="CA upsell TTC" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
@@ -279,7 +279,7 @@ export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode
                 <ExpandableDataTable<UpsellStaffRow>
                   columns={staffColumns}
                   data={staffData.staff}
-                  initialSortBy="upsell_revenue_ht_cents"
+                  initialSortBy="upsell_revenue_ttc_cents"
                   initialSortDir="desc"
                   emptyMessage="Aucune vente additionnelle attribuée à un membre de l'équipe sur cette période."
                 />
