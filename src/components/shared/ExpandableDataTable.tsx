@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronUp, ChevronDown } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Table,
   TableBody,
@@ -18,6 +19,24 @@ export interface ColumnConfig<T> {
   width?: string;
 }
 
+/**
+ * Sélection de lignes par cases à cocher. L'état est tenu par le parent (les
+ * identifiants survivent à un changement de page) ; la case de l'en-tête
+ * coche / décoche les lignes sélectionnables des données affichées.
+ */
+export interface RowSelection<T> {
+  /** Champ de la ligne qui l'identifie dans `selected`. */
+  rowKey: keyof T;
+  selected: ReadonlySet<string>;
+  onChange: (next: Set<string>) => void;
+  /** Lignes qui peuvent être cochées ; toutes par défaut. */
+  isSelectable?: (row: T) => boolean;
+  /** Info-bulle d'une ligne qui ne peut pas être cochée. */
+  unselectableReason?: string;
+  /** Libellé accessible de la case de l'en-tête. */
+  headerLabel?: string;
+}
+
 export interface ExpandableDataTableProps<T> {
   columns: ColumnConfig<T>[];
   data: T[];
@@ -29,6 +48,7 @@ export interface ExpandableDataTableProps<T> {
   emptyMessage?: string;
   emptyIcon?: React.ReactNode;
   headerClassName?: string;
+  selection?: RowSelection<T>;
 }
 
 export function ExpandableDataTable<T extends Record<string, any>>({
@@ -42,8 +62,10 @@ export function ExpandableDataTable<T extends Record<string, any>>({
   emptyMessage = 'Aucune donnée',
   emptyIcon,
   headerClassName,
+  selection,
 }: ExpandableDataTableProps<T>) {
   const isExpandable = Boolean(renderExpandedRow && expandableRowKey);
+  const leadingColumns = (isExpandable ? 1 : 0) + (selection ? 1 : 0);
   const [expandedRows, setExpandedRows] = useState<Set<string | number>>(new Set());
   const [sortColumn, setSortColumn] = useState<keyof T | undefined>(initialSortBy);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>(initialSortDir);
@@ -105,6 +127,29 @@ export function ExpandableDataTable<T extends Record<string, any>>({
     return sorted;
   }, [data, sortColumn, sortDirection]);
 
+  const isRowSelectable = (row: T) => (selection?.isSelectable ? selection.isSelectable(row) : true);
+  const selectableIds = selection
+    ? data.filter(isRowSelectable).map((row) => String(row[selection.rowKey]))
+    : [];
+  const selectedCount = selection ? selectableIds.filter((id) => selection.selected.has(id)).length : 0;
+  const allSelected = selectableIds.length > 0 && selectedCount === selectableIds.length;
+  const headerChecked: boolean | 'indeterminate' = allSelected ? true : selectedCount > 0 ? 'indeterminate' : false;
+
+  const toggleAll = () => {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    selectableIds.forEach((id) => (allSelected ? next.delete(id) : next.add(id)));
+    selection.onChange(next);
+  };
+
+  const toggleOne = (id: string) => {
+    if (!selection) return;
+    const next = new Set(selection.selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    selection.onChange(next);
+  };
+
   if (data.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -119,6 +164,16 @@ export function ExpandableDataTable<T extends Record<string, any>>({
       <Table>
         <TableHeader className={headerClassName}>
           <TableRow>
+            {selection && (
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={headerChecked}
+                  disabled={selectableIds.length === 0}
+                  onCheckedChange={toggleAll}
+                  aria-label={selection.headerLabel ?? 'Tout sélectionner'}
+                />
+              </TableHead>
+            )}
             {isExpandable && <TableHead className="w-10"></TableHead>}
             {columns.map((col) => (
               <TableHead
@@ -156,6 +211,17 @@ export function ExpandableDataTable<T extends Record<string, any>>({
                     onRowClick?.(row);
                   }}
                 >
+                  {selection && (
+                    <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selection.selected.has(String(row[selection.rowKey]))}
+                        disabled={!isRowSelectable(row)}
+                        onCheckedChange={() => toggleOne(String(row[selection.rowKey]))}
+                        title={!isRowSelectable(row) ? selection.unselectableReason : undefined}
+                        aria-label="Sélectionner la ligne"
+                      />
+                    </TableCell>
+                  )}
                   {isExpandable && (
                     <TableCell className="w-10">
                       {isExpanded ? (
@@ -176,7 +242,7 @@ export function ExpandableDataTable<T extends Record<string, any>>({
                 </TableRow>
                 {isExpanded && renderExpandedRow && (
                   <TableRow className="bg-muted/30">
-                    <TableCell colSpan={columns.length + (isExpandable ? 1 : 0)} className="p-4">
+                    <TableCell colSpan={columns.length + leadingColumns} className="p-4">
                       {renderExpandedRow(row)}
                     </TableCell>
                   </TableRow>

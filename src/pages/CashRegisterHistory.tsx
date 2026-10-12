@@ -23,6 +23,8 @@ import { Tile } from '@/components/shared/Tile';
 import { useToast } from '@/hooks/use-toast';
 import {
   CashRegisterHistoryRecord,
+  REGISTER_EXPORT_MAX,
+  exportRegistersPDF,
   getCashRegisterById,
   getCashRegisterHistory,
 } from '@/services/cashRegisterHistoryService';
@@ -74,12 +76,19 @@ const CashRegisterHistory = () => {
   const [closeConfirmDialogOpen, setCloseConfirmDialogOpen] = useState(false);
   const [closingRegisterId, setClosingRegisterId] = useState<string | null>(null);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  // Sélection pour l'export PDF : identifiants cochés (conservés d'une page à
+  // l'autre), ou toute la période affichée (selectAllPeriod).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectAllPeriod, setSelectAllPeriod] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
 
   const { toast } = useToast();
 
   // Load registers when date range changes
   useEffect(() => {
     setPage(1);
+    setSelectedIds(new Set());
+    setSelectAllPeriod(false);
   }, [dateRange]);
 
   const loadRegisters = useCallback(async (targetPage: number) => {
@@ -149,6 +158,40 @@ const CashRegisterHistory = () => {
     setExportDialogOpen(true);
   };
 
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+    setSelectAllPeriod(false);
+  };
+
+  // Seuls les registres clôturés et validés ont un PDF.
+  const isExportable = (register: CashRegisterHistoryRecord) => register.enclosed;
+
+  const handleExportSelection = async () => {
+    setExportingPdf(true);
+    try {
+      const result = await exportRegistersPDF(
+        selectAllPeriod
+          ? { dateFrom: dateRange.from, dateTo: dateRange.to }
+          : { registerIds: Array.from(selectedIds) }
+      );
+      toast({
+        title: 'Export terminé',
+        description:
+          result.ignored > 0
+            ? `${result.exported} PDF téléchargés. ${result.ignored} registre(s) écarté(s) car non clôturé(s) ou introuvable(s) : voir ignores.txt dans l'archive.`
+            : `${result.exported} PDF téléchargé${result.exported > 1 ? 's' : ''}.`,
+      });
+    } catch (error) {
+      toast({
+        title: "Erreur d'export",
+        description: error instanceof Error ? error.message : "L'export des registres a échoué.",
+        variant: 'destructive',
+      });
+    } finally {
+      setExportingPdf(false);
+    }
+  };
+
   const handleEncloseSuccess = async () => {
     if (!selectedRegisterForEnclose) return;
 
@@ -171,6 +214,18 @@ const CashRegisterHistory = () => {
   const totalPages = Math.max(1, metadata.total_pages || 1);
   const displayStart = registers.length === 0 ? 0 : ((currentPage - 1) * currentLimit) + 1;
   const displayEnd = registers.length === 0 ? 0 : displayStart + registers.length - 1;
+
+  // Sélection effective : en mode « toute la période », toutes les lignes
+  // exportables de la page sont cochées.
+  const exportableOnPage = registers.filter(isExportable);
+  const effectiveSelection = selectAllPeriod
+    ? new Set(exportableOnPage.map((register) => register.id))
+    : selectedIds;
+  const selectedCount = selectAllPeriod ? totalItems : selectedIds.size;
+  const allPageSelected =
+    exportableOnPage.length > 0 && exportableOnPage.every((register) => selectedIds.has(register.id));
+  const periodHasMorePages = totalItems > registers.length;
+  const overExportLimit = selectedCount > REGISTER_EXPORT_MAX;
 
   return (
     <DashboardLayout>
@@ -225,6 +280,47 @@ const CashRegisterHistory = () => {
             icon={Clock}
           />
         </div>
+
+        {/* ═══ BARRE DE SÉLECTION (export PDF) ═══ */}
+        {selectedCount > 0 && (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1 text-sm">
+              <p className="font-medium">
+                {selectAllPeriod
+                  ? `Les ${totalItems} registres de la période sont sélectionnés.`
+                  : `${selectedCount} registre${selectedCount > 1 ? 's' : ''} sélectionné${selectedCount > 1 ? 's' : ''}.`}
+                {!selectAllPeriod && allPageSelected && periodHasMorePages && (
+                  <Button
+                    variant="link"
+                    className="h-auto px-2 py-0 text-sm"
+                    onClick={() => setSelectAllPeriod(true)}
+                  >
+                    Sélectionner les {totalItems} registres de la période
+                  </Button>
+                )}
+                <Button variant="link" className="h-auto px-2 py-0 text-sm" onClick={clearSelection}>
+                  Tout désélectionner
+                </Button>
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Seuls les registres clôturés et validés sont exportés (un PDF par registre, dans une archive ZIP).
+              </p>
+              {overExportLimit && (
+                <p className="text-xs font-medium text-destructive">
+                  {REGISTER_EXPORT_MAX} registres au maximum par export : réduisez la période ou la sélection.
+                </p>
+              )}
+            </div>
+            <Button
+              onClick={handleExportSelection}
+              disabled={exportingPdf || overExportLimit}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              {exportingPdf ? 'Export en cours…' : `Télécharger (${selectedCount})`}
+            </Button>
+          </div>
+        )}
 
         {/* ═══ TABLE SECTION ═══ */}
         <Card>
@@ -362,6 +458,18 @@ const CashRegisterHistory = () => {
                   },
                 ]}
                 data={registers}
+                selection={{
+                  rowKey: 'id',
+                  selected: effectiveSelection,
+                  onChange: (next) => {
+                    // Toute modification manuelle sort du mode « toute la période ».
+                    setSelectAllPeriod(false);
+                    setSelectedIds(next);
+                  },
+                  isSelectable: isExportable,
+                  unselectableReason: 'Seuls les registres clôturés et validés peuvent être exportés en PDF.',
+                  headerLabel: 'Sélectionner les registres exportables de la page',
+                }}
                 expandableRowKey="id"
                 initialSortBy="start_date"
                 initialSortDir="desc"

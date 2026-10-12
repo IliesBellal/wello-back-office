@@ -9,7 +9,7 @@
  * ici.
  */
 import { useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, CreditCard, Package, RefreshCw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -20,7 +20,10 @@ import { SettingsCard, SettingsGrid, SettingsPageContainer } from "@/components/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModuleOfferCard } from "@/components/subscription/ModuleOfferCard";
+import { PayoutDocumentsPanel } from "@/components/subscription/PayoutDocumentsPanel";
+import { SubscriptionInvoicesPanel } from "@/components/subscription/SubscriptionInvoicesPanel";
 
 import { usePermissions } from "@/hooks/usePermissions";
 import { qk } from "@/lib/queryKeys";
@@ -40,7 +43,19 @@ export default function SubscriptionManagement() {
   return <SubscriptionManagementContent />;
 }
 
+const TAB_VALUES = ["abonnement", "factures", "virements"] as const;
+type SubscriptionTab = (typeof TAB_VALUES)[number];
+
 function SubscriptionManagementContent() {
+  const { canViewFinancials } = usePermissions();
+  // Onglet courant gardé dans l'URL (?tab=factures) : rechargement et liens directs.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const tab: SubscriptionTab =
+    TAB_VALUES.includes(requestedTab as SubscriptionTab) && (requestedTab !== "virements" || canViewFinancials)
+      ? (requestedTab as SubscriptionTab)
+      : "abonnement";
+
   const currentQ = useQuery({
     queryKey: qk.subscriptions.current,
     queryFn: () => subscriptionsApi.getCurrent(),
@@ -57,36 +72,60 @@ function SubscriptionManagementContent() {
         header={<h1 className="text-3xl font-bold text-foreground">Abonnement & facturation</h1>}
         description="Consultez votre abonnement WelloResto et gérez les modules activés."
       >
-        {currentQ.isLoading ? (
-          <SettingsPageContainer>
-            <SettingsGrid>
-              <SettingsCard title="Chargement…">
-                <Skeleton className="h-32 w-full" />
-              </SettingsCard>
-            </SettingsGrid>
-          </SettingsPageContainer>
-        ) : currentQ.error || !currentQ.data ? (
-          <SettingsPageContainer>
-            <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-destructive">
-              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
-              <div>
-                <p className="font-medium">Impossible de charger votre abonnement.</p>
-                <p className="text-sm">{(currentQ.error as Error | null)?.message ?? "Erreur inconnue."}</p>
-              </div>
-            </div>
-          </SettingsPageContainer>
-        ) : (
-          <SettingsPageContainer>
-            <SettingsGrid>
-              <CompositionCard current={currentQ.data} />
-              <BillingCard
-                activationState={activationQ.data?.activation_state}
-                subscriptionStatus={activationQ.data?.subscription_status}
-              />
-              <ModulesCard current={currentQ.data} />
-            </SettingsGrid>
-          </SettingsPageContainer>
-        )}
+        <Tabs value={tab} onValueChange={(value) => setSearchParams(value === "abonnement" ? {} : { tab: value }, { replace: true })} className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="abonnement">Abonnement</TabsTrigger>
+            <TabsTrigger value="factures">Factures</TabsTrigger>
+            {canViewFinancials && <TabsTrigger value="virements">Virements</TabsTrigger>}
+          </TabsList>
+
+          <TabsContent value="abonnement">
+            {currentQ.isLoading ? (
+              <SettingsPageContainer>
+                <SettingsGrid>
+                  <SettingsCard title="Chargement…">
+                    <Skeleton className="h-32 w-full" />
+                  </SettingsCard>
+                </SettingsGrid>
+              </SettingsPageContainer>
+            ) : currentQ.error || !currentQ.data ? (
+              <SettingsPageContainer>
+                <div className="flex items-start gap-3 rounded-md border border-destructive/40 bg-destructive/5 p-4 text-destructive">
+                  <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
+                  <div>
+                    <p className="font-medium">Impossible de charger votre abonnement.</p>
+                    <p className="text-sm">{(currentQ.error as Error | null)?.message ?? "Erreur inconnue."}</p>
+                  </div>
+                </div>
+              </SettingsPageContainer>
+            ) : (
+              <SettingsPageContainer>
+                <SettingsGrid>
+                  <CompositionCard current={currentQ.data} />
+                  <BillingCard
+                    activationState={activationQ.data?.activation_state}
+                    subscriptionStatus={activationQ.data?.subscription_status}
+                  />
+                  <ModulesCard current={currentQ.data} />
+                </SettingsGrid>
+              </SettingsPageContainer>
+            )}
+          </TabsContent>
+
+          <TabsContent value="factures">
+            <SettingsPageContainer>
+              <SubscriptionInvoicesPanel />
+            </SettingsPageContainer>
+          </TabsContent>
+
+          {canViewFinancials && (
+            <TabsContent value="virements">
+              <SettingsPageContainer>
+                <PayoutDocumentsPanel />
+              </SettingsPageContainer>
+            </TabsContent>
+          )}
+        </Tabs>
       </PageContainer>
     </DashboardLayout>
   );

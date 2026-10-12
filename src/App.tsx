@@ -29,7 +29,6 @@ import ComponentCategoriesTable from './pages/ComponentCategoriesTable';
 import FinancialReports from './pages/FinancialReports';
 import FiscalArchives from './pages/FiscalArchives';
 import Attestation from './pages/Attestation';
-import PayoutDocuments from './pages/PayoutDocuments';
 import Locations from './pages/Locations';
 import CashRegisterHistory from './pages/CashRegisterHistory';
 import VAT from './pages/TVA';
@@ -45,6 +44,7 @@ import DashboardOrderHistory from './pages/DashboardOrderHistory';
 import IntegrationsOverview from './pages/IntegrationsOverview';
 import UberEats from './pages/UberEats';
 import Deliveroo from './pages/Deliveroo';
+import AccountingSync from './pages/AccountingSync';
 import ScanNOrder from './pages/ScanNOrder';
 import EquipePage from './pages/equipe/EquipePage';
 import PlanningPage from './pages/equipe/PlanningPage';
@@ -119,7 +119,6 @@ const App = () => (
               <Route path="/accounting/report" element={<ProtectedRoute><FinancialReports /></ProtectedRoute>} />
               <Route path="/accounting/fiscal-archives" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'reports.financial.read')}><FiscalArchives /></ProtectedRoute>} />
               <Route path="/accounting/attestation" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'reports.financial.read')}><Attestation /></ProtectedRoute>} />
-              <Route path="/accounting/payouts" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'reports.financial.read')}><PayoutDocuments /></ProtectedRoute>} />
               
               {/* Reports & Analytics */}
               {/* Consolidated under Accounting section */}
@@ -168,6 +167,7 @@ const App = () => (
               <Route path="/integrations/scannorder" element={<ProtectedRoute requiredModule="scannorder" accessCheck={(authData) => checkPermission(authData, 'platforms.manage')}><ScanNOrder /></ProtectedRoute>} />
               <Route path="/integrations/uber-eats" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'platforms.manage')}><UberEats /></ProtectedRoute>} />
               <Route path="/integrations/deliveroo" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'platforms.manage')}><Deliveroo /></ProtectedRoute>} />
+              <Route path="/integrations/accounting" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'platforms.manage')}><AccountingSync /></ProtectedRoute>} />
               
               {/* HACCP - Hygiene & Safety */}
               <Route path="/haccp/activity" element={<ProtectedRoute requiredModule="haccp"><HacCPActivity /></ProtectedRoute>} />

@@ -44,7 +44,7 @@ import {
   CreditCard,
   Archive,
   FileSignature,
-  Landmark,
+  Calculator,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -367,14 +367,6 @@ export const NAV_ITEMS: NavItem[] = [
         // settings.manage côté API.
         visibilityCheck: (authData) => checkPermission(authData, 'reports.financial.read'),
       },
-      {
-        id: 'payouts',
-        title: 'Versements',
-        icon: Landmark,
-        href: '/accounting/payouts',
-        // Matches the route guard and the API (/accounting/* : reports.financial.read).
-        visibilityCheck: (authData) => checkPermission(authData, 'reports.financial.read'),
-      },
     ],
   },
 
@@ -422,6 +414,14 @@ export const NAV_ITEMS: NavItem[] = [
         title: 'Deliveroo',
         icon: Store,
         href: '/integrations/deliveroo',
+        visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
+      },
+      {
+        id: 'accounting-sync',
+        title: 'Comptabilité',
+        icon: Calculator,
+        href: '/integrations/accounting',
+        // Même droit que l'API (/accounting-integrations : platforms.manage).
         visibilityCheck: (authData) => checkPermission(authData, 'platforms.manage'),
       },
     ],

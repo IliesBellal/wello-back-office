@@ -372,6 +372,32 @@ export const getCashRegisterStats = async (
   );
 };
 
+const saveBlob = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  window.URL.revokeObjectURL(url);
+};
+
+// Nom de fichier proposé par l'API (Content-Disposition), à défaut `fallback`.
+const filenameFromResponse = (response: Response, fallback: string): string => {
+  const match = /filename="?([^";]+)"?/i.exec(response.headers.get('Content-Disposition') ?? '');
+  return match ? match[1] : fallback;
+};
+
+// Message à afficher pour une réponse d'erreur de l'API : le message en français
+// de premier niveau quand il existe, sinon `fallback`.
+const errorMessageFromResponse = async (response: Response, fallback: string): Promise<string> => {
+  try {
+    const body = await response.json();
+    return body?.message || body?.data?.message || fallback;
+  } catch {
+    return fallback;
+  }
+};
+
 export const exportRegisterPDF = async (registerId: string): Promise<void> => {
   logAPI('POST', `/accounting/registers/${registerId}/export-pdf`);
 
@@ -394,70 +420,86 @@ export const exportRegisterPDF = async (registerId: string): Promise<void> => {
         }
       );
 
-      if (!response.ok) throw new Error('Export failed');
+      if (!response.ok) {
+        throw new Error(await errorMessageFromResponse(response, "L'export du registre a échoué."));
+      }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `register_${registerId}.pdf`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      saveBlob(await response.blob(), `register_${registerId}.pdf`);
     }
   );
 };
 
-export const exportPeriodRegisters = async (
-  startDate: Date | string,
-  endDate: Date | string,
-  type: 'all' | 'Z' | 'X' = 'all',
-  format: 'zip' | 'single' = 'zip'
-): Promise<void> => {
-  const startDateUTC = toUTCDateString(startDate);
-  const endDateUTC = toUTCDateString(endDate);
+/** Plafond de registres d'un export (aligné sur RegisterExportMax côté API). */
+export const REGISTER_EXPORT_MAX = 100;
 
-  logAPI('POST', '/accounting/registers/export-period', {
-    start_date: startDateUTC,
-    end_date: endDateUTC,
-    type,
-    format,
-  });
+/**
+ * Registres à exporter : une sélection d'identifiants, ou toute une période —
+ * la même que celle de la liste (mêmes bornes, mêmes registres visibles).
+ */
+export type RegisterExportSelection =
+  | { registerIds: string[] }
+  | { dateFrom: Date | string; dateTo: Date | string };
+
+export interface RegisterExportResult {
+  /** PDF contenus dans le téléchargement. */
+  exported: number;
+  /** Registres demandés mais écartés (listés dans ignores.txt du ZIP). */
+  ignored: number;
+}
+
+/**
+ * Télécharge les PDF des registres choisis : un seul registre donne son PDF,
+ * plusieurs (ou une période) un ZIP avec un PDF par registre. Seuls les
+ * registres clôturés et validés sont exportés ; les autres sont écartés et
+ * comptés dans `ignored`.
+ */
+export const exportRegistersPDF = async (
+  selection: RegisterExportSelection
+): Promise<RegisterExportResult> => {
+  if ('registerIds' in selection && selection.registerIds.length === 1) {
+    await exportRegisterPDF(selection.registerIds[0]);
+    return { exported: 1, ignored: 0 };
+  }
+
+  const body =
+    'registerIds' in selection
+      ? { register_ids: selection.registerIds }
+      : {
+          // Mêmes bornes que la liste (getCashRegisterHistory).
+          date_from: `${toUTCDateString(selection.dateFrom)} 00:00:00`,
+          date_to: `${toUTCDateString(selection.dateTo)} 23:59:59`,
+        };
+
+  logAPI('POST', '/accounting/registers/export-pdf', body);
 
   return withMock(
     () => {
-      // Mock: trigger download with dummy ZIP
-      const link = document.createElement('a');
-      link.href = `/mock-registers-${startDateUTC}-${endDateUTC}.zip`;
-      link.download = `registers_${startDateUTC}_to_${endDateUTC}.zip`;
-      link.click();
+      const count = 'registerIds' in selection ? selection.registerIds.length : mockRegisters.length;
+      return { exported: count, ignored: 0 };
     },
     async () => {
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'https://api.example.com'}/accounting/registers/export-period`,
+        `${import.meta.env.VITE_API_BASE_URL || 'https://api.example.com'}/accounting/registers/export-pdf`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${getStoredAuthToken() || ''}`,
           },
-          body: JSON.stringify({
-            start_date: startDateUTC,
-            end_date: endDateUTC,
-            type,
-            format,
-          }),
+          body: JSON.stringify(body),
         }
       );
 
-      if (!response.ok) throw new Error('Export failed');
+      if (!response.ok) {
+        throw new Error(await errorMessageFromResponse(response, "L'export des registres a échoué."));
+      }
 
       const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `registers_${startDateUTC}_to_${endDateUTC}.${format === 'zip' ? 'zip' : 'pdf'}`;
-      link.click();
-      window.URL.revokeObjectURL(url);
+      saveBlob(blob, filenameFromResponse(response, 'registres.zip'));
+      return {
+        exported: Number(response.headers.get('X-Registers-Exported') ?? 0),
+        ignored: Number(response.headers.get('X-Registers-Ignored') ?? 0),
+      };
     }
   );
 };
