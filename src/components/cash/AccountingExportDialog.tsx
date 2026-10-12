@@ -169,7 +169,7 @@ export const AccountingExportDialog = ({ open, onOpenChange, dateRange }: Accoun
               <div>
                 <p className="text-sm font-semibold">Canaux de commande</p>
                 <p className="text-xs text-muted-foreground">
-                  Clôture automatique : choisissez les canaux à inclure. La TVA est ventilée à partir des
+                  Choisissez les canaux à inclure. La TVA est ventilée à partir des
                   encaissements de ces commandes.
                 </p>
               </div>
@@ -197,7 +197,7 @@ export const AccountingExportDialog = ({ open, onOpenChange, dateRange }: Accoun
           ) : (
             <p className="rounded-md border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
               Clôture manuelle : l'export reprend la TVA des ventes et les encaissements déclarés lors des
-              clôtures de caisse. Il n'est pas filtrable par canal.
+              clôtures de caisse.
             </p>
           )}
 
