@@ -14,7 +14,7 @@ import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_COLORS, CHANNEL_LABELS } from '@/utils/channels';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
-import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
+import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle, CumulativeSectionTitle } from '@/components/analytics/ChartSync';
 
 interface VATAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -114,62 +114,67 @@ export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 
         <Tile title="Total TTC" value={eur(current.total_ttc_cents)} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="bg-card border border-border lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">TVA par taux</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={byRateChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="rate" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip
-                  {...chartTooltipProps}
-                  formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                />
-                <Legend />
-                <Bar dataKey="base_ht" fill="#3b82f6" name="Base HT" />
-                <Bar dataKey="vat" fill="#f59e0b" name="TVA" />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">TVA par canal</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {byChannelPieData.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">Aucune donnée sur cette période</div>
-            ) : (
+      <div className="space-y-3">
+        {data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0 && (
+          <CumulativeSectionTitle merchantIds={data.by_merchant.map((m) => m.merchant_id)} />
+        )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="bg-card border border-border lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">TVA par taux</CardTitle>
+            </CardHeader>
+            <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={byChannelPieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
-                  >
-                    {byChannelPieData.map((entry) => (
-                      <Cell key={entry.key} fill={entry.color} />
-                    ))}
-                  </Pie>
+                <BarChart data={byRateChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="rate" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
                   <Tooltip
                     {...chartTooltipProps}
                     formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                   />
                   <Legend />
-                </PieChart>
+                  <Bar dataKey="base_ht" fill="#3b82f6" name="Base HT" />
+                  <Bar dataKey="vat" fill="#f59e0b" name="TVA" />
+                </BarChart>
               </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border border-border">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">TVA par canal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {byChannelPieData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">Aucune donnée sur cette période</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={byChannelPieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label
+                    >
+                      {byChannelPieData.map((entry) => (
+                        <Cell key={entry.key} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      {...chartTooltipProps}
+                      formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0 && (

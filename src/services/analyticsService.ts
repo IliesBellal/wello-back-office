@@ -259,6 +259,13 @@ export interface ProductsCostCoverage {
 // simplement pas de coût connu sur la période. evolution_percent est absent
 // pour un produit sans vente sur la période précédente (jamais un -100%
 // trompeur).
+export interface ProductsMerchantTotal {
+  merchant_id: string;
+  quantity_sold: number;
+  revenue_ttc_cents: number;
+  revenue_ht_cents: number;
+}
+
 export interface ProductRow {
   product_id: string;
   name: string;
@@ -275,6 +282,9 @@ export interface ProductRow {
   no_recipe_quantity: number;
   incomplete_recipe_quantity: number;
   evolution_percent?: number;
+  // Ventilation de ce produit par établissement — uniquement avec
+  // group_by=merchant. Un établissement sans vente est absent, pas à 0.
+  by_merchant?: ProductsMerchantTotal[];
 }
 
 export interface ProductsAnalyticsResponse {
@@ -288,6 +298,9 @@ export interface ProductsAnalyticsResponse {
   available_categories: ProductCategoryOption[];
   pagination: { total_items: number; total_pages: number; current_page: number; limit: number };
   rows: ProductRow[];
+  // Totaux de toute la période par établissement (pas seulement la page
+  // affichée) — uniquement avec group_by=merchant.
+  by_merchant?: ProductsMerchantTotal[];
 }
 
 export interface ProductsAnalyticsFilters {
@@ -297,10 +310,11 @@ export interface ProductsAnalyticsFilters {
   page?: number;
   pageSize?: number;
   // merchantIds scopes to a subset of the accessible establishments (PROMPT
-  // 24 Phase 3) — no group_by here: Produits is a paginated table, not one
-  // of the 5 comparable tabs, so a multi-establishment selection always
-  // aggregates.
+  // 24 Phase 3). groupBy 'compare' (with 2+ merchantIds) asks for the
+  // per-establishment split — totals plus a split on each row. Pagination and
+  // sorting still act on the cumulated per-product aggregate.
   merchantIds?: string[];
+  groupBy?: ComparisonMode;
   orderFilter?: OrderFilterSelection;
 }
 
@@ -821,26 +835,6 @@ export interface ClientsTopResponse {
   top_clients: ClientRow[];
 }
 
-// Restaurants Comparative
-interface RestaurantComparative {
-  restaurant_id: string;
-  name: string;
-  value: number;
-  previous_period: number;
-  evolution_percent: number;
-  rank: number;
-}
-
-interface RestaurantsAnalyticsResponse {
-  by_restaurant: RestaurantComparative[];
-  timeline?: Array<{ date: string; [key: string]: unknown }>;
-  breakdown?: Array<{ name: string; value: number }>;
-  comparisons: {
-    previous_period: { value: number; change: number };
-    year_ago: { value: number; change: number };
-  };
-}
-
 // Order History
 export interface OrderHistoryItem {
   id: string;
@@ -1325,13 +1319,13 @@ class AnalyticsService {
   ): Promise<ProductsAnalyticsResponse> {
     const dateFrom = toLocalDateString(startDate);
     const dateTo = toLocalDateString(endDate);
-    const { categoryId, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds, orderFilter } = filters;
+    const { categoryId, sortBy = 'quantity', sortDir = 'desc', page = 1, pageSize = 50, merchantIds, groupBy, orderFilter } = filters;
 
     const mockPeriod = (from: string, to: string): ProductsPeriodTotals => ({
       from, to, quantity_sold: 1725, revenue_ttc_cents: 1482500, revenue_ht_cents: 1268500,
     });
 
-    return withMock(
+    return withMock<ProductsAnalyticsResponse>(
       () => ({
         scope: { merchant_ids: ['mock'], group_by: 'none' },
         category_id: categoryId ?? '',
@@ -1366,6 +1360,7 @@ class AnalyticsService {
             sort_by: sortBy, sort_dir: sortDir,
             page, page_size: pageSize,
             merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+            group_by: groupBy === 'compare' && (merchantIds?.length ?? 0) > 1 ? 'merchant' : undefined,
             ...orderFilterToRequestFields(orderFilter),
           }
         );
@@ -1509,7 +1504,12 @@ class AnalyticsService {
           '/analytics/cancellations',
           { date_from: dateFrom, date_to: dateTo, ...scopeToRequestFields(scope) }
         );
-        return response.data;
+        return {
+          ...response.data,
+          by_reason: response.data.by_reason ?? [],
+          by_author_type: response.data.by_author_type ?? [],
+          by_channel: response.data.by_channel ?? [],
+        };
       }
     );
   }
@@ -1550,7 +1550,7 @@ class AnalyticsService {
             ...orderFilterToRequestFields(orderFilter),
           }
         );
-        return response.data;
+        return { ...response.data, staff: response.data.staff ?? [] };
       }
     );
   }
@@ -1616,7 +1616,8 @@ class AnalyticsService {
             merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
           }
         );
-        return response.data;
+        // Le serveur peut renvoyer `rows: null` sans remise — normalisé ici.
+        return { ...response.data, rows: response.data.rows ?? [] };
       }
     );
   }
@@ -1729,66 +1730,6 @@ class AnalyticsService {
         return response.data;
       }
     );
-  }
-
-  /**
-   * Récupère les données comparatives restaurants
-   */
-  getRestaurantsAnalytics(
-    startDate: string | Date,
-    endDate: string | Date,
-    restaurantIds?: string[],
-    metric: string = 'revenue'
-  ): RestaurantsAnalyticsResponse {
-    // Convert Date to string if needed
-    const start = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
-    const end = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
-    const mockRestaurants: RestaurantComparative[] = [
-      {
-        restaurant_id: '1',
-        name: 'Restaurant Paris 8ème',
-        value: 14825,
-        previous_period: 14200,
-        evolution_percent: 4.4,
-        rank: 1,
-      },
-      {
-        restaurant_id: '2',
-        name: 'Restaurant Marseille',
-        value: 12450,
-        previous_period: 12100,
-        evolution_percent: 2.9,
-        rank: 2,
-      },
-      {
-        restaurant_id: '3',
-        name: 'Restaurant Lyon',
-        value: 8920,
-        previous_period: 8650,
-        evolution_percent: 3.1,
-        rank: 3,
-      },
-    ];
-
-    const mockTimeline = Array.from({ length: 30 }, (_, i) => {
-      const date = new Date(startDate);
-      date.setDate(date.getDate() + i);
-      return {
-        date: date.toISOString().split('T')[0],
-        'Paris 8ème': Math.floor(400 + Math.random() * 200),
-        'Marseille': Math.floor(350 + Math.random() * 180),
-        'Lyon': Math.floor(250 + Math.random() * 120),
-      };
-    });
-
-    return {
-      by_restaurant: mockRestaurants,
-      timeline: metric === 'revenue' ? mockTimeline : undefined,
-      comparisons: {
-        previous_period: { value: 38950, change: 3.8 },
-        year_ago: { value: 35200, change: 14.2 },
-      },
-    };
   }
 
   /**
@@ -2050,7 +1991,9 @@ class AnalyticsService {
             ...orderFilterToRequestFields(orderFilter),
           }
         );
-        return response.data;
+        // Le serveur peut renvoyer `staff: null` (slice vide côté Go) — on
+        // normalise ici pour que l'onglet n'ait jamais à tester null.
+        return { ...response.data, staff: response.data.staff ?? [] };
       }
     );
   }

@@ -1,5 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
-import { LucideIcon } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Info, LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ReactNode } from 'react';
 
@@ -7,6 +8,8 @@ export interface TileProps {
   title: string;
   value: string | ReactNode;
   subtitle?: string;
+  /** Explication affichée au survol d'une icône d'aide à côté du titre. */
+  info?: string;
   icon?: LucideIcon;
   trend?: string;
   isHighlighted?: boolean;
@@ -38,8 +41,9 @@ export interface TileProps {
 export const Tile = ({ 
   title, 
   value, 
-  subtitle, 
-  icon: Icon, 
+  subtitle,
+  info,
+  icon: Icon,
   trend,
   isHighlighted = false,
   onClick,
@@ -60,10 +64,20 @@ export const Tile = ({
         <div className="flex items-start justify-between">
           <div className="space-y-2 flex-1">
             <p className={cn(
-              "text-sm font-medium",
+              "text-sm font-medium flex items-center gap-1.5",
               isHighlighted ? "text-white/90" : "text-muted-foreground"
             )}>
               {title}
+              {info && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" aria-label={`Définition : ${title}`} className="cursor-help">
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs text-xs leading-relaxed">{info}</TooltipContent>
+                </Tooltip>
+              )}
             </p>
             <div>
               <h3 className={cn(

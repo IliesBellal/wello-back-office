@@ -149,3 +149,24 @@ export function EstablishmentSectionTitle({ merchantId, label }: { merchantId: s
     </div>
   );
 }
+
+/**
+ * Section header for the cumulated chart block shown after (or before) the per-establishment duplicates in compare mode —
+ * one overlapping swatch per compared establishment (same palette as EstablishmentSectionTitle) + "Cumulé".
+ */
+export function CumulativeSectionTitle({ merchantIds }: { merchantIds: string[] }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="flex items-center -space-x-1.5" aria-hidden="true">
+        {merchantIds.map((merchantId) => (
+          <span
+            key={merchantId}
+            className="inline-block w-3 h-3 rounded-full shrink-0 ring-2 ring-background"
+            style={{ backgroundColor: merchantColor(merchantId) }}
+          />
+        ))}
+      </span>
+      <h3 className="text-base font-semibold text-foreground">Cumulé</h3>
+    </div>
+  );
+}

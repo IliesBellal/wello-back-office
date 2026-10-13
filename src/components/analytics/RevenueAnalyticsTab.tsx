@@ -14,7 +14,7 @@ import { CHANNEL_COLORS, CHANNEL_LABELS, CHANNEL_ORDER } from '@/utils/channels'
 import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
-import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle } from '@/components/analytics/ChartSync';
+import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle, CumulativeSectionTitle } from '@/components/analytics/ChartSync';
 import { usePerMerchantAnalytics } from '@/hooks/usePerMerchantAnalytics';
 
 interface RevenueAnalyticsTabProps {
@@ -255,71 +255,74 @@ export const RevenueAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
         </p>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="bg-card border border-border lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Évolution CA</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={timelineChartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                <XAxis dataKey="date" stroke="#6b7280" />
-                <YAxis stroke="#6b7280" />
-                <Tooltip
-                  {...chartTooltipProps}
-                  formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-                />
-                <Legend />
-                {presentChannels.map((channel) => (
-                  <Area
-                    key={channel}
-                    type="monotone"
-                    dataKey={channel}
-                    stackId="1"
-                    stroke={CHANNEL_COLORS[channel]}
-                    fill={CHANNEL_COLORS[channel]}
-                    name={CHANNEL_LABELS[channel]}
-                  />
-                ))}
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-card border border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Répartition CA par canal</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {channelPieData.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">Aucune donnée sur cette période</div>
-            ) : (
+      <div className="space-y-3">
+        {compareMerchantIds.length > 0 && <CumulativeSectionTitle merchantIds={compareMerchantIds} />}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card className="bg-card border border-border lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Évolution CA</CardTitle>
+            </CardHeader>
+            <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={channelPieData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label
-                  >
-                    {channelPieData.map((entry) => (
-                      <Cell key={entry.key} fill={entry.color} />
-                    ))}
-                  </Pie>
+                <AreaChart data={timelineChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis dataKey="date" stroke="#6b7280" />
+                  <YAxis stroke="#6b7280" />
                   <Tooltip
                     {...chartTooltipProps}
                     formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
                   />
                   <Legend />
-                </PieChart>
+                  {presentChannels.map((channel) => (
+                    <Area
+                      key={channel}
+                      type="monotone"
+                      dataKey={channel}
+                      stackId="1"
+                      stroke={CHANNEL_COLORS[channel]}
+                      fill={CHANNEL_COLORS[channel]}
+                      name={CHANNEL_LABELS[channel]}
+                    />
+                  ))}
+                </AreaChart>
               </ResponsiveContainer>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border border-border">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Répartition CA par canal</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {channelPieData.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">Aucune donnée sur cette période</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={channelPieData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label
+                    >
+                      {channelPieData.map((entry) => (
+                        <Cell key={entry.key} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      {...chartTooltipProps}
+                      formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <div className="flex justify-end">

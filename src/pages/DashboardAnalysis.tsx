@@ -18,7 +18,7 @@ import { EstablishmentFilter } from '@/components/analytics/EstablishmentFilter'
 import { OrderFilter } from '@/components/analytics/OrderFilter';
 import { DEFAULT_ORDER_FILTER, type OrderFilterSelection } from '@/utils/orderFilters';
 import { subDays, format } from 'date-fns';
-import { TrendingUp, TrendingDown, Download, ChevronRight } from 'lucide-react';
+import { Download, ChevronRight } from 'lucide-react';
 import { UpsellAnalyticsTab } from '@/components/analytics/UpsellAnalyticsTab';
 import { RevenueAnalyticsTab } from '@/components/analytics/RevenueAnalyticsTab';
 import { OrdersAnalyticsTab } from '@/components/analytics/OrdersAnalyticsTab';
@@ -31,10 +31,9 @@ import { ClientsAnalyticsTab } from '@/components/analytics/ClientsAnalyticsTab'
 import { DiscountsAnalyticsTab } from '@/components/analytics/DiscountsAnalyticsTab';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { TabSystem } from '@/components/shared/TabSystem';
-import { Tile } from '@/components/shared/Tile';
 import { toast } from 'sonner';
 
-type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'paiements' | 'tva' | 'restaurants';
+type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'paiements' | 'tva';
 
 // Onglets dont l'endpoint accepte le filtre canal × type de commande
 // (OrderFilterRequest, internal/modules/analytics/order_filter.go). Ailleurs
@@ -45,24 +44,6 @@ interface DateRange {
   from: Date;
   to: Date;
 }
-
-const EvolutionBadge = ({ percent }: { percent: number }) => (
-  <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-    {percent >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-    <span className="font-medium">{percent > 0 ? '+' : ''}{percent.toFixed(1)}%</span>
-  </div>
-);
-
-// Remplace le MetricCard local par une fonction qui crée des Tile
-const MetricCard = ({ label, value, change, isHighlighted }: { label: string; value: string | number; change?: number; isHighlighted?: boolean }) => (
-  <Tile 
-    title={label}
-    value={value}
-    isHighlighted={isHighlighted}
-  >
-    {typeof change === 'number' && <EvolutionBadge percent={change} />}
-  </Tile>
-);
 
 export const DashboardAnalysis = () => {
   const { canViewAnalytics } = usePermissions();
@@ -139,36 +120,10 @@ const DashboardAnalysisContent = () => {
     setSelectedMerchantIds(next);
   };
 
-  // Données analytiques
-  const analyticsData = useMemo(() => {
-    return {
-      restaurants: analyticsService.getRestaurantsAnalytics(dateRange.from, dateRange.to),
-    };
-  }, [dateRange]);
-
   // ==================== ONGLETS CA / COMMANDES / PRODUITS / OPTIONS / RÈGLEMENTS / TVA / ANNULATIONS / VENTE ADDITIONNELLE / CLIENTS / REMISES ====================
   // Branchés en SQL direct — voir components/analytics/{Revenue,Orders,Products,Options,Payments,VAT,Cancellations,Upsell,Clients,Discounts}AnalyticsTab.tsx.
-  // Reste des onglets : toujours sur analyticsData (mocks) ci-dessus.
   // (Tags retiré, PROMPT 09 lot 3 C4 — voir docs/analytics/TAGS_RETRAIT.md :
   // aucun établissement PROD n'étiquette ses produits.)
-
-  // ==================== ONGLET RESTAURANTS ====================
-  const renderRestaurantsTab = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {analyticsData.restaurants.by_restaurant.map((restaurant, idx) => (
-          <div key={restaurant.restaurant_id}>
-            <MetricCard
-              label={restaurant.name}
-              value={restaurant.value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
-              change={restaurant.evolution_percent}
-              isHighlighted={idx === 0}
-            />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
 
   // ==================== RENDU PRINCIPAL ====================
   // Tous les onglets branchés en SQL direct reçoivent le périmètre
@@ -203,8 +158,6 @@ const DashboardAnalysisContent = () => {
         return <PaymentsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'tva':
         return <VATAnalyticsTab dateRange={dateRange} {...scopeProps} />;
-      case 'restaurants':
-        return renderRestaurantsTab();
       default:
         return null;
     }
@@ -221,7 +174,6 @@ const DashboardAnalysisContent = () => {
     { id: 'clients', label: 'Clients' },
     { id: 'paiements', label: 'Règlements' },
     { id: 'tva', label: 'TVA' },
-    { id: 'restaurants', label: 'Restaurants' },
   ];
 
   return (

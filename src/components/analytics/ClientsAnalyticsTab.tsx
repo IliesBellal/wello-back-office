@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tile } from '@/components/shared/Tile';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ExportButton } from '@/components/analytics';
 import { ExpandableDataTable, ColumnConfig } from '@/components/shared/ExpandableDataTable';
 import { ChannelFilter } from '@/components/analytics/ChannelFilter';
@@ -43,7 +44,38 @@ const SEGMENT_BADGE_CLASS: Record<string, string> = {
   dormant: 'bg-amber-100 text-amber-700',
 };
 
-const CHANNEL_FILTER_OPTIONS = CHANNEL_ORDER.map((c) => ({ id: c, label: CHANNEL_LABELS[c] ?? c }));
+// Libellé de phrase dans data.definitions.segments → clé de segment. Les
+// seuils (5 commandes, 180 jours) ne sont écrits qu'une fois, côté serveur
+// (clientsDefinitions) : on découpe son texte plutôt que de les dupliquer ici.
+const SEGMENT_SENTENCE_PREFIX: Record<string, string> = {
+  nouveau: 'Nouveau',
+  fidele: 'Fidèle',
+  recurrent: 'Récurrent',
+  inactif: 'Inactif',
+  dormant: 'Dormant',
+};
+
+const parseSegmentDefinitions = (text: string): Record<string, string> => {
+  const result: Record<string, string> = {};
+  for (const [segment, prefix] of Object.entries(SEGMENT_SENTENCE_PREFIX)) {
+    const match = text.match(new RegExp(`${prefix} : ([^.]*)\\.`));
+    if (match) result[segment] = match[1].charAt(0).toUpperCase() + match[1].slice(1) + '.';
+  }
+  return result;
+};
+
+// Précisions que la définition serveur ne porte pas : les 5 segments sont
+// exclusifs (évalués dans cet ordre) et Dormant n'existe que sur une période
+// plus courte que le seuil d'inactivité.
+const SEGMENT_EXTRA_NOTES: Record<string, string> = {
+  nouveau: 'Prioritaire sur les autres segments : un nouveau client n\'est jamais compté fidèle ni récurrent.',
+  fidele: 'Les commandes comptées sont celles de toute la vie du client, pas seulement celles de la période.',
+  recurrent: 'Clients déjà connus avant la période, revenus pendant celle-ci.',
+  inactif: 'Ce client n\'a commandé à aucun moment de la période.',
+  dormant: 'Ce segment n\'apparaît que sur les périodes plus courtes que le seuil d\'inactivité.',
+};
+
+const CHANNEL_FILTER_OPTIONS =CHANNEL_ORDER.map((c) => ({ id: c, label: CHANNEL_LABELS[c] ?? c }));
 
 export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: ClientsAnalyticsTabProps) => {
   // Vide = tous les canaux (même convention que le backend : channels.go's
@@ -148,6 +180,7 @@ export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
 
   const coveragePct = (data.coverage.coverage_ratio * 100).toFixed(1);
   const segmentTotal = data.segments.reduce((sum: number, s: ClientsSegmentCount) => sum + s.count, 0);
+  const segmentDefinitions = parseSegmentDefinitions(data.definitions.segments);
 
   return (
     <div className="space-y-6">
@@ -181,6 +214,7 @@ export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
               title="Nouveaux clients"
               value={data.new_customers_count.toLocaleString('fr-FR')}
               subtitle="Première commande de tous les temps sur la période"
+              info={segmentDefinitions.nouveau}
               isHighlighted
             />
             <Tile
@@ -195,16 +229,19 @@ export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
                   ? `Effectif sous ${data.min_customers_for_rate} clients — taux non affiché`
                   : `${data.recurring_count} sur ${data.identified_customers_in_period} clients actifs`
               }
+              info={`${data.definitions.recurrence} Le taux n'est affiché qu'à partir de ${data.min_customers_for_rate} clients actifs.`}
             />
             <Tile
               title="Fréquence d'achat"
               value={`${data.avg_orders_per_active_customer.toFixed(2)}x`}
               subtitle="Commandes par client actif sur la période"
+              info={data.definitions.frequency}
             />
             <Tile
               title="Clients actifs sur la période"
               value={data.identified_customers_in_period.toLocaleString('fr-FR')}
               subtitle="Au moins une commande avec client identifié"
+              info="Clients identifiés ayant passé au moins une commande sur la période, filtres de canal inclus. Les commandes sans client identifié ne sont pas comptées."
             />
           </div>
 
@@ -213,9 +250,25 @@ export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
               <Card key={seg.segment} className="bg-card border border-border">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-xs font-medium">
-                    <span className={`px-2 py-1 rounded-full ${SEGMENT_BADGE_CLASS[seg.segment] ?? 'bg-gray-100 text-gray-700'}`}>
-                      {SEGMENT_LABELS[seg.segment] ?? seg.segment}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          tabIndex={0}
+                          className={`px-2 py-1 rounded-full cursor-help ${SEGMENT_BADGE_CLASS[seg.segment] ?? 'bg-gray-100 text-gray-700'}`}
+                        >
+                          {SEGMENT_LABELS[seg.segment] ?? seg.segment}
+                        </span>
+                      </TooltipTrigger>
+                      {segmentDefinitions[seg.segment] && (
+                        <TooltipContent className="max-w-xs text-xs leading-relaxed space-y-1">
+                          <p className="font-semibold">{SEGMENT_LABELS[seg.segment] ?? seg.segment}</p>
+                          <p>{segmentDefinitions[seg.segment]}</p>
+                          {SEGMENT_EXTRA_NOTES[seg.segment] && (
+                            <p className="text-muted-foreground">{SEGMENT_EXTRA_NOTES[seg.segment]}</p>
+                          )}
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -236,18 +289,6 @@ export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
           </div>
         </>
       )}
-
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">Définitions retenues</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p><span className="font-medium text-foreground">Taux de récurrence : </span>{data.definitions.recurrence}</p>
-          <p><span className="font-medium text-foreground">Segments : </span>{data.definitions.segments}</p>
-          <p><span className="font-medium text-foreground">Fréquence d'achat : </span>{data.definitions.frequency}</p>
-          <p><span className="font-medium text-foreground">Inactivité : </span>{data.definitions.inactivity}</p>
-        </CardContent>
-      </Card>
 
       {/* Bloc nominatif — endpoint séparé, permission séparée (customers.manage).
           Absent du DOM (pas seulement vide) quand isTopForbidden : PROMPT 18 §2

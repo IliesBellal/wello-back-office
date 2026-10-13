@@ -9,11 +9,13 @@ import {
   analyticsService,
   ProductsAnalyticsResponse,
   ProductRow,
+  ProductsMerchantTotal,
   ComparisonMode,
 } from '@/services/analyticsService';
 import { isApiHttpError } from '@/services/apiClient';
 import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
-import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
+import { merchantColor } from '@/utils/merchantColors';
+import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 
 interface ProductsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -30,6 +32,33 @@ const EvolutionBadge = ({ percent }: { percent: number }) => (
     {percent >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
     <span className="font-medium">{percent > 0 ? '+' : ''}{percent.toFixed(1)}%</span>
   </div>
+);
+
+interface MerchantSplitProps {
+  entries: ProductsMerchantTotal[];
+  merchantsById: Record<string, string>;
+  format: (entry: ProductsMerchantTotal) => string;
+  /** Tile en surbrillance (texte blanc sur fond dégradé). */
+  highlighted?: boolean;
+}
+
+// Ventilation par établissement sous un KPI — pastille (même couleur que les
+// autres graphiques de comparaison, utils/merchantColors.ts) + nom + valeur.
+const MerchantSplit = ({ entries, merchantsById, format, highlighted = false }: MerchantSplitProps) => (
+  <ul className={`mt-3 pt-2 space-y-1 border-t text-xs ${highlighted ? 'border-white/30 text-white/90' : 'border-border text-muted-foreground'}`}>
+    {entries.map((entry) => (
+      <li key={entry.merchant_id} className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-1.5 min-w-0">
+          <span
+            className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+            style={{ backgroundColor: merchantColor(entry.merchant_id) }}
+          />
+          <span className="truncate">{merchantsById[entry.merchant_id] ?? entry.merchant_id}</span>
+        </span>
+        <span className={`font-medium shrink-0 ${highlighted ? 'text-white' : 'text-foreground'}`}>{format(entry)}</span>
+      </li>
+    ))}
+  </ul>
 );
 
 type SortBy = 'quantity' | 'revenue_ttc' | 'margin';
@@ -71,6 +100,7 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
       page,
       pageSize,
       merchantIds,
+      groupBy: comparisonMode,
       orderFilter,
     })
       .then((result) => {
@@ -90,7 +120,7 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateRange.from, dateRange.to, categoryId, sortBy, sortDir, page, merchantIds.join(','), filterKey]);
+  }, [dateRange.from, dateRange.to, categoryId, sortBy, sortDir, page, merchantIds.join(','), comparisonMode, filterKey]);
 
   const handleSort = (column: SortBy) => {
     if (sortBy === column) {
@@ -123,11 +153,15 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
 
   const { current_period: current, cost_coverage: coverage } = data;
   const marginBelowThreshold = coverage.margin_cents === undefined;
+  // Mode comparé effectif : lu sur la réponse (scope.group_by), pas sur le
+  // mode demandé — le serveur ne ventile qu'avec 2+ établissements.
+  const merchantSplit = data.scope.group_by === 'merchant' && data.by_merchant && data.by_merchant.length > 0
+    ? data.by_merchant
+    : null;
 
   return (
     <div className="space-y-6">
       <ScopeSummary merchantIds={data.scope.merchant_ids} merchantsById={merchantsById} />
-      {comparisonMode === 'compare' && merchantIds.length > 1 && <AggregationNotice />}
 
       <Card className="bg-card border border-border">
         <CardHeader className="pb-3">
@@ -168,9 +202,21 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Tile title="Quantité vendue" value={current.quantity_sold} isHighlighted />
-        <Tile title="CA TTC" value={eur(current.revenue_ttc_cents)} />
-        <Tile title="CA HT" value={eur(current.revenue_ht_cents)} />
+        <Tile title="Quantité vendue" value={current.quantity_sold} isHighlighted>
+          {merchantSplit && (
+            <MerchantSplit entries={merchantSplit} merchantsById={merchantsById} format={(e) => String(e.quantity_sold)} highlighted />
+          )}
+        </Tile>
+        <Tile title="CA TTC" value={eur(current.revenue_ttc_cents)}>
+          {merchantSplit && (
+            <MerchantSplit entries={merchantSplit} merchantsById={merchantsById} format={(e) => eur(e.revenue_ttc_cents)} />
+          )}
+        </Tile>
+        <Tile title="CA HT" value={eur(current.revenue_ht_cents)}>
+          {merchantSplit && (
+            <MerchantSplit entries={merchantSplit} merchantsById={merchantsById} format={(e) => eur(e.revenue_ht_cents)} />
+          )}
+        </Tile>
         <Tile
           title="Marge (sur coût connu)"
           value={marginBelowThreshold ? '—' : eur(coverage.margin_cents as number)}
@@ -206,7 +252,7 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                     <TableHead>Catégorie</TableHead>
                     {sortHeader('quantity', 'Quantité vendue')}
                     {sortHeader('revenue_ttc', 'CA TTC')}
-                    <TableHead className="text-right">CA HT</TableHead>
+                    {merchantSplit && <TableHead>Établissement</TableHead>}
                     <TableHead className="text-right">Coût</TableHead>
                     {sortHeader('margin', 'Marge')}
                     <TableHead className="text-right">Marge %</TableHead>
@@ -220,7 +266,28 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                       <TableCell>{row.category_name || '—'}</TableCell>
                       <TableCell className="text-right">{row.quantity_sold}</TableCell>
                       <TableCell className="text-right">{eur(row.revenue_ttc_cents)}</TableCell>
-                      <TableCell className="text-right">{eur(row.revenue_ht_cents)}</TableCell>
+                      {merchantSplit && (
+                        <TableCell>
+                          {row.by_merchant && row.by_merchant.length > 0 ? (
+                            <ul className="space-y-0.5">
+                              {row.by_merchant.map((entry) => (
+                                <li key={entry.merchant_id} className="flex items-center gap-1.5 whitespace-nowrap">
+                                  <span
+                                    className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: merchantColor(entry.merchant_id) }}
+                                  />
+                                  <span>{merchantsById[entry.merchant_id] ?? entry.merchant_id}</span>
+                                  {row.by_merchant!.length > 1 && (
+                                    <span className="text-muted-foreground">· {entry.quantity_sold}</span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         {row.cost_price_cents !== undefined ? eur(row.cost_price_cents) : <span className="text-muted-foreground">non disponible</span>}
                       </TableCell>

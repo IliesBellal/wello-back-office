@@ -1,132 +1,86 @@
-import { useState, useEffect, type InputHTMLAttributes } from 'react';
+import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authService } from '@/services/authService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { OTPVerification } from '@/components/auth';
+import { LoginShowcase } from '@/components/auth/LoginShowcase';
 import { AuthData, type AuthResponse } from '@/types/auth';
 import { publicTunnelApi, isPublicApiError } from '@/services/publicTunnelApi';
 import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 import { decodeJwtPayload } from '@/lib/decodeJwtPayload';
-import { Mail, Lock, Eye, EyeOff, Shield, Check, type LucideIcon } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 
-// Animated background component
-const AnimatedBackground = () => {
-  const floatingElements = Array.from({ length: 6 }).map((_, i) => ({
-    id: i,
-    x: Math.random() * 100,
-    y: Math.random() * 100,
-    duration: 12 + i * 3,
-    delay: i * 0.3,
-  }));
+/** Logo officiel (PNG avec marges) recadré à son contenu. */
+const WelloLogo = ({ className }: { className?: string }) => (
+  <div role="img" aria-label="Wello Resto" className={`relative aspect-[2105/460] overflow-hidden ${className ?? ''}`}>
+    <img
+      src="/wello_resto_logo.png"
+      alt=""
+      draggable={false}
+      className="absolute max-w-none select-none"
+      style={{ width: '110.9%', left: '-5.23%', top: '-21.7%' }}
+    />
+  </div>
+);
 
-  return (
-    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-white via-slate-50 to-slate-100">
-      {/* Animated gradient blobs - very subtle */}
-      {floatingElements.map((elem) => (
-        <motion.div
-          key={elem.id}
-          className="absolute rounded-full blur-3xl opacity-5"
-          style={{
-            width: Math.random() * 200 + 100,
-            height: Math.random() * 200 + 100,
-            background: `linear-gradient(135deg, #0ea5e9, #06b6d4)`,
-            left: `${elem.x}%`,
-            top: `${elem.y}%`,
-          }}
-          animate={{
-            x: [0, 70, -70, 0],
-            y: [0, -70, 70, 0],
-            scale: [1, 1.3, 0.7, 1],
-          }}
-          transition={{
-            duration: elem.duration,
-            delay: elem.delay,
-            repeat: Infinity,
-            ease: 'easeInOut',
-          }}
-        />
-      ))}
-
-      {/* Subtle lines decoration */}
-      <div
-        className="absolute inset-0 opacity-[0.02]"
-        style={{
-          backgroundImage: `
-            linear-gradient(0deg, transparent 24%, rgba(15, 23, 42, 0.1) 25%, rgba(15, 23, 42, 0.1) 26%, transparent 27%, transparent 74%, rgba(15, 23, 42, 0.1) 75%, rgba(15, 23, 42, 0.1) 76%, transparent 77%, transparent),
-            linear-gradient(90deg, transparent 24%, rgba(15, 23, 42, 0.1) 25%, rgba(15, 23, 42, 0.1) 26%, transparent 27%, transparent 74%, rgba(15, 23, 42, 0.1) 75%, rgba(15, 23, 42, 0.1) 76%, transparent 77%, transparent)
-          `,
-          backgroundSize: '50px 50px',
-        }}
-      />
-    </div>
-  );
-};
-
-// Input field with icon
-interface InputWithIconProps extends InputHTMLAttributes<HTMLInputElement> {
-  icon: LucideIcon;
+interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
+  id: string;
+  label: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  label: string;
+  /** Rendered on the right of the label (e.g. "Mot de passe oublié ?"). */
+  labelAside?: ReactNode;
   showToggle?: boolean;
   isPasswordVisible?: boolean;
   onTogglePassword?: () => void;
 }
 
-const InputWithIcon = ({
-  icon: Icon,
+const Field = ({
+  id,
   type,
-  placeholder,
-  value,
-  onChange,
   label,
+  labelAside,
   showToggle,
   isPasswordVisible,
   onTogglePassword,
+  className,
   ...props
-}: InputWithIconProps) => {
-  return (
-    <div className="space-y-2">
-      <Label htmlFor={label} className="text-sm font-semibold text-slate-700">
+}: FieldProps) => (
+  <div className="space-y-1.5">
+    <div className="flex items-center justify-between">
+      <Label htmlFor={id} className="text-[13px] font-semibold text-[#2a3a63]">
         {label}
       </Label>
-      <div className="relative group">
-        <Icon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-blue-600 transition-colors" />
-        <Input
-          id={label}
-          type={showToggle && isPasswordVisible ? 'text' : type}
-          placeholder={placeholder}
-          value={value}
-          onChange={onChange}
-          className="w-full h-12 pl-12 pr-12 bg-white border border-slate-200 rounded-lg text-slate-900 placeholder:text-slate-400
-            focus:bg-white focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-100
-            backdrop-blur-sm transition-all duration-200 hover:border-slate-300"
-          {...props}
-        />
-        {showToggle && (
-          <motion.button
-            type="button"
-            onClick={onTogglePassword}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition-colors"
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            {isPasswordVisible ? (
-              <EyeOff className="w-5 h-5" />
-            ) : (
-              <Eye className="w-5 h-5" />
-            )}
-          </motion.button>
-        )}
-      </div>
+      {labelAside}
     </div>
-  );
-};
+    <div className="relative">
+      <Input
+        id={id}
+        type={showToggle && isPasswordVisible ? 'text' : type}
+        className={`h-11 rounded-lg border-[#dbe5f7] bg-white px-3.5 text-[#0b1230] shadow-[0_1px_2px_rgba(5,8,23,0.04)]
+          placeholder:text-[#9aa8cb] hover:border-[#b9c8ea]
+          focus-visible:border-[#0036d9] focus-visible:ring-2 focus-visible:ring-[#0036d9]/20 focus-visible:ring-offset-0
+          transition-[border-color,box-shadow] duration-150 ${showToggle ? 'pr-11' : ''} ${className ?? ''}`}
+        {...props}
+      />
+      {showToggle && (
+        <button
+          type="button"
+          onClick={onTogglePassword}
+          aria-label={isPasswordVisible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+          className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#7e90bd]
+            transition-colors hover:bg-[#edf3fc] hover:text-[#0036d9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0036d9]/30"
+        >
+          {isPasswordVisible ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+        </button>
+      )}
+    </div>
+  </div>
+);
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -297,192 +251,162 @@ const Login = () => {
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.08,
-        delayChildren: 0.15,
-      },
-    },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 25 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.35, ease: 'easeOut' },
-    },
-  };
+  const emailIsValid = isValidEmail(email);
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
-      {/* Animated background */}
-      <AnimatedBackground />
+    <div className="grid min-h-screen bg-white lg:grid-cols-[minmax(420px,5fr)_6fr]">
+      {/* Left: form */}
+      <div className="flex min-h-screen flex-col px-6 py-8 sm:px-12 lg:px-16">
+        <header>
+          <WelloLogo className="h-9" />
+        </header>
 
-      {/* Main content */}
-      <motion.div
-        className="relative z-10 w-full max-w-md"
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
-      >
-        {/* Glassmorphism card */}
-        <motion.div
-          className="backdrop-blur-sm bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden
-            hover:shadow-xl transition-all duration-300"
-          variants={containerVariants}
-          initial="hidden"
-          animate="visible"
-          whileHover={{ boxShadow: '0 20px 40px -10px rgba(15, 23, 42, 0.08)' }}
-        >
-          {/* Header */}
-          <motion.div className="px-6 md:px-8 pt-8 md:pt-10 pb-6 text-center" variants={itemVariants}>
-            {/* Logo and branding */}
-            <motion.div
-              className="mb-6 flex justify-center"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              <div className="relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-100 to-cyan-100 rounded-2xl blur-xl opacity-40" />
-                <div className="relative w-16 h-16 bg-gradient-to-br from-blue-600 to-cyan-600 rounded-2xl flex items-center justify-center
-                  shadow-md border border-blue-200">
-                  <Lock className="w-8 h-8 text-white" />
-                </div>
-              </div>
-            </motion.div>
+        <main className="flex flex-1 items-center justify-center py-10">
+          <motion.div
+            className="w-full max-w-[400px]"
+            initial={{ opacity: 0, y: 14 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+          >
+            <h1 className="text-[28px] font-bold leading-tight tracking-tight text-[#0b1230]">Connexion</h1>
+            <p className="mt-2 text-[15px] text-[#506390]">Accédez à votre espace de gestion Wello Resto.</p>
 
-            <motion.h1
-              className="text-3xl md:text-4xl font-bold text-slate-900 mb-2"
-              variants={itemVariants}
-            >
-              Wello Resto
-            </motion.h1>
-
-            <motion.p className="text-sm md:text-base text-slate-600 font-medium" variants={itemVariants}>
-              Espace de gestion professionnel
-            </motion.p>
-          </motion.div>
-
-          {/* Form */}
-          <motion.form onSubmit={handleSubmit} className="px-6 md:px-8 py-6 md:py-8 space-y-5" variants={containerVariants}>
-            {/* Email field */}
-            <motion.div variants={itemVariants}>
-              <InputWithIcon
-                icon={Mail}
+            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+              <Field
+                id="login-email"
                 type="email"
-                placeholder="votre.email@restaurant.fr"
+                label="Adresse e-mail"
+                placeholder="vous@restaurant.fr"
+                autoComplete="username"
+                autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                label="Adresse email"
                 required
               />
-            </motion.div>
 
-            {/* Password field - hidden by default, shown after valid email */}
-            <motion.div
-              variants={itemVariants}
-              initial={{ opacity: 0, height: 0 }}
-              animate={{
-                opacity: isValidEmail(email) ? 1 : 0,
-                height: isValidEmail(email) ? 'auto' : 0,
-              }}
-              transition={{ duration: 0.25 }}
-            >
-              {isValidEmail(email) && (
-                <InputWithIcon
-                  icon={Lock}
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  label="Mot de passe sécurisé"
-                  showToggle
-                  isPasswordVisible={showPasswordField}
-                  onTogglePassword={() => setShowPasswordField(!showPasswordField)}
-                  required
-                />
-              )}
-            </motion.div>
+              {/* Password: revealed once the email looks valid */}
+              <AnimatePresence initial={false}>
+                {emailIsValid && (
+                  <motion.div
+                    key="password"
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.25, ease: 'easeOut' }}
+                    // Room for the focus ring, which overflow-hidden would clip.
+                    className="-mx-1 -mb-1 overflow-hidden px-1 pb-1"
+                  >
+                    <Field
+                      id="login-password"
+                      type="password"
+                      label="Mot de passe"
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      showToggle
+                      isPasswordVisible={showPasswordField}
+                      onTogglePassword={() => setShowPasswordField(!showPasswordField)}
+                      required
+                      labelAside={
+                        <Link
+                          to="/forgot-password"
+                          className="text-[13px] font-medium text-[#0036d9] transition-colors hover:text-[#002aa8] hover:underline"
+                        >
+                          Mot de passe oublié ?
+                        </Link>
+                      }
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            {/* Submit button */}
-            <motion.div variants={itemVariants}>
               <motion.button
                 type="submit"
-                disabled={isLoading || !isValidEmail(email) || !password}
-                className="w-full h-12 md:h-13 bg-gradient-to-r from-blue-600 to-blue-600 text-white font-semibold
-                  rounded-lg shadow-md hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed
-                  transition-all duration-300 relative overflow-hidden group hover:from-blue-700 hover:to-blue-700"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                disabled={isLoading || !emailIsValid || !password}
+                className="group flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0036d9] text-[15px] font-semibold text-white
+                  shadow-[0_1px_2px_rgba(0,54,217,0.35),0_10px_22px_-10px_rgba(0,54,217,0.7)]
+                  transition-colors hover:bg-[#002fbd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0036d9]/40 focus-visible:ring-offset-2
+                  disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                whileTap={{ scale: 0.985 }}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-blue-700 opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
-                <span className="relative flex items-center justify-center gap-2">
-                  {isLoading ? (
-                    <>
-                      <motion.div
-                        className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-                      />
-                      Connexion en cours...
-                    </>
-                  ) : (
-                    <>
-                      Se connecter
-                      <motion.div animate={{ x: [0, 5, 0] }} transition={{ duration: 1.2, repeat: Infinity }}>
-                        <Check className="w-5 h-5" />
-                      </motion.div>
-                    </>
-                  )}
-                </span>
+                {isLoading ? (
+                  <>
+                    <motion.span
+                      className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white"
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+                    />
+                    Connexion en cours…
+                  </>
+                ) : (
+                  <>
+                    Se connecter
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+                  </>
+                )}
               </motion.button>
-            </motion.div>
 
-            {/* Google sign-in */}
-            <motion.div variants={itemVariants} className="space-y-5">
-              <div className="flex items-center gap-3 text-xs text-slate-400" aria-hidden>
-                <span className="h-px flex-1 bg-slate-200" />
+              <div className="flex items-center gap-3 text-xs text-[#7e90bd]" aria-hidden>
+                <span className="h-px flex-1 bg-[#dbe5f7]" />
                 ou
-                <span className="h-px flex-1 bg-slate-200" />
+                <span className="h-px flex-1 bg-[#dbe5f7]" />
               </div>
+
               <GoogleSignInButton onCredential={handleGoogleCredential} disabled={isLoading} />
-            </motion.div>
+            </form>
 
-            {/* Password recovery */}
-            <motion.div variants={itemVariants} className="text-center">
-              <Link
-                to="/forgot-password"
-                className="text-sm text-slate-600 hover:text-blue-600 transition-colors"
-              >
-                Mot de passe oublié ?
-              </Link>
-            </motion.div>
-          </motion.form>
-
-          {/* Security badge footer */}
-          <motion.div
-            className="px-6 md:px-8 pb-6 md:pb-8 flex items-center justify-center gap-2 text-xs text-slate-600 bg-gradient-to-t from-slate-50 to-transparent pt-4"
-            variants={itemVariants}
-          >
-            <Shield className="w-4 h-4 text-green-600" />
-            <span>Connexion sécurisée SSL 256-bit</span>
+            <div className="mt-8 flex items-center justify-center gap-2 text-xs text-[#506390]">
+              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+              <span>Connexion chiffrée et sécurisée</span>
+            </div>
           </motion.div>
-        </motion.div>
+        </main>
 
-        {/* Bottom accent */}
+        <footer className="text-center text-xs text-[#7e90bd]">© 2024-2026 Wello Resto</footer>
+      </div>
+
+      {/* Right: brand panel with animated product mockups (desktop only) */}
+      <aside className="relative hidden overflow-hidden bg-[#050817] lg:flex lg:items-center lg:justify-center" aria-label="Présentation de Wello Resto">
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background: [
+              'radial-gradient(at 12% 18%, rgba(252,144,61,0.22) 0%, transparent 42%)',
+              'radial-gradient(at 88% 8%, rgba(128,179,255,0.30) 0%, transparent 48%)',
+              'radial-gradient(at 70% 95%, rgba(0,54,217,0.55) 0%, transparent 55%)',
+              'radial-gradient(at 0% 100%, #101c4a 0%, transparent 50%)',
+            ].join(','),
+          }}
+        />
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.07]"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(255,255,255,1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,1) 1px, transparent 1px)',
+            backgroundSize: '44px 44px',
+            maskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black 30%, transparent 75%)',
+          }}
+        />
+
         <motion.div
-          className="mt-6 text-center text-xs text-slate-500"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
+          className="relative z-10 w-full max-w-[620px] px-10 xl:px-14"
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.15, ease: 'easeOut' }}
         >
-          <p>Version 1.0 • © 2024-2026 Wello Resto</p>
+          <h2 className="text-[32px] font-bold leading-[1.15] tracking-tight text-white xl:text-[36px]">
+            Tout votre restaurant,
+            <br />
+            dans un seul outil.
+          </h2>
+          <p className="mb-10 mt-4 max-w-md text-[15px] leading-relaxed text-[#b7c4e6]">
+            Caisse, commandes en ligne, HACCP et analyses : pilotez votre activité en temps réel, où que vous soyez.
+          </p>
+          <LoginShowcase />
         </motion.div>
-      </motion.div>
+      </aside>
 
       {/* MFA Modal */}
       <OTPVerification
