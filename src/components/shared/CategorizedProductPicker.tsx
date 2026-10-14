@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { ReactNode, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ interface CategorizedProductPickerProps {
   onChange: (selectedIds: string[]) => void;
   /** Filtre sur le nom ; les catégories sans résultat sont masquées. */
   search?: string;
+  /** Contenu optionnel affiché à droite d'une ligne (ex. saisie d'un prix). */
+  renderItemExtra?: (item: { id: string; isSub: boolean; selected: boolean }) => ReactNode;
 }
 
 interface PickerItem {
@@ -48,6 +50,7 @@ export function CategorizedProductPicker({
   selectedIds,
   onChange,
   search = '',
+  renderItemExtra,
 }: CategorizedProductPickerProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const selected = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -234,6 +237,11 @@ export function CategorizedProductPicker({
                       <span className="text-xs text-muted-foreground shrink-0">
                         Groupe · {item.subIds.length} sous-produit{item.subIds.length > 1 ? 's' : ''}
                       </span>
+                    )}
+                    {renderItemExtra && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        {renderItemExtra({ id: item.id, isSub: item.isSub, selected: selected.has(item.id) })}
+                      </div>
                     )}
                   </label>
                 ))}

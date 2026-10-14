@@ -10,7 +10,6 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import {
@@ -44,7 +43,7 @@ import { useState as useStateBase } from 'react';
 import { promotionsService } from '@/services/promotionsService';
 import { menuService } from '@/services/menuService';
 import { Promotion, Availability, DayOfWeek, TimeSlot } from '@/types/promotions';
-import { Category, Product } from '@/types/menu';
+import { Category } from '@/types/menu';
 import { CategorizedProductPicker } from '@/components/shared/CategorizedProductPicker';
 import { useToast } from '@/hooks/use-toast';
 
@@ -216,7 +215,7 @@ function PromotionFormDialog({
   );
   const [activeTab, setActiveTab] = useState('general');
   const [saving, setSaving] = useState(false);
-  const [products, setProducts] = useState<Product[]>([]);
+  const [productCategories, setProductCategories] = useState<Category[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [priceDisplayValues, setPriceDisplayValues] = useState<Record<string, string>>({});
@@ -240,14 +239,14 @@ function PromotionFormDialog({
 
   // Load products when dialog opens
   useEffect(() => {
-    if (open && products.length === 0) {
+    if (open && productCategories.length === 0) {
       setLoadingProducts(true);
-      menuService.getProducts().then(data => {
-        setProducts(data);
+      menuService.getMenuData().then(data => {
+        setProductCategories(data);
         setLoadingProducts(false);
       }).catch(() => setLoadingProducts(false));
     }
-  }, [open, products.length]);
+  }, [open, productCategories.length]);
 
 
 
@@ -673,9 +672,40 @@ function PromotionFormDialog({
   };
 
   // ─── TAB: PRODUITS ────────────────────────────────────────────────────────
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(productSearch.toLowerCase())
-  );
+  // Sélection catégorie par catégorie (CategorizedProductPicker) ; un prix est
+  // saisi par produit coché pour l'unité NEWPRICE.
+  const handleProductIdsChange = (ids: string[]) => {
+    const prices: Record<string, number> = {};
+    ids.forEach(id => {
+      prices[id] = form.product_prices?.[id] ?? 0;
+    });
+    setForm(prev => ({ ...prev, product_ids: ids, product_prices: prices }));
+  };
+
+  const renderPriceInput = ({ id, selected }: { id: string; selected: boolean }) => {
+    if (!selected || form.discount_unit !== 'NEWPRICE') return null;
+    const priceInCents = form.product_prices?.[id] ?? 0;
+    return (
+      <div className="w-24">
+        <Input
+          id={`price-${id}`}
+          type="text"
+          inputMode="decimal"
+          value={priceDisplayValues[id] ?? priceToDisplayValue(priceInCents)}
+          onChange={(e) => {
+            setPriceDisplayValues(prev => ({ ...prev, [id]: e.target.value }));
+            set('product_prices', { ...(form.product_prices ?? {}), [id]: parsePriceInput(e.target.value) });
+          }}
+          onBlur={(e) => {
+            const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
+            setPriceDisplayValues(prev => ({ ...prev, [id]: formatted }));
+          }}
+          placeholder="0,00"
+          className="h-8 text-xs font-mono"
+        />
+      </div>
+    );
+  };
 
   const renderProduitsTabContent = () => (
     <>
@@ -686,77 +716,13 @@ function PromotionFormDialog({
           ))}
         </div>
       ) : (
-        <div className="border border-border rounded-lg p-2 space-y-1">
-          {filteredProducts.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-8 text-center">
-              {products.length === 0 ? 'Aucun produit disponible' : 'Aucun résultat pour votre recherche'}
-            </p>
-          ) : (
-            filteredProducts.map(product => {
-              const isSelected = (form.product_ids ?? []).includes(product.product_id);
-              const priceInCents = form.product_prices?.[product.product_id] ?? 0;
-              
-              return (
-                <div
-                  key={product.product_id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors border-b border-border last:border-b-0"
-                >
-                  <Avatar className="h-8 w-8 flex-shrink-0">
-                    <AvatarImage src={product.image_url} alt={product.name} />
-                    <AvatarFallback
-                      style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
-                    />
-                  </Avatar>
-                  <span className="text-sm font-medium flex-1 truncate">{product.name}</span>
-                  
-                  {/* Prix pour NEWPRICE */}
-                  {isSelected && form.discount_unit === 'NEWPRICE' && (
-                    <div className="w-24">
-                      <Input
-                        id={`price-${product.product_id}`}
-                        type="text"
-                        inputMode="decimal"
-                        value={priceDisplayValues[product.product_id] ?? priceToDisplayValue(priceInCents)}
-                        onChange={(e) => {
-                          setPriceDisplayValues(prev => ({ ...prev, [product.product_id]: e.target.value }));
-                          set('product_prices', { ...(form.product_prices ?? {}), [product.product_id]: parsePriceInput(e.target.value) });
-                        }}
-                        onBlur={(e) => {
-                          const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
-                          setPriceDisplayValues(prev => ({ ...prev, [product.product_id]: formatted }));
-                        }}
-                        placeholder="0,00"
-                        className="h-8 text-xs font-mono"
-                      />
-                    </div>
-                  )}
-                  
-                  <Switch
-                    checked={isSelected}
-                    onCheckedChange={checked => {
-                      const updated = [...(form.product_ids ?? [])];
-                      if (checked && !updated.includes(product.product_id)) {
-                        updated.push(product.product_id);
-                        // Initialiser le prix si pas défini
-                        if (!form.product_prices?.[product.product_id]) {
-                          set('product_prices', { ...(form.product_prices ?? {}), [product.product_id]: 0 });
-                        }
-                      } else if (!checked) {
-                        const idx = updated.indexOf(product.product_id);
-                        if (idx > -1) updated.splice(idx, 1);
-                        // Supprimer le prix
-                        const prices = { ...(form.product_prices ?? {}) };
-                        delete prices[product.product_id];
-                        set('product_prices', prices);
-                      }
-                      set('product_ids', updated);
-                    }}
-                  />
-                </div>
-              );
-            })
-          )}
-        </div>
+        <CategorizedProductPicker
+          categories={productCategories}
+          selectedIds={form.product_ids ?? []}
+          onChange={handleProductIdsChange}
+          search={productSearch}
+          renderItemExtra={renderPriceInput}
+        />
       )}
     </>
   );
