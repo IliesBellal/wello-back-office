@@ -26,6 +26,15 @@ export interface Customer {
   created_at: string;
   last_order_date?: string;
   match_score?: number;
+  /**
+   * Bloqué pour la commande en ligne (ib-welloresto-api docs/CUSTOMER_BLOCKING.md).
+   * `blocked_reason_id` est un deletion_reason_id (object `customer`) : son
+   * libellé se résout avec `getCustomerBlockReasons`.
+   */
+  blocked?: boolean;
+  blocked_at?: string;
+  blocked_reason_id?: string;
+  blocked_comment?: string;
 }
 
 export type CustomerSortField =
@@ -172,6 +181,10 @@ export interface RawApiCustomer {
   creation_date?: string | number | null;
   last_order_date?: string | number | null;
   match_score?: number;
+  blocked?: boolean;
+  blocked_at?: string | null;
+  blocked_reason_id?: string | null;
+  blocked_comment?: string | null;
 }
 
 /** Response envelope from GET /customers/list and /customer/search */
@@ -304,6 +317,10 @@ const normalizeCustomer = (raw: RawApiCustomer): Customer => ({
   created_at: toIsoDateString(raw.creation_date),
   last_order_date: toIsoDateString(raw.last_order_date) || undefined,
   match_score: raw.match_score,
+  blocked: raw.blocked === true,
+  blocked_at: raw.blocked_at ?? undefined,
+  blocked_reason_id: raw.blocked_reason_id ?? undefined,
+  blocked_comment: raw.blocked_comment ?? undefined,
 });
 
 const toOrderDateIsoString = (value: string | number | null | undefined): string => {
@@ -934,6 +951,100 @@ export const describeCreateCustomerError = (error: unknown): string => {
   }
 
   return message || "La création du client a échoué. Réessayez dans un instant.";
+};
+
+// ============= Blocage de clients (commande en ligne) =============
+
+/** Motif de blocage : ligne de GET /pos/deletion_reasons/customer. */
+export interface CustomerBlockReason {
+  deletion_reason_id: string;
+  deletion_reason_desc: string;
+  /** Libellé français (table labels). */
+  label: string;
+  requires_comment: boolean;
+}
+
+/**
+ * Corps de POST /customers/block. Soit `customer_id` (fiche existante), soit
+ * `phone` et/ou `email` : un client inconnu est créé par l'API pour porter le
+ * blocage. `first_name` / `last_name` ne servent qu'à cette création.
+ */
+export interface BlockCustomerPayload {
+  customer_id?: string;
+  phone?: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  reason_id: string;
+  comment?: string;
+}
+
+export interface BlockCustomerResult {
+  status: string;
+  customer_id: string;
+  /** true quand l'API a dû créer la fiche du client bloqué. */
+  created: boolean;
+  /** Nombre de fiches bloquées : les doublons (même téléphone ou email) le sont ensemble. */
+  blocked_count: number;
+}
+
+export const getCustomerBlockReasons = async (): Promise<CustomerBlockReason[]> => {
+  const res = await apiClient.get<WelloApiResponse<{ deletions_reasons?: CustomerBlockReason[] }>>(
+    "/pos/deletion_reasons/customer"
+  );
+  return Array.isArray(res.data?.deletions_reasons) ? res.data.deletions_reasons : [];
+};
+
+export const blockCustomer = async (payload: BlockCustomerPayload): Promise<BlockCustomerResult> => {
+  logAPI("POST", "/customers/block", payload);
+
+  return apiClient
+    .post<WelloApiResponse<BlockCustomerResult>>("/customers/block", payload)
+    .then((res) => res.data);
+};
+
+export const unblockCustomer = async (customerId: string): Promise<{ status: string }> => {
+  logAPI("PATCH", `/customers/${customerId}/unblock`);
+
+  return apiClient
+    .patch<WelloApiResponse<{ status: string }>>(`/customers/${customerId}/unblock`, {})
+    .then((res) => res.data);
+};
+
+/**
+ * Message affiché quand `blockCustomer` / `unblockCustomer` échoue. Codes émis
+ * par CustomersHandler.BlockCustomer / UnblockCustomer
+ * (internal/modules/customers/blocking_handler.go).
+ */
+export const describeBlockCustomerError = (error: unknown): string => {
+  const fallback = "L'opération a échoué. Réessayez dans un instant.";
+  if (!isApiHttpError(error)) {
+    return error instanceof Error && error.message ? error.message : fallback;
+  }
+
+  // Le corps d'erreur est tantôt enveloppé ({ id, data: { error } }), tantôt plat.
+  const body = typeof error.responseBody === "object" && error.responseBody !== null
+    ? (error.responseBody as { data?: unknown; error?: unknown })
+    : undefined;
+  const container = typeof body?.data === "object" && body.data !== null ? (body.data as { error?: unknown }) : body;
+  const code = typeof container?.error === "string" ? container.error : undefined;
+
+  switch (code) {
+    case "identity_required":
+      return "Saisissez un numéro de téléphone ou un email.";
+    case "invalid_phone":
+      return "Ce numéro de téléphone n'est pas valide.";
+    case "invalid_email":
+      return "Cette adresse email n'est pas valide.";
+    case "invalid_reason":
+      return "Choisissez un motif de blocage.";
+    case "comment_required":
+      return "Ce motif demande une précision : renseignez le commentaire.";
+    case "customer_not_found":
+      return "Ce client est introuvable.";
+    default:
+      return error.status === 403 ? "Vous n'avez pas les droits pour bloquer ou débloquer un client." : fallback;
+  }
 };
 
 export const getCustomerLoyalty = async (customerId: string): Promise<CustomerLoyalty> => {

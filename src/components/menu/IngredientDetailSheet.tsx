@@ -322,14 +322,14 @@ const EditContent = ({
             value={formData.name || ''}
             onChange={(e) => onNameChange(e.target.value)}
             placeholder="ex: Tomate"
-            className="border-slate-200 bg-slate-50 focus:bg-white"
+            className="border-slate-200 bg-card"
           />
 
           <Label htmlFor="ingredient-category" className="text-sm font-medium text-slate-700">
             Catégorie
           </Label>
           <Select value={formData.category_id || ''} onValueChange={onCategoryChange}>
-            <SelectTrigger id="ingredient-category" className="border-slate-200 bg-slate-50 focus:bg-white">
+            <SelectTrigger id="ingredient-category" className="border-slate-200 bg-card">
               <SelectValue placeholder="Choisir une catégorie" />
             </SelectTrigger>
             <SelectContent>
@@ -365,7 +365,7 @@ const EditContent = ({
               onChange={(e) => onPurchaseCostChange(e.target.value)}
               onBlur={(e) => onPurchaseCostBlur(e.target.value)}
               placeholder="0,00"
-              className="border-slate-200 bg-slate-50 focus:bg-white"
+              className="border-slate-200 bg-card"
             />
           </div>
 
@@ -377,7 +377,7 @@ const EditContent = ({
               value={formData.purchase_unit_id?.toString() || ''}
               onValueChange={onPurchaseUnitChange}
             >
-              <SelectTrigger id="purchase-unit" className="border-slate-200 bg-slate-50 focus:bg-white">
+              <SelectTrigger id="purchase-unit" className="border-slate-200 bg-card">
                 <SelectValue placeholder="Sélectionner une unité" />
               </SelectTrigger>
               <SelectContent>
@@ -402,7 +402,7 @@ const EditContent = ({
               value={purchaseCostQtyDisplayValue}
               onChange={(e) => onPurchaseCostQtyChange(e.target.value)}
               onBlur={(e) => onPurchaseCostQtyBlur(e.target.value)}
-              className="border-slate-200 bg-slate-50 focus:bg-white"
+              className="border-slate-200 bg-card"
             />
           </div>
         </CardContent>
@@ -425,7 +425,7 @@ const EditContent = ({
             onChange={(e) => onSupplementPriceChange(e.target.value)}
             onBlur={(e) => onSupplementPriceBlur(e.target.value)}
             placeholder="0,00"
-            className="border-slate-200 bg-slate-50 focus:bg-white"
+            className="border-slate-200 bg-card"
           />
         </CardContent>
       </Card>
@@ -457,7 +457,7 @@ const EditContent = ({
               placeholder="Ex: 3"
               value={formData.conservation_days_display}
               onChange={(e) => onConservationDaysChange(e.target.value)}
-              className="border-slate-200 bg-slate-50 focus:bg-white"
+              className="border-slate-200 bg-card"
             />
           </div>
 
@@ -469,7 +469,7 @@ const EditContent = ({
               value={formData.conservation_type || 'froid'}
               onValueChange={onConservationTypeChange}
             >
-              <SelectTrigger id="conservation-type" className="border-slate-200 bg-slate-50 focus:bg-white">
+              <SelectTrigger id="conservation-type" className="border-slate-200 bg-card">
                 <SelectValue placeholder="Sélectionner un type" />
               </SelectTrigger>
               <SelectContent>
@@ -494,7 +494,7 @@ const EditContent = ({
                 placeholder="0"
                 value={formData.storage_temp_min_display}
                 onChange={(e) => onStorageTempMinChange(e.target.value)}
-                className="border-slate-200 bg-slate-50 focus:bg-white"
+                className="border-slate-200 bg-card"
               />
             </div>
             <div className="space-y-2">
@@ -508,7 +508,7 @@ const EditContent = ({
                 placeholder="4"
                 value={formData.storage_temp_max_display}
                 onChange={(e) => onStorageTempMaxChange(e.target.value)}
-                className="border-slate-200 bg-slate-50 focus:bg-white"
+                className="border-slate-200 bg-card"
               />
             </div>
           </div>

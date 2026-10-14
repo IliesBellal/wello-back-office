@@ -24,6 +24,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import CustomerDetailsSheet from '@/components/customers/CustomerDetailsSheet';
 import { CustomerCreateSheet } from '@/components/customers/CustomerCreateSheet';
+import { CustomerBlockDialog } from '@/components/customers/CustomerBlockDialog';
 import { CustomerImportDialog } from '@/components/customers/import/CustomerImportDialog';
 import type { ImportDoor } from '@/hooks/useCustomerImport';
 import { OrderDetailModal } from '@/pages/DashboardOrderHistory';
@@ -47,6 +48,7 @@ import {
   Crown,
   Upload,
   UserPlus,
+  Ban,
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -162,6 +164,7 @@ const CustomersList = () => {
   const [importOpen, setImportOpen] = useState(false);
   const [importInitialDoor, setImportInitialDoor] = useState<ImportDoor | undefined>(undefined);
   const [createOpen, setCreateOpen] = useState(false);
+  const [blockNumberOpen, setBlockNumberOpen] = useState(false);
   const { toast } = useToast();
   const { canManageCustomers } = usePermissions();
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -244,6 +247,13 @@ const CustomersList = () => {
       loadCustomers(value, undefined, 1);
     }, 500);
   }, []);
+
+  // La fiche ouverte est un instantané : après un rechargement (blocage,
+  // déblocage...), on la remplace par sa version fraîche pour que ses badges et
+  // ses actions suivent.
+  useEffect(() => {
+    setSelectedCustomer((prev) => (prev ? customers.find((c) => c.id === prev.id) ?? prev : prev));
+  }, [customers]);
 
   useEffect(() => {
     loadCustomers();
@@ -365,6 +375,10 @@ const CustomersList = () => {
                       <UserPlus className="w-4 h-4 mr-2" />
                       Saisir plusieurs clients
                     </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setBlockNumberOpen(true)}>
+                      <Ban className="w-4 h-4 mr-2" />
+                      Bloquer un numéro
+                    </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
@@ -449,6 +463,12 @@ const CustomersList = () => {
                               NEW
                             </span>
                           )}
+                          {customer.blocked && (
+                            <span className="inline-flex items-center gap-1 rounded bg-destructive px-2 py-0.5 text-[11px] font-medium text-destructive-foreground">
+                              <Ban className="h-3 w-3" />
+                              Bloqué
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="pl-2">
@@ -528,6 +548,8 @@ const CustomersList = () => {
             nextParams.set('orderId', orderId);
             setSearchParams(nextParams);
           }}
+          canManage={canManageCustomers}
+          onBlockChange={() => loadCustomers()}
         />
       )}
 
@@ -553,6 +575,14 @@ const CustomersList = () => {
           // déjà en place avec les paramètres courants (page, tri, recherche).
           onImported={() => loadCustomers()}
           initialDoor={importInitialDoor}
+        />
+      )}
+
+      {canManageCustomers && (
+        <CustomerBlockDialog
+          open={blockNumberOpen}
+          onOpenChange={setBlockNumberOpen}
+          onBlocked={() => loadCustomers()}
         />
       )}
 

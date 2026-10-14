@@ -557,7 +557,7 @@ export function HaccpActivityDetailSheet({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto bg-slate-50 border-slate-200 p-0">
+      <DialogContent className="max-w-2xl max-h-[88vh] overflow-y-auto bg-card border-slate-200 p-0">
         <DialogHeader className="sticky top-0 z-10 bg-gradient-to-r from-slate-900 to-slate-700 text-white px-6 py-4 border-b border-slate-600">
           <DialogTitle className="flex items-center gap-2">
             {isTemperature && <Thermometer className="h-5 w-5 text-blue-500" />}

@@ -288,7 +288,7 @@ const RefundModal = ({ isOpen, onClose, onRefund, maxAmount, zIndex = 70 }: Refu
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-2 block">Motif</label>
             <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger className="bg-background border border-input">
+              <SelectTrigger className="bg-card border border-input">
                 <SelectValue placeholder="Sélectionner un motif" />
               </SelectTrigger>
               <SelectContent>

@@ -29,7 +29,7 @@ const ResponsiveSheetOverlay = React.forwardRef<
 ResponsiveSheetOverlay.displayName = SheetPrimitive.Overlay.displayName;
 
 const sheetVariants = cva(
-  "fixed z-50 gap-4 bg-background shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
+  "fixed z-50 gap-4 bg-card shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
   {
     variants: {
       side: {
@@ -100,7 +100,7 @@ ResponsiveSheetHeader.displayName = "ResponsiveSheetHeader";
 const ResponsiveSheetFixedHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div 
     className={cn(
-      "sticky top-0 z-40 bg-background border-b border-border",
+      "sticky top-0 z-40 bg-card border-b border-border",
       "flex items-center justify-between p-4 md:p-6 gap-4",
       "flex-shrink-0",
       className
@@ -114,7 +114,7 @@ const ResponsiveSheetFooter = ({ className, ...props }: React.HTMLAttributes<HTM
   <div 
     className={cn(
       "flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 mt-4",
-      "sticky bottom-0 bg-background pt-4 pb-safe -mx-4 md:-mx-6 px-4 md:px-6 border-t border-border",
+      "sticky bottom-0 bg-card pt-4 pb-safe -mx-4 md:-mx-6 px-4 md:px-6 border-t border-border",
       className
     )} 
     {...props} 

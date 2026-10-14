@@ -111,7 +111,7 @@ export function OTPInput({
             "disabled:opacity-50 disabled:cursor-not-allowed",
             error
               ? "border-destructive bg-destructive/10 animate-shake"
-              : "border-input bg-background hover:border-primary/50 focus:border-primary",
+              : "border-input bg-card hover:border-primary/50 focus:border-primary",
             value[index] && !error && "border-primary"
           )}
           aria-label={`Digit ${index + 1}`}

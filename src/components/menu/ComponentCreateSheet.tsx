@@ -128,7 +128,7 @@ export function ComponentCreateSheet({
                       <FormControl>
                         <Input
                           placeholder="Farine, Tomate, Mozzarella..."
-                          className="border-slate-200 bg-slate-50 focus:bg-white"
+                          className="border-slate-200 bg-card"
                           {...field}
                         />
                       </FormControl>
@@ -166,7 +166,7 @@ export function ComponentCreateSheet({
                       <FormLabel className="text-sm font-medium text-slate-700">Unité de mesure</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value?.toString()}>
                         <FormControl>
-                          <SelectTrigger className="border-slate-200 bg-slate-50 focus:bg-white">
+                          <SelectTrigger className="border-slate-200 bg-card">
                             <SelectValue placeholder="Sélectionner une unité" />
                           </SelectTrigger>
                         </FormControl>

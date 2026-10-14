@@ -153,7 +153,7 @@ export const OptionsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-2 block">Tri</label>
               <Select value={sortBy} onValueChange={(v) => { setSortBy(v as SortBy); setSortDir('desc'); }}>
-                <SelectTrigger className="bg-background border border-input">
+                <SelectTrigger className="bg-card border border-input">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

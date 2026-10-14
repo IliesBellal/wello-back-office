@@ -172,7 +172,7 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-2 block">Catégorie</label>
               <Select value={categoryId || 'all'} onValueChange={(v) => setCategoryId(v === 'all' ? '' : v)}>
-                <SelectTrigger className="bg-background border border-input">
+                <SelectTrigger className="bg-card border border-input">
                   <SelectValue placeholder="Toutes catégories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -186,7 +186,7 @@ export const ProductsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
             <div>
               <label className="text-xs font-medium text-muted-foreground mb-2 block">Tri</label>
               <Select value={sortBy} onValueChange={(v) => { setSortBy(v as SortBy); setSortDir('desc'); }}>
-                <SelectTrigger className="bg-background border border-input">
+                <SelectTrigger className="bg-card border border-input">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

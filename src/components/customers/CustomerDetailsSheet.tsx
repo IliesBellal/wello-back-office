@@ -10,18 +10,21 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { 
-  Phone, Mail, MapPin, ShoppingBag, DollarSign, TrendingUp, 
-  ExternalLink, Edit2, Crown, Gift, Check
+import {
+  Phone, Mail, MapPin, ShoppingBag, DollarSign, TrendingUp,
+  ExternalLink, Edit2, Crown, Gift, Check, Ban, Loader2
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { toast } from "sonner";
-import { 
+import {
   Customer, CustomerOrder, CustomerLoyalty, LoyaltyProgram, Reward,
   getCustomerOrders, getCustomerLoyalty, updateLoyaltyProgress, updateRewardStatus,
+  unblockCustomer, describeBlockCustomerError,
   acquisitionSourceLabels, deliveryTypeLabels
 } from "@/services/customersService";
+import { CustomerBlockDialog } from "@/components/customers/CustomerBlockDialog";
+import { useCustomerBlockReasons } from "@/hooks/useCustomerBlockReasons";
 
 const ORDERS_PAGE_SIZE = 10;
 
@@ -30,9 +33,13 @@ interface CustomerDetailsSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOrderClick?: (orderId: string) => void;
+  /** Droit customers.manage : affiche les actions bloquer / débloquer. */
+  canManage?: boolean;
+  /** Rappelé après un blocage / déblocage, pour recharger la liste. */
+  onBlockChange?: () => void;
 }
 
-const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: CustomerDetailsSheetProps) => {
+const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick, canManage = false, onBlockChange }: CustomerDetailsSheetProps) => {
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [ordersPage, setOrdersPage] = useState(1);
   const [hasMoreOrders, setHasMoreOrders] = useState(true);
@@ -43,6 +50,9 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
   const [activeTab, setActiveTab] = useState("general");
   const [editingProgram, setEditingProgram] = useState<string | null>(null);
   const [newProgramValue, setNewProgramValue] = useState("");
+  const [blockOpen, setBlockOpen] = useState(false);
+  const [unblocking, setUnblocking] = useState(false);
+  const { labelFor: blockReasonLabel } = useCustomerBlockReasons(open && Boolean(customer?.blocked));
 
   useEffect(() => {
     if (open && customer) {
@@ -112,6 +122,21 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
       toast.error("Erreur lors du chargement de la fidélité");
     } finally {
       setLoadingLoyalty(false);
+    }
+  };
+
+  const handleUnblock = async () => {
+    if (!customer) return;
+
+    setUnblocking(true);
+    try {
+      await unblockCustomer(customer.id);
+      toast.success("Client débloqué : il peut de nouveau commander en ligne");
+      onBlockChange?.();
+    } catch (error) {
+      toast.error(describeBlockCustomerError(error));
+    } finally {
+      setUnblocking(false);
     }
   };
 
@@ -243,6 +268,12 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                       VIP
                     </Badge>
                   )}
+                  {customer.blocked && (
+                    <Badge variant="destructive">
+                      <Ban className="h-3 w-3 mr-1" />
+                      Bloqué
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">Membre depuis {memberSince}</p>
               </div>
@@ -258,6 +289,35 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
           </TabsList>
 
           <TabsContent value="general" className="mt-4 flex-1 min-h-0 overflow-y-auto space-y-4">
+            {/* Blocage pour la commande en ligne */}
+            {customer.blocked && (
+              <Card className="border-destructive/40 bg-destructive/5">
+                <CardContent className="p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
+                    <Ban className="h-4 w-4" />
+                    Ce client ne peut pas commander en ligne
+                  </div>
+                  <p className="text-sm">
+                    Motif : {blockReasonLabel(customer.blocked_reason_id) ?? "non précisé"}
+                  </p>
+                  {customer.blocked_comment && (
+                    <p className="text-sm text-muted-foreground">{customer.blocked_comment}</p>
+                  )}
+                  {customer.blocked_at && !Number.isNaN(new Date(customer.blocked_at).getTime()) && (
+                    <p className="text-xs text-muted-foreground">
+                      Bloqué le {format(new Date(customer.blocked_at), "dd/MM/yyyy")}
+                    </p>
+                  )}
+                  {canManage && (
+                    <Button variant="outline" size="sm" onClick={handleUnblock} disabled={unblocking}>
+                      {unblocking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Débloquer
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Contact Info */}
             <Card>
               <CardContent className="p-4 space-y-3 flex flex-col sm:flex-row sm:items-start sm:justify-between">
@@ -331,6 +391,20 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
                 Source: {acquisitionSourceLabels[customer.acquisition_source] || customer.acquisition_source}
               </Badge>
             </div>
+
+            {canManage && !customer.blocked && (
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => setBlockOpen(true)}
+                >
+                  <Ban className="mr-2 h-4 w-4" />
+                  Bloquer ce client
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent
@@ -539,6 +613,17 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick }: Cu
             )}
           </TabsContent>
         </Tabs>
+
+        {/* Rendu DANS le SheetContent : la fiche est non modale, un clic dans une
+            boîte rendue ailleurs serait vu comme un clic "à l'extérieur". */}
+        {canManage && (
+          <CustomerBlockDialog
+            open={blockOpen}
+            onOpenChange={setBlockOpen}
+            customer={customer}
+            onBlocked={() => onBlockChange?.()}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );

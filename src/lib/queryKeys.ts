@@ -197,4 +197,9 @@ export const qk = {
     deletionReasons: ["reservations", "deletion-reasons"] as const,
     availability: (date: string) => ["reservations", "availability", date] as const,
   },
+
+  // ─── Customers ──────────────────────────────────────────
+  customers: {
+    blockReasons: ["customers", "block-reasons"] as const,
+  },
 } as const;

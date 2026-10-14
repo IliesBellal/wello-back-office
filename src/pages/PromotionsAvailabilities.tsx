@@ -294,7 +294,7 @@ function PromotionFormDialog({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Type de remise *</Label>
           <Select value={form.discount_unit ?? 'PERCENTAGE'} onValueChange={v => {
@@ -356,7 +356,7 @@ function PromotionFormDialog({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Date de début</Label>
           <DatePicker
@@ -616,7 +616,7 @@ function PromotionFormDialog({
                   {schedules.map((schedule, idx) => (
                     <div key={`${dayObj.key}-${idx}`} className="space-y-1">
                       <div className="flex gap-2 items-end">
-                        <div className="flex-1 space-y-1">
+                        <div className="flex-1 min-w-0 space-y-1">
                           <Label className="text-xs">Début</Label>
                           <Input
                             type="time"
@@ -626,7 +626,7 @@ function PromotionFormDialog({
                           />
                         </div>
 
-                        <div className="flex-1 space-y-1">
+                        <div className="flex-1 min-w-0 space-y-1">
                           <Label className="text-xs">Fin</Label>
                           <Input
                             type="time"
@@ -729,16 +729,16 @@ function PromotionFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-2xl h-[800px] flex flex-col p-0">
+      <DialogContent className="flex flex-col gap-0 p-0 w-full max-w-full h-[100dvh] max-h-[100dvh] rounded-none border-0 sm:h-[800px] sm:max-h-[90vh] sm:max-w-2xl sm:rounded-lg sm:border">
         {/* Fixed Header */}
-        <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+        <DialogHeader className="px-4 sm:px-6 py-4 pr-12 sm:pr-12 border-b flex-shrink-0">
           <DialogTitle>{initial ? 'Modifier la promotion' : 'Nouvelle promotion'}</DialogTitle>
         </DialogHeader>
 
         {/* Tabs Container */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {/* Tabs Navigation - Always Visible */}
-          <TabsList className="w-full justify-start px-6 py-0 h-auto rounded-none border-b bg-transparent gap-6 flex-shrink-0">
+          <TabsList className="w-full justify-start px-4 sm:px-6 py-0 h-auto rounded-none border-b bg-transparent gap-4 sm:gap-6 flex-shrink-0 overflow-x-auto">
             <TabsTrigger 
               value="general" 
               className="rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-primary pb-3 pt-3"
@@ -760,11 +760,11 @@ function PromotionFormDialog({
           </TabsList>
 
           {/* Tab Contents Container */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 min-h-0 flex flex-col">
             {/* Général Tab - No scroll needed */}
             <TabsContent 
               value="general" 
-              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden"
+              className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 mt-0 data-[state=inactive]:hidden"
             >
               {renderGeneralTab()}
             </TabsContent>
@@ -772,9 +772,9 @@ function PromotionFormDialog({
             {/* Horaires Tab - Internal scroll */}
             <TabsContent 
               value="horaires" 
-              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden flex flex-col"
+              className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 mt-0 data-[state=inactive]:hidden"
             >
-              <div className="overflow-y-auto flex-1 pr-2">
+              <div>
                 {renderHorairesTab()}
               </div>
             </TabsContent>
@@ -782,9 +782,10 @@ function PromotionFormDialog({
             {/* Produits Tab - Fixed search + scrollable list */}
             <TabsContent 
               value="produits" 
-              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden flex flex-col"
+              className="flex-1 min-h-0 overflow-hidden px-4 sm:px-6 py-4 mt-0 data-[state=active]:flex flex-col data-[state=inactive]:hidden"
             >
               <div className="relative mb-3 flex-shrink-0">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Rechercher un produit…"
                   value={productSearch}
@@ -792,7 +793,7 @@ function PromotionFormDialog({
                   className="pl-9"
                 />
               </div>
-              <div className="overflow-y-auto flex-1 pr-2">
+              <div className="overflow-y-auto flex-1 min-h-0">
                 {renderProduitsTabContent()}
               </div>
             </TabsContent>
@@ -800,7 +801,7 @@ function PromotionFormDialog({
         </Tabs>
 
         {/* Fixed Action Buttons */}
-        <div className="px-6 py-4 border-t flex gap-3 flex-shrink-0">
+        <div className="px-4 sm:px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t flex gap-3 flex-shrink-0">
           <Button variant="outline" onClick={onClose} className="flex-1" disabled={saving}>
             Annuler
           </Button>
@@ -1224,7 +1225,7 @@ function AvailabilityFormDialog({
                   {schedules.map((schedule, idx) => (
                     <div key={`${dayObj.key}-${idx}`} className="space-y-1">
                       <div className="flex gap-2 items-end">
-                        <div className="flex-1 space-y-1">
+                        <div className="flex-1 min-w-0 space-y-1">
                           <Label className="text-xs">Début</Label>
                           <Input
                             type="time"
@@ -1234,7 +1235,7 @@ function AvailabilityFormDialog({
                           />
                         </div>
 
-                        <div className="flex-1 space-y-1">
+                        <div className="flex-1 min-w-0 space-y-1">
                           <Label className="text-xs">Fin</Label>
                           <Input
                             type="time"
@@ -1299,16 +1300,16 @@ function AvailabilityFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-2xl h-[800px] flex flex-col p-0">
+      <DialogContent className="flex flex-col gap-0 p-0 w-full max-w-full h-[100dvh] max-h-[100dvh] rounded-none border-0 sm:h-[800px] sm:max-h-[90vh] sm:max-w-2xl sm:rounded-lg sm:border">
         {/* Fixed Header */}
-        <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+        <DialogHeader className="px-4 sm:px-6 py-4 pr-12 sm:pr-12 border-b flex-shrink-0">
           <DialogTitle>{initial ? 'Modifier la disponibilité' : 'Nouvelle disponibilité'}</DialogTitle>
         </DialogHeader>
 
         {/* Tabs Container */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Tabs Navigation - Always Visible */}
-          <TabsList className="w-full justify-start px-6 py-0 h-auto rounded-none border-b bg-transparent gap-6 flex-shrink-0">
+          <TabsList className="w-full justify-start px-4 sm:px-6 py-0 h-auto rounded-none border-b bg-transparent gap-4 sm:gap-6 flex-shrink-0 overflow-x-auto">
             <TabsTrigger 
               value="general" 
               className="rounded-none border-b-2 border-b-transparent data-[state=active]:border-b-primary pb-3 pt-3"
@@ -1330,11 +1331,11 @@ function AvailabilityFormDialog({
           </TabsList>
 
           {/* Tab Contents Container */}
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 min-h-0 flex flex-col">
             {/* Général Tab */}
             <TabsContent 
               value="general" 
-              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden"
+              className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 mt-0 data-[state=inactive]:hidden"
             >
               {renderGeneralTab()}
             </TabsContent>
@@ -1342,9 +1343,9 @@ function AvailabilityFormDialog({
             {/* Horaires Tab - Internal scroll */}
             <TabsContent 
               value="horaires" 
-              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden flex flex-col"
+              className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 py-4 mt-0 data-[state=inactive]:hidden"
             >
-              <div className="overflow-y-auto flex-1 pr-2">
+              <div>
                 {renderHorairesTab()}
               </div>
             </TabsContent>
@@ -1352,7 +1353,7 @@ function AvailabilityFormDialog({
             {/* Produits Tab - Fixed search + scrollable list */}
             <TabsContent 
               value="produits" 
-              className="flex-1 overflow-auto px-6 py-4 data-[state=inactive]:hidden flex flex-col"
+              className="flex-1 min-h-0 overflow-hidden px-4 sm:px-6 py-4 mt-0 data-[state=active]:flex flex-col data-[state=inactive]:hidden"
             >
               <div className="relative mb-3 flex-shrink-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -1363,7 +1364,7 @@ function AvailabilityFormDialog({
                   className="pl-9"
                 />
               </div>
-              <div className="overflow-y-auto flex-1 pr-2">
+              <div className="overflow-y-auto flex-1 min-h-0">
                 {renderProduitsTabContent()}
               </div>
             </TabsContent>
@@ -1371,7 +1372,7 @@ function AvailabilityFormDialog({
         </Tabs>
 
         {/* Fixed Action Buttons */}
-        <div className="px-6 py-4 border-t space-y-3 flex-shrink-0">
+        <div className="px-4 sm:px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t space-y-3 flex-shrink-0">
           <AvailabilityWarnings warnings={warnings} />
           <div className="flex gap-3">
             <Button variant="outline" onClick={onClose} className="flex-1" disabled={saving}>

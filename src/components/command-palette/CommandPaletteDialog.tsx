@@ -103,7 +103,7 @@ export function CommandPaletteDialog({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-xl rounded-lg border border-border bg-background shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div className="w-full max-w-xl rounded-lg border border-border bg-card shadow-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Search Input */}
         <div className="border-b border-border p-4 flex items-center gap-3">
           <Search className="w-4 h-4 text-muted-foreground flex-shrink-0" />
