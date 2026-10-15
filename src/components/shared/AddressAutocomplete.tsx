@@ -8,10 +8,14 @@ import { MapPin } from 'lucide-react';
 
 export interface ParsedAddress {
   address: string;     // formatted_address
-  street: string;
+  street: string;      // street_number + route, joined
+  /** Components of `street`, kept apart for callers that store them separately. */
+  street_number: string;
+  route: string;
   city: string;
   postal_code: string;
-  country: string;
+  country: string;     // ISO 3166-1 alpha-2
+  country_name: string; // long name, e.g. "France"
   lat: number | null;
   lng: number | null;
   // LOT A Semaine 3, Chantier 14 additions — only populated when
@@ -51,6 +55,11 @@ interface AddressAutocompleteProps {
    */
   onInputChange?: (text: string) => void;
 }
+
+const isPlacesDropdownOpen = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('.pac-container')).some(
+    (el) => getComputedStyle(el).display !== 'none' && el.querySelector('.pac-item') !== null,
+  );
 
 export const AddressAutocomplete = ({ label, value, onSelect, placeholder, searchType = 'address', onInputChange }: AddressAutocompleteProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -102,9 +111,12 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder, searc
           const parsed: ParsedAddress = {
             address: place.formatted_address ?? '',
             street,
+            street_number: get('street_number'),
+            route: get('route'),
             city: get('locality') || get('postal_town') || get('administrative_area_level_2'),
             postal_code: get('postal_code'),
             country: get('country', true), // ISO 3166-1 alpha-2
+            country_name: get('country'),
             lat: place.geometry?.location?.lat() ?? null,
             lng: place.geometry?.location?.lng() ?? null,
             place_id: place.place_id ?? '',
@@ -141,6 +153,12 @@ export const AddressAutocomplete = ({ label, value, onSelect, placeholder, searc
           onChange={(e) => {
             setInputValue(e.target.value);
             onInputChangeRef.current?.(e.target.value);
+          }}
+          onKeyDown={(e) => {
+            // Inside a <form>, Enter used to pick a suggestion also submits the
+            // form, creating the record with an unresolved address. Swallow it
+            // only while Google's suggestion list is showing.
+            if (e.key === 'Enter' && isPlacesDropdownOpen()) e.preventDefault();
           }}
           placeholder={placeholder ?? 'Rechercher une adresse...'}
           className="pl-9"

@@ -31,6 +31,11 @@ export interface CreateMerchantRequest {
   zip_code?: string;
   city?: string;
   country?: string;
+  /** Google Places location, captured silently. Omit when unresolved: the
+   * backend stores NULL for 0. */
+  lat?: number;
+  lng?: number;
+  place_id?: string;
   web_site?: string;
   email?: string;
   user_id?: string;

@@ -27,7 +27,7 @@ export const MenuPhotoImportBanner = () => {
   if (!isSuccess || productCount > 0) return null;
 
   return (
-    <Card className="flex flex-col gap-4 border-primary/40 p-6 sm:flex-row sm:items-center">
+    <Card className="mb-8 flex flex-col gap-4 border-primary/40 p-6 sm:flex-row sm:items-center">
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10">
         <Camera className="h-5 w-5 text-primary" />
       </div>
