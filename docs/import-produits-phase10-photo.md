@@ -157,3 +157,16 @@ Le dépôt n'a toujours pas de harnais de test (voir phase 8). Les scripts de v�
    - un groupe avec ses déclinaisons ;
    - les options rattachées.
 10. **Mesures à relever :** durée par photo, jetons et coût. On les trouve dans les journaux de l'API (`llm_call succeeded`, tâche `menu_ocr`) et dans `menu_import_drafts.pages`.
+
+
+## Relecture : groupes d'options et promotions (2026-10-15)
+
+Décisions côté API : `ib-welloresto-api/docs/import-carte-ia-03-porte-ia.md` (D22 et § 12).
+
+- **Groupes d'options** (`ImportProductAttributes`, `lib/importAttributes.ts`) : sous chaque produit lu, ses groupes avec leur règle (« choix unique, obligatoire »…) et leurs options avec suppléments. Lecture seule. Champs API : `attributes[].options`, `products[].attribute_external_ids`.
+- **Promotions** (`review/ImportPromotions.tsx`, section affichée seulement pour la porte photo) :
+  - chaque promotion lue est montrée telle qu'elle sera créée (`summary`), avec le texte de la carte, les produits ciblés, la photo et les limites (`notes`) ; une case l'écarte (`decisions.excluded_promotions`, `setPromotionExcluded`) ;
+  - une promotion qui existe déjà (`action: already_exists`) est grisée et non cochable ;
+  - les promotions vues sur la carte mais **non créées** (avertissement `ai_promotion_not_created`) sont affichées en tête de la section avec leur raison, et retirées du panneau « Points d'attention » ;
+  - toutes les promotions sont créées **désactivées** : l'écran de fin le dit (`ImportDoneStep`) et liste celles qui n'ont pas été créées (`promotions[].reason`).
+- Non vérifié visuellement ; `tsc` et `eslint` OK sur les fichiers touchés, test vitest de `describeAttributeRule`.

@@ -27,12 +27,14 @@ import {
   type ImportChannel,
   type ImportDecisions,
   type ImportPhotoDraft,
+  type ImportPreviewAttribute,
   type ImportPreviewProduct,
   type ImportPreviewResult,
 } from '@/types/import';
 import type { TvaRate, TvaRateGroup } from '@/types/menu';
 
 import { ImportCategorySelect } from './ImportCategorySelect';
+import { ImportProductAttributes } from './ImportProductAttributes';
 
 interface ImportPhotoProductsProps {
   preview: ImportPreviewResult;
@@ -150,6 +152,10 @@ export const ImportPhotoProducts = ({
         .sort((a, b) => (a.product.source_photo ?? 0) - (b.product.source_photo ?? 0) || a.index - b.index)
         .map(({ product }) => product),
     [preview.products],
+  );
+  const attributesById = useMemo(
+    () => new Map(preview.attributes.map((attribute) => [attribute.external_id, attribute])),
+    [preview.attributes],
   );
   // Taux configurés dans la caisse, par canal : seuls choix possibles.
   const ratesByChannel = useMemo(() => {
@@ -272,6 +278,11 @@ export const ImportPhotoProducts = ({
                     {(product.issues?.length ?? 0) > 0 && (
                       <p className="text-xs text-amber-700">{product.issues?.join(' · ')}</p>
                     )}
+                    <ImportProductAttributes
+                      attributes={(product.attribute_external_ids ?? [])
+                        .map((id) => attributesById.get(id))
+                        .filter((attribute): attribute is ImportPreviewAttribute => attribute !== undefined)}
+                    />
                     {blockers?.map((message) => (
                       <p key={message} className="text-xs text-destructive">
                         {message}

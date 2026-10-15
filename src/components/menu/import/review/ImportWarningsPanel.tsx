@@ -28,6 +28,7 @@ const WARNING_TITLES: Record<string, string> = {
   ai_duplicate_merged: 'Produits présents sur plusieurs photos',
   ai_group_dissolved: 'Groupes à une seule déclinaison, non créés',
   ai_photo_warning: 'Remarques sur les photos',
+  ai_promotion_duplicate_merged: 'Promotions présentes sur plusieurs photos',
 };
 
 /**

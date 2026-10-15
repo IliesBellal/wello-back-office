@@ -357,6 +357,17 @@ export const useProductImport = () => {
     [patchDecisions],
   );
 
+  /** Porte photo : inclut ou écarte une promotion lue sur la carte. */
+  const setPromotionExcluded = useCallback(
+    (promotionExternalId: string, excluded: boolean) => {
+      patchDecisions((current) => ({
+        ...current,
+        excluded_promotions: { ...current.excluded_promotions, [promotionExternalId]: excluded },
+      }));
+    },
+    [patchDecisions],
+  );
+
   /** Inclut ou écarte tout le catalogue d'un coup — « tout sélectionner ». */
   const setAllProductsExcluded = useCallback(
     (productExternalIds: string[], excluded: boolean) => {
@@ -702,6 +713,7 @@ export const useProductImport = () => {
     setReimportResolution,
     setAllReimportResolutions,
     setProductExcluded,
+    setPromotionExcluded,
     setAllProductsExcluded,
     commit,
 

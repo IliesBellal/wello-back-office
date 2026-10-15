@@ -81,6 +81,8 @@ export interface ImportPreviewSummary {
   /** Écartés par décision de l'utilisateur, avant tout autre arbitrage. */
   products_excluded: number;
   unresolved_tva_rates: number;
+  /** Porte photo : promotions lues sur la carte qui seront créées (inactives). */
+  promotions_to_create?: number;
 }
 
 /**
@@ -173,6 +175,8 @@ export interface ImportPreviewProduct {
   issues?: string[];
   /** Numéro de la photo (à partir de 1) où la ligne a été lue. */
   source_photo?: number;
+  /** Groupes d'options du produit (entrées de `ImportPreviewResult.attributes`). */
+  attribute_external_ids?: string[];
 }
 
 /** Porte « autre établissement » uniquement. */
@@ -200,7 +204,38 @@ export interface ImportPreviewAttribute {
   option_count: number;
   min_options: number;
   max_options: number;
+  /** Valeurs du groupe, dans l'ordre de la source. */
+  options?: ImportPreviewAttributeOption[];
   mapping_stale?: boolean;
+}
+
+export interface ImportPreviewAttributeOption {
+  title: string;
+  /** Supplément, en centimes. */
+  extra_price: number;
+}
+
+export type ImportPromotionKind = 'new_price' | 'percent_off' | 'amount_off' | 'nth_free';
+
+/** Promotion lue sur la carte (porte photo). Créée inactive au commit. */
+export interface ImportPreviewPromotion {
+  external_id: string;
+  name: string;
+  description: string;
+  kind: ImportPromotionKind;
+  /** La promotion telle qu'elle sera créée, en une phrase. */
+  summary: string;
+  /** `already_exists` : une promotion du même nom existe déjà, elle ne sera pas recréée. */
+  action: 'create' | 'already_exists';
+  all_products?: boolean;
+  /** Produits ciblés (entrées de `ImportPreviewResult.products`). */
+  product_external_ids?: string[];
+  /** Limites à connaître avant d'activer la promotion. */
+  notes?: string[];
+  /** Texte de la carte dont elle est tirée. */
+  source_text?: string;
+  source_photo?: number;
+  excluded?: boolean;
 }
 
 export interface ImportPreviewWarning {
@@ -247,6 +282,8 @@ export interface ImportDecisions {
    * catégorie existante.
    */
   added_categories?: Record<string, string>;
+  /** Porte photo : promotions lues sur la carte que le restaurateur écarte. */
+  excluded_promotions?: Record<string, boolean>;
 }
 
 /** Canaux de vente d'un produit, dans l'ordre des colonnes de la relecture. */
@@ -274,6 +311,8 @@ export interface ImportPreviewResult {
   /** Porte « autre établissement » uniquement — absents/vides ailleurs. */
   component_categories: ImportPreviewComponentCategory[];
   components: ImportPreviewComponent[];
+  /** Porte photo : promotions lues sur la carte — absent ailleurs. */
+  promotions?: ImportPreviewPromotion[];
   warnings: ImportPreviewWarning[];
   decisions: ImportDecisions;
 }
@@ -311,6 +350,8 @@ export interface ImportCommitSummary {
   tags: ImportCommitCounts;
   attributes: ImportCommitCounts;
   products: ImportCommitCounts;
+  /** Porte photo : promotions créées (inactives) ou ignorées. */
+  promotions?: ImportCommitCounts;
   options_created: number;
 }
 
@@ -318,6 +359,8 @@ export interface ImportCommitEntity {
   external_id: string;
   wello_id?: string;
   action: 'created' | 'reused' | 'skipped';
+  /** Pourquoi une promotion n'a pas été créée. */
+  reason?: string;
 }
 
 export interface ImportCommitResponse {
@@ -327,6 +370,7 @@ export interface ImportCommitResponse {
   tags: ImportCommitEntity[];
   attributes: ImportCommitEntity[];
   products: ImportCommitEntity[];
+  promotions?: ImportCommitEntity[];
 }
 
 /** Canaux de vente, dans l'ordre d'affichage. */

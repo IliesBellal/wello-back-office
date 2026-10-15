@@ -86,6 +86,25 @@ export const ImportDoneStep = ({ result, onClose, onImportAnother }: ImportDoneS
       </Table>
     </div>
 
+    {(result.promotions?.length ?? 0) > 0 && (
+      <div className="space-y-2 rounded-md border p-3 text-sm">
+        <p className="font-medium">
+          {result.summary.promotions?.created ?? 0} promotion(s) créée(s), désactivée(s)
+        </p>
+        <p className="text-muted-foreground">
+          Vérifiez-les puis activez-les depuis vos promotions : tant qu’elles sont désactivées,
+          elles ne s’appliquent à aucune commande.
+        </p>
+        {result.promotions
+          ?.filter((promotion) => promotion.action === 'skipped')
+          .map((promotion) => (
+            <p key={promotion.external_id} className="text-muted-foreground">
+              Non créée : {promotion.reason ?? 'raison inconnue'}.
+            </p>
+          ))}
+      </div>
+    )}
+
     {result.summary.attributes.created > 0 && (
       <p className="rounded-md border border-dashed p-3 text-sm text-muted-foreground">
         Les groupes d’options ont été créés sans être rattachés aux produits. Associez-les depuis

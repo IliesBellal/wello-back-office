@@ -25,6 +25,7 @@ import { ImportNameCollisions } from './review/ImportNameCollisions';
 import { ImportPhotoProducts } from './review/ImportPhotoProducts';
 import { ImportProductSelection } from './review/ImportProductSelection';
 import { ImportTagClassification } from './review/ImportTagClassification';
+import { ImportPromotions, PROMOTION_NOT_CREATED } from './review/ImportPromotions';
 import { ImportTvaConfirmation } from './review/ImportTvaConfirmation';
 import { ImportTvaResolution } from './review/ImportTvaResolution';
 import { ImportWarningsPanel } from './review/ImportWarningsPanel';
@@ -122,6 +123,16 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
     [preview.products],
   );
   const previouslyImported = useMemo(() => alreadyImportedProducts(preview), [preview]);
+  // Promotions vues sur la carte mais non créées : montrées avec les promotions,
+  // pas repliées parmi les autres avertissements.
+  const promotionsNotCreated = useMemo(
+    () => preview.warnings.filter((warning) => warning.code === PROMOTION_NOT_CREATED),
+    [preview.warnings],
+  );
+  const otherWarnings = useMemo(
+    () => preview.warnings.filter((warning) => warning.code !== PROMOTION_NOT_CREATED),
+    [preview.warnings],
+  );
 
   if (!decisions || !precheck) return null;
 
@@ -242,6 +253,28 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         </>
       )}
 
+      {isPhoto && ((preview.promotions?.length ?? 0) > 0 || promotionsNotCreated.length > 0) && (
+        <>
+          <Section
+            title="Promotions lues sur votre carte"
+            description="Elles seront créées désactivées : vérifiez-les, puis activez-les depuis vos promotions. Décochez celles à ne pas créer."
+            count={(preview.promotions?.length ?? 0) + promotionsNotCreated.length}
+          >
+            <ImportPromotions
+              promotions={preview.promotions ?? []}
+              notCreated={promotionsNotCreated}
+              products={preview.products}
+              excluded={decisions.excluded_promotions ?? {}}
+              photoDraft={wizard.photoDraft}
+              disabled={isCommitting}
+              onExclude={wizard.setPromotionExcluded}
+            />
+          </Section>
+
+          <Separator />
+        </>
+      )}
+
       {/* Une lecture de photos ne produit que des catégories, jamais de libellés à classer. */}
       {(!isPhoto || preview.tags.length > 0) && (
         <>
@@ -339,7 +372,7 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
       <Separator />
 
       <Section title="Points d’attention" description="Pour information — rien de bloquant.">
-        <ImportWarningsPanel warnings={preview.warnings} />
+        <ImportWarningsPanel warnings={otherWarnings} />
       </Section>
 
       {isPhoto && (
