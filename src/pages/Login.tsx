@@ -61,7 +61,7 @@ const Field = ({
         type={showToggle && isPasswordVisible ? 'text' : type}
         className={`h-11 rounded-lg border-[#dbe5f7] bg-white px-3.5 text-[#0b1230] shadow-[0_1px_2px_rgba(5,8,23,0.04)]
           placeholder:text-[#9aa8cb] hover:border-[#b9c8ea]
-          focus-visible:border-[#0036d9] focus-visible:ring-2 focus-visible:ring-[#0036d9]/20 focus-visible:ring-offset-0
+          focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20 focus-visible:ring-offset-0
           transition-[border-color,box-shadow] duration-150 ${showToggle ? 'pr-11' : ''} ${className ?? ''}`}
         {...props}
       />
@@ -71,7 +71,7 @@ const Field = ({
           onClick={onTogglePassword}
           aria-label={isPasswordVisible ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
           className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[#7e90bd]
-            transition-colors hover:bg-[#edf3fc] hover:text-[#0036d9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0036d9]/30"
+            transition-colors hover:bg-[#edf3fc] hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
         >
           {isPasswordVisible ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
         </button>
@@ -290,7 +290,7 @@ const Login = () => {
                 labelAside={
                   <Link
                     to="/forgot-password"
-                    className="text-[13px] font-medium text-[#0036d9] hover:underline focus-visible:outline-none focus-visible:underline"
+                    className="text-[13px] font-medium text-primary hover:underline focus-visible:outline-none focus-visible:underline"
                   >
                     Mot de passe oublié ?
                   </Link>
@@ -301,8 +301,8 @@ const Login = () => {
             <button
               type="submit"
               disabled={isLoading || !emailIsValid || !password}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#0036d9] text-[15px] font-semibold text-white
-                transition-colors hover:bg-[#002fbd] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0036d9]/40 focus-visible:ring-offset-2
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-[15px] font-semibold text-white
+                transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2
                 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? (
