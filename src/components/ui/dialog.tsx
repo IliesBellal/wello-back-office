@@ -27,14 +27,33 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+const isGooglePlacesTarget = (target: EventTarget | null) =>
+  target instanceof Element && !!target.closest(".pac-container");
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+>(({ className, children, onPointerDownOutside, onFocusOutside, onInteractOutside, ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
+      // Google Places suggestions (.pac-container) live in <body>, outside this
+      // content: Radix would treat a click on one as an outside interaction and
+      // its focus trap would move focus to another field instead of letting
+      // Google resolve the selection.
+      onPointerDownOutside={(e) => {
+        if (isGooglePlacesTarget(e.target)) e.preventDefault();
+        onPointerDownOutside?.(e);
+      }}
+      onFocusOutside={(e) => {
+        if (isGooglePlacesTarget(e.target)) e.preventDefault();
+        onFocusOutside?.(e);
+      }}
+      onInteractOutside={(e) => {
+        if (isGooglePlacesTarget(e.target)) e.preventDefault();
+        onInteractOutside?.(e);
+      }}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-xl translate-x-[-50%] translate-y-[-50%] gap-4 border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
         className,

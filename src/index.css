@@ -195,3 +195,11 @@ All colors MUST be HSL.
     animation: shake 0.5s ease-in-out;
   }
 }
+
+/* Google Places suggestions are appended to <body>, outside any Radix
+   Dialog/Sheet. Radix sets `pointer-events: none` on body while modal and
+   stacks content at z-50, so without this the suggestions can't be clicked. */
+.pac-container {
+  pointer-events: auto;
+  z-index: 100;
+}
