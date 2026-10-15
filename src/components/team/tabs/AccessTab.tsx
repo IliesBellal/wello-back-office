@@ -48,11 +48,20 @@ export function AccessTab({ userId }: AccessTabProps) {
     queryFn: rolesApi.list,
   });
 
+  // A link with no role_id yet (accounts that predate the RBAC migration) is
+  // still treated as admin by the backend when its legacy `admin` flag is set
+  // (permissions.go's Has(), RoleID == nil branch). Mirror that here so the
+  // tab shows the role the user effectively holds instead of "Aucun rôle".
+  const currentRoleId =
+    detail?.role_id ??
+    (detail?.admin ? roles?.find((r) => r.system_key === "admin")?.id : undefined) ??
+    null;
+
   const [selectedRoleId, setSelectedRoleId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (detail) setSelectedRoleId(detail.role_id ?? null);
-  }, [detail]);
+    setSelectedRoleId(currentRoleId);
+  }, [currentRoleId]);
 
   const { data: selectedRole, isLoading: isLoadingSelectedRole } = useQuery({
     queryKey: qk.roles.detail(selectedRoleId ?? "none"),
@@ -82,7 +91,7 @@ export function AccessTab({ userId }: AccessTabProps) {
     );
   }
 
-  const dirty = selectedRoleId !== (detail.role_id ?? null);
+  const dirty = selectedRoleId !== currentRoleId;
 
   return (
     <div className="space-y-5 py-2">

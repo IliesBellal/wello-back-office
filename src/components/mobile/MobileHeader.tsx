@@ -10,17 +10,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Menu, Building2, ChevronDown, Check } from 'lucide-react';
+import { Menu, Building2, ChevronDown, Check, Plus } from 'lucide-react';
 import { MobileSidebar } from './MobileSidebar';
 import { authService } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
 import { NotificationBell } from '@/components/shared/NotificationBell';
+import { CreateEstablishmentDialog } from '@/components/dashboard/CreateEstablishmentDialog';
+import { checkPermission } from '@/lib/permissions';
 
 export const MobileHeader = () => {
   const { authData, setAuthData } = useAuth();
   const { toast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
+  const [showCreateEstablishmentDialog, setShowCreateEstablishmentDialog] = useState(false);
 
   const handleMerchantSwitch = async (token: string, businessName: string) => {
     setIsSwitching(true);
@@ -139,10 +142,27 @@ export const MobileHeader = () => {
               </DropdownMenuItem>
             );
           })}
+          {checkPermission(authData, 'settings.manage') && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => setShowCreateEstablishmentDialog(true)}
+                className="flex items-center gap-2 py-3 cursor-pointer text-primary min-h-[44px]"
+              >
+                <Plus className="w-4 h-4 flex-shrink-0" />
+                <span className="font-medium">Nouvel établissement</span>
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
 
       <NotificationBell authData={authData} />
+
+      <CreateEstablishmentDialog
+        open={showCreateEstablishmentDialog}
+        onOpenChange={setShowCreateEstablishmentDialog}
+      />
     </header>
   );
 };
