@@ -17,11 +17,11 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 207 90% 77%;
+    --primary: 219 100% 48%;
     --primary-foreground: 0 0% 100%;
     
-    --primary-gradient-from: 189 80% 65%;
-    --primary-gradient-to: 207 90% 77%;
+    --primary-gradient-from: 218 93% 61%;
+    --primary-gradient-to: 219 100% 48%;
 
     --secondary: 210 40% 96%;
     --secondary-foreground: 222 47% 11%;
@@ -29,26 +29,26 @@ All colors MUST be HSL.
     --muted: 210 40% 96%;
     --muted-foreground: 215 16% 47%;
 
-    --accent: 189 80% 65%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 220 86% 95%;
+    --accent-foreground: 222 47% 11%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 207 90% 77%;
+    --ring: 219 100% 48%;
 
     --radius: 1rem;
 
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 207 90% 77%;
+    --sidebar-primary: 219 100% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96%;
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214 32% 91%;
-    --sidebar-ring: 207 90% 77%;
+    --sidebar-ring: 219 100% 48%;
     
     --shadow-soft: 0 2px 8px 0 rgb(0 0 0 / 0.04);
     --shadow-card: 0 4px 12px 0 rgb(0 0 0 / 0.05);
@@ -64,11 +64,11 @@ All colors MUST be HSL.
     --popover: 222 47% 13%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 207 90% 77%;
+    --primary: 218 93% 61%;
     --primary-foreground: 222 47% 11%;
     
-    --primary-gradient-from: 189 80% 65%;
-    --primary-gradient-to: 207 90% 77%;
+    --primary-gradient-from: 218 93% 61%;
+    --primary-gradient-to: 219 100% 48%;
 
     --secondary: 217 33% 18%;
     --secondary-foreground: 210 40% 98%;
@@ -76,24 +76,24 @@ All colors MUST be HSL.
     --muted: 217 33% 18%;
     --muted-foreground: 215 20% 65%;
 
-    --accent: 189 80% 65%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 226 60% 20%;
+    --accent-foreground: 210 40% 98%;
 
     --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 217 33% 18%;
     --input: 217 33% 18%;
-    --ring: 207 90% 77%;
+    --ring: 218 93% 61%;
     
     --sidebar-background: 222 47% 13%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 207 90% 77%;
+    --sidebar-primary: 218 93% 61%;
     --sidebar-primary-foreground: 222 47% 11%;
     --sidebar-accent: 217 33% 18%;
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 18%;
-    --sidebar-ring: 207 90% 77%;
+    --sidebar-ring: 218 93% 61%;
     
     --shadow-soft: 0 2px 8px 0 rgb(0 0 0 / 0.15);
     --shadow-card: 0 4px 12px 0 rgb(0 0 0 / 0.2);
