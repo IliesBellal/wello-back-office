@@ -30,6 +30,7 @@ export default {
             to: "hsl(var(--primary-gradient-to))",
           },
         },
+        "brand-orange": "hsl(var(--brand-orange))",
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",

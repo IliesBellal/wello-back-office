@@ -39,6 +39,8 @@ All colors MUST be HSL.
     --input: 214 32% 91%;
     --ring: 219 100% 48%;
 
+    --brand-orange: 22 99% 55%;
+
     --radius: 1rem;
 
     --sidebar-background: 0 0% 100%;
@@ -95,6 +97,8 @@ All colors MUST be HSL.
     --sidebar-border: 217 33% 18%;
     --sidebar-ring: 218 93% 61%;
     
+    --brand-orange: 22 99% 55%;
+
     --shadow-soft: 0 2px 8px 0 rgb(0 0 0 / 0.15);
     --shadow-card: 0 4px 12px 0 rgb(0 0 0 / 0.2);
   }
