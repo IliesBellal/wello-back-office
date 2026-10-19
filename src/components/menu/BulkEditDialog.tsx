@@ -52,6 +52,7 @@ import {
   CircleDot,
   Wheat,
   CirclePlus,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -62,6 +63,7 @@ type BulkAction =
   | 'add_attribute'
   | 'set_components'
   | 'add_components'
+  | 'ai_components'
   | 'set_tags'
   | 'add_tags'
   | 'assign_category'
@@ -190,6 +192,8 @@ interface BulkEditDialogProps {
   onSetAvailability: (productIds: string[], fields: BulkAvailabilityFields) => Promise<void>;
   /** Appelé après une action réussie, pour vider la sélection du tableau. */
   onApplied: () => void;
+  /** Ouvre la génération de composition par IA ; sans elle, l'action n'est pas proposée. */
+  onGenerateComposition?: (products: Product[]) => void;
 }
 
 const ACTIONS: {
@@ -235,6 +239,12 @@ const ACTIONS: {
     label: 'Ajouter des ingrédients',
     hint: 'Ajoute les ingrédients sélectionnés aux produits sans retirer ceux déjà présents.',
     icon: CirclePlus,
+  },
+  {
+    value: 'ai_components',
+    label: 'Générer les ingrédients depuis la description',
+    hint: 'L’IA lit la description de chaque produit et propose ses ingrédients, à vérifier avant d’appliquer. Utilise un crédit d’import IA.',
+    icon: Sparkles,
   },
   {
     value: 'set_tags',
@@ -346,6 +356,7 @@ export const BulkEditDialog = ({
   onSetTva,
   onSetAvailability,
   onApplied,
+  onGenerateComposition,
 }: BulkEditDialogProps) => {
   const { statuses } = useIntegrationStatus();
   const [step, setStep] = useState<BulkEditStep>('choose');
@@ -463,12 +474,13 @@ export const BulkEditDialog = ({
   // Liste filtrée par la recherche : le libellé et l'indice suffisent, pas
   // besoin de chercher dans la description qui n'apparaît qu'au survol.
   const filteredActions = useMemo(() => {
+    const available = onGenerateComposition ? ACTIONS : ACTIONS.filter(({ value }) => value !== 'ai_components');
     const query = actionSearch.trim().toLowerCase();
-    if (!query) return ACTIONS;
-    return ACTIONS.filter(
+    if (!query) return available;
+    return available.filter(
       ({ label, hint }) => label.toLowerCase().includes(query) || hint.toLowerCase().includes(query)
     );
-  }, [actionSearch]);
+  }, [actionSearch, onGenerateComposition]);
 
   // Sur l'écran de choix, il suffit d'avoir sélectionné une action — le
   // paramètre, lui, n'est réclamé qu'au moment d'appliquer.
@@ -594,6 +606,12 @@ export const BulkEditDialog = ({
   };
 
   const handlePrimary = () => {
+    // Fenêtre dédiée (lecture IA, puis relecture produit par produit).
+    if (action === 'ai_components' && onGenerateComposition) {
+      onGenerateComposition(selectedProducts);
+      onOpenChange(false);
+      return;
+    }
     if (step === 'choose' && needsDetailStep(action)) {
       setStep('detail');
       return;
@@ -611,7 +629,7 @@ export const BulkEditDialog = ({
   const selectedActionMeta = ACTIONS.find((entry) => entry.value === action);
   const primaryLabel = applying
     ? 'Application…'
-    : step === 'choose' && needsDetailStep(action)
+    : (step === 'choose' && needsDetailStep(action)) || action === 'ai_components'
       ? 'Continuer'
       : action === 'duplicate_to_category'
         ? 'Copier'

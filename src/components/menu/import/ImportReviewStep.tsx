@@ -246,6 +246,7 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
               onGroup={wizard.setProductGroup}
               onPrice={wizard.setProductPrice}
               onTva={wizard.setProductTva}
+              onIngredients={wizard.setProductIngredients}
             />
           </Section>
 

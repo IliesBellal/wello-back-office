@@ -408,6 +408,11 @@ const mockAvailabilities: Availability[] = [
   },
 ];
 
+// Ordre courant tel que le pricing l'évalue : preferred_order croissant. Tri
+// stable, une égalité garde l'ordre de la liste reçue de l'API.
+export const sortByApplicationOrder = (promotions: Promotion[]) =>
+  [...promotions].sort((a, b) => (a.preferred_order ?? 0) - (b.preferred_order ?? 0));
+
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 export const promotionsService = {
@@ -456,6 +461,23 @@ export const promotionsService = {
     return withMock(
       () => undefined,
       () => apiClient.delete<void>(`/menu/discounts/${id}`)
+    );
+  },
+
+  /**
+   * Ordre d'application : le pricing évalue les promotions par preferred_order
+   * croissant. Rangs 1..n, distincts (des égalités laissaient l'API départager
+   * sur l'identifiant). Pas d'endpoint de tri groupé : un PATCH par promotion
+   * dont le rang change ; renvoie la liste dans le nouvel ordre.
+   */
+  async reorderPromotions(ordered: Promotion[]): Promise<Promotion[]> {
+    return Promise.all(
+      ordered.map((promo, index) => {
+        const rank = index + 1;
+        return promo.preferred_order === rank
+          ? promo
+          : promotionsService.updatePromotion(promo.id, { preferred_order: rank });
+      })
     );
   },
 

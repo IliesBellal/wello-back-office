@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
  * Usage:
  * const { product, loading, error } = useProductData(productId, isOpen);
  */
-export const useProductData = (productId: string | null, isOpen: boolean) => {
+export const useProductData = (productId: string | null, isOpen: boolean, reloadKey = 0) => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export const useProductData = (productId: string | null, isOpen: boolean) => {
     };
 
     loadProduct();
-  }, [productId, isOpen, toast]);
+  }, [productId, isOpen, reloadKey, toast]);
 
   return { product, loading, error };
 };

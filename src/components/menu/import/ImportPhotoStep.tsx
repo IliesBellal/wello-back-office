@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { MAX_MENU_PHOTOS, MENU_PHOTO_ACCEPT } from '@/lib/menuPhotos';
 import type { UseProductImport } from '@/hooks/useProductImport';
 import type { ImportPhotoDraftStatus } from '@/types/import';
@@ -38,6 +39,7 @@ export const ImportPhotoStep = ({ wizard }: ImportPhotoStepProps) => {
     isUploadingPhotos,
     addPhotos,
     removePhoto,
+    setPhotoIngredients,
     submitPhotos,
     resumePhotoDraft,
     abandonPhotoDraft,
@@ -176,6 +178,22 @@ export const ImportPhotoStep = ({ wizard }: ImportPhotoStepProps) => {
           ))}
         </div>
       )}
+
+      <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
+        <Checkbox
+          className="mt-0.5"
+          checked={state.photoIngredients}
+          onCheckedChange={(checked) => setPhotoIngredients(checked === true)}
+          disabled={isUploadingPhotos}
+        />
+        <span className="space-y-1">
+          <span className="block font-medium">Lire aussi les ingrédients</span>
+          <span className="block text-muted-foreground">
+            Crée la composition de chaque produit à partir des ingrédients écrits sous son nom sur la
+            carte, sans quantité. Vous pourrez retirer ceux qui ne conviennent pas avant l’import.
+          </span>
+        </span>
+      </label>
 
       {state.error && (
         <Alert variant="destructive">

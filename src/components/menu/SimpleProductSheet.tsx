@@ -38,7 +38,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2, MonitorSmartphone, MoreVertical, Copy } from 'lucide-react';
+import { Edit, Save, X, ImageIcon, Loader2, Plus, Trash2, MonitorSmartphone, MoreVertical, Copy, Sparkles } from 'lucide-react';
+import { AICompositionDialog } from '@/components/menu/AICompositionDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -92,6 +93,11 @@ interface SimpleProductSheetProps {
   onCreateCategory: (name: string) => Promise<{ category_id: string }>;
   /** Ouvre une fiche de création préremplie avec les données de ce produit. */
   onCopy?: (product: Product) => void;
+  /**
+   * Après une génération de composition par IA appliquée (menu ⋮) ; sans
+   * elle, l'entrée n'est pas proposée.
+   */
+  onCompositionApplied?: () => void | Promise<void>;
 }
 
 // Socle de lecture en création : la fiche est rendue avant qu'aucun produit
@@ -191,9 +197,13 @@ export const SimpleProductSheet = ({
   onDelete,
   onCreateCategory,
   onCopy,
+  onCompositionApplied,
 }: SimpleProductSheetProps) => {
+  // Relecture de la fiche après une composition générée par IA.
+  const [reloadKey, setReloadKey] = useState(0);
+  const [aiCompositionOpen, setAiCompositionOpen] = useState(false);
   // Load product data if productId is provided
-  const { product: loadedProduct, loading } = useProductData(productId || null, open);
+  const { product: loadedProduct, loading } = useProductData(productId || null, open, reloadKey);
 
   // Declare all state hooks FIRST before using them
   const [isEditMode, setIsEditMode] = useState(false);
@@ -243,6 +253,21 @@ export const SimpleProductSheet = ({
 
   // Load sheet-specific data (TVA rates, tags, allergens, units)
   const { tvaRates, tags: loadedTags, allergens: loadedAllergens, units: loadedUnits } = useProductEditData(open);
+
+  const canGenerateComposition = Boolean(onCompositionApplied && product && !isCreateMode);
+  const aiCompositionDialog = canGenerateComposition && product && (
+    <AICompositionDialog
+      open={aiCompositionOpen}
+      onOpenChange={setAiCompositionOpen}
+      products={[product]}
+      onApplied={async () => {
+        // La fiche relit le produit : sa composition et son coût ont changé.
+        setDisplayedProduct(null);
+        setReloadKey((key) => key + 1);
+        await onCompositionApplied?.();
+      }}
+    />
+  );
 
   const findTvaRates = (deliveryType: string) =>
     tvaRates.find((group) => group.delivery_type === deliveryType)?.rates || [];
@@ -916,6 +941,12 @@ export const SimpleProductSheet = ({
                         Copier
                       </DropdownMenuItem>
                     )}
+                    {canGenerateComposition && (
+                      <DropdownMenuItem onClick={() => setAiCompositionOpen(true)}>
+                        <Sparkles className="w-4 h-4 mr-2" />
+                        Générer les ingrédients (IA)
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onClick={() => setShowDeleteDialog(true)}
                       className="text-destructive focus:text-destructive"
@@ -1568,6 +1599,7 @@ export const SimpleProductSheet = ({
           </div>
 
           <DuplicateNameDialog {...duplicateDialogProps} />
+          {aiCompositionDialog}
 
           {/* Delete Product Dialog */}
           <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -1668,6 +1700,12 @@ export const SimpleProductSheet = ({
                           <DropdownMenuItem onClick={() => onCopy(product)}>
                             <Copy className="w-4 h-4 mr-2" />
                             Copier
+                          </DropdownMenuItem>
+                        )}
+                        {canGenerateComposition && (
+                          <DropdownMenuItem onClick={() => setAiCompositionOpen(true)}>
+                            <Sparkles className="w-4 h-4 mr-2" />
+                            Générer les ingrédients (IA)
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem
@@ -2459,6 +2497,7 @@ export const SimpleProductSheet = ({
         </div>
 
         <DuplicateNameDialog {...duplicateDialogProps} />
+        {aiCompositionDialog}
 
         {/* Delete Product Dialog */}
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

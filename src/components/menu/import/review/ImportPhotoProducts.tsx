@@ -28,6 +28,7 @@ import {
   type ImportDecisions,
   type ImportPhotoDraft,
   type ImportPreviewAttribute,
+  type ImportPreviewComponent,
   type ImportPreviewProduct,
   type ImportPreviewResult,
 } from '@/types/import';
@@ -35,6 +36,7 @@ import type { TvaRate, TvaRateGroup } from '@/types/menu';
 
 import { ImportCategorySelect } from './ImportCategorySelect';
 import { ImportProductAttributes } from './ImportProductAttributes';
+import { ImportProductIngredients } from './ImportProductIngredients';
 
 interface ImportPhotoProductsProps {
   preview: ImportPreviewResult;
@@ -52,6 +54,7 @@ interface ImportPhotoProductsProps {
   onGroup: (productExternalId: string, groupExternalId: string) => void;
   onPrice: (product: ImportPreviewProduct, channel: ImportChannel, cents: number) => void;
   onTva: (productExternalId: string, channel: ImportChannel, tvaId: number) => void;
+  onIngredients: (productExternalId: string, componentExternalIds: string[]) => void;
 }
 
 /** Valeur du select de groupe pour « aucun groupe » : Radix refuse la chaîne vide. */
@@ -140,6 +143,7 @@ export const ImportPhotoProducts = ({
   onGroup,
   onPrice,
   onTva,
+  onIngredients,
 }: ImportPhotoProductsProps) => {
   const groups = useMemo(() => preview.products.filter((product) => product.is_group), [preview.products]);
   const variants = useMemo(() => groupVariants(preview, decisions), [preview, decisions]);
@@ -156,6 +160,10 @@ export const ImportPhotoProducts = ({
   const attributesById = useMemo(
     () => new Map(preview.attributes.map((attribute) => [attribute.external_id, attribute])),
     [preview.attributes],
+  );
+  const componentsById = useMemo(
+    () => new Map((preview.components ?? []).map((component) => [component.external_id, component])),
+    [preview.components],
   );
   // Taux configurés dans la caisse, par canal : seuls choix possibles.
   const ratesByChannel = useMemo(() => {
@@ -265,6 +273,13 @@ export const ImportPhotoProducts = ({
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
+                      {product.color_hex && (
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-sm border"
+                          style={{ backgroundColor: product.color_hex }}
+                          title="Couleur proposée pour la tuile du produit"
+                        />
+                      )}
                       <span className="font-medium">{product.name}</span>
                       {flagged && (
                         <Badge variant="outline" className="border-amber-500 text-amber-700">
@@ -282,6 +297,16 @@ export const ImportPhotoProducts = ({
                       attributes={(product.attribute_external_ids ?? [])
                         .map((id) => attributesById.get(id))
                         .filter((attribute): attribute is ImportPreviewAttribute => attribute !== undefined)}
+                    />
+                    <ImportProductIngredients
+                      ingredients={(product.component_external_ids ?? [])
+                        .map((id) => componentsById.get(id))
+                        .filter((component): component is ImportPreviewComponent => component !== undefined)}
+                      kept={
+                        decisions.ingredients_per_product?.[product.external_id] ?? product.component_external_ids ?? []
+                      }
+                      disabled={disabled || excluded}
+                      onChange={(kept) => onIngredients(product.external_id, kept)}
                     />
                     {blockers?.map((message) => (
                       <p key={message} className="text-xs text-destructive">

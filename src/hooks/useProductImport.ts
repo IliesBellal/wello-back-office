@@ -89,6 +89,8 @@ export interface ProductImportState {
   sourceMerchantId: string | null;
   /** Photos choisies, avant préparation et envoi — porte photo. */
   photos: File[];
+  /** Porte photo : lire aussi les ingrédients des descriptions (décoché par défaut). */
+  photoIngredients: boolean;
   /** Brouillon photo suivi (lecture en cours, puis relecture). */
   photoDraftId: string | null;
   preview: ImportPreviewResult | null;
@@ -110,6 +112,7 @@ const initialState: ProductImportState = {
   manualRows: [createManualRow()],
   sourceMerchantId: null,
   photos: [],
+  photoIngredients: false,
   photoDraftId: null,
   preview: null,
   decisions: null,
@@ -433,6 +436,20 @@ export const useProductImport = () => {
     [patchDecisions],
   );
 
+  /** Ingrédients gardés pour un produit, parmi ceux lus dans sa description. */
+  const setProductIngredients = useCallback(
+    (productExternalId: string, componentExternalIds: string[]) => {
+      patchDecisions((current) => ({
+        ...current,
+        ingredients_per_product: {
+          ...current.ingredients_per_product,
+          [productExternalId]: componentExternalIds,
+        },
+      }));
+    },
+    [patchDecisions],
+  );
+
   // ─── Appels ─────────────────────────────────────────────
 
   /**
@@ -476,6 +493,10 @@ export const useProductImport = () => {
     });
   }, []);
 
+  const setPhotoIngredients = useCallback((photoIngredients: boolean) => {
+    setState((previous) => ({ ...previous, photoIngredients }));
+  }, []);
+
   const removePhoto = useCallback((index: number) => {
     setState((previous) => ({
       ...previous,
@@ -501,8 +522,8 @@ export const useProductImport = () => {
 
   const photoUploadMutation = useMutation({
     // Préparation dans le navigateur (orientation, taille, JPEG), puis envoi.
-    mutationFn: async (files: File[]) =>
-      menuImportService.startPhotoImport(await normalizeMenuPhotos(files)),
+    mutationFn: async ({ files, withIngredients }: { files: File[]; withIngredients: boolean }) =>
+      menuImportService.startPhotoImport(await normalizeMenuPhotos(files), withIngredients),
     onSuccess: followPhotoDraft,
     onError: failPreview,
   });
@@ -512,8 +533,8 @@ export const useProductImport = () => {
       setState((previous) => ({ ...previous, error: 'Ajoutez au moins une photo de votre carte.' }));
       return;
     }
-    photoUploadMutation.mutate(state.photos);
-  }, [photoUploadMutation, state.photos]);
+    photoUploadMutation.mutate({ files: state.photos, withIngredients: state.photoIngredients });
+  }, [photoUploadMutation, state.photos, state.photoIngredients]);
 
   /** Reprend un brouillon existant (lecture en cours ou terminée). */
   const resumePhotoDraft = useCallback((draftId: string) => {
@@ -725,6 +746,7 @@ export const useProductImport = () => {
     isRetryingPhotos: photoRetryMutation.isPending,
     addPhotos,
     removePhoto,
+    setPhotoIngredients,
     submitPhotos,
     resumePhotoDraft,
     retryPhotos,
@@ -734,6 +756,7 @@ export const useProductImport = () => {
     setProductTva,
     setProductGroup,
     setTvaConfirmed,
+    setProductIngredients,
   };
 };
 

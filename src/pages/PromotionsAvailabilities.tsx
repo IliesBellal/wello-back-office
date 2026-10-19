@@ -35,12 +35,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { DatePicker } from '@/components/ui/date-picker';
 import { formatCalendarDate } from '@/utils/apiDate';
 import { isValidTimeSlot, TIME_SLOT_ERROR } from '@/utils/timeSlots';
-import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X, Search, UtensilsCrossed, Info, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Tag, Clock, Percent, Euro, CalendarDays, X, Search, UtensilsCrossed, Info, AlertTriangle, MoreVertical, ListOrdered } from 'lucide-react';
+import { PromotionOrderDialog } from '@/components/promotions/PromotionOrderDialog';
 import { useState as useStateBase } from 'react';
-import { promotionsService } from '@/services/promotionsService';
+import { promotionsService, sortByApplicationOrder } from '@/services/promotionsService';
 import { menuService } from '@/services/menuService';
 import { Promotion, Availability, DayOfWeek, TimeSlot } from '@/types/promotions';
 import { Category } from '@/types/menu';
@@ -825,12 +832,16 @@ function PromotionsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Promotion | undefined>(undefined);
   const [deleting, setDeleting] = useState<Promotion | null>(null);
+  const [orderOpen, setOrderOpen] = useState(false);
 
-  useEffect(() => {
+  const loadPromotions = () =>
     promotionsService.getPromotions().then(data => {
-      setPromotions(data);
+      setPromotions(sortByApplicationOrder(data));
       setLoading(false);
     });
+
+  useEffect(() => {
+    loadPromotions();
   }, []);
 
   const handleSave = async (data: Omit<Promotion, 'id'>) => {
@@ -839,9 +850,23 @@ function PromotionsTab() {
       setPromotions(prev => prev.map(p => p.id === editing.id ? updated : p));
       toast({ title: 'Succès', description: 'Promotion mise à jour.' });
     } else {
-      const created = await promotionsService.createPromotion(data);
+      // Placée en dernier : avec le rang 0 par défaut, une nouvelle promotion
+      // passerait devant toutes celles déjà ordonnées.
+      const lastRank = Math.max(0, ...promotions.map(p => p.preferred_order ?? 0));
+      const created = await promotionsService.createPromotion({ ...data, preferred_order: lastRank + 1 });
       setPromotions(prev => [...prev, created]);
       toast({ title: 'Succès', description: 'Promotion créée.' });
+    }
+  };
+
+  const handleReorder = async (ordered: Promotion[]) => {
+    try {
+      setPromotions(await promotionsService.reorderPromotions(ordered));
+      toast({ title: 'Succès', description: "Ordre d'application enregistré." });
+    } catch (error) {
+      // Échec partiel possible (un PATCH par promotion) : on se resynchronise.
+      await loadPromotions();
+      throw error;
     }
   };
 
@@ -881,10 +906,26 @@ function PromotionsTab() {
         <p className="text-sm text-muted-foreground">
           {promotions.length} promotion{promotions.length !== 1 ? 's' : ''}
         </p>
-        <Button className="bg-gradient-primary" onClick={openNew}>
-          <Plus className="w-4 h-4 mr-2" />
-          Nouvelle promotion
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button className="bg-gradient-primary" onClick={openNew}>
+            <Plus className="w-4 h-4 mr-2" />
+            Nouvelle promotion
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreVertical className="w-4 h-4" />
+                <span className="sr-only">Plus d'actions</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="bg-popover">
+              <DropdownMenuItem disabled={promotions.length < 2} onClick={() => setOrderOpen(true)}>
+                <ListOrdered className="w-4 h-4 mr-2" />
+                Ordre d'application
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {promotions.length === 0 ? (
@@ -1002,6 +1043,13 @@ function PromotionsTab() {
         initial={editing}
         onClose={() => setDialogOpen(false)}
         onSave={handleSave}
+      />
+
+      <PromotionOrderDialog
+        open={orderOpen}
+        promotions={promotions}
+        onClose={() => setOrderOpen(false)}
+        onSave={handleReorder}
       />
 
       <DeleteConfirm

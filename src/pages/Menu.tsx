@@ -13,6 +13,7 @@ import { useOrganizeModal } from '@/contexts/OrganizeModalContext';
 import { MultiFilter } from '@/components/shared/MultiFilter';
 import { ProductsTable } from '@/components/menu/ProductsTable';
 import { BulkEditDialog } from '@/components/menu/BulkEditDialog';
+import { AICompositionDialog } from '@/components/menu/AICompositionDialog';
 import { countProductRows } from '@/components/menu/productRows';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
 import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
@@ -128,6 +129,8 @@ export default function Menu() {
   const [groupCreateOpen, setGroupCreateOpen] = useState(false);
   const [copySourceProduct, setCopySourceProduct] = useState<Product | null>(null);
   const [copyCreateOpen, setCopyCreateOpen] = useState(false);
+  // Génération de composition par IA, lancée depuis l'édition de groupe.
+  const [aiCompositionProducts, setAiCompositionProducts] = useState<Product[] | null>(null);
 
   // Filtres et tri
   const [search, setSearch] = useState('');
@@ -575,6 +578,18 @@ export default function Menu() {
           onSetComponents={bulkSetProductsComponents}
           onAddComponents={bulkAddProductsComponents}
           onApplied={() => setSelectedIds(new Set())}
+          onGenerateComposition={setAiCompositionProducts}
+        />
+
+        <AICompositionDialog
+          open={aiCompositionProducts !== null}
+          onOpenChange={(next) => !next && setAiCompositionProducts(null)}
+          products={aiCompositionProducts ?? []}
+          onApplied={async () => {
+            setSelectedIds(new Set());
+            // Ingrédients créés et coûts recalculés côté API : rechargement complet.
+            await loadData();
+          }}
         />
 
         <SimpleProductSheet
@@ -589,6 +604,7 @@ export default function Menu() {
           onDelete={handleDeleteProduct}
           onCreateCategory={createProductCategory}
           onCopy={handleCopyProduct}
+          onCompositionApplied={loadData}
         />
 
         {/* Copie : fiche de création dédiée, préremplie avec les données du

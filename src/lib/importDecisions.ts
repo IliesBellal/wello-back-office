@@ -452,6 +452,16 @@ export const buildImportDecisions = (
     built.added_categories = Object.fromEntries(
       Object.entries(decisions.added_categories ?? {}).filter(([ref]) => referenced.has(ref)),
     );
+
+    // Les promotions sont créées actives : une case décochée doit partir,
+    // sinon la promotion s'appliquerait aux commandes dès l'import.
+    built.excluded_promotions = { ...decisions.excluded_promotions };
+
+    // Ingrédients : seuls les produits dont la sélection a été modifiée.
+    const productIds = new Set(preview.products.map((product) => product.external_id));
+    built.ingredients_per_product = Object.fromEntries(
+      Object.entries(decisions.ingredients_per_product ?? {}).filter(([id]) => productIds.has(id)),
+    );
   }
 
   return built;

@@ -177,6 +177,10 @@ export interface ImportPreviewProduct {
   source_photo?: number;
   /** Groupes d'options du produit (entrées de `ImportPreviewResult.attributes`). */
   attribute_external_ids?: string[];
+  /** Ingrédients lus dans la description (entrées de `ImportPreviewResult.components`), si demandés. */
+  component_external_ids?: string[];
+  /** Couleur proposée pour la tuile du produit (`#RRGGBB`). */
+  color_hex?: string;
 }
 
 /** Porte « autre établissement » uniquement. */
@@ -188,7 +192,7 @@ export interface ImportPreviewComponentCategory {
   mapping_stale?: boolean;
 }
 
-/** Porte « autre établissement » uniquement. */
+/** Porte « autre établissement », et porte photo quand les ingrédients sont lus. */
 export interface ImportPreviewComponent {
   external_id: string;
   name: string;
@@ -284,6 +288,11 @@ export interface ImportDecisions {
   added_categories?: Record<string, string>;
   /** Porte photo : promotions lues sur la carte que le restaurateur écarte. */
   excluded_promotions?: Record<string, boolean>;
+  /**
+   * Porte photo : ingrédients gardés par produit, parmi ceux lus dans sa
+   * description. Produit absent = tous ; liste vide = aucun.
+   */
+  ingredients_per_product?: Record<string, string[]>;
 }
 
 /** Canaux de vente d'un produit, dans l'ordre des colonnes de la relecture. */
@@ -308,7 +317,7 @@ export interface ImportPreviewResult {
   tags: ImportPreviewTag[];
   products: ImportPreviewProduct[];
   attributes: ImportPreviewAttribute[];
-  /** Porte « autre établissement » uniquement — absents/vides ailleurs. */
+  /** Porte « autre établissement », et porte photo avec ingrédients — absents/vides ailleurs. */
   component_categories: ImportPreviewComponentCategory[];
   components: ImportPreviewComponent[];
   /** Porte photo : promotions lues sur la carte — absent ailleurs. */
