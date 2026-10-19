@@ -124,6 +124,15 @@ export interface HourOfOperationPayload {
   valid_to?: string | null;
 }
 
+// Créneau de livraison ScanNOrder (GET/PUT /pos/settings/delivery_hours).
+// Aucun créneau = livraison pendant toutes les heures d'ouverture.
+// hour_to <= hour_from = le créneau se termine le lendemain (ex. 19:00 → 00:00).
+export interface DeliveryHour {
+  day_of_week: number; // 1 = lundi ... 7 = dimanche
+  hour_from: string; // "HH:MM"
+  hour_to: string; // "HH:MM"
+}
+
 export interface VacationPeriod {
   id: string;
   label?: string | null;

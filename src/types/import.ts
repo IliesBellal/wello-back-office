@@ -81,7 +81,7 @@ export interface ImportPreviewSummary {
   /** Écartés par décision de l'utilisateur, avant tout autre arbitrage. */
   products_excluded: number;
   unresolved_tva_rates: number;
-  /** Porte photo : promotions lues sur la carte qui seront créées (inactives). */
+  /** Porte photo : promotions lues sur la carte qui seront créées (actives dès l'import). */
   promotions_to_create?: number;
 }
 
@@ -217,7 +217,7 @@ export interface ImportPreviewAttributeOption {
 
 export type ImportPromotionKind = 'new_price' | 'percent_off' | 'amount_off' | 'nth_free';
 
-/** Promotion lue sur la carte (porte photo). Créée inactive au commit. */
+/** Promotion lue sur la carte (porte photo). Créée active au commit. */
 export interface ImportPreviewPromotion {
   external_id: string;
   name: string;
@@ -230,7 +230,7 @@ export interface ImportPreviewPromotion {
   all_products?: boolean;
   /** Produits ciblés (entrées de `ImportPreviewResult.products`). */
   product_external_ids?: string[];
-  /** Limites à connaître avant d'activer la promotion. */
+  /** Limites à connaître avant de valider l'import : la promotion sera active dès sa création. */
   notes?: string[];
   /** Texte de la carte dont elle est tirée. */
   source_text?: string;
@@ -350,7 +350,7 @@ export interface ImportCommitSummary {
   tags: ImportCommitCounts;
   attributes: ImportCommitCounts;
   products: ImportCommitCounts;
-  /** Porte photo : promotions créées (inactives) ou ignorées. */
+  /** Porte photo : promotions créées (actives) ou ignorées. */
   promotions?: ImportCommitCounts;
   options_created: number;
 }

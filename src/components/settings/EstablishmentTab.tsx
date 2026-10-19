@@ -18,6 +18,7 @@ import {
   establishmentProductionDisplayFields
 } from "@/config/settingsConfig";
 import { DeliveryZoneSettings } from "./DeliveryZoneSettings";
+import { DeliveryHours } from "./DeliveryHours";
 
 import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
@@ -644,6 +645,22 @@ export const EstablishmentTab = () => {
           <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto bg-gradient-primary">
             {isSaving ? "Enregistrement..." : "Enregistrer"}
           </Button>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Clock className="h-5 w-5" />
+                Horaires de livraison
+              </CardTitle>
+              <CardDescription>
+                Livrez sur des horaires plus courts que vos heures d'ouverture. S'applique aux commandes
+                en ligne ; la caisse peut toujours enregistrer une livraison.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <DeliveryHours />
+            </CardContent>
+          </Card>
         </div>
       );
     }

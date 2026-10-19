@@ -1,5 +1,5 @@
 import { apiClient, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
-import { UserProfile, EstablishmentSettings, HourOfOperation, HourOfOperationPayload, VacationPeriod, VacationPeriodPayload } from "@/types/settings";
+import { UserProfile, EstablishmentSettings, HourOfOperation, HourOfOperationPayload, VacationPeriod, VacationPeriodPayload, DeliveryHour } from "@/types/settings";
 
 const unwrapWelloData = <T>(response: WelloApiResponse<T> | T): T => {
   if (response && typeof response === "object" && "data" in response) {
@@ -101,6 +101,7 @@ const cloneSettings = (settings: EstablishmentSettings): EstablishmentSettings =
 });
 
 let mockVacationPeriods: VacationPeriod[] = [];
+let mockDeliveryHours: DeliveryHour[] = [];
 
 // ============= API Functions =============
 export const settingsService = {
@@ -245,6 +246,32 @@ export const settingsService = {
       async () => {
         const response = await apiClient.delete<WelloApiResponse<{ status: number }> | { status: number }>(`/pos/settings/hours_of_operations/${hourId}`);
         return unwrapWelloData(response);
+      }
+    );
+  },
+
+  async getDeliveryHours(): Promise<DeliveryHour[]> {
+    logAPI('GET', '/pos/settings/delivery_hours');
+    return withMock(
+      () => mockDeliveryHours.map((hour) => ({ ...hour })),
+      async () => {
+        const response = await apiClient.get<WelloApiResponse<{ delivery_hours: DeliveryHour[] }> | { delivery_hours: DeliveryHour[] }>('/pos/settings/delivery_hours');
+        return unwrapWelloData(response).delivery_hours ?? [];
+      }
+    );
+  },
+
+  // Remplace toute la semaine ; une liste vide supprime la restriction.
+  async replaceDeliveryHours(hours: DeliveryHour[]): Promise<DeliveryHour[]> {
+    logAPI('PUT', '/pos/settings/delivery_hours', { delivery_hours: hours });
+    return withMock(
+      () => {
+        mockDeliveryHours = hours.map((hour) => ({ ...hour }));
+        return mockDeliveryHours.map((hour) => ({ ...hour }));
+      },
+      async () => {
+        const response = await apiClient.put<WelloApiResponse<{ delivery_hours: DeliveryHour[] }> | { delivery_hours: DeliveryHour[] }>('/pos/settings/delivery_hours', { delivery_hours: hours });
+        return unwrapWelloData(response).delivery_hours ?? [];
       }
     );
   },

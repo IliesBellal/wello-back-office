@@ -27,8 +27,9 @@ interface ImportPromotionsProps {
 /**
  * Promotions lues sur la carte, une ligne chacune : la promotion telle qu'elle
  * sera créée (pas la phrase de la carte), le texte d'origine pour comparer, et
- * les limites à connaître. Tout est créé désactivé : cocher ne fait rien
- * appliquer, cela autorise seulement la création.
+ * les limites à connaître. Tout est créé actif dès l'import : décocher une
+ * ligne est donc la seule vérification qui reste avant qu'elle ne s'applique
+ * à une vraie commande.
  */
 export const ImportPromotions = ({
   promotions,

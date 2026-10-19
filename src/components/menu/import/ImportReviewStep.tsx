@@ -257,7 +257,7 @@ export const ImportReviewStep = ({ preview, wizard }: ImportReviewStepProps) => 
         <>
           <Section
             title="Promotions lues sur votre carte"
-            description="Elles seront créées désactivées : vérifiez-les, puis activez-les depuis vos promotions. Décochez celles à ne pas créer."
+            description="Elles seront créées actives et s’appliqueront immédiatement à vos commandes : vérifiez-les avant de valider l’import. Décochez celles à ne pas créer."
             count={(preview.promotions?.length ?? 0) + promotionsNotCreated.length}
           >
             <ImportPromotions

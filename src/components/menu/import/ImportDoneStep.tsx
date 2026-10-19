@@ -89,11 +89,11 @@ export const ImportDoneStep = ({ result, onClose, onImportAnother }: ImportDoneS
     {(result.promotions?.length ?? 0) > 0 && (
       <div className="space-y-2 rounded-md border p-3 text-sm">
         <p className="font-medium">
-          {result.summary.promotions?.created ?? 0} promotion(s) créée(s), désactivée(s)
+          {result.summary.promotions?.created ?? 0} promotion(s) créée(s), active(s)
         </p>
         <p className="text-muted-foreground">
-          Vérifiez-les puis activez-les depuis vos promotions : tant qu’elles sont désactivées,
-          elles ne s’appliquent à aucune commande.
+          Elles s’appliquent déjà à vos commandes : vérifiez-les depuis vos promotions et
+          désactivez celles qui ne conviennent pas.
         </p>
         {result.promotions
           ?.filter((promotion) => promotion.action === 'skipped')
