@@ -46,6 +46,7 @@ import UberEats from './pages/UberEats';
 import Deliveroo from './pages/Deliveroo';
 import AccountingSync from './pages/AccountingSync';
 import ScanNOrder from './pages/ScanNOrder';
+import Franchise from './pages/Franchise';
 import EquipePage from './pages/equipe/EquipePage';
 import PlanningPage from './pages/equipe/PlanningPage';
 import MyPlanningPage from './pages/equipe/MyPlanningPage';
@@ -168,6 +169,9 @@ const App = () => (
               <Route path="/integrations/uber-eats" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'platforms.manage')}><UberEats /></ProtectedRoute>} />
               <Route path="/integrations/deliveroo" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'platforms.manage')}><Deliveroo /></ProtectedRoute>} />
               <Route path="/integrations/accounting" element={<ProtectedRoute accessCheck={(authData) => checkPermission(authData, 'platforms.manage')}><AccountingSync /></ProtectedRoute>} />
+
+              {/* Franchise : droits vérifiés par l'API (gestionnaires, administrateurs d'établissement), pas par permission d'établissement */}
+              <Route path="/franchise" element={<ProtectedRoute><Franchise /></ProtectedRoute>} />
               
               {/* HACCP - Hygiene & Safety */}
               <Route path="/haccp/activity" element={<ProtectedRoute requiredModule="haccp"><HacCPActivity /></ProtectedRoute>} />

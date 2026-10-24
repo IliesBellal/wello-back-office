@@ -18,6 +18,17 @@ export const qk = {
     all: ["menu", "tva-rates"] as const,
   },
 
+  // ─── Franchises ───────────────────────────────────────────
+  // Rattachées à l'utilisateur, pas à l'établissement sélectionné.
+  franchises: {
+    all: ["franchises"] as const,
+    lists: ["franchises", "list"] as const,
+    list: (userId: string) => ["franchises", "list", userId] as const,
+    detail: (franchiseId: string) => ["franchises", "detail", franchiseId] as const,
+    candidates: (franchiseId: string) => ["franchises", "candidates", franchiseId] as const,
+    members: (franchiseId: string) => ["franchises", "members", franchiseId] as const,
+  },
+
   // ─── Users ────────────────────────────────────────────────
   users: {
     all: ["users"] as const,

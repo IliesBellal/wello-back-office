@@ -45,9 +45,19 @@ import {
   Archive,
   FileSignature,
   Calculator,
+  Network,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
+
+/**
+ * Visibilité qui dépend d'une donnée chargée par le menu, pas de authData :
+ * l'entrée Franchise suit GET /franchises (franchises gérées ou droit d'en
+ * créer), indépendante de l'établissement sélectionné.
+ */
+export interface NavVisibilityContext {
+  showFranchise?: boolean;
+}
 
 export interface NavChild {
   id: string;
@@ -56,7 +66,7 @@ export interface NavChild {
   href: string;
   badge?: number;
   requiredModule?: ModuleCapability;
-  visibilityCheck?: (authData: AuthData | null | undefined) => boolean;
+  visibilityCheck?: (authData: AuthData | null | undefined, context?: NavVisibilityContext) => boolean;
 }
 
 export interface NavItem {
@@ -67,7 +77,7 @@ export interface NavItem {
   children?: NavChild[];
   badge?: number;
   requiredModule?: ModuleCapability;
-  visibilityCheck?: (authData: AuthData | null | undefined) => boolean;
+  visibilityCheck?: (authData: AuthData | null | undefined, context?: NavVisibilityContext) => boolean;
   // For BottomNav: mark primary items that should appear in mobile bottom navigation
   primaryNav?: boolean;
 }
@@ -427,6 +437,15 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
 
+  // ═══ FRANCHISE ═══
+  {
+    id: 'franchise',
+    title: 'Franchise',
+    icon: Network,
+    href: '/franchise',
+    visibilityCheck: (_authData, context) => context?.showFranchise === true,
+  },
+
   // ═══ HYGIENE & SAFETY (HACCP) ═══
   {
     id: 'haccp',
@@ -566,13 +585,16 @@ export const NAV_ITEMS: NavItem[] = [
 /**
  * Filter navigation items based on module access.
  */
-export const getVisibleNavItems = (authData: AuthData | null | undefined): NavItem[] => {
+export const getVisibleNavItems = (
+  authData: AuthData | null | undefined,
+  context?: NavVisibilityContext,
+): NavItem[] => {
   return NAV_ITEMS.reduce<NavItem[]>((items, item) => {
     if (!hasModuleAccess(authData, item.requiredModule)) {
       return items;
     }
 
-    if (item.visibilityCheck && !item.visibilityCheck(authData)) {
+    if (item.visibilityCheck && !item.visibilityCheck(authData, context)) {
       return items;
     }
 
@@ -586,7 +608,7 @@ export const getVisibleNavItems = (authData: AuthData | null | undefined): NavIt
         return false;
       }
 
-      if (child.visibilityCheck && !child.visibilityCheck(authData)) {
+      if (child.visibilityCheck && !child.visibilityCheck(authData, context)) {
         return false;
       }
 

@@ -13,6 +13,7 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useShowFranchiseMenu } from '@/hooks/useFranchises';
 
 export type NavigationVariant = 'desktop' | 'mobile';
 
@@ -71,7 +72,8 @@ export const NavMenuContent: React.FC<NavMenuContentProps> = ({
   const location = useLocation();
   const { authData } = useAuth();
   const [mobileOpenSections, setMobileOpenSections] = useState<Record<string, boolean>>({});
-  const visibleNavItems = getVisibleNavItems(authData);
+  const showFranchise = useShowFranchiseMenu();
+  const visibleNavItems = getVisibleNavItems(authData, { showFranchise });
 
   const handleNavClick = () => {
     onClose?.();
