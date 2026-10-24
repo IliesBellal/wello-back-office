@@ -73,6 +73,7 @@ export function OTPVerification({
     resendCode,
     sendInitialCode,
     sendSMSFallback,
+    startCooldown,
   } = useOTPVerification({ mode, onSuccess, token, initialRecipient: recipient });
 
   const config = MODE_CONFIG[mode];
@@ -95,6 +96,15 @@ export function OTPVerification({
       setCode('');
     }
   }, [isOpen, setCode]);
+
+  // MFA: the API already sent the code before the modal opened (login, or the
+  // mfa_required answer itself) and enforces a cooldown from that moment, so the
+  // resend buttons start disabled instead of failing with otp_wait_time.
+  useEffect(() => {
+    if (isOpen && mode === 'mfa') {
+      startCooldown();
+    }
+  }, [isOpen, mode, startCooldown]);
 
   // Auto-send verification code on open for profile verification flows.
   useEffect(() => {

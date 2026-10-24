@@ -4,6 +4,8 @@ import { toast } from '@/hooks/use-toast';
 
 type OTPMode = 'mfa' | 'email' | 'tel';
 
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
 interface UseOTPVerificationProps {
   mode: OTPMode;
   onSuccess?: () => void;
@@ -58,6 +60,11 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
       return () => clearTimeout(timer);
     }
   }, [cooldown]);
+
+  // The server applies a 60s cooldown after each OTP it sends, including the one it
+  // sends on its own when it answers mfa_required (so the user never asked for it).
+  // Callers use this to start the same countdown when the modal opens.
+  const startCooldown = useCallback(() => setCooldown(OTP_RESEND_COOLDOWN_SECONDS), []);
 
   // Auto-verify when 6 digits are entered
   const handleComplete = useCallback(
@@ -126,7 +133,7 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
       const responseData = 'data' in response ? response.data : response;
 
       if (responseData.status === 'success') {
-        setCooldown(60);
+        setCooldown(OTP_RESEND_COOLDOWN_SECONDS);
         setCode(''); // Clear existing code
         if (responseData.recipient) {
           setRecipient(responseData.recipient);
@@ -175,7 +182,7 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
       const responseData = 'data' in response ? response.data : response;
 
       if (responseData.status === 'success') {
-        setCooldown(60);
+        setCooldown(OTP_RESEND_COOLDOWN_SECONDS);
         setCode(''); // Clear existing code
         if (responseData.recipient) {
           setRecipient(responseData.recipient);
@@ -218,5 +225,6 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
     resendCode,
     sendInitialCode,
     sendSMSFallback,
+    startCooldown,
   };
 }
