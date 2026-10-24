@@ -36,7 +36,10 @@ describe("shiftDurationHours", () => {
     expect(shiftDurationHours({ start_time: "22:00", end_time: "06:00", break_minutes: 0 })).toBe(8);
   });
   it("never returns a negative duration", () => {
-    expect(shiftDurationHours({ start_time: "09:00", end_time: "09:00", break_minutes: 30 })).toBe(0);
+    expect(shiftDurationHours({ start_time: "09:00", end_time: "09:15", break_minutes: 30 })).toBe(0);
+  });
+  it("treats an equal start and end as a 24 h shift, like the API", () => {
+    expect(shiftDurationHours({ start_time: "09:00", end_time: "09:00", break_minutes: 30 })).toBe(23.5);
   });
 });
 
@@ -139,6 +142,7 @@ describe("aggregateTotals", () => {
         payroll_ratio: 21300 / 50000,
         revenue_per_hour_cents: 5000,
         hours_delta: 0,
+        premium_breakdown: { normal_hours: 10, night_hours: 0, sunday_hours: 0, night_sunday_hours: 0, holiday_hours: 0 },
       },
       {
         period_start: "2026-05-26",
@@ -153,6 +157,7 @@ describe("aggregateTotals", () => {
         payroll_ratio: 21300 / 50000,
         revenue_per_hour_cents: 5000,
         hours_delta: 0,
+        premium_breakdown: { normal_hours: 10, night_hours: 0, sunday_hours: 0, night_sunday_hours: 0, holiday_hours: 0 },
       },
     ];
     const t = aggregateTotals(periods as any, "2026-05-25", "2026-05-26");
@@ -162,6 +167,7 @@ describe("aggregateTotals", () => {
     expect(t.worked_hours).toBe(20);
     expect(t.payroll_ratio).toBeCloseTo(42600 / 100000);
     expect(t.revenue_per_hour_cents).toBe(5000);
+    expect(t.premium_breakdown.normal_hours).toBe(20);
   });
 
   it("keeps payroll_ratio null when no revenue source", () => {
@@ -179,6 +185,7 @@ describe("aggregateTotals", () => {
         payroll_ratio: null,
         revenue_per_hour_cents: null,
         hours_delta: 0,
+        premium_breakdown: { normal_hours: 8, night_hours: 0, sunday_hours: 0, night_sunday_hours: 0, holiday_hours: 0 },
       },
     ];
     const t = aggregateTotals(periods as any, "2026-05-25", "2026-05-25");
