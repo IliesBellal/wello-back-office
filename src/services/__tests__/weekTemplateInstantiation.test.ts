@@ -1,9 +1,9 @@
 /**
- * Tests de la PROJECTION pure (`weekTemplateProjection`) + des méthodes
- * `previewWeekTemplate` / `instantiateWeekTemplate` du service.
+ * Tests de la PROJECTION pure (`weekTemplateProjection`). La preview et
+ * l’instanciation sont calculées par l’API (/planning/week-templates/{id}/…).
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   classifyTemplateShift,
@@ -11,13 +11,6 @@ import {
   isContractEnded,
   isOnApprovedLeave,
 } from "@/lib/weekTemplateProjection";
-import {
-  WeekTemplateService,
-  previewWeekTemplate,
-  instantiateWeekTemplate,
-  type InstantiationApiBridge,
-  type InstantiationContext,
-} from "@/services/weekTemplateService";
 import type {
   Employee,
   EmployeePosition,
@@ -111,16 +104,6 @@ const EMPLOYEES = [
   emp({ id: "emp-1", first_name: "Alice", last_name: "Martin" }),
   emp({ id: "emp-2", first_name: "Bob", last_name: "Dupont" }),
 ];
-
-function makeCtx(over: Partial<InstantiationContext> = {}): InstantiationContext {
-  return {
-    existingShiftsByWeekStart: new Map(),
-    leaves: [],
-    employees: EMPLOYEES,
-    positions: POSITIONS,
-    ...over,
-  };
-}
 
 const employeeById = new Map(EMPLOYEES.map((e) => [e.id, e]));
 const positionIdByLabel = new Map(POSITIONS.map((p) => [p.label.toLowerCase(), p.id]));
@@ -279,169 +262,5 @@ describe("classifyTemplateShift — filets de sécurité (priorité sur le mode)
       expect(c.action).toEqual({ kind: "create_unassigned", reason: "contract_ended" });
       expect(c.conflict?.reason).toBe("contract_ended");
     }
-  });
-});
-
-// ─── preview / instantiate via le service ────────────────────────────────────
-
-describe("previewWeekTemplate / instantiateWeekTemplate", () => {
-  let tmplId: string;
-
-  beforeEach(async () => {
-    WeekTemplateService.__resetForTests();
-    const created = await WeekTemplateService.create({
-      label: "T1",
-      shifts: [
-        // lundi 09–13 emp-1 (Manager)
-        { day_of_week: 1, employee_id: "emp-1", position_id: "pos-1", title: null, start_time: "09:00", end_time: "13:00", break_minutes: 0, location: null, notes: null },
-        // mardi 18–23 BESOIN (emp_id=null)
-        { day_of_week: 2, employee_id: null,    position_id: "pos-2", title: null, start_time: "18:00", end_time: "23:00", break_minutes: 0, location: null, notes: null },
-        // dimanche 10–14 emp-2
-        { day_of_week: 0, employee_id: "emp-2", position_id: "pos-1", title: null, start_time: "10:00", end_time: "14:00", break_minutes: 0, location: null, notes: null },
-      ],
-    });
-    tmplId = created.week_template.id;
-  });
-
-  it("preview multi-semaines : agrège compteurs sur 3 semaines, déduplique & trie", () => {
-    const ctx = makeCtx();
-    const p = previewWeekTemplate(
-      tmplId,
-      ["2026-06-15", "2026-06-01", "2026-06-08", "2026-06-01"], // doublon + désordre
-      ctx,
-    );
-    expect(p.target_week_starts).toEqual(["2026-06-01", "2026-06-08", "2026-06-15"]);
-    // 3 shifts × 3 semaines = 9 shifts à créer (aucun conflit).
-    expect(p.to_create_count).toBe(9);
-    expect(p.conflicts).toHaveLength(0);
-    expect(p.impacted_employee_count).toBe(0);
-    expect(p.auto_unassigned_count).toBe(0);
-    expect(p.idempotent_skipped_count).toBe(0);
-  });
-
-  it("impacted_employee_count distinct (30 conflits / 1 employé ⇒ 1)", () => {
-    // 3 semaines, congé qui couvre tout le mois sur emp-1 → 3 shifts auto-unassigned (1 par semaine).
-    const ctx = makeCtx({
-      leaves: [leave({ employee_id: "emp-1", start_date: "2026-06-01", end_date: "2026-06-30" })],
-    });
-    const p = previewWeekTemplate(
-      tmplId,
-      ["2026-06-01", "2026-06-08", "2026-06-15"],
-      ctx,
-    );
-    expect(p.auto_unassigned_count).toBe(3); // 1 shift emp-1 × 3 semaines
-    expect(p.impacted_employee_count).toBe(1); // un seul employé impacté
-    expect(p.conflicts.every((c) => c.reason === "on_leave")).toBe(true);
-  });
-
-  it("idempotence : un shift identique préexistant → skipped, pas de conflit", () => {
-    const existing = [
-      shift({
-        id: "pre-1",
-        shift_date: "2026-06-01", // lundi
-        employee_id: "emp-1",
-        start_time: "09:00",
-        end_time: "13:00",
-        position: "Manager",
-      }),
-    ];
-    const ctx = makeCtx({
-      existingShiftsByWeekStart: new Map([["2026-06-01", existing]]),
-    });
-    const p = previewWeekTemplate(tmplId, ["2026-06-01"], ctx);
-    expect(p.idempotent_skipped_count).toBe(1);
-    expect(p.to_create_count).toBe(2); // les 2 autres
-    expect(p.conflicts).toHaveLength(0);
-  });
-
-  it("instantiate keep_existing : un overlap NON identique ⇒ skip + existant intact", async () => {
-    const existing = [
-      // chevauche 09–13 sur lundi 06-01 mais horaires différents → pas idempotent
-      shift({ id: "pre-1", shift_date: "2026-06-01", employee_id: "emp-1", start_time: "10:00", end_time: "12:00" }),
-    ];
-    const ctx = makeCtx({ existingShiftsByWeekStart: new Map([["2026-06-01", existing]]) });
-
-    const create = vi.fn().mockResolvedValue(undefined);
-    const del = vi.fn().mockResolvedValue(undefined);
-    const api: InstantiationApiBridge = {
-      ensureWeekIdForStart: async () => "wk-1",
-      createShift: create,
-      deleteShift: del,
-    };
-
-    const r = await instantiateWeekTemplate(tmplId, ["2026-06-01"], "keep_existing", ctx, api);
-    expect(del).not.toHaveBeenCalled();
-    // 2 shifts créés (mardi besoin + dimanche emp-2), lundi skipped pour overlap.
-    expect(r.created_count).toBe(2);
-    expect(r.skipped_count).toBe(1);
-    expect(r.replaced_count).toBe(0);
-    expect(create).toHaveBeenCalledTimes(2);
-  });
-
-  it("instantiate replace : overlap ⇒ delete + create assigné", async () => {
-    const existing = [
-      shift({ id: "pre-1", shift_date: "2026-06-01", employee_id: "emp-1", start_time: "10:00", end_time: "12:00" }),
-    ];
-    const ctx = makeCtx({ existingShiftsByWeekStart: new Map([["2026-06-01", existing]]) });
-
-    const create = vi.fn().mockResolvedValue(undefined);
-    const del = vi.fn().mockResolvedValue(undefined);
-    const api: InstantiationApiBridge = {
-      ensureWeekIdForStart: async () => "wk-1",
-      createShift: create,
-      deleteShift: del,
-    };
-
-    const r = await instantiateWeekTemplate(tmplId, ["2026-06-01"], "replace", ctx, api);
-    expect(del).toHaveBeenCalledWith("pre-1");
-    expect(r.replaced_count).toBe(1);
-    expect(r.created_count).toBe(3); // 3 shifts du template tous créés
-    expect(r.assigned_count).toBe(2); // emp-1 lundi + emp-2 dimanche
-    expect(r.unassigned_count).toBe(1); // besoin mardi
-  });
-
-  it("instantiate template_to_unassigned : overlap ⇒ template en non-assigné, existant intact", async () => {
-    const existing = [
-      shift({ id: "pre-1", shift_date: "2026-06-01", employee_id: "emp-1", start_time: "10:00", end_time: "12:00" }),
-    ];
-    const ctx = makeCtx({ existingShiftsByWeekStart: new Map([["2026-06-01", existing]]) });
-
-    const create = vi.fn().mockResolvedValue(undefined);
-    const del = vi.fn().mockResolvedValue(undefined);
-    const api: InstantiationApiBridge = {
-      ensureWeekIdForStart: async () => "wk-1",
-      createShift: create,
-      deleteShift: del,
-    };
-
-    const r = await instantiateWeekTemplate(tmplId, ["2026-06-01"], "template_to_unassigned", ctx, api);
-    expect(del).not.toHaveBeenCalled();
-    // 3 shifts créés ; le lundi part en non-assigné, mardi reste besoin, dimanche assigné.
-    expect(r.created_count).toBe(3);
-    expect(r.unassigned_count).toBe(2);
-    expect(r.assigned_count).toBe(1);
-    // Le shift lundi (avec emp-1) doit avoir été envoyé avec employee_id=null.
-    const lundiCall = create.mock.calls.find(([, p]) => (p as { shift_date: string }).shift_date === "2026-06-01");
-    expect(lundiCall).toBeDefined();
-    expect((lundiCall![1] as { employee_id: string | null }).employee_id).toBeNull();
-  });
-
-  it("instantiate on_leave : non-assigné dans le résultat même en mode replace", async () => {
-    const ctx = makeCtx({
-      leaves: [leave({ employee_id: "emp-1", start_date: "2026-06-01", end_date: "2026-06-07" })],
-    });
-
-    const create = vi.fn().mockResolvedValue(undefined);
-    const api: InstantiationApiBridge = {
-      ensureWeekIdForStart: async () => "wk-1",
-      createShift: create,
-      deleteShift: vi.fn(),
-    };
-
-    const r = await instantiateWeekTemplate(tmplId, ["2026-06-01"], "replace", ctx, api);
-    // lundi emp-1 forcé en non-assigné par on_leave (le mode replace ne s'applique PAS).
-    const lundiCall = create.mock.calls.find(([, p]) => (p as { shift_date: string }).shift_date === "2026-06-01");
-    expect((lundiCall![1] as { employee_id: string | null }).employee_id).toBeNull();
-    expect(r.unassigned_count).toBeGreaterThanOrEqual(2); // besoin mardi + lundi forcé
   });
 });
