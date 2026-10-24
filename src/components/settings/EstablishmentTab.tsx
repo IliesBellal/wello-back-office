@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles, ImagePlus, Users, Smartphone, Monitor, MapPin } from "lucide-react";
+import { Store, ShoppingCart, Clock, Calendar, Utensils, Package, Truck, Lock, Sparkles, ImagePlus, Users, Smartphone, Monitor, MapPin, CreditCard } from "lucide-react";
 import { useEstablishmentSettings, useVacationPeriods } from "@/hooks/useSettings";
 import { TabSystem } from "@/components/shared/TabSystem";
 import { SettingsSection } from "./SettingsSection";
@@ -26,6 +26,8 @@ import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressA
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+// Même exigence que l'API (PATCH /pos/settings) : une adresse seule, avec un domaine.
+const EMAIL_PATTERN = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
 const nameSiretFields = establishmentInfoFields.filter((field) => field.key === "name" || field.key === "siret");
 const otherInfoFields = establishmentInfoFields.filter((field) => field.key !== "name" && field.key !== "siret");
 
@@ -182,6 +184,16 @@ export const EstablishmentTab = () => {
       return;
     }
 
+    const trimmedEmail = formData.info.email?.trim() ?? "";
+    if (trimmedEmail && !EMAIL_PATTERN.test(trimmedEmail)) {
+      toast({
+        title: "E-mail invalide",
+        description: "L'e-mail de l'établissement n'est pas une adresse valide.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const securityDelayError = getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes);
     if (securityDelayError) {
       toast({
@@ -213,6 +225,7 @@ export const EstablishmentTab = () => {
       info: {
         ...formData.info,
         phone: normalizedPhone,
+        email: trimmedEmail,
         logo_url: logoUrl
       }
     });
@@ -435,6 +448,24 @@ export const EstablishmentTab = () => {
                   <Switch
                     checked={formData.ordering.mobile_payment_enabled !== false}
                     onCheckedChange={(checked) => handleFieldChange('ordering', 'mobile_payment_enabled', checked)}
+                  />
+                </div>
+
+                {/* Alerte commande sans paiement */}
+                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground flex items-center gap-2">
+                      <CreditCard className="h-4 w-4" />
+                      Alerte commande sans paiement
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Demande une confirmation sur le POS avant de créer une commande pour laquelle aucun paiement n'a
+                      été saisi
+                    </p>
+                  </div>
+                  <Switch
+                    checked={formData.ordering.unpaid_order_warning !== false}
+                    onCheckedChange={(checked) => handleFieldChange('ordering', 'unpaid_order_warning', checked)}
                   />
                 </div>
               </div>

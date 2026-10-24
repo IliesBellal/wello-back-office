@@ -117,6 +117,9 @@ export const SettingsSection = ({ fields, values, onChange, defaultPhoneCountry,
               {errors?.[field.key] && (
                 <p className="text-xs text-destructive">{errors[field.key]}</p>
               )}
+              {field.description && (
+                <p className="text-xs text-muted-foreground mt-1">{field.description}</p>
+              )}
             </div>
           )}
         </div>

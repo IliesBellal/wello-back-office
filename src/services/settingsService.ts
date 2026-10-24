@@ -51,6 +51,7 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     upsell_enabled: false,
     covers_count_required: false,
     mobile_payment_enabled: true,
+    unpaid_order_warning: true,
     production_display_mode: "CLASSIC"
   },
   scan_order: {

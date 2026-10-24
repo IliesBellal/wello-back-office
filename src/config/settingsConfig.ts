@@ -11,6 +11,14 @@ export const userProfileFields: FieldConfig[] = [
 export const establishmentInfoFields: FieldConfig[] = [
   { key: 'name', label: 'Nom de l\'établissement', type: 'text', group: 'info', placeholder: 'Nom du restaurant' },
   { key: 'phone', label: 'Téléphone', type: 'tel', group: 'info', placeholder: '01 02 03 04 05' },
+  {
+    key: 'email',
+    label: 'E-mail de l\'établissement',
+    type: 'email',
+    group: 'info',
+    placeholder: 'contact@restaurant.fr',
+    description: 'Reçoit les avis de virement de vos ventes en ligne et sur borne. Les relevés de versement, les factures et les rappels liés à votre abonnement sont envoyés à l\'administrateur le plus ancien de l\'établissement, ou à cette adresse s\'il n\'y en a pas. Chaque e-mail indique le nom, l\'adresse et l\'identifiant de l\'établissement concerné.',
+  },
   { key: 'siret', label: 'SIRET', type: 'text', group: 'info', placeholder: '123 456 789 00012', readOnly: true },
 
   { key: 'currency', label: 'Devise', type: 'select', group: 'info', options: [

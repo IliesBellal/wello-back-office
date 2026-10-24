@@ -25,6 +25,7 @@ export interface EstablishmentInfo {
   website?: string;
   country_code?: string;
   siret: string;
+  email?: string;
   address: string;
   street?: string;
   city?: string;
@@ -58,6 +59,7 @@ export interface EstablishmentOrdering {
   upsell_enabled: boolean;
   covers_count_required: boolean;
   mobile_payment_enabled: boolean;
+  unpaid_order_warning: boolean;
   production_display_mode: 'CLASSIC' | 'PRODUCT_FOCUS';
 }
 
@@ -174,6 +176,8 @@ export interface FieldConfig {
   type: FieldType;
   group: string;
   placeholder?: string;
+  /** Aide affichée sous le champ. */
+  description?: string;
   min?: number;
   max?: number;
   readOnly?: boolean;
