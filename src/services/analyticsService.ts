@@ -602,6 +602,35 @@ export interface CancellationsByStaffResponse {
 // suggestions is the one block NOT gated by instrumentation_active: it reads
 // upsell_suggestions, a different, already-working write path (populated
 // whenever an order references a suggestion, independent of is_upsell).
+// ScanNOrder (onglet ScanNOrder) : canal ScanNOrder du périmètre et hub de
+// franchise — POST /analytics/scannorder, reports.sales.read
+// (ib-welloresto-api docs/franchises.md, D16 à D18). Les statistiques du hub
+// ne sont mesurées que depuis hub.tracking_since.
+export interface ScanNOrderAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  totals: { sno_orders: number; sno_revenue_ttc_cents: number; all_revenue_ttc_cents: number };
+  hub: {
+    in_franchise: boolean;
+    franchises: string[];
+    views: number;
+    order_clicks: number;
+    reservation_clicks: number;
+    orders: number;
+    revenue_ttc_cents: number;
+    tracking_since: string | null;
+  };
+  daily: { date: string; sno_orders: number; hub_orders: number; order_clicks: number }[];
+  by_merchant: {
+    merchant_id: string;
+    sno_orders: number;
+    sno_revenue_ttc_cents: number;
+    order_clicks: number;
+    reservation_clicks: number;
+    hub_orders: number;
+    hub_revenue_ttc_cents: number;
+  }[];
+}
+
 export interface UpsellPeriodTotals {
   from: string;
   to: string;
@@ -1952,6 +1981,36 @@ class AnalyticsService {
             ...orderFilterToRequestFields(orderFilter),
           }
         );
+        return response.data;
+      }
+    );
+  }
+
+  /** Onglet ScanNOrder : canal ScanNOrder et hub de franchise du périmètre. */
+  async getScanNOrderAnalytics(
+    startDate: string | Date,
+    endDate: string | Date,
+    merchantIds?: string[]
+  ): Promise<ScanNOrderAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+    return withMock<ScanNOrderAnalyticsResponse>(
+      () => ({
+        scope: { merchant_ids: ["mock"], group_by: "none" },
+        totals: { sno_orders: 120, sno_revenue_ttc_cents: 285000, all_revenue_ttc_cents: 1200000 },
+        hub: {
+          in_franchise: true, franchises: ["Démo"], views: 640, order_clicks: 96, reservation_clicks: 21,
+          orders: 58, revenue_ttc_cents: 139000, tracking_since: dateFrom,
+        },
+        daily: [],
+        by_merchant: [],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: ScanNOrderAnalyticsResponse }>("/analytics/scannorder", {
+          date_from: dateFrom,
+          date_to: dateTo,
+          merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+        });
         return response.data;
       }
     );
