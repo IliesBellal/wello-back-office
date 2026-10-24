@@ -100,7 +100,8 @@ export interface AttributeOption {
   component_id?: string;  // Optional ingredient ID
   quantity?: number;  // Quantity of ingredient
   unit_of_measure_id?: string | number;  // Unit of ingredient
-  order?: number;  // Display order
+  order?: number;  // Local only (set on drag-and-drop); the API ignores it — it derives the order from the position in `options`
+  display_order?: number;  // Rank returned by the API (options already arrive sorted by it)
   image_url?: string;  // Option thumbnail image
 }
 
