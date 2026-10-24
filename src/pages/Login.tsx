@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { authService } from '@/services/authService';
+import { isApiHttpError } from '@/services/apiClient';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { OTPVerification } from '@/components/auth';
@@ -192,6 +193,15 @@ const Login = () => {
     }
   };
 
+  /** Valid credentials, but every establishment link was removed ("Délier du
+   * merchant"): the API answers 403 `no_active_merchant` on both login paths. */
+  const toastNoActiveMerchant = () =>
+    toast({
+      title: 'Aucun établissement actif',
+      description: "Votre compte n'est plus rattaché à aucun établissement. Contactez le responsable de votre établissement.",
+      variant: 'destructive',
+    });
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -199,6 +209,11 @@ const Login = () => {
     try {
       handleAuthResponse(await authService.login({ email, password }));
     } catch (error) {
+      const body = isApiHttpError(error) ? (error.responseBody as { status?: unknown } | undefined) : undefined;
+      if (body?.status === 'no_active_merchant') {
+        toastNoActiveMerchant();
+        return;
+      }
       toast({
         title: 'Erreur de connexion',
         description: 'Email ou mot de passe incorrect',
@@ -223,6 +238,10 @@ const Login = () => {
       const code = isPublicApiError(error) ? error.code : undefined;
       if (code === 'google_account_not_found') {
         navigate('/creer-mon-compte', { state: { googleIdToken: idToken } });
+        return;
+      }
+      if (code === 'no_active_merchant') {
+        toastNoActiveMerchant();
         return;
       }
       if (code === 'google_account_has_password') {
