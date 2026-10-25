@@ -602,13 +602,27 @@ export interface CancellationsByStaffResponse {
 // suggestions is the one block NOT gated by instrumentation_active: it reads
 // upsell_suggestions, a different, already-working write path (populated
 // whenever an order references a suggestion, independent of is_upsell).
-// ScanNOrder (onglet ScanNOrder) : canal ScanNOrder du périmètre et hub de
-// franchise — POST /analytics/scannorder, reports.sales.read
-// (ib-welloresto-api docs/franchises.md, D16 à D18). Les statistiques du hub
-// ne sont mesurées que depuis hub.tracking_since.
+// ScanNOrder (onglet ScanNOrder) : canal ScanNOrder du périmètre, mesure
+// d'audience anonyme (entonnoir, sources, produits vus) et hub de franchise —
+// POST /analytics/scannorder, reports.sales.read (ib-welloresto-api
+// docs/franchises.md, D16 à D23). L'audience n'est mesurée que depuis
+// audience_since.
+export interface ScanNOrderFunnel {
+  visits: number;
+  product_views: number;
+  add_to_cart: number;
+  checkout_start: number;
+  payment_redirect: number;
+  orders: number;
+}
+
 export interface ScanNOrderAnalyticsResponse {
   scope: { merchant_ids: string[]; group_by: string };
   totals: { sno_orders: number; sno_revenue_ttc_cents: number; all_revenue_ttc_cents: number };
+  audience_since: string | null;
+  funnel: ScanNOrderFunnel;
+  sources: { source: string; visits: number; orders: number; revenue_ttc_cents: number }[];
+  top_products: { product_id: string; name: string; views: number; add_to_cart: number }[];
   hub: {
     in_franchise: boolean;
     franchises: string[];
@@ -617,11 +631,11 @@ export interface ScanNOrderAnalyticsResponse {
     reservation_clicks: number;
     orders: number;
     revenue_ttc_cents: number;
-    tracking_since: string | null;
   };
-  daily: { date: string; sno_orders: number; hub_orders: number; order_clicks: number }[];
+  daily: { date: string; visits: number; sno_orders: number; hub_orders: number; order_clicks: number }[];
   by_merchant: {
     merchant_id: string;
+    visits: number;
     sno_orders: number;
     sno_revenue_ttc_cents: number;
     order_clicks: number;
@@ -1998,9 +2012,17 @@ class AnalyticsService {
       () => ({
         scope: { merchant_ids: ["mock"], group_by: "none" },
         totals: { sno_orders: 120, sno_revenue_ttc_cents: 285000, all_revenue_ttc_cents: 1200000 },
+        audience_since: dateFrom,
+        funnel: { visits: 1000, product_views: 640, add_to_cart: 260, checkout_start: 150, payment_redirect: 118, orders: 104 },
+        sources: [
+          { source: "qr_table", visits: 420, orders: 52, revenue_ttc_cents: 98000 },
+          { source: "direct", visits: 300, orders: 30, revenue_ttc_cents: 71000 },
+          { source: "hub", visits: 160, orders: 22, revenue_ttc_cents: 52000 },
+        ],
+        top_products: [],
         hub: {
           in_franchise: true, franchises: ["Démo"], views: 640, order_clicks: 96, reservation_clicks: 21,
-          orders: 58, revenue_ttc_cents: 139000, tracking_since: dateFrom,
+          orders: 58, revenue_ttc_cents: 139000,
         },
         daily: [],
         by_merchant: [],
