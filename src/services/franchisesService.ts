@@ -6,6 +6,7 @@ import type {
   FranchiseMember,
   FranchiseRole,
   FranchiseSlugAvailability,
+  FranchiseStats,
   FranchiseUpdateRequest,
 } from "@/types/franchise";
 
@@ -128,6 +129,12 @@ export const franchisesService = {
       const response = await apiClient.put<Envelope<{ photo_url: string }>>(path(franchiseId, `/${imageType}`), formData, OWN_ERRORS);
       return response.data.photo_url;
     });
+  },
+
+  /** Dates locales YYYY-MM-DD incluses. */
+  stats(franchiseId: string, dateFrom: string, dateTo: string): Promise<FranchiseStats> {
+    const params = new URLSearchParams({ date_from: dateFrom, date_to: dateTo });
+    return call(async () => (await apiClient.get<Envelope<FranchiseStats>>(path(franchiseId, `/stats?${params.toString()}`), OWN_ERRORS)).data);
   },
 
   candidates(franchiseId: string): Promise<FranchiseCandidate[]> {

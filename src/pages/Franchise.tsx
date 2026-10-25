@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, Loader2, Network, Plus } from "lucide-react";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
@@ -12,7 +11,7 @@ import { FranchiseHubLink } from "@/components/franchise/FranchiseHubLink";
 import { FranchiseMerchantsTab } from "@/components/franchise/FranchiseMerchantsTab";
 import { FranchiseAppearanceTab } from "@/components/franchise/FranchiseAppearanceTab";
 import { FranchiseMembersTab } from "@/components/franchise/FranchiseMembersTab";
-import { useFranchiseList } from "@/hooks/useFranchises";
+import { useFranchiseSelection } from "@/hooks/useFranchiseSelection";
 import { qk } from "@/lib/queryKeys";
 import { franchisesService } from "@/services/franchisesService";
 import { franchiseRoleLabels } from "@/types/franchise";
@@ -36,28 +35,11 @@ function CenteredState({ children }: { children: React.ReactNode }) {
  * l'établissement sélectionné. La franchise affichée est dans l'URL (?f=).
  */
 export default function Franchise() {
-  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("merchants");
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data: list, isLoading: listLoading, isError: listError, refetch } = useFranchiseList();
-  const franchises = list?.franchises ?? [];
-  const requestedId = searchParams.get("f");
-  const selectedId =
-    franchises.find((f) => f.franchise_id === requestedId)?.franchise_id ?? franchises[0]?.franchise_id ?? null;
-
-  const select = (franchiseId: string | null) => {
-    const next = new URLSearchParams(searchParams);
-    if (franchiseId) next.set("f", franchiseId);
-    else next.delete("f");
-    setSearchParams(next, { replace: true });
-  };
-
-  // Garde l'URL alignée sur la franchise réellement affichée (lien partageable).
-  useEffect(() => {
-    if (selectedId && selectedId !== requestedId) select(selectedId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, requestedId]);
+  const { listQuery, list, franchises, selectedId, select } = useFranchiseSelection();
+  const { isLoading: listLoading, isError: listError, refetch } = listQuery;
 
   const { data: detail, isLoading: detailLoading, isError: detailError } = useQuery({
     queryKey: qk.franchises.detail(selectedId ?? ""),

@@ -94,3 +94,29 @@ export const FRANCHISE_SLUG_MIN = 3;
 export const FRANCHISE_SLUG_MAX = 50;
 export const FRANCHISE_NAME_MAX = 80;
 export const FRANCHISE_DESCRIPTION_MAX = 500;
+
+/** GET /franchises/{id}/stats — statistiques du hub (D24, D25). */
+export interface FranchiseStats {
+  franchise_id: string;
+  date_from: string;
+  date_to: string;
+  /** Premier événement mesuré (YYYY-MM-DD), null si aucun. */
+  tracking_since: string | null;
+  totals: {
+    hub_views: number;
+    order_clicks: number;
+    reservation_clicks: number;
+    hub_orders: number;
+    hub_revenue_ttc_cents: number;
+  };
+  sources: { source: string; views: number }[];
+  daily: { date: string; hub_views: number; order_clicks: number; hub_orders: number }[];
+  merchants: {
+    merchant_id: string;
+    business_name: string;
+    order_clicks: number;
+    reservation_clicks: number;
+    hub_orders: number;
+    hub_revenue_ttc_cents: number;
+  }[];
+}

@@ -64,6 +64,8 @@ export interface NavChild {
   title: string;
   icon: IconComponent;
   href: string;
+  /** Actif seulement sur cette route exacte, pas sur ses sous-routes. */
+  end?: boolean;
   badge?: number;
   requiredModule?: ModuleCapability;
   visibilityCheck?: (authData: AuthData | null | undefined, context?: NavVisibilityContext) => boolean;
@@ -442,8 +444,13 @@ export const NAV_ITEMS: NavItem[] = [
     id: 'franchise',
     title: 'Franchise',
     icon: Network,
-    href: '/franchise',
     visibilityCheck: (_authData, context) => context?.showFranchise === true,
+    // Statistiques à part de la page Analyse : périmètre et droits de la
+    // franchise, pas ceux des établissements (ib-welloresto-api docs/franchises.md, D24).
+    children: [
+      { id: 'franchise-manage', title: 'Gestion', icon: Settings2, href: '/franchise', end: true },
+      { id: 'franchise-stats', title: 'Statistiques', icon: BarChart3, href: '/franchise/statistiques' },
+    ],
   },
 
   // ═══ HYGIENE & SAFETY (HACCP) ═══

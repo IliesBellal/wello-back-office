@@ -27,6 +27,7 @@ export const qk = {
     detail: (franchiseId: string) => ["franchises", "detail", franchiseId] as const,
     candidates: (franchiseId: string) => ["franchises", "candidates", franchiseId] as const,
     members: (franchiseId: string) => ["franchises", "members", franchiseId] as const,
+    stats: (franchiseId: string, from: string, to: string) => ["franchises", "stats", franchiseId, from, to] as const,
   },
 
   // ─── Users ────────────────────────────────────────────────

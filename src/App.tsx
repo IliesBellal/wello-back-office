@@ -47,6 +47,7 @@ import Deliveroo from './pages/Deliveroo';
 import AccountingSync from './pages/AccountingSync';
 import ScanNOrder from './pages/ScanNOrder';
 import Franchise from './pages/Franchise';
+import FranchiseStats from './pages/FranchiseStats';
 import EquipePage from './pages/equipe/EquipePage';
 import PlanningPage from './pages/equipe/PlanningPage';
 import MyPlanningPage from './pages/equipe/MyPlanningPage';
@@ -172,6 +173,7 @@ const App = () => (
 
               {/* Franchise : droits vérifiés par l'API (gestionnaires, administrateurs d'établissement), pas par permission d'établissement */}
               <Route path="/franchise" element={<ProtectedRoute><Franchise /></ProtectedRoute>} />
+              <Route path="/franchise/statistiques" element={<ProtectedRoute><FranchiseStats /></ProtectedRoute>} />
               
               {/* HACCP - Hygiene & Safety */}
               <Route path="/haccp/activity" element={<ProtectedRoute requiredModule="haccp"><HacCPActivity /></ProtectedRoute>} />

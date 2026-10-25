@@ -17,7 +17,6 @@ interface ScanNOrderAnalyticsTabProps {
 }
 
 const SNO_COLOR = '#3b82f6';
-const HUB_COLOR = '#f97316';
 const VISITS_COLOR = '#94a3b8';
 
 const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -81,8 +80,9 @@ function Funnel({ funnel }: { funnel: ScanNOrderFunnel }) {
 
 /**
  * Onglet ScanNOrder : canal ScanNOrder des établissements sélectionnés,
- * entonnoir et sources (mesure d'audience anonyme), apport du hub de leur
- * franchise (ib-welloresto-api docs/franchises.md, D16 à D23).
+ * entonnoir et sources (mesure d'audience anonyme). Le hub n'y apparaît que
+ * comme source : ses statistiques ont leur page, Franchise → Statistiques
+ * (ib-welloresto-api docs/franchises.md, D16 à D26).
  */
 export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: ScanNOrderAnalyticsTabProps) => {
   const [data, setData] = useState<ScanNOrderAnalyticsResponse | null>(null);
@@ -119,7 +119,6 @@ export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparison
   const { totals, hub, funnel } = data;
   const avgBasket = totals.sno_orders > 0 ? Math.round(totals.sno_revenue_ttc_cents / totals.sno_orders) : null;
   const showByMerchant = comparisonMode === 'compare' && data.by_merchant.length > 1;
-  const several = data.scope.merchant_ids.length > 1;
 
   return (
     <div className="space-y-6">
@@ -238,41 +237,14 @@ export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparison
         </Card>
       )}
 
-      {/* Hub de franchise */}
-      <Card className="bg-card border border-border">
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">
-            Hub de franchise{hub.franchises.length > 0 ? ` · ${hub.franchises.join(', ')}` : ''}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!hub.in_franchise ? (
-            <div className="rounded-md border border-dashed px-4 py-6 text-center text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Aucune franchise pour {several ? 'ces établissements' : 'cet établissement'}</p>
-              <p className="mt-1">
-                Une franchise réunit vos établissements sur une page commune où vos clients choisissent le leur.{' '}
-                <Link to="/franchise" className="text-primary underline underline-offset-2">Créer ou gérer une franchise</Link>
-              </p>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs text-muted-foreground">
-                Visites comptées pour toute la franchise (une visite du hub montre tous ses établissements) ; clics et commandes
-                pour {several ? 'les établissements sélectionnés' : 'cet établissement'}. Une commande est attribuée au hub quand
-                elle suit un clic « Commander » dans les 2 h.
-              </p>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <Tile title="Visites du hub" value={hub.views} />
-                <Tile title="Clics « Commander »" value={hub.order_clicks} subtitle={`${pct(hub.order_clicks, hub.views)} des visites`} />
-                <Tile title="Clics « Réserver »" value={hub.reservation_clicks} />
-                <Tile title="Commandes venues du hub" value={hub.orders} subtitle={`${pct(hub.orders, totals.sno_orders)} des commandes ScanNOrder`} />
-                <Tile title="CA venu du hub TTC" value={eur(hub.revenue_ttc_cents)} />
-                <Tile title="Conversion clic → commande" value={pct(hub.orders, hub.order_clicks)} />
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {hub.in_franchise && (
+        <p className="text-sm text-muted-foreground">
+          Visites, clics et commandes venus du hub{hub.franchises.length > 0 ? ` de ${hub.franchises.join(', ')}` : ''} :{' '}
+          <Link to="/franchise/statistiques" className="text-primary underline underline-offset-2">
+            voir les statistiques de la franchise
+          </Link>
+        </p>
+      )}
 
       {/* Évolution */}
       <Card className="bg-card border border-border">
@@ -289,7 +261,6 @@ export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparison
               <Legend />
               <Bar dataKey="visits" name="Visites du menu" fill={VISITS_COLOR} />
               <Bar dataKey="sno_orders" name="Commandes ScanNOrder" fill={SNO_COLOR} />
-              {hub.in_franchise && <Bar dataKey="hub_orders" name="dont venues du hub" fill={HUB_COLOR} />}
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -311,9 +282,6 @@ export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparison
                     <TableHead className="text-right">Commandes</TableHead>
                     <TableHead className="text-right">Conversion</TableHead>
                     <TableHead className="text-right">CA ScanNOrder</TableHead>
-                    <TableHead className="text-right">Clics hub</TableHead>
-                    <TableHead className="text-right">Commandes hub</TableHead>
-                    <TableHead className="text-right">CA hub</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -324,9 +292,6 @@ export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparison
                       <TableCell className="text-right">{row.sno_orders}</TableCell>
                       <TableCell className="text-right">{row.visits > 0 ? pct(row.sno_orders, row.visits) : '—'}</TableCell>
                       <TableCell className="text-right">{eur(row.sno_revenue_ttc_cents)}</TableCell>
-                      <TableCell className="text-right">{row.order_clicks + row.reservation_clicks}</TableCell>
-                      <TableCell className="text-right">{row.hub_orders}</TableCell>
-                      <TableCell className="text-right">{eur(row.hub_revenue_ttc_cents)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
