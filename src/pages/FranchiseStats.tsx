@@ -1,19 +1,14 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { format, subDays } from "date-fns";
-import { AlertCircle, Loader2, Network } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { PageContainer } from "@/components/shared";
 import { AdvancedDatePicker } from "@/components/shared/AdvancedDatePicker";
 import { Tile } from "@/components/shared/Tile";
 import { chartTooltipProps } from "@/components/analytics/chartTooltip";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { dayLabel, eur, frDate, pct, sourceLabel } from "@/components/analytics/channelFormat";
+import { FranchisePageShell } from "@/components/franchise/FranchisePageShell";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useFranchiseSelection } from "@/hooks/useFranchiseSelection";
 import { qk } from "@/lib/queryKeys";
 import { FranchiseApiError, franchiseErrorMessage, franchisesService } from "@/services/franchisesService";
 import type { FranchiseStats as FranchiseStatsData } from "@/types/franchise";
@@ -22,31 +17,8 @@ const VIEWS_COLOR = "#94a3b8";
 const CLICKS_COLOR = "#3b82f6";
 const ORDERS_COLOR = "#f97316";
 
-const eur = (cents: number) => (cents / 100).toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
-const pct = (part: number, total: number) => (total > 0 ? `${((part / total) * 100).toFixed(1)} %` : "—");
-const dayLabel = (iso: string) => {
-  const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
-};
-const frDate = (iso: string) => new Date(iso).toLocaleDateString("fr-FR");
-
-// Provenance d'une visite du hub (normalizeSource côté API).
-const SOURCE_LABELS: Record<string, string> = {
-  direct: "Direct ou QR de la franchise",
-  search: "Moteur de recherche",
-  social: "Réseaux sociaux",
-  referral: "Autre site",
-  unknown: "Origine inconnue",
-};
-const sourceLabel = (source: string) => SOURCE_LABELS[source] ?? `Lien « ${source} »`;
-
-function CenteredState({ children }: { children: React.ReactNode }) {
-  return (
-    <DashboardLayout>
-      <div className="flex h-full items-center justify-center p-4">{children}</div>
-    </DashboardLayout>
-  );
-}
+// Sur le hub, « direct » couvre aussi les scans du QR de la franchise.
+const HUB_SOURCE_LABELS = { direct: "Direct ou QR de la franchise" };
 
 function StatsContent({ stats }: { stats: FranchiseStatsData }) {
   const { totals } = stats;
@@ -146,7 +118,7 @@ function StatsContent({ stats }: { stats: FranchiseStatsData }) {
                 <TableBody>
                   {stats.sources.map((row) => (
                     <TableRow key={row.source}>
-                      <TableCell className="font-medium">{sourceLabel(row.source)}</TableCell>
+                      <TableCell className="font-medium">{sourceLabel(row.source, HUB_SOURCE_LABELS)}</TableCell>
                       <TableCell className="text-right">{row.views}</TableCell>
                       <TableCell className="text-right">{pct(row.views, totals.hub_views)}</TableCell>
                     </TableRow>
@@ -161,128 +133,64 @@ function StatsContent({ stats }: { stats: FranchiseStatsData }) {
   );
 }
 
+function StatsPanel({ franchiseId }: { franchiseId: string }) {
+  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
+  const from = format(dateRange.from, "yyyy-MM-dd");
+  const to = format(dateRange.to, "yyyy-MM-dd");
+
+  // Les chiffres de la période précédente restent affichés pendant le
+  // chargement de la nouvelle : pas de clignotement au changement de période.
+  const statsQuery = useQuery({
+    queryKey: qk.franchises.stats(franchiseId, from, to),
+    queryFn: () => franchisesService.stats(franchiseId, from, to),
+    placeholderData: keepPreviousData,
+  });
+
+  return (
+    <>
+      <Card className="bg-card border border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-semibold">Période</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="w-full max-w-sm">
+            <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {statsQuery.isError ? (
+        <div className="py-8 text-center text-sm text-muted-foreground">
+          {statsQuery.error instanceof FranchiseApiError && statsQuery.error.httpStatus === 400
+            ? "Choisissez une période d'un an au plus."
+            : franchiseErrorMessage(statsQuery.error, "Impossible de charger les statistiques.")}{" "}
+          <button type="button" className="text-primary underline underline-offset-2" onClick={() => statsQuery.refetch()}>
+            Réessayer
+          </button>
+        </div>
+      ) : statsQuery.data ? (
+        <div className={statsQuery.isPlaceholderData ? "opacity-60 transition-opacity" : "transition-opacity"}>
+          <StatsContent stats={statsQuery.data} />
+        </div>
+      ) : (
+        <div className="py-8 text-center text-muted-foreground">Chargement...</div>
+      )}
+    </>
+  );
+}
+
 /**
  * Franchise → Statistiques : apport du hub pour toute la franchise, ouvert à
  * tous ses gestionnaires (ib-welloresto-api docs/franchises.md, D24 à D26).
  * Le canal ScanNOrder de chaque établissement reste dans Analyse.
  */
 export default function FranchiseStats() {
-  const { listQuery, franchises, selectedId, select } = useFranchiseSelection();
-  const [dateRange, setDateRange] = useState({ from: subDays(new Date(), 30), to: new Date() });
-  const from = format(dateRange.from, "yyyy-MM-dd");
-  const to = format(dateRange.to, "yyyy-MM-dd");
-
-  const statsQuery = useQuery({
-    queryKey: qk.franchises.stats(selectedId ?? "", from, to),
-    queryFn: () => franchisesService.stats(selectedId as string, from, to),
-    enabled: selectedId !== null,
-  });
-
-  if (listQuery.isLoading) {
-    return (
-      <CenteredState>
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </CenteredState>
-    );
-  }
-
-  if (listQuery.isError) {
-    return (
-      <CenteredState>
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              Erreur
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">Impossible de charger vos franchises.</p>
-            <Button onClick={() => listQuery.refetch()} className="mt-4 w-full">
-              Réessayer
-            </Button>
-          </CardContent>
-        </Card>
-      </CenteredState>
-    );
-  }
-
-  if (!selectedId) {
-    return (
-      <CenteredState>
-        <Card className="w-full max-w-lg text-center">
-          <CardHeader>
-            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-              <Network className="h-6 w-6" />
-            </div>
-            <CardTitle>Aucune franchise</CardTitle>
-            <CardDescription>Les statistiques du hub apparaissent ici dès que vous gérez une franchise.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to="/franchise">Créer ou gérer une franchise</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </CenteredState>
-    );
-  }
-
-  const current = franchises.find((f) => f.franchise_id === selectedId);
-
   return (
-    <DashboardLayout>
-      <PageContainer
-        header={
-          <div className="flex items-center gap-3 min-w-0">
-            <h1 className="text-3xl font-bold">Statistiques</h1>
-            {franchises.length > 1 ? (
-              <Select value={selectedId} onValueChange={select}>
-                <SelectTrigger className="h-10 w-56 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {franchises.map((f) => (
-                    <SelectItem key={f.franchise_id} value={f.franchise_id}>
-                      {f.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <span className="text-xl text-muted-foreground truncate">{current?.name}</span>
-            )}
-          </div>
-        }
-        description="Ce que le hub de la franchise apporte à ses établissements : visites, clics et commandes."
-        className="space-y-6"
-      >
-        <Card className="bg-card border border-border">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold">Période</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="w-full max-w-sm">
-              <AdvancedDatePicker value={dateRange} onChange={setDateRange} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {statsQuery.isLoading ? (
-          <div className="py-8 text-center text-muted-foreground">Chargement...</div>
-        ) : statsQuery.isError ? (
-          <div className="py-8 text-center text-sm text-muted-foreground">
-            {statsQuery.error instanceof FranchiseApiError && statsQuery.error.httpStatus === 400
-              ? "Choisissez une période d'un an au plus."
-              : franchiseErrorMessage(statsQuery.error, "Impossible de charger les statistiques.")}{" "}
-            <button type="button" className="text-primary underline underline-offset-2" onClick={() => statsQuery.refetch()}>
-              Réessayer
-            </button>
-          </div>
-        ) : statsQuery.data ? (
-          <StatsContent stats={statsQuery.data} />
-        ) : null}
-      </PageContainer>
-    </DashboardLayout>
+    <FranchisePageShell
+      title="Statistiques"
+      description="Ce que le hub de la franchise apporte à ses établissements : visites, clics et commandes."
+    >
+      {({ franchiseId }) => <StatsPanel key={franchiseId} franchiseId={franchiseId} />}
+    </FranchisePageShell>
   );
 }

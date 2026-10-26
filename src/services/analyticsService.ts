@@ -602,11 +602,12 @@ export interface CancellationsByStaffResponse {
 // suggestions is the one block NOT gated by instrumentation_active: it reads
 // upsell_suggestions, a different, already-working write path (populated
 // whenever an order references a suggestion, independent of is_upsell).
-// ScanNOrder (onglet ScanNOrder) : canal ScanNOrder du périmètre, mesure
-// d'audience anonyme (entonnoir, sources, produits vus) et hub de franchise —
+// ScanNOrder (onglet ScanNOrder) : canal ScanNOrder du périmètre et mesure
+// d'audience anonyme (entonnoir, sources, produits vus) —
 // POST /analytics/scannorder, reports.sales.read (ib-welloresto-api
-// docs/franchises.md, D16 à D23). L'audience n'est mesurée que depuis
-// audience_since.
+// docs/mesure-audience.md). L'audience n'est mesurée que depuis
+// audience_since. Le hub n'y est qu'une source : ses statistiques sont dans
+// Franchise → Statistiques.
 export interface ScanNOrderFunnel {
   visits: number;
   product_views: number;
@@ -623,25 +624,69 @@ export interface ScanNOrderAnalyticsResponse {
   funnel: ScanNOrderFunnel;
   sources: { source: string; visits: number; orders: number; revenue_ttc_cents: number }[];
   top_products: { product_id: string; name: string; views: number; add_to_cart: number }[];
-  hub: {
-    in_franchise: boolean;
-    franchises: string[];
-    views: number;
-    order_clicks: number;
-    reservation_clicks: number;
+  /** Franchises du périmètre, pour le lien vers leurs statistiques. */
+  hub: { in_franchise: boolean; franchises: string[] };
+  daily: { date: string; visits: number; sno_orders: number }[];
+  by_merchant: { merchant_id: string; visits: number; sno_orders: number; sno_revenue_ttc_cents: number }[];
+}
+
+// Borne (onglet Borne) : canal borne du périmètre et mesure d'audience
+// anonyme des bornes (sessions, entonnoir, abandons, échecs de paiement carte,
+// durée d'une commande) — POST /analytics/kiosk, reports.sales.read
+// (ib-welloresto-api docs/mesure-audience.md, D27 à D33). L'audience n'est
+// mesurée que depuis audience_since (bornes mises à jour).
+export interface KioskFunnel {
+  sessions: number;
+  fulfillment_chosen: number;
+  product_views: number;
+  add_to_cart: number;
+  summary_views: number;
+  payment_starts: number;
+  orders: number;
+}
+
+export interface KioskCount {
+  key: string;
+  count: number;
+}
+
+export interface KioskSplitRow {
+  key: string;
+  orders: number;
+  revenue_ttc_cents: number;
+}
+
+export interface KioskAnalyticsResponse {
+  scope: { merchant_ids: string[]; group_by: string };
+  totals: { kiosk_orders: number; kiosk_revenue_ttc_cents: number; all_revenue_ttc_cents: number };
+  audience_since: string | null;
+  funnel: KioskFunnel;
+  abandonments: {
+    sessions: number;
+    amount_cents: number;
+    by_step: { step: string; sessions: number; amount_cents: number }[];
+    by_reason: KioskCount[];
+  };
+  payment_failures: { card_starts: number; failures: number; by_reason: KioskCount[] };
+  duration: { orders: number; median_seconds: number | null; p90_seconds: number | null };
+  /** IN (sur place), TAKE_AWAY (à emporter). */
+  by_order_type: KioskSplitRow[];
+  /** card (carte à la borne), counter (au comptoir). */
+  by_payment: KioskSplitRow[];
+  top_products: { product_id: string; name: string; views: number; add_to_cart: number }[];
+  daily: { date: string; sessions: number; kiosk_orders: number; abandonments: number }[];
+  by_merchant: { merchant_id: string; sessions: number; kiosk_orders: number; kiosk_revenue_ttc_cents: number }[];
+  /** Nom vide : borne supprimée depuis. */
+  by_kiosk: {
+    kiosk_id: string;
+    name: string;
+    merchant_id: string;
+    sessions: number;
     orders: number;
     revenue_ttc_cents: number;
-  };
-  daily: { date: string; visits: number; sno_orders: number; hub_orders: number; order_clicks: number }[];
-  by_merchant: {
-    merchant_id: string;
-    visits: number;
-    sno_orders: number;
-    sno_revenue_ttc_cents: number;
-    order_clicks: number;
-    reservation_clicks: number;
-    hub_orders: number;
-    hub_revenue_ttc_cents: number;
+    abandonments: number;
+    payment_failures: number;
+    median_seconds: number | null;
   }[];
 }
 
@@ -2000,7 +2045,7 @@ class AnalyticsService {
     );
   }
 
-  /** Onglet ScanNOrder : canal ScanNOrder et hub de franchise du périmètre. */
+  /** Onglet ScanNOrder : canal ScanNOrder et mesure d'audience du périmètre. */
   async getScanNOrderAnalytics(
     startDate: string | Date,
     endDate: string | Date,
@@ -2020,15 +2065,56 @@ class AnalyticsService {
           { source: "hub", visits: 160, orders: 22, revenue_ttc_cents: 52000 },
         ],
         top_products: [],
-        hub: {
-          in_franchise: true, franchises: ["Démo"], views: 640, order_clicks: 96, reservation_clicks: 21,
-          orders: 58, revenue_ttc_cents: 139000,
-        },
+        hub: { in_franchise: true, franchises: ["Démo"] },
         daily: [],
         by_merchant: [],
       }),
       async () => {
         const response = await apiClient.post<{ id: string; data: ScanNOrderAnalyticsResponse }>("/analytics/scannorder", {
+          date_from: dateFrom,
+          date_to: dateTo,
+          merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,
+        });
+        return response.data;
+      }
+    );
+  }
+
+  /** Onglet Borne : canal borne et mesure d'audience des bornes du périmètre. */
+  async getKioskAnalytics(
+    startDate: string | Date,
+    endDate: string | Date,
+    merchantIds?: string[]
+  ): Promise<KioskAnalyticsResponse> {
+    const dateFrom = toLocalDateString(startDate);
+    const dateTo = toLocalDateString(endDate);
+    return withMock<KioskAnalyticsResponse>(
+      () => ({
+        scope: { merchant_ids: ["mock"], group_by: "none" },
+        totals: { kiosk_orders: 210, kiosk_revenue_ttc_cents: 412000, all_revenue_ttc_cents: 1200000 },
+        audience_since: dateFrom,
+        funnel: { sessions: 320, fulfillment_chosen: 300, product_views: 290, add_to_cart: 250, summary_views: 236, payment_starts: 220, orders: 210 },
+        abandonments: {
+          sessions: 96,
+          amount_cents: 118000,
+          by_step: [
+            { step: "menu", sessions: 52, amount_cents: 24000 },
+            { step: "cart", sessions: 28, amount_cents: 61000 },
+            { step: "payment", sessions: 16, amount_cents: 33000 },
+          ],
+          by_reason: [{ key: "inactivity", count: 70 }, { key: "cancel", count: 26 }],
+        },
+        payment_failures: { card_starts: 150, failures: 12, by_reason: [{ key: "declined", count: 8 }, { key: "canceled", count: 4 }] },
+        duration: { orders: 210, median_seconds: 118, p90_seconds: 245 },
+        by_order_type: [{ key: "TAKE_AWAY", orders: 130, revenue_ttc_cents: 240000 }, { key: "IN", orders: 80, revenue_ttc_cents: 172000 }],
+        by_payment: [{ key: "card", orders: 150, revenue_ttc_cents: 300000 }, { key: "counter", orders: 60, revenue_ttc_cents: 112000 }],
+        top_products: [],
+        daily: [],
+        by_merchant: [],
+        by_kiosk: [],
+      }),
+      async () => {
+        const response = await apiClient.post<{ id: string; data: KioskAnalyticsResponse }>("/analytics/kiosk", {
           date_from: dateFrom,
           date_to: dateTo,
           merchant_ids: merchantIds && merchantIds.length > 0 ? merchantIds : undefined,

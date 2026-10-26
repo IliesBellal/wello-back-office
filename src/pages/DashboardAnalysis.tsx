@@ -30,11 +30,12 @@ import { CancellationsAnalyticsTab } from '@/components/analytics/CancellationsA
 import { ClientsAnalyticsTab } from '@/components/analytics/ClientsAnalyticsTab';
 import { DiscountsAnalyticsTab } from '@/components/analytics/DiscountsAnalyticsTab';
 import { ScanNOrderAnalyticsTab } from '@/components/analytics/ScanNOrderAnalyticsTab';
+import { KioskAnalyticsTab } from '@/components/analytics/KioskAnalyticsTab';
 import { AdvancedDatePicker } from '@/components/shared/AdvancedDatePicker';
 import { TabSystem } from '@/components/shared/TabSystem';
 import { toast } from 'sonner';
 
-type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'scannorder' | 'paiements' | 'tva';
+type TabType = 'ca' | 'commandes' | 'produits' | 'options' | 'annulations' | 'upsell' | 'remises' | 'clients' | 'scannorder' | 'borne' | 'paiements' | 'tva';
 
 // Onglets dont l'endpoint accepte le filtre canal × type de commande
 // (OrderFilterRequest, internal/modules/analytics/order_filter.go). Ailleurs
@@ -157,6 +158,8 @@ const DashboardAnalysisContent = () => {
         return <ClientsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'scannorder':
         return <ScanNOrderAnalyticsTab dateRange={dateRange} {...scopeProps} />;
+      case 'borne':
+        return <KioskAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'paiements':
         return <PaymentsAnalyticsTab dateRange={dateRange} {...scopeProps} />;
       case 'tva':
@@ -176,6 +179,7 @@ const DashboardAnalysisContent = () => {
     { id: 'remises', label: 'Remises' },
     { id: 'clients', label: 'Clients' },
     { id: 'scannorder', label: 'ScanNOrder' },
+    { id: 'borne', label: 'Borne' },
     { id: 'paiements', label: 'Règlements' },
     { id: 'tva', label: 'TVA' },
   ];

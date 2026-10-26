@@ -48,6 +48,8 @@ import AccountingSync from './pages/AccountingSync';
 import ScanNOrder from './pages/ScanNOrder';
 import Franchise from './pages/Franchise';
 import FranchiseStats from './pages/FranchiseStats';
+import FranchiseHub from './pages/FranchiseHub';
+import FranchiseManagers from './pages/FranchiseManagers';
 import EquipePage from './pages/equipe/EquipePage';
 import PlanningPage from './pages/equipe/PlanningPage';
 import MyPlanningPage from './pages/equipe/MyPlanningPage';
@@ -173,6 +175,8 @@ const App = () => (
 
               {/* Franchise : droits vérifiés par l'API (gestionnaires, administrateurs d'établissement), pas par permission d'établissement */}
               <Route path="/franchise" element={<ProtectedRoute><Franchise /></ProtectedRoute>} />
+              <Route path="/franchise/hub" element={<ProtectedRoute><FranchiseHub /></ProtectedRoute>} />
+              <Route path="/franchise/gestionnaires" element={<ProtectedRoute><FranchiseManagers /></ProtectedRoute>} />
               <Route path="/franchise/statistiques" element={<ProtectedRoute><FranchiseStats /></ProtectedRoute>} />
               
               {/* HACCP - Hygiene & Safety */}

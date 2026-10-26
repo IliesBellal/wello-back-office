@@ -6,6 +6,8 @@ import { Tile } from '@/components/shared/Tile';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { chartTooltipProps } from '@/components/analytics/chartTooltip';
 import { analyticsService, ComparisonMode, ScanNOrderAnalyticsResponse, ScanNOrderFunnel } from '@/services/analyticsService';
+import { AudienceFunnel } from '@/components/analytics/AudienceFunnel';
+import { dayLabel, eur, frDate, pct, sourceLabel } from '@/components/analytics/channelFormat';
 import { isApiHttpError } from '@/services/apiClient';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 
@@ -19,25 +21,6 @@ interface ScanNOrderAnalyticsTabProps {
 const SNO_COLOR = '#3b82f6';
 const VISITS_COLOR = '#94a3b8';
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
-const pct = (part: number, total: number) => (total > 0 ? `${((part / total) * 100).toFixed(1)} %` : '—');
-const dayLabel = (iso: string) => {
-  const [, m, d] = iso.split('-');
-  return `${d}/${m}`;
-};
-const frDate = (iso: string) => new Date(iso).toLocaleDateString('fr-FR');
-
-const SOURCE_LABELS: Record<string, string> = {
-  qr_table: 'QR de table',
-  direct: 'Direct ou QR principal',
-  hub: 'Hub de franchise',
-  search: 'Moteur de recherche',
-  social: 'Réseaux sociaux',
-  referral: 'Autre site',
-  unknown: 'Origine inconnue',
-};
-const sourceLabel = (source: string) => SOURCE_LABELS[source] ?? `Lien « ${source} »`;
-
 const FUNNEL_STEPS: { key: keyof ScanNOrderFunnel; label: string }[] = [
   { key: 'visits', label: 'Visites du menu' },
   { key: 'product_views', label: 'Produit consulté' },
@@ -47,42 +30,11 @@ const FUNNEL_STEPS: { key: keyof ScanNOrderFunnel; label: string }[] = [
   { key: 'orders', label: 'Commande créée' },
 ];
 
-/** Entonnoir : chaque étape en part des visites, et la perte depuis l'étape précédente. */
-function Funnel({ funnel }: { funnel: ScanNOrderFunnel }) {
-  const top = funnel.visits;
-  return (
-    <div className="space-y-3">
-      {FUNNEL_STEPS.map((step, i) => {
-        const value = funnel[step.key];
-        const previous = i > 0 ? funnel[FUNNEL_STEPS[i - 1].key] : null;
-        const width = top > 0 ? Math.max(2, (value / top) * 100) : 0;
-        return (
-          <div key={step.key}>
-            <div className="flex items-baseline justify-between gap-2 text-sm">
-              <span className="font-medium">{step.label}</span>
-              <span className="text-muted-foreground">
-                <span className="font-semibold text-foreground">{value.toLocaleString('fr-FR')}</span>
-                {i > 0 && ` · ${pct(value, top)} des visites`}
-                {previous !== null && previous > 0 && value < previous && (
-                  <span className="text-destructive"> · −{pct(previous - value, previous)}</span>
-                )}
-              </span>
-            </div>
-            <div className="mt-1 h-2.5 rounded-full bg-muted">
-              <div className="h-2.5 rounded-full" style={{ width: `${width}%`, backgroundColor: SNO_COLOR }} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /**
  * Onglet ScanNOrder : canal ScanNOrder des établissements sélectionnés,
  * entonnoir et sources (mesure d'audience anonyme). Le hub n'y apparaît que
  * comme source : ses statistiques ont leur page, Franchise → Statistiques
- * (ib-welloresto-api docs/franchises.md, D16 à D26).
+ * (ib-welloresto-api docs/mesure-audience.md).
  */
 export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {} }: ScanNOrderAnalyticsTabProps) => {
   const [data, setData] = useState<ScanNOrderAnalyticsResponse | null>(null);
@@ -153,7 +105,11 @@ export const ScanNOrderAnalyticsTab = ({ dateRange, merchantIds = [], comparison
               <p className="py-6 text-center text-sm text-muted-foreground">Aucune visite mesurée sur cette période.</p>
             ) : (
               <>
-                <Funnel funnel={funnel} />
+                <AudienceFunnel
+                  steps={FUNNEL_STEPS.map((step) => ({ ...step, value: funnel[step.key] }))}
+                  color={SNO_COLOR}
+                  topLabel="visites"
+                />
                 <p className="mt-4 text-sm">
                   Taux de conversion : <span className="font-semibold">{pct(funnel.orders, funnel.visits)}</span> des visites
                   aboutissent à une commande.
