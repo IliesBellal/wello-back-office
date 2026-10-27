@@ -75,7 +75,19 @@ function CountList({ rows, labels, total }: { rows: KioskCount[]; labels: Record
   );
 }
 
-function SplitTable({ title, rows, labels, totalOrders }: { title: string; rows: KioskSplitRow[]; labels: Record<string, string>; totalOrders: number }) {
+function SplitTable({
+  title,
+  rows,
+  labels,
+  totalOrders,
+  footer,
+}: {
+  title: string;
+  rows: KioskSplitRow[];
+  labels: Record<string, string>;
+  totalOrders: number;
+  footer?: React.ReactNode;
+}) {
   return (
     <Card className="bg-card border border-border">
       <CardHeader>
@@ -97,15 +109,16 @@ function SplitTable({ title, rows, labels, totalOrders }: { title: string; rows:
             <TableBody>
               {rows.map((row) => (
                 <TableRow key={row.key}>
-                  <TableCell className="font-medium">{label(labels, row.key)}</TableCell>
+                  <TableCell className="whitespace-nowrap font-medium">{label(labels, row.key)}</TableCell>
                   <TableCell className="text-right">{row.orders}</TableCell>
-                  <TableCell className="text-right">{pct(row.orders, totalOrders)}</TableCell>
-                  <TableCell className="text-right">{eur(row.revenue_ttc_cents)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-right">{pct(row.orders, totalOrders)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-right">{eur(row.revenue_ttc_cents)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         )}
+        {footer && <div className="px-6 pb-6 pt-2">{footer}</div>}
       </CardContent>
     </Card>
   );
@@ -263,17 +276,20 @@ export const KioskAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode 
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <SplitTable title="Sur place ou à emporter" rows={data.by_order_type} labels={ORDER_TYPE_LABELS} totalOrders={totals.kiosk_orders} />
-        <SplitTable title="Paiement" rows={data.by_payment} labels={PAYMENT_LABELS} totalOrders={totals.kiosk_orders} />
-        <Card className="bg-card border border-border">
-          <CardHeader>
-            <CardTitle className="text-sm font-semibold">Échecs de paiement carte</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CountList rows={failures.by_reason} labels={PAYMENT_FAILURE_LABELS} total={failures.failures} />
-          </CardContent>
-        </Card>
+        <SplitTable
+          title="Paiement"
+          rows={data.by_payment}
+          labels={PAYMENT_LABELS}
+          totalOrders={totals.kiosk_orders}
+          footer={
+            <>
+              <p className="mb-2 text-xs font-medium text-muted-foreground">Échecs de paiement carte</p>
+              <CountList rows={failures.by_reason} labels={PAYMENT_FAILURE_LABELS} total={failures.failures} />
+            </>
+          }
+        />
       </div>
 
       {/* Produits les plus vus */}
