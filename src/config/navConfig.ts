@@ -47,7 +47,6 @@ import {
   Calculator,
   Network,
   Globe,
-  UserCog,
 } from 'lucide-react';
 
 export type IconComponent = React.ComponentType<SVGProps<SVGSVGElement>>;
@@ -450,9 +449,8 @@ export const NAV_ITEMS: NavItem[] = [
     // Statistiques à part de la page Analyse : périmètre et droits de la
     // franchise, pas ceux des établissements (ib-welloresto-api docs/franchises.md, D24).
     children: [
-      { id: 'franchise-merchants', title: 'Établissements', icon: Store, href: '/franchise', end: true },
+      { id: 'franchise-manage', title: 'Gestion', icon: Settings2, href: '/franchise', end: true },
       { id: 'franchise-hub', title: 'Hub', icon: Globe, href: '/franchise/hub' },
-      { id: 'franchise-managers', title: 'Gestionnaires', icon: UserCog, href: '/franchise/gestionnaires' },
       { id: 'franchise-stats', title: 'Statistiques', icon: BarChart3, href: '/franchise/statistiques' },
     ],
   },

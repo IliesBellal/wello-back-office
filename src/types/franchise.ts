@@ -17,6 +17,18 @@ export interface Franchise {
   /** Couleur du hub (#RRGGBB), null = thème par défaut. */
   brand_color: string | null;
   created_at: string;
+  /** Absent d'une API sans la migration 196. */
+  announcement?: FranchiseAnnouncement;
+}
+
+/** Bandeau d'annonce du hub : affiché quand activé, avec un texte, jusqu'à ends_on inclus. */
+export interface FranchiseAnnouncement {
+  enabled: boolean;
+  text: string | null;
+  /** Lien https facultatif ouvert au clic. */
+  url: string | null;
+  /** Dernier jour d'affichage (YYYY-MM-DD), null = sans fin. */
+  ends_on: string | null;
 }
 
 export interface FranchiseSummary {
@@ -80,6 +92,8 @@ export interface FranchiseUpdateRequest {
   description?: string;
   /** Chaîne vide = thème par défaut. */
   brand_color?: string;
+  /** Champs absents inchangés ; chaîne vide = efface. */
+  announcement?: { enabled?: boolean; text?: string; url?: string; ends_on?: string };
 }
 
 export interface FranchiseSlugAvailability {
@@ -94,6 +108,7 @@ export const FRANCHISE_SLUG_MIN = 3;
 export const FRANCHISE_SLUG_MAX = 50;
 export const FRANCHISE_NAME_MAX = 80;
 export const FRANCHISE_DESCRIPTION_MAX = 500;
+export const FRANCHISE_ANNOUNCEMENT_MAX = 140;
 
 /** GET /franchises/{id}/stats — statistiques du hub (D24, D25). */
 export interface FranchiseStats {

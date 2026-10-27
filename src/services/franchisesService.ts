@@ -30,6 +30,7 @@ const errorMessages: Record<string, string> = {
   franchise_slug_taken: "Cette adresse est déjà utilisée par une autre franchise.",
   franchise_brand_color_invalid: "La couleur n'est pas valide.",
   franchise_description_invalid: "La description est limitée à 500 caractères.",
+  franchise_announcement_invalid: "Bandeau : texte de 140 caractères au plus, lien en https://, date de fin valide.",
   franchise_merchant_not_admin: "Vous devez être administrateur d'un établissement pour l'ajouter à la franchise.",
   franchise_merchant_in_other_franchise: "Cet établissement appartient déjà à une autre franchise.",
   franchise_merchant_not_in_franchise: "Cet établissement ne fait pas partie de la franchise.",

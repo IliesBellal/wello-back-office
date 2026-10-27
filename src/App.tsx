@@ -49,7 +49,6 @@ import ScanNOrder from './pages/ScanNOrder';
 import Franchise from './pages/Franchise';
 import FranchiseStats from './pages/FranchiseStats';
 import FranchiseHub from './pages/FranchiseHub';
-import FranchiseManagers from './pages/FranchiseManagers';
 import EquipePage from './pages/equipe/EquipePage';
 import PlanningPage from './pages/equipe/PlanningPage';
 import MyPlanningPage from './pages/equipe/MyPlanningPage';
@@ -176,7 +175,8 @@ const App = () => (
               {/* Franchise : droits vérifiés par l'API (gestionnaires, administrateurs d'établissement), pas par permission d'établissement */}
               <Route path="/franchise" element={<ProtectedRoute><Franchise /></ProtectedRoute>} />
               <Route path="/franchise/hub" element={<ProtectedRoute><FranchiseHub /></ProtectedRoute>} />
-              <Route path="/franchise/gestionnaires" element={<ProtectedRoute><FranchiseManagers /></ProtectedRoute>} />
+              {/* Ancienne page Gestionnaires : désormais un onglet de Gestion. */}
+              <Route path="/franchise/gestionnaires" element={<Navigate to="/franchise?tab=gestionnaires" replace />} />
               <Route path="/franchise/statistiques" element={<ProtectedRoute><FranchiseStats /></ProtectedRoute>} />
               
               {/* HACCP - Hygiene & Safety */}
