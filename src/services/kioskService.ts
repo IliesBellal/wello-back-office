@@ -5,6 +5,7 @@ import {
   type EnrollmentCodeCreated,
   type KioskApiErrorPayload,
   type KioskEntry,
+  type KioskMarketingMedia,
   type KioskSettings,
   type UpdateKioskRequest,
   type UpdateKioskSettingsRequest,
@@ -183,5 +184,49 @@ export const kioskService = {
   async deleteIdleVideo(): Promise<KioskSettings> {
     const response = await apiClient.delete<WelloApiResponse<KioskSettings>>(`${KIOSK_BASE}/settings/idle-video`);
     return response.data;
+  },
+
+  // ─── Ruban marketing ────────────────────────────────────────────────────
+
+  async listMarketingMedia(): Promise<KioskMarketingMedia[]> {
+    const response = await apiClient.get<WelloApiResponse<KioskMarketingMedia[]>>(
+      `${KIOSK_BASE}/marketing/media`,
+    );
+    return response.data ?? [];
+  },
+
+  // Le `kind` n'est pas envoyé : l'API le déduit du contenu du fichier.
+  async uploadMarketingMedia(file: File): Promise<KioskMarketingMedia> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const response = await apiClient.post<WelloApiResponse<KioskMarketingMedia>>(
+      `${KIOSK_BASE}/marketing/media`,
+      formData,
+    );
+    return response.data;
+  },
+
+  // `null` : le média redevient suiveur de la durée par défaut.
+  async updateMarketingMediaDuration(mediaId: string, seconds: number | null): Promise<KioskMarketingMedia> {
+    const response = await apiClient.put<WelloApiResponse<KioskMarketingMedia>>(
+      `${KIOSK_BASE}/marketing/media/${mediaId}`,
+      { duration_seconds: seconds },
+    );
+    return response.data;
+  },
+
+  async reorderMarketingMedia(orderedIds: string[]): Promise<void> {
+    await apiClient.put<unknown>(`${KIOSK_BASE}/marketing/media/reorder`, { ordered_ids: orderedIds });
+  },
+
+  async resetMarketingMediaDurations(): Promise<{ reset: number }> {
+    const response = await apiClient.post<WelloApiResponse<{ reset: number }>>(
+      `${KIOSK_BASE}/marketing/media/reset-durations`,
+    );
+    return response.data;
+  },
+
+  async deleteMarketingMedia(mediaId: string): Promise<void> {
+    await apiClient.delete<void>(`${KIOSK_BASE}/marketing/media/${mediaId}`);
   },
 };

@@ -494,7 +494,7 @@ export const NAV_ITEMS: NavItem[] = [
   // ═══ KIOSK ═══
   {
     id: 'kiosk',
-    title: 'Kiosk',
+    title: 'Borne de commande',
     icon: MonitorSmartphone,
     // RBAC lot 10 : matches KiosksPage.tsx/KioskSettingsPage.tsx's self-gate.
     // requiredModule: 'kiosks' wires the establishment's subscription flag

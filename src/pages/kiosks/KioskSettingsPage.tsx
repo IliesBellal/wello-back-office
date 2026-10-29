@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -25,7 +26,14 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { qk } from '@/lib/queryKeys';
 import { kioskService } from '@/services/kioskService';
-import type { ForceFulfillmentType, KioskSettings, UpdateKioskSettingsRequest } from '@/types/kiosks';
+import { KioskMarketingRotation } from '@/components/settings/kiosks/KioskMarketingRotation';
+import {
+  KIOSK_MARKETING_DURATION_MAX,
+  KIOSK_MARKETING_DURATION_MIN,
+  type ForceFulfillmentType,
+  type KioskSettings,
+  type UpdateKioskSettingsRequest,
+} from '@/types/kiosks';
 
 const NO_FORCE_VALUE = 'none';
 
@@ -46,9 +54,7 @@ const commandFormSchema = z.object({
   force_fulfillment_type: z.union([z.enum(['DINE_IN', 'TAKE_AWAY']), z.null()]),
   pager_number_required: z.boolean(),
   show_allergens: z.boolean(),
-  show_promo_badge: z.boolean(),
   inactivity_timeout_sec: z.number(),
-  upsell_enabled: z.boolean(),
   pay_at_counter_enabled: z.boolean(),
   card_payment_enabled: z.boolean(),
 });
@@ -63,15 +69,33 @@ const colorFormSchema = z.object({
 
 type ColorFormValues = z.infer<typeof colorFormSchema>;
 
+const marketingFormSchema = z.object({
+  show_promo_badge: z.boolean(),
+  upsell_enabled: z.boolean(),
+  marketing_ribbon_enabled: z.boolean(),
+  marketing_default_duration_seconds: z
+    .number({ invalid_type_error: 'Durée invalide' })
+    .int('Durée invalide')
+    .min(KIOSK_MARKETING_DURATION_MIN, `Minimum ${KIOSK_MARKETING_DURATION_MIN} secondes`)
+    .max(KIOSK_MARKETING_DURATION_MAX, `Maximum ${KIOSK_MARKETING_DURATION_MAX} secondes`),
+});
+
+type MarketingFormValues = z.infer<typeof marketingFormSchema>;
+
+const defaultMarketingValues: MarketingFormValues = {
+  show_promo_badge: true,
+  upsell_enabled: true,
+  marketing_ribbon_enabled: false,
+  marketing_default_duration_seconds: 10,
+};
+
 const defaultCommandValues: CommandFormValues = {
   fulfillment_dine_in: true,
   fulfillment_take_away: true,
   force_fulfillment_type: null,
   pager_number_required: false,
   show_allergens: true,
-  show_promo_badge: true,
   inactivity_timeout_sec: 90,
-  upsell_enabled: true,
   pay_at_counter_enabled: true,
   card_payment_enabled: false,
 };
@@ -113,6 +137,11 @@ function KioskSettingsPageContent() {
     defaultValues: { primary_color: '#000000' },
   });
 
+  const marketingForm = useForm<MarketingFormValues>({
+    resolver: zodResolver(marketingFormSchema),
+    defaultValues: defaultMarketingValues,
+  });
+
   useEffect(() => {
     if (settings) {
       commandForm.reset({
@@ -121,13 +150,17 @@ function KioskSettingsPageContent() {
         force_fulfillment_type: settings.force_fulfillment_type,
         pager_number_required: settings.pager_number_required,
         show_allergens: settings.show_allergens,
-        show_promo_badge: settings.show_promo_badge,
         inactivity_timeout_sec: settings.inactivity_timeout_sec,
-        upsell_enabled: settings.upsell_enabled,
         pay_at_counter_enabled: settings.pay_at_counter_enabled,
         card_payment_enabled: settings.card_payment_enabled,
       });
       colorForm.reset({ primary_color: settings.primary_color ?? '#000000' });
+      marketingForm.reset({
+        show_promo_badge: settings.show_promo_badge,
+        upsell_enabled: settings.upsell_enabled,
+        marketing_ribbon_enabled: settings.marketing_ribbon?.enabled ?? false,
+        marketing_default_duration_seconds: settings.marketing_ribbon?.default_duration_seconds ?? 10,
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings]);
@@ -170,6 +203,22 @@ function KioskSettingsPageContent() {
       toast({
         title: 'Erreur',
         description: "Impossible d'enregistrer la couleur.",
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const saveMarketingMutation = useMutation({
+    mutationFn: (data: UpdateKioskSettingsRequest) => kioskService.updateKioskSettings(data),
+    onSuccess: (updated: KioskSettings) => {
+      toast({ title: 'Paramètres marketing enregistrés' });
+      queryClient.setQueryData(qk.kiosks.settings, updated);
+      queryClient.invalidateQueries({ queryKey: qk.kiosks.settings });
+    },
+    onError: () => {
+      toast({
+        title: 'Erreur',
+        description: "Impossible d'enregistrer les paramètres marketing.",
         variant: 'destructive',
       });
     },
@@ -266,38 +315,36 @@ function KioskSettingsPageContent() {
     },
   });
 
+  // Chaque onglet n'enregistre que ses propres champs : le reste de la requête
+  // reprend les valeurs déjà enregistrées, jamais une saisie en cours d'un
+  // autre onglet.
+  const savedSettingsRequest = (current: KioskSettings): UpdateKioskSettingsRequest => ({
+    fulfillment_dine_in: current.fulfillment_dine_in,
+    fulfillment_take_away: current.fulfillment_take_away,
+    force_fulfillment_type: current.force_fulfillment_type,
+    pager_number_required: current.pager_number_required,
+    show_allergens: current.show_allergens,
+    show_promo_badge: current.show_promo_badge,
+    inactivity_timeout_sec: current.inactivity_timeout_sec,
+    upsell_enabled: current.upsell_enabled,
+    pay_at_counter_enabled: current.pay_at_counter_enabled,
+    card_payment_enabled: current.card_payment_enabled,
+    primary_color: current.primary_color,
+  });
+
   const onSubmitCommand = (values: CommandFormValues) => {
     if (!settings) return;
-    updateSettingsMutation.mutate({
-      fulfillment_dine_in: values.fulfillment_dine_in,
-      fulfillment_take_away: values.fulfillment_take_away,
-      force_fulfillment_type: values.force_fulfillment_type,
-      pager_number_required: values.pager_number_required,
-      show_allergens: values.show_allergens,
-      show_promo_badge: values.show_promo_badge,
-      inactivity_timeout_sec: values.inactivity_timeout_sec,
-      upsell_enabled: values.upsell_enabled,
-      pay_at_counter_enabled: values.pay_at_counter_enabled,
-      card_payment_enabled: values.card_payment_enabled,
-      primary_color: settings.primary_color,
-    });
+    updateSettingsMutation.mutate({ ...savedSettingsRequest(settings), ...values });
   };
 
   const onSubmitColor = (values: ColorFormValues) => {
     if (!settings) return;
-    saveColorMutation.mutate({
-      fulfillment_dine_in: commandForm.getValues('fulfillment_dine_in'),
-      fulfillment_take_away: commandForm.getValues('fulfillment_take_away'),
-      force_fulfillment_type: commandForm.getValues('force_fulfillment_type'),
-      pager_number_required: commandForm.getValues('pager_number_required'),
-      show_allergens: commandForm.getValues('show_allergens'),
-      show_promo_badge: commandForm.getValues('show_promo_badge'),
-      inactivity_timeout_sec: commandForm.getValues('inactivity_timeout_sec'),
-      upsell_enabled: commandForm.getValues('upsell_enabled'),
-      pay_at_counter_enabled: commandForm.getValues('pay_at_counter_enabled'),
-      card_payment_enabled: commandForm.getValues('card_payment_enabled'),
-      primary_color: values.primary_color,
-    });
+    saveColorMutation.mutate({ ...savedSettingsRequest(settings), primary_color: values.primary_color });
+  };
+
+  const onSubmitMarketing = (values: MarketingFormValues) => {
+    if (!settings) return;
+    saveMarketingMutation.mutate({ ...savedSettingsRequest(settings), ...values });
   };
 
   const handleConfirmDeleteVideo = async () => {
@@ -309,7 +356,7 @@ function KioskSettingsPageContent() {
     return (
       <DashboardLayout>
         <PageContainer
-          header={<h1 className="text-3xl font-bold text-foreground">Paramètres Kiosk</h1>}
+          header={<h1 className="text-3xl font-bold text-foreground">Paramètres de la borne de commande</h1>}
           description="Configurez vos bornes de commande en libre-service"
         >
           <p className="text-muted-foreground">Chargement des paramètres...</p>
@@ -319,15 +366,23 @@ function KioskSettingsPageContent() {
   }
 
   const watchedColor = colorForm.watch('primary_color');
+  const marketingDuration = marketingForm.watch('marketing_default_duration_seconds');
 
   return (
     <DashboardLayout>
       <PageContainer
-        header={<h1 className="text-3xl font-bold text-foreground">Paramètres Kiosk</h1>}
+        header={<h1 className="text-3xl font-bold text-foreground">Paramètres de la borne de commande</h1>}
         description="Configurez vos bornes de commande en libre-service"
       >
-        <div className="space-y-6">
-          {/* ─── Section Commande ─────────────────────────────────────── */}
+        <Tabs defaultValue="order" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="order">Commande</TabsTrigger>
+            <TabsTrigger value="appearance">Apparence</TabsTrigger>
+            <TabsTrigger value="marketing">Marketing</TabsTrigger>
+          </TabsList>
+
+          {/* ─── Onglet Commande ──────────────────────────────────────── */}
+          <TabsContent value="order">
           <Card>
             <CardHeader>
               <CardTitle>Commande</CardTitle>
@@ -426,37 +481,6 @@ function KioskSettingsPageContent() {
 
                     <FormField
                       control={commandForm.control}
-                      name="show_promo_badge"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-md border p-3">
-                          <div className="space-y-0.5">
-                            <FormLabel className="font-normal">Badge « Promo » sur les produits</FormLabel>
-                            <FormDescription>
-                              Signale les produits visés par une promotion en cours.
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={commandForm.control}
-                      name="upsell_enabled"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center justify-between rounded-md border p-3">
-                          <FormLabel className="font-normal">Activer l'upsell</FormLabel>
-                          <FormControl>
-                            <Switch checked={field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={commandForm.control}
                       name="pay_at_counter_enabled"
                       render={({ field }) => (
                         <FormItem className="flex items-center justify-between rounded-md border p-3">
@@ -527,8 +551,10 @@ function KioskSettingsPageContent() {
               </form>
             </Form>
           </Card>
+          </TabsContent>
 
-          {/* ─── Section Apparence ────────────────────────────────────── */}
+          {/* ─── Onglet Apparence ─────────────────────────────────────── */}
+          <TabsContent value="appearance">
           <Card>
             <CardHeader>
               <CardTitle>Apparence</CardTitle>
@@ -695,7 +721,136 @@ function KioskSettingsPageContent() {
               </div>
             </CardContent>
           </Card>
-        </div>
+          </TabsContent>
+
+          {/* ─── Onglet Marketing ─────────────────────────────────────── */}
+          <TabsContent value="marketing">
+            <Card>
+              <CardHeader>
+                <CardTitle>Marketing</CardTitle>
+                <CardDescription>
+                  Valorisez vos promotions et vos produits sur les bornes de commande.
+                </CardDescription>
+              </CardHeader>
+              <Form {...marketingForm}>
+                <form onSubmit={marketingForm.handleSubmit(onSubmitMarketing)}>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-4">
+                      <FormField
+                        control={marketingForm.control}
+                        name="show_promo_badge"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-md border p-3">
+                            <div className="space-y-0.5">
+                              <FormLabel className="font-normal">Badge « Promo » sur les produits</FormLabel>
+                              <FormDescription>
+                                Signale les produits visés par une promotion en cours.
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={marketingForm.control}
+                        name="upsell_enabled"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-md border p-3">
+                            <div className="space-y-0.5">
+                              <FormLabel className="font-normal">Activer l'upsell</FormLabel>
+                              <FormDescription>
+                                Propose des produits complémentaires avant le paiement.
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <div className="space-y-4 border-t pt-6">
+                      <h3 className="text-sm font-semibold text-foreground">Ruban marketing</h3>
+
+                      <FormField
+                        control={marketingForm.control}
+                        name="marketing_ribbon_enabled"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center justify-between rounded-md border p-3">
+                            <div className="space-y-0.5">
+                              <FormLabel className="font-normal">Afficher le ruban marketing</FormLabel>
+                              <FormDescription>
+                                Rotation d'images et de vidéos en haut de l'écran de menu des bornes de commande.
+                              </FormDescription>
+                            </div>
+                            <FormControl>
+                              <Switch checked={field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={marketingForm.control}
+                        name="marketing_default_duration_seconds"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Durée d'affichage par défaut d'une image (secondes)</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                min={KIOSK_MARKETING_DURATION_MIN}
+                                max={KIOSK_MARKETING_DURATION_MAX}
+                                className="max-w-xs"
+                                value={Number.isNaN(field.value) ? '' : field.value}
+                                onChange={(event) => field.onChange(event.target.valueAsNumber)}
+                              />
+                            </FormControl>
+                            <FormDescription>
+                              Entre {KIOSK_MARKETING_DURATION_MIN} et {KIOSK_MARKETING_DURATION_MAX} secondes. Chaque
+                              image peut avoir sa propre durée ; les vidéos sont jouées en entier.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </CardContent>
+                  <CardFooter className="justify-end">
+                    <Button type="submit" disabled={saveMarketingMutation.isPending}>
+                      {saveMarketingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Enregistrer
+                    </Button>
+                  </CardFooter>
+                </form>
+              </Form>
+            </Card>
+
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Médias du ruban</CardTitle>
+                <CardDescription>
+                  Images et vidéos affichées en rotation. Les modifications de médias sont appliquées immédiatement.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <KioskMarketingRotation
+                  defaultDuration={
+                    Number.isFinite(marketingDuration) &&
+                    marketingDuration >= KIOSK_MARKETING_DURATION_MIN &&
+                    marketingDuration <= KIOSK_MARKETING_DURATION_MAX
+                      ? marketingDuration
+                      : settings.marketing_ribbon?.default_duration_seconds ?? 10
+                  }
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         <ConfirmDialog
           open={deleteVideoDialogOpen}

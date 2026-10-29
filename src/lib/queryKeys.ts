@@ -160,6 +160,7 @@ export const qk = {
     detail: (id: string) => ["kiosks", "detail", id] as const,
     enrollmentCodes: ["kiosks", "enrollment-codes"] as const,
     settings: ["kiosks", "settings"] as const,
+    marketingMedia: ["kiosks", "marketing-media"] as const,
   },
 
   // ─── CDS (écrans d'affichage client) ──────────────────────
