@@ -1,10 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient, WelloApiResponse } from '@/services/apiClient';
 import { toast } from '@/hooks/use-toast';
+import { otpErrorCode, otpErrorMessage } from './otpErrors';
 
 type OTPMode = 'mfa' | 'email' | 'tel';
 
 const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
+// Les erreurs de ces appels sont affichées ici (voir otpErrors.ts) : sans
+// suppressErrorToast, un code faux (401 otp_mismatch) passerait par le
+// traitement générique du 401 et déconnecterait l'utilisateur.
+const OTP_REQUEST_OPTIONS = { suppressErrorToast: true } as const;
 
 interface UseOTPVerificationProps {
   mode: OTPMode;
@@ -83,7 +89,7 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
         const response = await apiClient.post<WelloApiResponse<VerifyResponse>>('/auth/verify', {
           mode: mode,
           code: completeCode,
-        }, { headers });
+        }, { headers, ...OTP_REQUEST_OPTIONS });
 
         if (response.data.status === 'success') {
           toast({
@@ -101,14 +107,13 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
           });
         }
       } catch (err: unknown) {
-        const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue lors de la vérification.';
-        setError(errorMessage);
-        setCode(''); // Clear code on error
-        toast({
+        const message = otpErrorMessage(err, {
           title: 'Erreur de vérification',
-          description: errorMessage,
-          variant: 'destructive',
+          description: 'Une erreur est survenue lors de la vérification.',
         });
+        setError(message.description);
+        setCode(''); // Clear code on error
+        toast({ ...message, variant: 'destructive' });
       } finally {
         setIsVerifying(false);
         isVerifyingRef.current = false;
@@ -128,7 +133,7 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await apiClient.post<WelloApiResponse<SendVerificationResponse> | SendVerificationResponse>('/auth/send-verification', {
         mode,
-      }, { headers });
+      }, { headers, ...OTP_REQUEST_OPTIONS });
 
       const responseData = 'data' in response ? response.data : response;
 
@@ -150,10 +155,13 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
         });
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Impossible de renvoyer le code.';
+      // Délai serveur pas encore écoulé (envoi depuis un autre onglet, ou code
+      // envoyé d'office à l'ouverture) : on affiche le décompte.
+      if (otpErrorCode(err) === 'otp_wait_time') {
+        setCooldown((current) => (current > 0 ? current : OTP_RESEND_COOLDOWN_SECONDS));
+      }
       toast({
-        title: 'Erreur',
-        description: errorMessage,
+        ...otpErrorMessage(err, { title: 'Erreur', description: 'Impossible de renvoyer le code.' }),
         variant: 'destructive',
       });
     } finally {
@@ -178,7 +186,7 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
 
     try {
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
-      const response = await apiClient.get<WelloApiResponse<FallbackSMSResponse> | FallbackSMSResponse>('/auth/mfa/fallback-sms', { headers });
+      const response = await apiClient.get<WelloApiResponse<FallbackSMSResponse> | FallbackSMSResponse>('/auth/mfa/fallback-sms', { headers, ...OTP_REQUEST_OPTIONS });
       const responseData = 'data' in response ? response.data : response;
 
       if (responseData.status === 'success') {
@@ -201,10 +209,11 @@ export function useOTPVerification({ mode, onSuccess, token, initialRecipient }:
         });
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'Impossible d\'envoyer le SMS.';
+      if (otpErrorCode(err) === 'otp_wait_time') {
+        setCooldown((current) => (current > 0 ? current : OTP_RESEND_COOLDOWN_SECONDS));
+      }
       toast({
-        title: 'Erreur',
-        description: errorMessage,
+        ...otpErrorMessage(err, { title: 'Erreur', description: 'Impossible d\'envoyer le SMS.' }),
         variant: 'destructive',
       });
     } finally {

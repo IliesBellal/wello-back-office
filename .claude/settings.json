@@ -45,7 +45,10 @@
       "Bash(gofmt -l -w internal/modules/menu/importer/models.go internal/modules/menu/importer/preview.go internal/modules/menu/importer/commit_plan.go internal/modules/menu/models.go internal/modules/menu/repository.go internal/modules/menu/import_repository.go internal/modules/menu/import_commit_repository.go internal/modules/menu/import_service.go internal/modules/menu/import_merchant_models.go internal/modules/menu/import_merchant_handler.go internal/modules/menu/import_merchant_service.go internal/modules/menu/import_merchant_repository.go internal/modules/auth/repository.go)",
       "Bash(echo \"VET_EXIT:$?\")",
       "Bash(xargs grep -l \"integration_uber_eats\\\\|integration_deliveroo\")",
-      "Bash(xargs grep -l \"deliveroo\\\\|uber\")"
+      "Bash(xargs grep -l \"deliveroo\\\\|uber\")",
+      "PowerShell($r='d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api'; Get-ChildItem \"$r\\\\internal\\\\modules\" -Directory | Select-Object -ExpandProperty Name | Out-String -Width 300; Get-ChildItem \"$r\\\\internal\\\\infrastructure\" -Directory | Select-Object -ExpandProperty Name | Out-String; Get-ChildItem \"$r\\\\internal\\\\modules\\\\merchantsms\",\"$r\\\\internal\\\\infrastructure\\\\brevo_sms\",\"$r\\\\internal\\\\infrastructure\\\\sms\" | Select-Object FullName,Length | Out-String -Width 300)",
+      "PowerShell($r='D:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api'; Get-ChildItem \"$r\\\\internal\\\\modules\\\\customers\",\"$r\\\\internal\\\\infrastructure\\\\brevo_mailer\",\"$r\\\\internal\\\\infrastructure\\\\mailer\",\"$r\\\\internal\\\\infrastructure\\\\brevo\",\"$r\\\\internal\\\\modules\\\\discounts\" | Select-Object FullName,Length | Out-String -Width 300)",
+      "WebFetch(domain:developers.brevo.com)"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",
