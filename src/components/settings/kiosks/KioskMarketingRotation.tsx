@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ConfirmDialog } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowDown,
   ArrowUp,
   Image as ImageIcon,
+  Lightbulb,
   Loader2,
   RotateCcw,
   Trash2,
@@ -172,6 +174,15 @@ export function KioskMarketingRotation({ defaultDuration }: KioskMarketingRotati
         Les médias défilent en boucle dans l'ordre ci-dessous. Une vidéo est jouée en entier et sans son ; une image
         s'affiche pendant sa durée. Images : 5 Mo max. Vidéos : 50 Mo max. 20 médias au maximum.
       </p>
+
+      <Alert>
+        <Lightbulb className="h-4 w-4" />
+        <AlertTitle>Conseil</AlertTitle>
+        <AlertDescription>
+          Le ruban est une bande horizontale au ratio <strong>6:1</strong> (par exemple 1800 × 300 px). Le média remplit
+          le cadre et est recadré s'il n'a pas ce rapport : gardez textes et logos au centre.
+        </AlertDescription>
+      </Alert>
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">Chargement des médias...</p>
