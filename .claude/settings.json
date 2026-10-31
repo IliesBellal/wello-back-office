@@ -48,7 +48,9 @@
       "Bash(xargs grep -l \"deliveroo\\\\|uber\")",
       "PowerShell($r='d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api'; Get-ChildItem \"$r\\\\internal\\\\modules\" -Directory | Select-Object -ExpandProperty Name | Out-String -Width 300; Get-ChildItem \"$r\\\\internal\\\\infrastructure\" -Directory | Select-Object -ExpandProperty Name | Out-String; Get-ChildItem \"$r\\\\internal\\\\modules\\\\merchantsms\",\"$r\\\\internal\\\\infrastructure\\\\brevo_sms\",\"$r\\\\internal\\\\infrastructure\\\\sms\" | Select-Object FullName,Length | Out-String -Width 300)",
       "PowerShell($r='D:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api'; Get-ChildItem \"$r\\\\internal\\\\modules\\\\customers\",\"$r\\\\internal\\\\infrastructure\\\\brevo_mailer\",\"$r\\\\internal\\\\infrastructure\\\\mailer\",\"$r\\\\internal\\\\infrastructure\\\\brevo\",\"$r\\\\internal\\\\modules\\\\discounts\" | Select-Object FullName,Length | Out-String -Width 300)",
-      "WebFetch(domain:developers.brevo.com)"
+      "WebFetch(domain:developers.brevo.com)",
+      "Bash(python __TRACKED_VAR__/patch_sheet.py src/components/menu/IngredientDetailSheet.tsx __TRACKED_VAR__/render.tsx)",
+      "Bash(echo \"tsc-filter-exit:$?\")"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",

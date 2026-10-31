@@ -4,16 +4,22 @@ import {
   Sheet,
   SheetContent,
   SheetDescription,
-  SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,7 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Edit, Save, X, Trash2, Loader2, Info } from 'lucide-react';
+import { Edit, Save, X, Trash2, Loader2, Info, MoreVertical } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { decimalToDisplayValue, formatPrice, parseDecimalInput, parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import { findUnitById, getCompatibleUnits } from '@/utils/unitConversions';
@@ -90,38 +96,64 @@ const getConservationTypeLabel = (value: string | undefined): string => {
   return CONSERVATION_TYPE_OPTIONS.find((option) => option.value === value)?.label || '—';
 };
 
-interface DetailViewActionsProps {
+interface ActionsMenuProps {
   onEdit: () => void;
   onDelete: () => void;
   hasDelete: boolean;
   compact?: boolean;
 }
 
-const DetailViewActions = ({ onEdit, onDelete, hasDelete, compact = false }: DetailViewActionsProps) => (
-  <div className="flex items-center gap-1">
-    <Button
-      onClick={onEdit}
-      variant={compact ? 'ghost' : 'outline'}
-      size={compact ? 'icon' : 'sm'}
-      className={compact ? 'h-8 w-8' : ''}
-      title="Modifier l'ingrédient"
-    >
-      <Edit className={`w-4 h-4 ${compact ? '' : 'mr-2'}`} />
-      {!compact && 'Modifier'}
-    </Button>
-    {hasDelete && (
+/** Menu ⋮ de la fiche : mêmes entrées et même présentation que la fiche produit. */
+const ActionsMenu = ({ onEdit, onDelete, hasDelete, compact = false }: ActionsMenuProps) => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
       <Button
-        onClick={onDelete}
-        variant="ghost"
+        variant={compact ? 'ghost' : 'outline'}
         size="icon"
-        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-        title="Supprimer l'ingrédient"
+        className={compact ? 'h-8 w-8' : ''}
+        title="Actions"
       >
-        <Trash2 className="w-4 h-4" />
+        <MoreVertical className="w-4 h-4" />
       </Button>
-    )}
-  </div>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end">
+      <DropdownMenuItem onClick={onEdit}>
+        <Edit className="w-4 h-4 mr-2" />
+        Modifier
+      </DropdownMenuItem>
+      {hasDelete && (
+        <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+          <Trash2 className="w-4 h-4 mr-2" />
+          Supprimer
+        </DropdownMenuItem>
+      )}
+    </DropdownMenuContent>
+  </DropdownMenu>
 );
+
+/**
+ * Onglets de la fiche. Le conteneur <Tabs> vit dans la fiche (et non dans les
+ * contenus lecture/édition) pour que l'onglet courant survive au passage
+ * consultation <-> modification.
+ */
+const IngredientTabsList = ({ isMobile }: { isMobile: boolean }) => {
+  const triggerClass = isMobile ? 'flex-shrink-0 rounded-none border-b-2 text-xs py-2' : 'text-xs';
+  return (
+    <ScrollArea className={isMobile ? 'w-full mb-4 border-b -mx-4 px-4' : 'w-full mb-6 border-b'}>
+      <TabsList
+        className={
+          isMobile
+            ? 'flex justify-start gap-1 p-0 border-0 h-auto bg-transparent w-max'
+            : 'w-full grid grid-cols-3 sticky top-0 bg-white'
+        }
+      >
+        <TabsTrigger value="general" className={triggerClass}>Général</TabsTrigger>
+        <TabsTrigger value="pricing" className={triggerClass}>Prix & Achats</TabsTrigger>
+        <TabsTrigger value="haccp" className={triggerClass}>Conservation</TabsTrigger>
+      </TabsList>
+    </ScrollArea>
+  );
+};
 
 // View Content Component (declared outside to prevent remounting)
 interface ViewContentProps {
@@ -131,14 +163,8 @@ interface ViewContentProps {
 }
 
 const ViewContent = ({ displayedComponent, units, categories }: ViewContentProps) => (
-  <Tabs defaultValue="general" className="w-full">
-    <TabsList className="grid w-full grid-cols-3">
-      <TabsTrigger value="general">Général</TabsTrigger>
-      <TabsTrigger value="pricing">Prix & Achats</TabsTrigger>
-      <TabsTrigger value="haccp">Conservation</TabsTrigger>
-    </TabsList>
-
-    <TabsContent value="general" className="mt-4 space-y-4">
+  <>
+    <TabsContent value="general" className="mt-0 space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Nom</CardTitle>
@@ -179,7 +205,7 @@ const ViewContent = ({ displayedComponent, units, categories }: ViewContentProps
       </Card>
     </TabsContent>
 
-    <TabsContent value="pricing" className="mt-4 space-y-4">
+    <TabsContent value="pricing" className="mt-0 space-y-4">
       <Card>
         <CardHeader>
           <CardTitle className="text-sm">Prix d'achat</CardTitle>
@@ -203,7 +229,7 @@ const ViewContent = ({ displayedComponent, units, categories }: ViewContentProps
       </Card>
     </TabsContent>
 
-    <TabsContent value="haccp" className="mt-4 space-y-4">
+    <TabsContent value="haccp" className="mt-0 space-y-4">
       <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
         <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
         <p>
@@ -242,7 +268,7 @@ const ViewContent = ({ displayedComponent, units, categories }: ViewContentProps
         </CardContent>
       </Card>
     </TabsContent>
-  </Tabs>
+  </>
 );
 
 interface IngredientFormData extends Partial<Component> {
@@ -272,9 +298,6 @@ interface EditContentProps {
   onStorageTempMaxChange: (value: string) => void;
   categories: ComponentCategory[];
   onCategoryChange: (value: string) => void;
-  onSave: () => Promise<void>;
-  onCancel: () => void;
-  isSaving: boolean;
 }
 
 const EditContent = ({
@@ -296,18 +319,9 @@ const EditContent = ({
   onStorageTempMaxChange,
   categories,
   onCategoryChange,
-  onSave,
-  onCancel,
-  isSaving,
 }: EditContentProps) => (
-  <Tabs defaultValue="general" className="w-full">
-    <TabsList className="grid w-full grid-cols-3">
-      <TabsTrigger value="general">Général</TabsTrigger>
-      <TabsTrigger value="pricing">Prix & Achats</TabsTrigger>
-      <TabsTrigger value="haccp">Conservation</TabsTrigger>
-    </TabsList>
-
-    <TabsContent value="general" className="mt-4 space-y-6">
+  <>
+    <TabsContent value="general" className="mt-0 space-y-6">
       <Card className="border-slate-200 bg-white shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-slate-900">Identité</CardTitle>
@@ -346,7 +360,7 @@ const EditContent = ({
       </Card>
     </TabsContent>
 
-    <TabsContent value="pricing" className="mt-4 space-y-6">
+    <TabsContent value="pricing" className="mt-0 space-y-6">
       <Card className="border-slate-200 bg-white shadow-sm">
         <CardHeader>
           <CardTitle className="text-sm font-semibold text-slate-900">Approvisionnement</CardTitle>
@@ -431,7 +445,7 @@ const EditContent = ({
       </Card>
     </TabsContent>
 
-    <TabsContent value="haccp" className="mt-4 space-y-6">
+    <TabsContent value="haccp" className="mt-0 space-y-6">
       <div className="flex items-start gap-2 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
         <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
         <p>
@@ -516,36 +530,7 @@ const EditContent = ({
       </Card>
     </TabsContent>
 
-    <Card className="border-slate-200 bg-white shadow-sm">
-      <CardContent className="flex gap-2 pt-6">
-        <Button
-          onClick={onSave}
-          disabled={isSaving}
-          className="flex-1"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Enregistrement...
-            </>
-          ) : (
-            <>
-              <Save className="w-4 h-4 mr-2" />
-              Enregistrer
-            </>
-          )}
-        </Button>
-        <Button
-          onClick={onCancel}
-          disabled={isSaving}
-          variant="outline"
-          className="flex-1 border-slate-200 bg-white hover:bg-slate-50"
-        >
-          Annuler
-        </Button>
-      </CardContent>
-    </Card>
-  </Tabs>
+  </>
 );
 
 const buildFormData = (component: Component): IngredientFormData => ({
@@ -578,6 +563,7 @@ export const IngredientDetailSheet = ({
   const { toast } = useToast();
 
   const [isEditMode, setIsEditMode] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -645,6 +631,7 @@ export const IngredientDetailSheet = ({
       setPurchaseCostQtyDisplayValue(decimalToDisplayValue(initialComponent.purchase_cost_qty ?? 1));
       // Reset to view mode when opening
       setIsEditMode(false);
+      setActiveTab('general');
     }
   }, [open, initialComponent]);
 
@@ -660,7 +647,20 @@ export const IngredientDetailSheet = ({
         description: 'Ingrédient mis à jour avec succès',
       });
       setIsEditMode(false);
-      setDisplayedComponent(prev => prev ? { ...prev, ...dataToSave } : null);
+      // La consultation lit le libellé de l'unité d'achat, alors que le
+      // formulaire ne porte que son identifiant : sans cette conversion la
+      // fiche affichait l'ancienne unité jusqu'à sa réouverture.
+      const purchaseUnit = units.find((u) => u.id.toString() === dataToSave.purchase_unit_id?.toString());
+      const savedCategory = categories.find((c) => c.category_id === dataToSave.category_id);
+      setDisplayedComponent(prev => prev ? {
+        ...prev,
+        ...dataToSave,
+        ...(purchaseUnit && {
+          purchase_unit_of_measure: purchaseUnit.name,
+          purchase_unit_of_measure_id: purchaseUnit.id.toString(),
+        }),
+        ...(savedCategory && { category: savedCategory.category_name || savedCategory.category }),
+      } : null);
     } catch (error) {
       toast({
         title: 'Erreur',
@@ -670,7 +670,7 @@ export const IngredientDetailSheet = ({
     } finally {
       setIsSaving(false);
     }
-  }, [componentId, displayedComponent, formData, onSave, toast]);
+  }, [componentId, displayedComponent, formData, onSave, toast, units, categories]);
 
   const handleDelete = useCallback(async () => {
     if (!componentId) return;
@@ -697,15 +697,18 @@ export const IngredientDetailSheet = ({
 
   const handleCancel = useCallback(() => {
     setIsEditMode(false);
-    if (initialComponent) {
-      setFormData(buildFormData(initialComponent));
+    // displayedComponent porte les dernières valeurs enregistrées ; le prop
+    // initial, lui, n'est pas rafraîchi tant que la fiche reste ouverte.
+    const source = displayedComponent ?? initialComponent;
+    if (source) {
+      setFormData(buildFormData(source));
       setPriceDisplayValues({
-        purchase_cost: priceToDisplayValue(initialComponent.purchase_cost),
-        price: priceToDisplayValue(initialComponent.price),
+        purchase_cost: priceToDisplayValue(source.purchase_cost),
+        price: priceToDisplayValue(source.price),
       });
-      setPurchaseCostQtyDisplayValue(decimalToDisplayValue(initialComponent.purchase_cost_qty ?? 1));
+      setPurchaseCostQtyDisplayValue(decimalToDisplayValue(source.purchase_cost_qty ?? 1));
     }
-  }, [initialComponent]);
+  }, [displayedComponent, initialComponent]);
 
   // Memoized callbacks to prevent unnecessary re-renders
   const handleNameChange = useCallback((value: string) => {
@@ -788,40 +791,44 @@ export const IngredientDetailSheet = ({
     () => {
       if (!displayedComponent) return null;
 
-      return isEditMode ? (
-        <EditContent
-          formData={formData}
-          priceDisplayValues={priceDisplayValues}
-          purchaseCostQtyDisplayValue={purchaseCostQtyDisplayValue}
-          units={units}
-          compatiblePurchaseUnits={compatiblePurchaseUnits}
-          onNameChange={handleNameChange}
-          onPurchaseCostChange={handlePurchaseCostChange}
-          onPurchaseCostBlur={handlePurchaseCostBlur}
-          onPurchaseUnitChange={handlePurchaseUnitChange}
-          onPurchaseCostQtyChange={handlePurchaseCostQtyChange}
-          onPurchaseCostQtyBlur={handlePurchaseCostQtyBlur}
-          onSupplementPriceChange={handleSupplementPriceChange}
-          onSupplementPriceBlur={handleSupplementPriceBlur}
-          onConservationDaysChange={handleConservationDaysChange}
-          onConservationTypeChange={handleConservationTypeChange}
-          onStorageTempMinChange={handleStorageTempMinChange}
-          onStorageTempMaxChange={handleStorageTempMaxChange}
-          categories={categories}
-          onCategoryChange={handleCategoryChange}
-          onSave={handleSave}
-          onCancel={handleCancel}
-          isSaving={isSaving}
-        />
-      ) : (
-        <ViewContent
-          displayedComponent={displayedComponent}
-          units={units}
-          categories={categories}
-        />
+      return (
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col">
+          <IngredientTabsList isMobile={isMobile} />
+          {isEditMode ? (
+            <EditContent
+              formData={formData}
+              priceDisplayValues={priceDisplayValues}
+              purchaseCostQtyDisplayValue={purchaseCostQtyDisplayValue}
+              units={units}
+              compatiblePurchaseUnits={compatiblePurchaseUnits}
+              onNameChange={handleNameChange}
+              onPurchaseCostChange={handlePurchaseCostChange}
+              onPurchaseCostBlur={handlePurchaseCostBlur}
+              onPurchaseUnitChange={handlePurchaseUnitChange}
+              onPurchaseCostQtyChange={handlePurchaseCostQtyChange}
+              onPurchaseCostQtyBlur={handlePurchaseCostQtyBlur}
+              onSupplementPriceChange={handleSupplementPriceChange}
+              onSupplementPriceBlur={handleSupplementPriceBlur}
+              onConservationDaysChange={handleConservationDaysChange}
+              onConservationTypeChange={handleConservationTypeChange}
+              onStorageTempMinChange={handleStorageTempMinChange}
+              onStorageTempMaxChange={handleStorageTempMaxChange}
+              categories={categories}
+              onCategoryChange={handleCategoryChange}
+            />
+          ) : (
+            <ViewContent
+              displayedComponent={displayedComponent}
+              units={units}
+              categories={categories}
+            />
+          )}
+        </Tabs>
       );
     },
     [
+      activeTab,
+      isMobile,
       isEditMode,
       displayedComponent,
       formData,
@@ -830,7 +837,6 @@ export const IngredientDetailSheet = ({
       units,
       compatiblePurchaseUnits,
       categories,
-      isSaving,
       handleNameChange,
       handleCategoryChange,
       handlePurchaseCostChange,
@@ -844,8 +850,6 @@ export const IngredientDetailSheet = ({
       handleConservationTypeChange,
       handleStorageTempMinChange,
       handleStorageTempMaxChange,
-      handleSave,
-      handleCancel,
     ]
   );
 
@@ -853,171 +857,159 @@ export const IngredientDetailSheet = ({
     return null;
   }
 
-  // Desktop: Side Sheet
-  if (!isMobile) {
+  // En édition, l'en-tête suit la saisie (comme la fiche produit).
+  const headerName = isEditMode ? (formData.name || 'Ingrédient') : displayedComponent.name;
+  const headerCategoryId = isEditMode ? formData.category_id : displayedComponent.category_id;
+  const headerCategory =
+    categories.find((c) => c.category_id === headerCategoryId)?.category_name
+    || (!isEditMode ? displayedComponent.category : undefined)
+    || 'Catégorie non définie';
+
+  const iconClass = isMobile ? 'w-3 h-3 mr-1' : 'w-4 h-4 mr-2';
+  const editActionBar = isEditMode && (
+    <>
+      <Button
+        variant="outline"
+        className={isMobile ? 'flex-1 h-8 text-xs' : 'flex-1'}
+        onClick={handleCancel}
+        disabled={isSaving}
+      >
+        <X className={iconClass} />
+        Annuler
+      </Button>
+      <Button
+        className={`flex-1 bg-gradient-primary ${isMobile ? 'h-8 text-xs' : ''}`}
+        onClick={handleSave}
+        disabled={isSaving}
+      >
+        {isSaving ? <Loader2 className={`animate-spin ${iconClass}`} /> : <Save className={iconClass} />}
+        {isSaving ? 'Enregistrement...' : 'Enregistrer'}
+      </Button>
+    </>
+  );
+
+  const deleteDialog = (
+    <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Supprimer l'ingrédient</AlertDialogTitle>
+          <AlertDialogDescription>
+            Êtes-vous sûr de vouloir supprimer "{displayedComponent.name}" ? Cette action est irréversible.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <div className="flex gap-2 justify-end">
+          <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="bg-destructive hover:bg-destructive/90"
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Suppression...
+              </>
+            ) : (
+              'Supprimer'
+            )}
+          </AlertDialogAction>
+        </div>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+
+  // Mobile : Dialog plein écran
+  if (isMobile) {
     return (
       <>
-        <Sheet open={open} onOpenChange={onOpenChange}>
-          <SheetContent className="sm:max-w-md [&>button]:hidden">
-            <SheetHeader className="border-b pb-4">
-              <div className="flex items-center gap-3">
-                <SheetTitle className="min-w-0 flex-1 truncate">
-                  {isEditMode ? "Modifier l'ingrédient" : displayedComponent.name}
-                </SheetTitle>
-                {!isEditMode && (
-                  <DetailViewActions
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="w-full h-dvh max-h-dvh max-w-full rounded-none flex flex-col gap-0 p-0 [&>button]:hidden">
+            <div className="sticky top-0 z-10 bg-white border-b border-border flex-shrink-0">
+              <div className="px-4 py-3 flex items-center justify-between gap-2">
+                <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="h-8 w-8" title="Fermer">
+                  <X className="h-5 w-5" />
+                </Button>
+                <DialogTitle className="text-sm font-semibold flex-1 min-w-0 text-center truncate">
+                  {headerName}
+                </DialogTitle>
+                {!isEditMode ? (
+                  <ActionsMenu
                     onEdit={() => setIsEditMode(true)}
                     onDelete={() => setShowDeleteDialog(true)}
                     hasDelete={!!onDelete}
+                    compact
                   />
+                ) : (
+                  <div className="w-8 flex-shrink-0" />
                 )}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => onOpenChange(false)}
-                  className="h-8 w-8 flex-shrink-0"
-                  title="Fermer"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
               </div>
+              <DialogDescription className="sr-only">
+                Fiche de l'ingrédient {displayedComponent.name}
+              </DialogDescription>
+
               {isEditMode && (
-                <SheetDescription className="pr-10">
-                  Ajustez les informations principales avec la même structure que la vue détail.
-                </SheetDescription>
+                <div className="px-4 py-2 border-t border-border bg-muted/30 flex gap-2 flex-shrink-0">
+                  {editActionBar}
+                </div>
               )}
-            </SheetHeader>
-            <div className="mt-6 overflow-y-auto max-h-[calc(100vh-120px)]">
+            </div>
+
+            <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-4">
               {content}
             </div>
-          </SheetContent>
-        </Sheet>
+          </DialogContent>
+        </Dialog>
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer l'ingrédient</AlertDialogTitle>
-              <AlertDialogDescription>
-                Êtes-vous sûr de vouloir supprimer "{displayedComponent.name}" ? Cette action est irréversible.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <div className="flex gap-2 justify-end">
-              <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="bg-destructive hover:bg-destructive/90"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Suppression...
-                  </>
-                ) : (
-                  'Supprimer'
-                )}
-              </AlertDialogAction>
-            </div>
-          </AlertDialogContent>
-        </AlertDialog>
+        {deleteDialog}
       </>
     );
   }
 
-  // Mobile: Full-Screen Dialog
+  // Desktop : Side Sheet
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full h-dvh max-h-dvh max-w-full rounded-none flex flex-col gap-0 p-0 [&>button]:hidden">
-          {/* Fixed Header */}
-          <DialogHeader className="border-b px-6 py-4 flex-shrink-0">
-            <div className="flex items-center justify-between gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onOpenChange(false)}
-                className="h-8 w-8"
-              >
-                <X className="w-4 h-4" />
-              </Button>
-              <DialogTitle className="text-center flex-1">
-                {isEditMode ? "Modifier l'ingrédient" : displayedComponent.name}
-              </DialogTitle>
-              {!isEditMode ? (
-                <DetailViewActions
-                  onEdit={() => setIsEditMode(true)}
-                  onDelete={() => setShowDeleteDialog(true)}
-                  hasDelete={!!onDelete}
-                  compact
-                />
-              ) : (
-                <div className="w-8 flex-shrink-0" />
+      <Sheet open={open} onOpenChange={onOpenChange}>
+        <SheetContent className="sm:max-w-2xl overflow-y-auto p-0 flex flex-col">
+          <div className="sticky top-0 z-10 bg-white border-b border-border">
+            <div className="px-6 py-4">
+              <div className="flex items-start justify-between gap-4 pr-8">
+                <div className="flex-1 min-w-0">
+                  <SheetTitle className="text-lg font-bold truncate">{headerName}</SheetTitle>
+                  <SheetDescription className="mt-1">{headerCategory}</SheetDescription>
+                </div>
+                <Badge
+                  variant={displayedComponent.available === false ? 'secondary' : 'default'}
+                  className="whitespace-nowrap"
+                >
+                  {displayedComponent.available === false ? 'Inactif' : 'Actif'}
+                </Badge>
+              </div>
+
+              {!isEditMode && (
+                <div className="flex justify-end mt-3">
+                  <ActionsMenu
+                    onEdit={() => setIsEditMode(true)}
+                    onDelete={() => setShowDeleteDialog(true)}
+                    hasDelete={!!onDelete}
+                  />
+                </div>
               )}
             </div>
-            {isEditMode && (
-              <DialogDescription className="px-10 text-center">
-                Ajustez les informations principales avec la même structure que la vue détail.
-              </DialogDescription>
-            )}
-          </DialogHeader>
 
-          {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto px-6 py-4">
+            {isEditMode && (
+              <div className="px-6 py-3 border-t border-border bg-muted/30 flex gap-2">
+                {editActionBar}
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto px-6 py-6">
             {content}
           </div>
+        </SheetContent>
+      </Sheet>
 
-          {/* Fixed Footer with Save Button */}
-          {isEditMode && (
-            <div className="border-t px-6 py-4 flex-shrink-0 bg-background">
-              <Button
-                onClick={handleSave}
-                disabled={isSaving}
-                className="w-full"
-              >
-                {isSaving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Enregistrement...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Enregistrer les modifications
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer l'ingrédient</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer "{displayedComponent.name}" ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-2 justify-end">
-            <AlertDialogCancel disabled={isDeleting}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Suppression...
-                </>
-              ) : (
-                'Supprimer'
-              )}
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
+      {deleteDialog}
     </>
   );
 };

@@ -288,9 +288,8 @@ export default function Components() {
                 unit_id: data.unit_id ? String(data.unit_id) : undefined,
                 purchase_unit_id: data.purchase_unit_id ? String(data.purchase_unit_id) : undefined
               };
+              // La fiche reste ouverte et repasse en consultation (comme la fiche produit).
               await updateComponent(componentId, convertedData);
-              setDetailSheetOpen(false);
-              setSelectedIngredient(null);
             }}
             onDelete={async (componentId) => {
               await deleteComponent(componentId);
