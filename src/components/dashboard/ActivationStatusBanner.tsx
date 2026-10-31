@@ -11,10 +11,10 @@ import { billingApi } from "@/services/billingService";
 /**
  * Persistent activation/trial banner (LOT B §7.6) — mounted once in
  * DashboardLayout so it spans every authenticated page, not a route of its
- * own. Always reads GET /merchant/activation-status fresh (never the
- * login-cached user object, which auth.Service caches server-side for 60
- * minutes — see the API's own doc comment on that endpoint) so it disappears
- * immediately once a merchant goes LIVE, not up to an hour later.
+ * own. Reads GET /merchant/activation-status rather than the login-cached
+ * user object (which auth.Service caches server-side for 60 minutes — see the
+ * API's own doc comment on that endpoint), and refreshes at key moments
+ * (SEPA setup, subscription page, window focus) instead of polling.
  *
  * Two distinct messages, mutually exclusive, matching the two cases the
  * endpoint actually carries — invisible in every other case (LIVE without a
@@ -24,8 +24,11 @@ export function ActivationStatusBanner() {
   const { data } = useQuery({
     queryKey: qk.billing.activationStatus,
     queryFn: () => billingApi.getActivationStatus(),
-    staleTime: 0,
-    refetchInterval: 60_000,
+    // No polling: DashboardLayout is remounted on every page, so a short
+    // staleTime would refetch on each navigation. Freshness comes from the
+    // invalidations after SEPA setup / subscription changes, the subscription
+    // page's own query, and a refetch on window focus once the data is 5 min old.
+    staleTime: 5 * 60_000,
     refetchOnWindowFocus: true,
     retry: 1,
   });
