@@ -48,8 +48,14 @@ export const payoutDocumentsService = {
   },
 
   /** Nouveau lien signé (une heure) vers le relevé ou la facture d'un versement. */
-  async getLink(payoutId: string, kind: PayoutDocumentKind): Promise<PayoutDocumentLink> {
-    const endpoint = `${ENDPOINT}/${encodeURIComponent(payoutId)}/${kind}/download`;
+  async getLink(payout: PayoutDocument, kind: PayoutDocumentKind): Promise<PayoutDocumentLink> {
+    const payoutId = payout.payout_id;
+    // Le relevé est servi par /payouts/{id}/download ; la facture de commission
+    // par /commission-invoices/{numéro}/invoice/download.
+    const endpoint =
+      kind === 'statement'
+        ? `${ENDPOINT}/${encodeURIComponent(payoutId)}/download`
+        : `/accounting/commission-invoices/${encodeURIComponent(payout.invoice_number ?? '')}/invoice/download`;
     logAPI('GET', endpoint);
     return withMock<PayoutDocumentLink>(
       () => ({ payout_id: payoutId, kind, filename: 'document_demo.pdf', download_url: '#' }),

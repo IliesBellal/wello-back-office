@@ -40,7 +40,7 @@ export function PayoutDocumentsPanel() {
   const handleDownload = async (payout: PayoutDocument, kind: PayoutDocumentKind) => {
     setDownloading(`${payout.payout_id}:${kind}`);
     try {
-      const link = await payoutDocumentsService.getLink(payout.payout_id, kind);
+      const link = await payoutDocumentsService.getLink(payout, kind);
       window.open(link.download_url, '_blank');
     } catch {
       // Message déjà affiché par apiClient.
