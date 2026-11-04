@@ -426,7 +426,7 @@ export const IntegrationCard = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Synchroniser le menu {name}</AlertDialogTitle>
             <AlertDialogDescription>
-              Synchroniser votre menu Wello Resto avec {name}? Cela mettra à jour votre carte Uber Eats avec les articles et prix définis via Wello Resto.
+              Votre menu {name} actuel sera remplacé par celui de Wello Resto : seuls les produits cochés « {name} » dans votre carte seront en vente, avec les prix et la TVA définis dans Wello Resto. Les produits que vous avez créés directement chez {name} disparaîtront.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="flex gap-3">

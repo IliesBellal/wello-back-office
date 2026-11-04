@@ -13,9 +13,10 @@ export interface MenuSyncUploadErrors {
 
 export interface MenuSync {
   id: number;
-  location_id: string;
-  origin: string; // manual | auto | scenario_13 | scenario_15
-  api_version: string;
+  location_id?: string; // Deliveroo
+  store_id?: string; // Uber Eats
+  origin: string; // manual | auto | uber_request | scenario_13 | scenario_15
+  api_version?: string;
   status: MenuSyncStatus;
   item_count: number;
   http_status?: number;
@@ -142,6 +143,17 @@ export const integrationsService = {
     );
   },
 
+  getUberEatsSyncs: async (limit = 10): Promise<MenuSync[]> => {
+    logAPI('GET', `/integrations/uber-eats/syncs?limit=${limit}`);
+
+    return withMock(
+      () => [],
+      () => apiClient
+        .get<WelloApiResponse<{ syncs: MenuSync[] }>>(`/integrations/uber-eats/syncs?limit=${limit}`)
+        .then(res => res.data.syncs ?? [])
+    );
+  },
+
   getScanNOrderStatus: async (): Promise<IntegrationStatus> => {
     logAPI('GET', '/integrations/scannorder');
 
@@ -205,20 +217,20 @@ export const integrationsService = {
   },
 
   syncUberEatsMenu: async (): Promise<{ synced_items: number }> => {
-    logAPI('PATCH', '/menu/uber-eats/sync');
+    logAPI('PATCH', '/menu/uber-eats/sync?confirm_replace=true');
     
     return withMock(
       () => ({ synced_items: mockIntegrations.uber_eats.synced_items }),
-      () => apiClient.patch<WelloApiResponse<{ synced_items: number }>>('/menu/uber-eats/sync', {}).then(res => res.data)
+      () => apiClient.patch<WelloApiResponse<{ synced_items: number }>>('/menu/uber-eats/sync?confirm_replace=true', {}).then(res => res.data)
     );
   },
 
   syncDeliverooMenu: async (): Promise<{ synced_items: number }> => {
-    logAPI('PATCH', '/menu/deliveroo/sync');
+    logAPI('PATCH', '/menu/deliveroo/sync?confirm_replace=true');
     
     return withMock(
       () => ({ synced_items: mockIntegrations.deliveroo.synced_items }),
-      () => apiClient.patch<WelloApiResponse<{ synced_items: number }>>('/menu/deliveroo/sync', {}).then(res => res.data)
+      () => apiClient.patch<WelloApiResponse<{ synced_items: number }>>('/menu/deliveroo/sync?confirm_replace=true', {}).then(res => res.data)
     );
   },
 

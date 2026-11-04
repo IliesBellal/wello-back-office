@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { IntegrationCard } from '@/components/integrations/IntegrationCard';
-import { DeliverooSyncLog } from '@/components/integrations/DeliverooSyncLog';
+import { MenuSyncLog } from '@/components/integrations/MenuSyncLog';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { AlertCircle } from 'lucide-react';
 
@@ -122,7 +122,7 @@ export default function DeliverooPage() {
           tutorial={<DeliverrooTutorial />}
           enablePreparationTime={true}
         />
-        {status?.active && <DeliverooSyncLog refreshKey={syncCount} />}
+        {status?.active && <MenuSyncLog platform="deliveroo" refreshKey={syncCount} />}
       </PageContainer>
     </DashboardLayout>
   );

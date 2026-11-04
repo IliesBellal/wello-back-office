@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { integrationsService, type MenuSync, type MenuSyncStatus } from '@/services/integrationsService';
 
-// Journal des publications du menu vers Deliveroo : le restaurateur y voit si
+// Journal des publications du menu vers Deliveroo ou Uber Eats : le restaurateur y voit si
 // sa dernière synchro est en ligne, en cours ou refusée, et pourquoi.
 
 const STATUS_LABEL: Record<MenuSyncStatus, string> = {
@@ -32,6 +32,7 @@ const ORIGIN_LABEL: Record<string, string> = {
   auto: 'Automatique',
   scenario_13: 'Test Deliveroo',
   scenario_15: 'Test Deliveroo',
+  uber_request: 'Demandée par Uber Eats',
 };
 
 const isPending = (s: MenuSync) => s.status === 'sending' || s.status === 'processing';
@@ -39,12 +40,14 @@ const isPending = (s: MenuSync) => s.status === 'sending' || s.status === 'proce
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
 
-interface DeliverooSyncLogProps {
+interface MenuSyncLogProps {
   /** Change à chaque synchronisation manuelle pour recharger le journal. */
   refreshKey?: number;
+  /** Plateforme dont on affiche le journal. */
+  platform?: 'deliveroo' | 'uber_eats';
 }
 
-export const DeliverooSyncLog = ({ refreshKey = 0 }: DeliverooSyncLogProps) => {
+export const MenuSyncLog = ({ refreshKey = 0, platform = 'deliveroo' }: MenuSyncLogProps) => {
   const [syncs, setSyncs] = useState<MenuSync[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
@@ -52,13 +55,17 @@ export const DeliverooSyncLog = ({ refreshKey = 0 }: DeliverooSyncLogProps) => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setSyncs(await integrationsService.getDeliverooSyncs(10));
+      setSyncs(
+        platform === 'uber_eats'
+          ? await integrationsService.getUberEatsSyncs(10)
+          : await integrationsService.getDeliverooSyncs(10),
+      );
     } catch {
       // apiClient a déjà informé l'utilisateur ; on garde l'affichage précédent.
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [platform]);
 
   useEffect(() => {
     void load();
@@ -78,7 +85,7 @@ export const DeliverooSyncLog = ({ refreshKey = 0 }: DeliverooSyncLogProps) => {
         <div>
           <CardTitle className="text-lg">Synchronisation du menu</CardTitle>
           <CardDescription>
-            Les dernières mises à jour de votre menu sur Deliveroo. Les modifications de votre carte sont envoyées automatiquement.
+            Les dernières mises à jour de votre menu sur {platform === 'uber_eats' ? 'Uber Eats' : 'Deliveroo'}. Les modifications de votre carte sont envoyées automatiquement.
           </CardDescription>
         </div>
         <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>

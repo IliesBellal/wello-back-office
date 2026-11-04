@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { IntegrationCard } from '@/components/integrations/IntegrationCard';
+import { MenuSyncLog } from '@/components/integrations/MenuSyncLog';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { AlertCircle, Check, Monitor, ListChecks, Settings } from 'lucide-react';
 
@@ -65,6 +66,7 @@ const UberEatsTutorial = () => (
 export default function UberEatsPage() {
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncCount, setSyncCount] = useState(0);
 
   useEffect(() => {
     integrationsService.getUberEatsStatus()
@@ -84,6 +86,7 @@ export default function UberEatsPage() {
 
   const handleSync = async () => {
     await integrationsService.syncUberEatsMenu();
+    setSyncCount((n) => n + 1);
     // Refresh status
     const updated = await integrationsService.getUberEatsStatus();
     setStatus(updated);
@@ -107,6 +110,7 @@ export default function UberEatsPage() {
           tutorial={<UberEatsTutorial />}
           enablePreparationTime={true}
         />
+        {status?.active && <MenuSyncLog platform="uber_eats" refreshKey={syncCount} />}
       </PageContainer>
     </DashboardLayout>
   );
