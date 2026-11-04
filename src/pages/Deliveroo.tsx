@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { IntegrationCard } from '@/components/integrations/IntegrationCard';
+import { DeliverooSyncLog } from '@/components/integrations/DeliverooSyncLog';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { AlertCircle } from 'lucide-react';
 
@@ -77,6 +78,7 @@ const DeliverrooTutorial = () => (
 export default function DeliverooPage() {
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [syncCount, setSyncCount] = useState(0);
 
   useEffect(() => {
     integrationsService.getDeliverooStatus()
@@ -96,6 +98,7 @@ export default function DeliverooPage() {
 
   const handleSync = async () => {
     await integrationsService.syncDeliverooMenu();
+    setSyncCount((n) => n + 1);
     // Refresh status
     const updated = await integrationsService.getDeliverooStatus();
     setStatus(updated);
@@ -119,6 +122,7 @@ export default function DeliverooPage() {
           tutorial={<DeliverrooTutorial />}
           enablePreparationTime={true}
         />
+        {status?.active && <DeliverooSyncLog refreshKey={syncCount} />}
       </PageContainer>
     </DashboardLayout>
   );

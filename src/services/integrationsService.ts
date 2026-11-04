@@ -1,6 +1,32 @@
 import { apiClient, USE_MOCK_DATA, withMock, logAPI, WelloApiResponse } from "@/services/apiClient";
 
 // ============= Types =============
+
+// Publication du menu WelloResto vers Deliveroo (journal marketplace_menu_syncs).
+export type MenuSyncStatus = 'sending' | 'processing' | 'success' | 'failed' | 'unchanged' | 'unconfirmed';
+
+export interface MenuSyncUploadErrors {
+  processing?: string;
+  images?: { url: string; message: string }[];
+  barcodes?: { barcode: string; message: string }[];
+}
+
+export interface MenuSync {
+  id: number;
+  location_id: string;
+  origin: string; // manual | auto | scenario_13 | scenario_15
+  api_version: string;
+  status: MenuSyncStatus;
+  item_count: number;
+  http_status?: number;
+  error?: string;
+  warnings?: string[] | null;
+  upload_errors?: MenuSyncUploadErrors | null;
+  availability_status?: 'success' | 'failed' | '';
+  availability_error?: string;
+  created_at: string;
+  finished_at?: string | null;
+}
 export interface IntegrationKPIs {
   revenue: number;
   orders: number;
@@ -102,6 +128,17 @@ export const integrationsService = {
     return withMock(
       () => mockIntegrations.deliveroo,
       () => apiClient.get<GetIntegrationResponse>('/integrations/deliveroo').then(res => res.data.integration)
+    );
+  },
+
+  getDeliverooSyncs: async (limit = 10): Promise<MenuSync[]> => {
+    logAPI('GET', `/integrations/deliveroo/syncs?limit=${limit}`);
+
+    return withMock(
+      () => [],
+      () => apiClient
+        .get<WelloApiResponse<{ syncs: MenuSync[] }>>(`/integrations/deliveroo/syncs?limit=${limit}`)
+        .then(res => res.data.syncs ?? [])
     );
   },
 
