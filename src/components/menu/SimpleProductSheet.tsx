@@ -179,6 +179,40 @@ const TvaRateSelect = ({
   </Select>
 );
 
+// Case « Alcool » (products.contains_alcohol) : article soumis à contrôle
+// d'âge, publié vers Deliveroo / Uber Eats. Saisie uniquement ici, onglet
+// Général de la fiche produit ; elle part avec le reste du formulaire au clic
+// sur « Enregistrer » / « Créer le produit ». Ne change pas la TVA.
+const AlcoholField = ({
+  editing,
+  checked,
+  onChange,
+  compact = false,
+}: {
+  editing: boolean;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  compact?: boolean;
+}) => {
+  if (!editing) {
+    return (
+      <div>
+        <Label className="text-xs font-semibold text-muted-foreground uppercase">Alcool</Label>
+        <p className="mt-1 text-sm text-foreground">{checked ? 'Oui, contrôle d’âge' : 'Non'}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+      <div>
+        <Label htmlFor="product-contains-alcohol" className={compact ? 'text-xs' : undefined}>Contient de l'alcool</Label>
+        <p className="text-xs text-muted-foreground">Contrôle d'âge à la livraison (Deliveroo, Uber Eats).</p>
+      </div>
+      <Switch id="product-contains-alcohol" checked={checked} onCheckedChange={onChange} />
+    </div>
+  );
+};
+
 export const SimpleProductSheet = ({
   productId,
   product: initialProduct = null,
@@ -719,6 +753,7 @@ export const SimpleProductSheet = ({
         components: formData.components || [],
         tags: (formData.tags || []).filter((tag): tag is string => typeof tag === 'string'),
         allergens: (formData.allergens || []).filter((allergen): allergen is string => typeof allergen === 'string'),
+        contains_alcohol: formData.contains_alcohol,
         // Toujours transmis : c'est l'absence du champ qui laisse les colonnes
         // sync_* à leur défaut TRUE côté API.
         integrations: {
@@ -1042,6 +1077,8 @@ export const SimpleProductSheet = ({
                         </p>
                       </div>
 
+                      <AlcoholField editing={false} checked={Boolean(product.contains_alcohol)} onChange={() => {}} />
+
                       {/* Colors stacked vertically */}
                       <div className="space-y-3">
                         <div>
@@ -1165,6 +1202,13 @@ export const SimpleProductSheet = ({
                           </SelectContent>
                         </Select>
                       </div>
+
+                      <AlcoholField
+                        editing
+                        compact
+                        checked={Boolean(formData.contains_alcohol)}
+                        onChange={(checked) => setFormData({ ...formData, contains_alcohol: checked })}
+                      />
 
                       {/* Tags */}
                       <MultiSelectDropdown
@@ -1830,6 +1874,8 @@ export const SimpleProductSheet = ({
                               {product.description || '—'}
                             </p>
                           </div>
+
+                          <AlcoholField editing={false} checked={Boolean(product.contains_alcohol)} onChange={() => {}} />
                           
                           <div className="grid grid-cols-2 gap-3 pt-2">
                             <div>
@@ -1964,6 +2010,13 @@ export const SimpleProductSheet = ({
                               <SelectItem value="removed_from_menu">Retiré</SelectItem>
                             </SelectContent>
                           </Select>
+                        </div>
+                        <div className="col-span-2">
+                          <AlcoholField
+                            editing
+                            checked={Boolean(formData.contains_alcohol)}
+                            onChange={(checked) => setFormData({ ...formData, contains_alcohol: checked })}
+                          />
                         </div>
                         <div>
                           <Label>Tags</Label>

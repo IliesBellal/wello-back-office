@@ -294,6 +294,10 @@ export interface Product {
   tags?: (string | Tag)[] | null;        // Support both ID array and Tag objects + null
   allergens?: (string | Allergen)[] | null;  // Support both ID array and Allergen objects + null
   by_product_of?: string;  // Parent product ID (from new API format)
+  // Article soumis à contrôle d'âge (alcool…), publié vers Deliveroo / Uber
+  // Eats. Renvoyé seulement par GET /menu/products/{id} : visible et
+  // modifiable uniquement dans la fiche produit, onglet Général.
+  contains_alcohol?: boolean;
 }
 
 // Category can come from API in two formats
@@ -369,6 +373,7 @@ export interface ProductCreatePayload {
   tags?: string[];                   // IDs de tags
   allergens?: string[];              // IDs d'allergènes
   integrations?: ProductIntegrations;
+  contains_alcohol?: boolean;        // Case « Alcool » de l'onglet Général
 }
 
 export interface Menu {
