@@ -1,4 +1,4 @@
-import { useState, type InputHTMLAttributes, type ReactNode } from 'react';
+import { useState, type InputHTMLAttributes } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,8 +31,6 @@ interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  /** Rendered on the right of the label (e.g. "Mot de passe oublié ?"). */
-  labelAside?: ReactNode;
   showToggle?: boolean;
   isPasswordVisible?: boolean;
   onTogglePassword?: () => void;
@@ -42,7 +40,6 @@ const Field = ({
   id,
   type,
   label,
-  labelAside,
   showToggle,
   isPasswordVisible,
   onTogglePassword,
@@ -50,12 +47,9 @@ const Field = ({
   ...props
 }: FieldProps) => (
   <div className="space-y-1.5">
-    <div className="flex items-center justify-between">
-      <Label htmlFor={id} className="text-[13px] font-semibold text-[#2a3a63]">
-        {label}
-      </Label>
-      {labelAside}
-    </div>
+    <Label htmlFor={id} className="text-[13px] font-semibold text-[#2a3a63]">
+      {label}
+    </Label>
     <div className="relative">
       <Input
         id={id}
@@ -294,27 +288,30 @@ const Login = () => {
 
             {/* Password: revealed once the email looks valid */}
             {emailIsValid && (
-              <Field
-                id="login-password"
-                type="password"
-                label="Mot de passe"
-                placeholder="••••••••"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                showToggle
-                isPasswordVisible={showPasswordField}
-                onTogglePassword={() => setShowPasswordField(!showPasswordField)}
-                required
-                labelAside={
+              <>
+                <Field
+                  id="login-password"
+                  type="password"
+                  label="Mot de passe"
+                  placeholder="••••••••"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  showToggle
+                  isPasswordVisible={showPasswordField}
+                  onTogglePassword={() => setShowPasswordField(!showPasswordField)}
+                  required
+                />
+                {/* Après le champ dans le DOM : Tab depuis l'e-mail atteint directement le mot de passe */}
+                <div className="-mt-2 flex justify-end">
                   <Link
                     to="/forgot-password"
                     className="text-[13px] font-medium text-primary hover:underline focus-visible:outline-none focus-visible:underline"
                   >
                     Mot de passe oublié ?
                   </Link>
-                }
-              />
+                </div>
+              </>
             )}
 
             <button
