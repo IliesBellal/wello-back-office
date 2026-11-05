@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   getLocations,
   createLocation,
@@ -21,6 +21,7 @@ import {
   type AreaPoint
 } from '@/services/locationsService';
 import { toast } from 'sonner';
+import { DEFAULT_SEATS, findFreeSpot, nextTableName } from '@/utils/floorPlanLayout';
 
 export interface FloorPlanState {
   floors: Floor[];
@@ -150,6 +151,12 @@ export function useFloorPlan(): UseFloorPlanReturn {
     try {
       const newFloor = await createFloorAPI(name);
       setFloors(prev => [...prev, newFloor]);
+      // L'étage tout juste créé devient l'étage actif : c'est là que
+      // l'utilisateur va poser ses tables.
+      setSelectedFloorId(newFloor.id);
+      setSelectedLocationId(null);
+      setSelectedObstacleId(null);
+      setSelectedAreaId(null);
       toast.success('Étage créé');
     } catch (error) {
       toast.error('Erreur lors de la création de l\'étage');
@@ -190,31 +197,54 @@ export function useFloorPlan(): UseFloorPlanReturn {
     }
   };
 
-  const addLocation = useCallback(async (shape: Location['shape'], floorId: string) => {
-    try {
-      const dims = getDefaultDimensions(shape);
-      const newLocation = await createLocation({
-        location_name: `Table ${locations.length + 1}`,
-        seats: 2,
-        floor_id: floorId,
-        shape,
-        angle: 0,
-        x: 500,
-        y: 500,
-        ...dims,
-        enabled: true
-      });
-      
-      setLocations(prev => [...prev, newLocation]);
-      setOriginalLocations(prev => [...prev, JSON.parse(JSON.stringify(newLocation))]);
-      setDirtyLocations(prev => new Set([...prev, newLocation.location_id]));
-      setSelectedLocationId(newLocation.location_id);
-      toast.success('Table ajoutée');
-    } catch (error) {
-      toast.error('Erreur lors de l\'ajout de la table');
-      throw error;
-    }
-  }, [locations.length]);
+  // Dernier état connu des tables, y compris celles créées par un appel encore
+  // en cours : évite que deux clics rapides calculent la même position/le même nom.
+  const locationsRef = useRef<Location[]>(locations);
+  locationsRef.current = locations;
+  // Les créations s'exécutent l'une après l'autre (file d'attente).
+  const creationQueue = useRef<Promise<unknown>>(Promise.resolve());
+
+  const addLocation = useCallback((shape: Location['shape'], floorId: string) => {
+    const run = async () => {
+      try {
+        const dims = getDefaultDimensions(shape);
+        const current = locationsRef.current;
+        const { x, y } = findFreeSpot(
+          current.filter(l => l.floor_id === floorId),
+          dims.width,
+          dims.height
+        );
+        const newLocation = await createLocation({
+          location_name: nextTableName(current.map(l => l.location_name)),
+          seats: DEFAULT_SEATS,
+          floor_id: floorId,
+          shape,
+          angle: 0,
+          x,
+          y,
+          ...dims,
+          enabled: true
+        });
+
+        locationsRef.current = [...locationsRef.current, newLocation];
+        setLocations(prev => [...prev, newLocation]);
+        setOriginalLocations(prev => [...prev, JSON.parse(JSON.stringify(newLocation))]);
+        // La table est déjà enregistrée côté serveur : pas de « modification
+        // non enregistrée » à signaler.
+        setSelectedLocationId(newLocation.location_id);
+        setSelectedObstacleId(null);
+        setSelectedAreaId(null);
+        toast.success('Table ajoutée');
+      } catch (error) {
+        toast.error('Erreur lors de l\'ajout de la table');
+        throw error;
+      }
+    };
+
+    const result = creationQueue.current.then(run, run);
+    creationQueue.current = result.catch(() => undefined);
+    return result;
+  }, []);
 
   const updateLocationState = useCallback((locationId: string, updates: Partial<Location>) => {
     setLocations(prev =>

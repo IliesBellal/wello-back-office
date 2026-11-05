@@ -237,9 +237,23 @@ export const getLocations = async (): Promise<LocationsData> => {
   );
 };
 
+/**
+ * Les créations (POST /floors, POST /locations/floors/{id}/tables) ne
+ * renvoient pas la ressource mais un accusé `{ id, data: { status, <clé> } }`.
+ * Lit l'identifiant généré (string ou nombre) ou lève une erreur explicite :
+ * mieux vaut échouer que d'insérer dans l'état local un objet sans id.
+ */
+const readCreatedId = (response: unknown, key: 'floor_id' | 'location_id'): string => {
+  const payload = (response as { data?: Record<string, unknown> } | null)?.data;
+  const value = payload?.[key];
+  if (typeof value === 'string' && value !== '') return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  throw new Error(`Réponse inattendue de l'API : ${key} manquant`);
+};
+
 export const createFloor = async (name: string): Promise<Floor> => {
   logAPI('POST', '/floors', { name });
-  
+
   return withMock(
     () => {
       const newFloor: Floor = {
@@ -250,7 +264,10 @@ export const createFloor = async (name: string): Promise<Floor> => {
       mockData.data.floors.push(newFloor);
       return newFloor;
     },
-    () => apiClient.post<Floor>('/floors', { name })
+    async () => {
+      const response = await apiClient.post<unknown>('/floors', { name });
+      return { id: readCreatedId(response, 'floor_id'), name, enabled: true };
+    }
   );
 };
 
@@ -301,7 +318,26 @@ export const createLocation = async (data: Partial<Location>): Promise<Location>
       mockData.data.locations.push(newLocation);
       return newLocation;
     },
-    () => apiClient.post<Location>(`/locations/floors/${data.floor_id || null}/tables`, data)
+    async () => {
+      if (!data.floor_id) {
+        throw new Error('Un étage est requis pour créer une table');
+      }
+      const response = await apiClient.post<unknown>(`/locations/floors/${data.floor_id}/tables`, data);
+      return {
+        location_id: readCreatedId(response, 'location_id'),
+        location_name: data.location_name || 'New Table',
+        seats: data.seats || 2,
+        floor_id: data.floor_id,
+        shape: data.shape || 'rectangle',
+        angle: data.angle || 0,
+        x: data.x ?? 500,
+        y: data.y ?? 500,
+        width: data.width || 80,
+        height: data.height || 80,
+        enabled: true,
+        attributes: data.attributes ?? null
+      };
+    }
   );
 };
 
