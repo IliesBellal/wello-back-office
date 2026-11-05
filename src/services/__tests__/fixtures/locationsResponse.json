@@ -1,0 +1,135 @@
+{
+  "id": "locations.get",
+  "data": {
+    "locations": [
+      {
+        "location_id": "40",
+        "order_id": null,
+        "booking_id": null,
+        "location_name": "Table 1",
+        "location_desc": null,
+        "seats": 4,
+        "order": 0,
+        "floor_id": "12",
+        "shape": "square",
+        "y": 100,
+        "width": 80,
+        "height": 80,
+        "bookings": []
+      },
+      {
+        "location_id": "41",
+        "order_id": null,
+        "booking_id": null,
+        "location_name": "Table 2",
+        "location_desc": null,
+        "seats": 6,
+        "order": 0,
+        "floor_id": "12",
+        "shape": "rectangle",
+        "x": 300,
+        "y": 200,
+        "width": 120,
+        "height": 80,
+        "angle": 45,
+        "bookings": [],
+        "attributes": {
+          "pmr": true,
+          "terrace": false,
+          "vip": false,
+          "window": false
+        }
+      },
+      {
+        "location_id": "42",
+        "order_id": null,
+        "booking_id": null,
+        "location_name": "Orpheline",
+        "location_desc": null,
+        "seats": 2,
+        "order": 0,
+        "shape": "circle",
+        "x": 10,
+        "y": 10,
+        "width": 80,
+        "height": 80,
+        "bookings": []
+      }
+    ],
+    "floors": [
+      {
+        "id": "12",
+        "name": "Salle"
+      },
+      {
+        "id": "13",
+        "name": "Terrasse"
+      }
+    ],
+    "areas": [
+      {
+        "id": "5",
+        "floor_id": "12",
+        "name": "Coin",
+        "points": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 100,
+            "y": 0
+          },
+          {
+            "x": 100,
+            "y": 100
+          }
+        ],
+        "x": 0,
+        "y": 0,
+        "angle": 0,
+        "stroke_color": "#64748B",
+        "color": "#E2E8F0"
+      }
+    ],
+    "obstacles": [
+      {
+        "id": "obs-1",
+        "floor_id": "12",
+        "type": "wall",
+        "x": 500,
+        "y": 100,
+        "width": 400,
+        "height": 12,
+        "angle": 0,
+        "direction": null,
+        "enabled": true
+      },
+      {
+        "id": "obs-2",
+        "floor_id": "12",
+        "type": "door",
+        "x": 300,
+        "y": 100,
+        "width": 80,
+        "height": 12,
+        "angle": 0,
+        "direction": 45,
+        "enabled": true
+      },
+      {
+        "id": "obs-3",
+        "floor_id": "12",
+        "type": "window",
+        "x": 700,
+        "y": 100,
+        "width": 100,
+        "height": 12,
+        "angle": 0,
+        "direction": null,
+        "enabled": true
+      }
+    ],
+    "revision": 4
+  }
+}

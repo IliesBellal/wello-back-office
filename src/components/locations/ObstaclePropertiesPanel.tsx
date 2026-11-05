@@ -1,248 +1,155 @@
-import { useState } from 'react';
+import { Copy, RotateCw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
-import { Trash2, X } from 'lucide-react';
-import { toast } from 'sonner';
-import { useIsMobile } from '@/hooks/use-mobile';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { Card } from '@/components/ui/card';
-import type { Obstacle } from '@/services/locationsService';
+import { OBSTACLE_MAX_SIZE, OBSTACLE_MIN_SIZE, getObstacleDefinition } from '@/lib/floorplan/obstacleCatalog';
+import type { Obstacle } from '@/lib/floorplan/types';
+import { OBSTACLE_ICONS } from './obstacleIcons';
+import { PropertiesShell } from './PropertiesShell';
 
 interface ObstaclePropertiesPanelProps {
-  obstacle: Obstacle | null;
-  onUpdate: (updates: Partial<Obstacle>) => void;
-  onDelete: () => Promise<void>;
+  obstacle: Obstacle;
+  onUpdate: (patch: Partial<Obstacle>, coalesceKey?: string) => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
   onClose: () => void;
-  isDeleting?: boolean;
 }
 
-const OBSTACLE_TYPE_LABELS: Record<Obstacle['type'], string> = {
-  wall: 'Mur',
-  bar: 'Bar',
-  stairs: 'Escaliers',
-  door: 'Porte'
-};
+const THICKNESS_MAX = 60;
 
-/**
- * Panneau de propriétés pour éditer un obstacle sélectionné
- * Responsive : bottom sheet on mobile, side panel on desktop
- */
-export function ObstaclePropertiesPanel({
-  obstacle,
-  onUpdate,
-  onDelete,
-  onClose,
-  isDeleting = false
-}: ObstaclePropertiesPanelProps) {
-  const isMobile = useIsMobile();
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting2, setIsDeleting] = useState(false);
+/** Propriétés d'un obstacle. Rendu avec `key={id}` par la page : changer d'obstacle réinitialise le formulaire. */
+export function ObstaclePropertiesPanel({ obstacle, onUpdate, onDuplicate, onDelete, onClose }: ObstaclePropertiesPanelProps) {
+  const definition = getObstacleDefinition(obstacle.type);
+  const Icon = OBSTACLE_ICONS[obstacle.type];
+  const key = (field: string) => `${obstacle.id}:${field}`;
 
-  if (!obstacle) return null;
+  // Plante et pilier restent proportionnels : un seul curseur de taille.
+  const setUniformSize = (size: number) => onUpdate({ width: size, height: size }, key('size'));
+  const isThin = obstacle.type === 'wall' || obstacle.type === 'door' || obstacle.type === 'window';
 
-  const handleDelete = async () => {
-    try {
-      setIsDeleting(true);
-      await onDelete();
-      setShowDeleteDialog(false);
-      toast.success('Obstacle supprimé');
-    } catch (error) {
-      toast.error('Erreur lors de la suppression');
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const content = (
-    <div className="space-y-6">
-      {/* Type (readonly) */}
-      <div className="space-y-2">
-        <Label>Type</Label>
-        <p className="text-sm font-medium text-foreground">{OBSTACLE_TYPE_LABELS[obstacle.type]}</p>
+  return (
+    <PropertiesShell title={definition.label} onClose={onClose}>
+      <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
+        <Icon className="h-5 w-5 text-muted-foreground" />
+        <div>
+          <p className="text-sm font-medium text-foreground">{definition.label}</p>
+          <p className="text-xs text-muted-foreground">{definition.hint}</p>
+        </div>
       </div>
 
-      {/* Dimensions */}
-      <div className="space-y-3">
+      {definition.keepRatio ? (
         <div className="space-y-2">
-          <Label htmlFor="obstacle-width">
-            Largeur: <span className="font-semibold text-primary">{obstacle.width}</span>
+          <Label htmlFor="obstacle-size">
+            Taille : <span className="font-semibold text-primary">{Math.round(obstacle.width)}</span>
           </Label>
           <Slider
-            id="obstacle-width"
-            min={10}
-            max={500}
+            id="obstacle-size"
+            min={OBSTACLE_MIN_SIZE}
+            max={200}
             step={5}
             value={[obstacle.width]}
-            onValueChange={([width]) => onUpdate({ width })}
+            onValueChange={([size]) => setUniformSize(size)}
           />
         </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="obstacle-width">
+              {isThin ? 'Longueur' : 'Largeur'} : <span className="font-semibold text-primary">{Math.round(obstacle.width)}</span>
+            </Label>
+            <Slider
+              id="obstacle-width"
+              min={OBSTACLE_MIN_SIZE}
+              max={OBSTACLE_MAX_SIZE}
+              step={5}
+              value={[obstacle.width]}
+              onValueChange={([width]) => onUpdate({ width }, key('width'))}
+            />
+          </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="obstacle-height">
-            Hauteur: <span className="font-semibold text-primary">{obstacle.height}</span>
-          </Label>
-          <Slider
-            id="obstacle-height"
-            min={10}
-            max={500}
-            step={5}
-            value={[obstacle.height]}
-            onValueChange={([height]) => onUpdate({ height })}
-          />
+          <div className="space-y-2">
+            <Label htmlFor="obstacle-height">
+              {isThin ? 'Épaisseur' : 'Hauteur'} : <span className="font-semibold text-primary">{Math.round(obstacle.height)}</span>
+            </Label>
+            <Slider
+              id="obstacle-height"
+              min={OBSTACLE_MIN_SIZE}
+              max={isThin ? THICKNESS_MAX : OBSTACLE_MAX_SIZE}
+              step={2}
+              value={[obstacle.height]}
+              onValueChange={([height]) => onUpdate({ height }, key('height'))}
+            />
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Rotation */}
       <div className="space-y-2">
-        <Label htmlFor="obstacle-angle">
-          Rotation: <span className="font-semibold text-primary">{obstacle.angle}°</span>
-        </Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="obstacle-angle">
+            Rotation : <span className="font-semibold text-primary">{Math.round(obstacle.angle)}°</span>
+          </Label>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1 px-2 text-xs"
+            onClick={() => onUpdate({ angle: obstacle.angle + 90 })}
+            title="Pivoter de 90°"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+            90°
+          </Button>
+        </div>
         <Slider
           id="obstacle-angle"
           min={0}
           max={359}
           step={5}
           value={[obstacle.angle]}
-          onValueChange={([angle]) => onUpdate({ angle })}
+          onValueChange={([angle]) => onUpdate({ angle }, key('angle'))}
         />
       </div>
 
-      {/* Direction (door only) */}
       {obstacle.type === 'door' && (
         <div className="space-y-2">
           <Label htmlFor="obstacle-direction">
-            Sens d'ouverture (°): <span className="font-semibold text-primary">{obstacle.direction ?? 90}</span>
+            Ouverture : <span className="font-semibold text-primary">{Math.round(obstacle.direction ?? 90)}°</span>
           </Label>
           <Slider
             id="obstacle-direction"
-            min={0}
-            max={359}
+            min={30}
+            max={180}
             step={5}
             value={[obstacle.direction ?? 90]}
-            onValueChange={([direction]) => onUpdate({ direction })}
+            onValueChange={([direction]) => onUpdate({ direction }, key('direction'))}
           />
         </div>
       )}
 
-      {/* Position Info (readonly) */}
-      <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
-        <p className="text-xs font-semibold text-muted-foreground">Position</p>
+      <div className="space-y-2 rounded-lg bg-muted/50 p-3">
+        <p className="text-xs font-semibold text-muted-foreground">Position (centre)</p>
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div>
-            <span className="text-muted-foreground">X:</span>
+            <span className="text-muted-foreground">X :</span>
             <span className="ml-1 font-mono">{Math.round(obstacle.x)}</span>
           </div>
           <div>
-            <span className="text-muted-foreground">Y:</span>
+            <span className="text-muted-foreground">Y :</span>
             <span className="ml-1 font-mono">{Math.round(obstacle.y)}</span>
           </div>
         </div>
       </div>
 
-      {/* Delete Button */}
-      <Button
-        variant="destructive"
-        className="w-full gap-2"
-        onClick={() => setShowDeleteDialog(true)}
-        disabled={isDeleting || isDeleting2}
-      >
-        <Trash2 className="w-4 h-4" />
-        Supprimer cet obstacle
-      </Button>
-    </div>
-  );
-
-  // Mobile: bottom sheet
-  if (isMobile) {
-    return (
-      <>
-        <Sheet open={!!obstacle} onOpenChange={(open) => !open && onClose()}>
-          <SheetContent side="bottom" className="h-auto max-h-[90vh]">
-            <SheetHeader>
-              <SheetTitle>Propriétés de l'obstacle</SheetTitle>
-            </SheetHeader>
-            <div className="py-4 overflow-y-auto max-h-[calc(90vh-100px)]">
-              {content}
-            </div>
-          </SheetContent>
-        </Sheet>
-
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Supprimer l'obstacle ?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Êtes-vous sûr de vouloir supprimer cet obstacle ({OBSTACLE_TYPE_LABELS[obstacle.type]}) ? Cette action est irréversible.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={isDeleting2}>Annuler</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleDelete}
-                disabled={isDeleting2}
-                className="bg-destructive hover:bg-destructive/90"
-              >
-                {isDeleting2 ? 'Suppression...' : 'Supprimer'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
-    );
-  }
-
-  // Desktop: side card
-  return (
-    <>
-      <Card className="absolute top-6 right-6 w-80 shadow-xl z-50 bg-card border-border max-h-[calc(100vh-100px)] overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-border flex items-center justify-between sticky top-0 bg-card z-10">
-          <h2 className="font-semibold text-foreground">Propriétés</h2>
-          <Button size="sm" variant="ghost" onClick={onClose} className="h-8 w-8 p-0">
-            <X className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <div className="p-4 space-y-6 overflow-y-auto flex-1">
-          {content}
-        </div>
-      </Card>
-
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer l'obstacle ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer cet obstacle ({OBSTACLE_TYPE_LABELS[obstacle.type]}) ? Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting2}>Annuler</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting2}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {isDeleting2 ? 'Suppression...' : 'Supprimer'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      <div className="flex gap-2">
+        <Button type="button" variant="outline" className="flex-1 gap-2" onClick={onDuplicate}>
+          <Copy className="h-4 w-4" />
+          Dupliquer
+        </Button>
+        <Button type="button" variant="destructive" className="flex-1 gap-2" onClick={onDelete}>
+          <Trash2 className="h-4 w-4" />
+          Supprimer
+        </Button>
+      </div>
+    </PropertiesShell>
   );
 }

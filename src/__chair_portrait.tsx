@@ -51,18 +51,10 @@ function Preview() {
           <TableShape
             location={longue}
             isSelected={false}
-            booking={null}
-            onSelect={() => {}}
-            onDragMove={() => {}}
-            scaleRatio={1}
           />
           <TableShape
             location={table12}
             isSelected={false}
-            booking={null}
-            onSelect={() => {}}
-            onDragMove={() => {}}
-            scaleRatio={1}
           />
           <Text x={20} y={5} text="Portrait rectangles" fontSize={12} fill="#333" />
         </Layer>
