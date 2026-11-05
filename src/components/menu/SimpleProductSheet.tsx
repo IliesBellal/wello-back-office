@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Product, TvaRate, TvaRateGroup, UnitOfMeasure, Component, Attribute, ProductAttribute, Category, Tag, Allergen, ProductCreatePayload } from '@/types/menu';
+import { Product, TvaRate, TvaRateGroup, UnitOfMeasure, Component, Attribute, ProductAttribute, Category, Tag, Allergen, ProductCreatePayload, PRODUCT_STATUS_HINTS } from '@/types/menu';
 import {
   Sheet,
   SheetContent,
@@ -1195,10 +1195,10 @@ export const SimpleProductSheet = ({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="available">Disponible</SelectItem>
-                            <SelectItem value="out_of_stock">Hors stock</SelectItem>
-                            <SelectItem value="not_available">Indisponible</SelectItem>
-                            <SelectItem value="removed_from_menu">Retiré</SelectItem>
+                            <SelectItem value="available" description={PRODUCT_STATUS_HINTS.available}>Disponible</SelectItem>
+                            <SelectItem value="out_of_stock" description={PRODUCT_STATUS_HINTS.out_of_stock}>Hors stock</SelectItem>
+                            <SelectItem value="not_available" description={PRODUCT_STATUS_HINTS.not_available}>Indisponible</SelectItem>
+                            <SelectItem value="removed_from_menu" description={PRODUCT_STATUS_HINTS.removed_from_menu}>Retiré</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -2004,10 +2004,10 @@ export const SimpleProductSheet = ({
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="available">Disponible</SelectItem>
-                              <SelectItem value="out_of_stock">Hors stock</SelectItem>
-                              <SelectItem value="not_available">Indisponible</SelectItem>
-                              <SelectItem value="removed_from_menu">Retiré</SelectItem>
+                              <SelectItem value="available" description={PRODUCT_STATUS_HINTS.available}>Disponible</SelectItem>
+                              <SelectItem value="out_of_stock" description={PRODUCT_STATUS_HINTS.out_of_stock}>Hors stock</SelectItem>
+                              <SelectItem value="not_available" description={PRODUCT_STATUS_HINTS.not_available}>Indisponible</SelectItem>
+                              <SelectItem value="removed_from_menu" description={PRODUCT_STATUS_HINTS.removed_from_menu}>Retiré</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

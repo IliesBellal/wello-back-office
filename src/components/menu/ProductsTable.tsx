@@ -1,4 +1,4 @@
-import { Product, Tag, Allergen } from '@/types/menu';
+import { Product, ProductStatus, PRODUCT_STATUS_HINTS, Tag, Allergen } from '@/types/menu';
 import {
   Table,
   TableBody,
@@ -9,8 +9,13 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Store, ShoppingBag, Truck, Check } from 'lucide-react';
-import { useState } from 'react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Store, ShoppingBag, Truck, Check, Loader2 } from 'lucide-react';
 
 type SortKey = 'name' | 'category' | 'tags' | 'status' | 'available_in' | 'available_take_away' | 'available_delivery';
 type SortDir = 'asc' | 'desc';
@@ -24,8 +29,9 @@ interface ProductsTableProps {
   sortKey?: SortKey;
   sortDir?: SortDir;
   onSort?: (key: SortKey) => void;
-  onStatusChange?: (productId: string, status: boolean) => void;
-  productStatusMap?: Record<string, boolean>;
+  /** Changement de statut via la pastille cliquable de la colonne Statut. */
+  onStatusChange?: (productId: string, status: ProductStatus) => void;
+  /** Produit dont la mise à jour de statut est en cours (pastille désactivée + spinner). */
   updatingProductId?: string | null;
   expandedGroups?: Record<string, boolean>;
   onToggleGroup?: (productId: string) => void;
@@ -47,16 +53,22 @@ const SortIcon = ({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
     : <ArrowDown className="w-3.5 h-3.5 ml-1 text-primary" />;
 };
 
-const getProductStatus = (product: Product) => {
-  const statusMap: Record<string, { label: string; color: string }> = {
-    'available': { label: 'Disponible', color: 'bg-green-100 text-green-800' },
-    'out_of_stock': { label: 'Rupture de stock', color: 'bg-orange-100 text-orange-800' },
-    'not_available': { label: 'Indisponible', color: 'bg-red-100 text-red-800' },
-    'removed_from_menu': { label: 'Retiré du menu', color: 'bg-gray-100 text-gray-800' },
-  };
+// Les 4 statuts de vente canoniques (cf. ProductStatus) et leur rendu dans la
+// pastille + le menu déroulant qu'elle ouvre.
+const STATUS_CONFIG: Record<ProductStatus, { label: string; color: string; dot: string }> = {
+  available: { label: 'Disponible', color: 'bg-green-100 text-green-800', dot: 'bg-green-500' },
+  out_of_stock: { label: 'Rupture de stock', color: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500' },
+  not_available: { label: 'Indisponible', color: 'bg-red-100 text-red-800', dot: 'bg-red-500' },
+  removed_from_menu: { label: 'Retiré du menu', color: 'bg-gray-100 text-gray-800', dot: 'bg-gray-500' },
+};
+const STATUS_ORDER: ProductStatus[] = ['available', 'out_of_stock', 'not_available', 'removed_from_menu'];
 
-  const statusValue = product.status?.toString() || 'available';
-  return statusMap[statusValue] || { label: 'Disponible', color: 'bg-green-100 text-green-800' };
+// `product.status` porte encore des valeurs héritées en base ('1', '0', vide) :
+// tout ce qui n'est pas une des 4 valeurs canoniques retombe sur "available",
+// comme l'ancien affichage figé le faisait déjà.
+const getProductStatusValue = (product: Product): ProductStatus => {
+  const raw = product.status?.toString();
+  return (raw && (STATUS_ORDER as string[]).includes(raw)) ? (raw as ProductStatus) : 'available';
 };
 
 const getTagLabel = (tag: string | Tag, tags?: Tag[]) => {
@@ -93,7 +105,6 @@ export const ProductsTable = ({
   sortDir = 'asc',
   onSort,
   onStatusChange,
-  productStatusMap = {},
   updatingProductId = null,
   expandedGroups = {},
   onToggleGroup,
@@ -125,7 +136,9 @@ export const ProductsTable = ({
   const renderTableRows = (productList: Product[], isSubProduct = false): JSX.Element[] => {
 
     return productList.flatMap((product) => {
-      const status = getProductStatus(product);
+      const statusValue = getProductStatusValue(product);
+      const status = STATUS_CONFIG[statusValue];
+      const isUpdatingStatus = updatingProductId === product.product_id;
       const productTags = product.tags || [];
       const productAllergens = product.allergens || [];
       const categoryName = categories[product.category_id || ''] || product.category || '—';
@@ -290,17 +303,45 @@ export const ProductsTable = ({
             {product.available_delivery && <Check className="w-4 h-4 text-green-600 mx-auto" />}
           </TableCell>
 
-          {/* Statut */}
-          <TableCell
-            onClick={() => onProductClick(product)}
-            className="cursor-pointer"
-          >
-            <Badge
-              className={`text-xs ${status.color}`}
-              variant="outline"
-            >
-              {status.label}
-            </Badge>
+          {/* Statut — pastille cliquable ouvrant le choix des 4 statuts de
+              vente. onClick doit être stoppé ici : sans ça le clic remonte à
+              la ligne et ouvre la fiche produit en même temps que le menu. */}
+          <TableCell onClick={(e) => e.stopPropagation()}>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild disabled={!onStatusChange || isUpdatingStatus}>
+                <button
+                  type="button"
+                  disabled={!onStatusChange || isUpdatingStatus}
+                  className="inline-flex disabled:cursor-default"
+                >
+                  <Badge
+                    className={`text-xs gap-1.5 ${status.color} ${onStatusChange ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                    variant="outline"
+                  >
+                    {isUpdatingStatus && <Loader2 className="w-3 h-3 animate-spin" />}
+                    {status.label}
+                  </Badge>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-64">
+                {STATUS_ORDER.map((option) => (
+                  <DropdownMenuItem
+                    key={option}
+                    onClick={() => onStatusChange?.(product.product_id, option)}
+                    className="flex-col items-stretch gap-0.5 py-2"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${STATUS_CONFIG[option].dot}`} />
+                      <span className="flex-1">{STATUS_CONFIG[option].label}</span>
+                      {option === statusValue && <Check className="w-3.5 h-3.5 shrink-0" />}
+                    </span>
+                    <span className="pl-4 text-xs text-muted-foreground">
+                      {PRODUCT_STATUS_HINTS[option]}
+                    </span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </TableCell>
         </TableRow>
       );

@@ -25,8 +25,7 @@ import { ExternalMenusSheet } from '@/components/menu/ExternalMenusSheet';
 import { ProductImportDialog } from '@/components/menu/import/ProductImportDialog';
 import type { ImportDoor } from '@/hooks/useProductImport';
 import { CreateProductCategoryDialog } from '@/components/menu/CreateProductCategoryDialog';
-import { GroupDeleteMode, Product } from '@/types/menu';
-import { menuService } from '@/services/menuService';
+import { GroupDeleteMode, Product, ProductStatus } from '@/types/menu';
 import { toast } from 'sonner';
 
 /** Valeur sentinelle du filtre : ouvre la création au lieu de filtrer. */
@@ -121,8 +120,8 @@ export default function Menu() {
   const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
   const { isOpen: productCreateOpen, setIsOpen: setProductCreateOpen } = useProductCreateSheet();
   const { isOpen: organizeModalOpen, setIsOpen: setOrganizeModalOpen } = useOrganizeModal();
+  // Désactive la pastille + affiche un spinner pendant la mise à jour du statut.
   const [updatingProductId, setUpdatingProductId] = useState<string | null>(null);
-  const [productStatusMap, setProductStatusMap] = useState<Record<string, boolean>>({});
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
@@ -196,33 +195,18 @@ export default function Menu() {
     }
   };
 
-  const handleProductStatusChange = async (productId: string, status: boolean) => {
-    // Immédiatement mettre à jour le statut localement (optimistic update)
-    setProductStatusMap(prev => ({
-      ...prev,
-      [productId]: status
-    }));
-    
-    // Désactiver le switch pendant l'appel
+  // Pastille de statut du tableau : passe par l'endpoint groupé (bulk) avec un
+  // seul ID plutôt qu'un endpoint dédié — bulkSetProductsStatus gère déjà
+  // l'appel API et le patch optimiste de menuData.products (dont resync
+  // automatique de selectedProduct si la fiche de ce produit est ouverte).
+  const handleProductStatusChange = async (productId: string, status: ProductStatus) => {
     setUpdatingProductId(productId);
-    
     try {
-      await menuService.updateProductStatus(productId, status);
-      
-      // Aussi actualiser le produit sélectionné si c'est celui-ci
-      if (selectedProduct?.product_id === productId) {
-        setSelectedProduct(prev => prev ? { ...prev, available: status } : null);
-      }
-      toast.success(status ? 'Produit disponible' : 'Produit indisponible');
+      await bulkSetProductsStatus([productId], status);
+      toast.success('Statut mis à jour');
     } catch (error) {
-      // En cas d'erreur, revenir à l'état précédent
-      setProductStatusMap(prev => ({
-        ...prev,
-        [productId]: !status
-      }));
       toast.error('Erreur lors de la mise à jour du statut');
     } finally {
-      // Re-activer le switch
       setUpdatingProductId(null);
     }
   };
@@ -543,7 +527,6 @@ export default function Menu() {
             sortDir={sortDir}
             onSort={handleSort}
             onStatusChange={handleProductStatusChange}
-            productStatusMap={productStatusMap}
             updatingProductId={updatingProductId}
             expandedGroups={expandedGroups}
             onToggleGroup={handleToggleGroup}

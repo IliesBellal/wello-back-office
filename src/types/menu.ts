@@ -237,6 +237,18 @@ export type ProductStatus =
   | 'out_of_stock'
   | 'removed_from_menu';
 
+/**
+ * Repère court affiché sous chaque statut dans ses sélecteurs (pastille du
+ * tableau produits, fiche produit) — seule source pour ce texte, afin que les
+ * deux surfaces restent synchronisées.
+ */
+export const PRODUCT_STATUS_HINTS: Record<ProductStatus, string> = {
+  available: 'Disponible à la commande',
+  not_available: 'Masqué du menu, réactivable en caisse',
+  out_of_stock: 'Indisponible sur le menu',
+  removed_from_menu: 'Retiré de tous les supports',
+};
+
 export interface Product {
   product_id: string;
   category_id?: string;
