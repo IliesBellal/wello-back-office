@@ -1,16 +1,19 @@
-import { useRef } from 'react';
-import { Circle, Ellipse, Rect, Group, Text } from 'react-konva';
-import type { Location, LocationBooking, TableAttributes } from '@/services/locationsService';
+import { memo, useCallback, useMemo } from 'react';
+import { Circle, Ellipse, Group, Rect, Text } from 'react-konva';
+import type Konva from 'konva';
+import { tableCenter } from '@/lib/floorplan/geometry';
+import type { Location, TableAttributes } from '@/lib/floorplan/types';
 import { getChairPositions } from '@/utils/chairPositions';
-import { snapToGrid } from '@/hooks/useFloorPlan';
+import { OVERLAP_COLOR, SELECTION_COLOR, itemKey, setCursor, type ItemEvents } from './itemEvents';
 
 interface TableShapeProps {
   location: Location;
   isSelected: boolean;
-  booking?: LocationBooking | null;
-  onSelect: () => void;
-  onDragMove: (x: number, y: number) => void;
-  scaleRatio: number; // Pixels per canvas unit (1000x1000)
+  /** Chevauche une autre table : mise en évidence rouge. */
+  isOverlapping?: boolean;
+  /** Fantôme de pose : translucide, jamais interactif. */
+  ghost?: boolean;
+  events?: ItemEvents;
 }
 
 const STATUS_STYLES = {
@@ -19,8 +22,7 @@ const STATUS_STYLES = {
   occupied: { fill: '#FEF2F2', stroke: '#EF4444', strokeWidth: 2 }
 } as const;
 
-const SELECTED_STROKE = '#6366F1';
-const SELECTED_STROKE_WIDTH = 2.5;
+const OVERLAP_STYLE = { fill: '#FEE2E2', stroke: OVERLAP_COLOR, strokeWidth: 2 } as const;
 
 const ATTRIBUTE_BADGE_COLORS: Record<keyof TableAttributes, string> = {
   pmr: '#0EA5E9',
@@ -29,187 +31,131 @@ const ATTRIBUTE_BADGE_COLORS: Record<keyof TableAttributes, string> = {
   window: '#A855F7'
 };
 
+const CHAIR_RADIUS = 6;
+const BADGE_RADIUS = 2.5;
+const BADGE_GAP = 2;
+
 /**
- * Composant Konva pour afficher une table sur le canvas (rendu top-down)
- * Supporte les formes : circle, oval, square, rectangle
- * Gère la sélection et le drag & drop (drag seulement si sélectionné)
+ * Table vue de dessus, en unités virtuelles (le zoom est porté par la scène).
+ * Le groupe est placé au CENTRE de la table pour que la rotation pivote
+ * correctement ; `location.x/y` restent le coin haut-gauche. Le libellé est
+ * contre-tourné pour rester lisible quel que soit l'angle.
  */
-export function TableShape({
-  location,
-  isSelected,
-  booking = null,
-  onSelect,
-  onDragMove,
-  scaleRatio
-}: TableShapeProps) {
-  const groupRef = useRef<any>(null);
+function TableShapeBase({ location, isSelected, isOverlapping = false, ghost = false, events }: TableShapeProps) {
+  const { width, height, angle, shape, seats, location_id } = location;
+  const center = tableCenter(location);
+  const ref = useMemo(() => ({ kind: 'table' as const, id: location_id }), [location_id]);
+  const interactive = !ghost && !!events?.interactive;
+  const registerNode = events?.registerNode;
 
-  const widthPx = location.width * scaleRatio;
-  const heightPx = location.height * scaleRatio;
-  // The Group is positioned at the table's visual center so rotation pivots
-  // correctly, while location.x/y keep meaning the top-left corner in
-  // virtual canvas units (unchanged storage/clamp semantics).
-  const centerX = location.x * scaleRatio + widthPx / 2;
-  const centerY = location.y * scaleRatio + heightPx / 2;
+  const status = location.open_order_id != null ? 'occupied' : location.booking != null ? 'reserved' : 'available';
+  const style = isOverlapping ? OVERLAP_STYLE : STATUS_STYLES[status];
+  const stroke = isSelected ? SELECTION_COLOR : style.stroke;
+  const strokeWidth = isSelected ? 2.5 : style.strokeWidth;
 
-  const status = location.open_order_id != null ? 'occupied' : booking != null ? 'reserved' : 'available';
-  const statusStyle = STATUS_STYLES[status];
+  const chairs = useMemo(() => (seats > 0 ? getChairPositions(shape, width, height, seats) : []), [shape, width, height, seats]);
 
-  const tableFill = statusStyle.fill;
-  const tableStroke = isSelected ? SELECTED_STROKE : statusStyle.stroke;
-  const strokeWidth = isSelected ? SELECTED_STROKE_WIDTH : statusStyle.strokeWidth;
+  const badges = useMemo(
+    () =>
+      location.attributes
+        ? (Object.keys(ATTRIBUTE_BADGE_COLORS) as (keyof TableAttributes)[]).filter(key => location.attributes?.[key])
+        : [],
+    [location.attributes]
+  );
+  const badgePitch = BADGE_RADIUS * 2 + BADGE_GAP;
 
-  const chairRadius = Math.max(4, 6 * scaleRatio);
-  const chairSize = chairRadius * 2;
-  const chairCornerRadius = 2 * scaleRatio;
-  const chairPositions = location.seats
-    ? getChairPositions(location.shape, widthPx, heightPx, location.seats)
-    : [];
-
-  const activeAttributeKeys = location.attributes
-    ? (Object.keys(ATTRIBUTE_BADGE_COLORS) as (keyof TableAttributes)[]).filter(
-        key => location.attributes?.[key]
-      )
-    : [];
-  const BADGE_RADIUS = 2.5;
-  const BADGE_GAP = 2;
-  const BADGE_PITCH = BADGE_RADIUS * 2 + BADGE_GAP;
-  const badgeRightEdgeX = widthPx / 2 - BADGE_RADIUS;
-  const badgeY = -heightPx / 2 - BADGE_RADIUS - BADGE_GAP;
-
-  const handleDragMove = (e: any) => {
-    if (!isSelected) return;
-
-    const newX = (e.target.x() - widthPx / 2) / scaleRatio;
-    const newY = (e.target.y() - heightPx / 2) / scaleRatio;
-
-    onDragMove(newX, newY);
-  };
-
-  const handleDragBoundFunc = (pos: any) => {
-    if (!isSelected) return pos;
-
-    const rawX = (pos.x - widthPx / 2) / scaleRatio;
-    const rawY = (pos.y - heightPx / 2) / scaleRatio;
-
-    // Snap to grid then clamp to canvas boundaries.
-    const clampedX = Math.max(0, Math.min(snapToGrid(rawX), 1000 - location.width));
-    const clampedY = Math.max(0, Math.min(snapToGrid(rawY), 1000 - location.height));
-
-    return {
-      x: clampedX * scaleRatio + widthPx / 2,
-      y: clampedY * scaleRatio + heightPx / 2
-    };
-  };
-
-  const handleMouseEnter = () => {
-    if (groupRef.current?.getStage()) {
-      groupRef.current.getStage().container().style.cursor = isSelected ? 'grab' : 'pointer';
-    }
-  };
-
-  const handleMouseLeave = () => {
-    if (groupRef.current?.getStage()) {
-      groupRef.current.getStage().container().style.cursor = 'default';
-    }
-  };
-
-  const renderTableBody = () => {
-    if (location.shape === 'circle' || location.shape === 'oval') {
-      return (
-        <Ellipse
-          radiusX={widthPx / 2}
-          radiusY={heightPx / 2}
-          fill={tableFill}
-          stroke={tableStroke}
-          strokeWidth={strokeWidth}
-        />
-      );
-    }
-
-    // square | rectangle | default
-    return (
-      <Rect
-        x={-widthPx / 2}
-        y={-heightPx / 2}
-        width={widthPx}
-        height={heightPx}
-        cornerRadius={6}
-        fill={tableFill}
-        stroke={tableStroke}
-        strokeWidth={strokeWidth}
-      />
-    );
-  };
+  const setRef = useCallback(
+    (node: Konva.Group | null) => registerNode?.(itemKey(ref), node),
+    [registerNode, ref]
+  );
 
   return (
     <Group
-      ref={groupRef}
-      x={centerX}
-      y={centerY}
-      rotation={location.angle}
-      offsetX={0}
-      offsetY={0}
-      draggable={isSelected}
-      onDragMove={handleDragMove}
-      dragBoundFunc={handleDragBoundFunc}
-      onClick={onSelect}
-      onTap={onSelect}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      ref={setRef}
+      x={center.x}
+      y={center.y}
+      rotation={angle}
+      opacity={ghost ? 0.55 : 1}
+      listening={!ghost && interactive}
+      draggable={interactive}
+      onClick={e => events?.onItemClick(ref, e)}
+      onTap={e => events?.onItemClick(ref, e)}
+      onDragStart={e => events?.onItemDragStart(ref, e)}
+      onDragMove={e => events?.onItemDragMove(ref, e)}
+      onDragEnd={e => events?.onItemDragEnd(ref, e)}
+      onMouseEnter={e => interactive && setCursor(e, 'move')}
+      onMouseLeave={e => interactive && setCursor(e, '')}
     >
-      {/* Chairs drawn first so they sit behind the table body */}
-      {chairPositions.map((pos, i) => (
+      {/* Les chaises sont dessinées d'abord pour passer sous le plateau. */}
+      {chairs.map((pos, i) => (
         <Rect
           key={i}
-          x={pos.x - chairSize / 2}
-          y={pos.y - chairSize / 2}
-          width={chairSize}
-          height={chairSize}
-          cornerRadius={chairCornerRadius}
-          fill={tableFill}
-          stroke={tableStroke}
+          x={pos.x - CHAIR_RADIUS}
+          y={pos.y - CHAIR_RADIUS}
+          width={CHAIR_RADIUS * 2}
+          height={CHAIR_RADIUS * 2}
+          cornerRadius={2}
+          fill={style.fill}
+          stroke={stroke}
           strokeWidth={strokeWidth}
         />
       ))}
 
-      {renderTableBody()}
-
-      <Text
-        text={location.location_name}
-        fontSize={11 * scaleRatio}
-        fill="#1E293B"
-        fontStyle="bold"
-        align="center"
-        verticalAlign="middle"
-        width={widthPx}
-        height={heightPx / 2}
-        x={-widthPx / 2}
-        y={-heightPx / 2}
-      />
-
-      {location.seats > 0 && (
-        <Text
-          text={`${location.seats} cvts`}
-          fontSize={9 * scaleRatio}
-          fill="#64748B"
-          align="center"
-          width={widthPx}
-          x={-widthPx / 2}
-          y={2 * scaleRatio}
+      {shape === 'circle' || shape === 'oval' ? (
+        <Ellipse radiusX={width / 2} radiusY={height / 2} fill={style.fill} stroke={stroke} strokeWidth={strokeWidth} />
+      ) : (
+        <Rect
+          x={-width / 2}
+          y={-height / 2}
+          width={width}
+          height={height}
+          cornerRadius={6}
+          fill={style.fill}
+          stroke={stroke}
+          strokeWidth={strokeWidth}
         />
       )}
 
-      {activeAttributeKeys.length > 0 &&
-        activeAttributeKeys.map((key, i) => (
-          <Circle
-            key={key}
-            x={badgeRightEdgeX - (activeAttributeKeys.length - 1 - i) * BADGE_PITCH}
-            y={badgeY}
-            radius={BADGE_RADIUS}
-            fill={ATTRIBUTE_BADGE_COLORS[key]}
+      {/* Libellé contre-tourné : toujours à l'endroit. */}
+      <Group rotation={-angle} listening={false}>
+        <Text
+          text={location.location_name}
+          fontSize={11}
+          fontStyle="bold"
+          fill="#1E293B"
+          align="center"
+          wrap="none"
+          ellipsis
+          width={Math.max(width, 40)}
+          x={-Math.max(width, 40) / 2}
+          y={-12}
+        />
+        {seats > 0 && (
+          <Text
+            text={`${seats} cvts`}
+            fontSize={9}
+            fill="#64748B"
+            align="center"
+            wrap="none"
+            width={Math.max(width, 40)}
+            x={-Math.max(width, 40) / 2}
+            y={2}
           />
-        ))}
+        )}
+      </Group>
+
+      {badges.map((key, i) => (
+        <Circle
+          key={key}
+          x={width / 2 - BADGE_RADIUS - (badges.length - 1 - i) * badgePitch}
+          y={-height / 2 - BADGE_RADIUS - BADGE_GAP}
+          radius={BADGE_RADIUS}
+          fill={ATTRIBUTE_BADGE_COLORS[key]}
+          listening={false}
+        />
+      ))}
     </Group>
   );
 }
+
+export const TableShape = memo(TableShapeBase);
