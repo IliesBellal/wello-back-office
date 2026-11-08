@@ -415,24 +415,6 @@ export const EstablishmentTab = () => {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Nombre de couverts */}
-                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Nombre de couverts obligatoire
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Ouvre automatiquement la saisie du nombre de couverts à la création d'une commande sur place,
-                      pré-remplie avec les places des tables sélectionnées
-                    </p>
-                  </div>
-                  <Switch
-                    checked={!!formData.ordering.covers_count_required}
-                    onCheckedChange={(checked) => handleFieldChange('ordering', 'covers_count_required', checked)}
-                  />
-                </div>
-
                 {/* Encaissement sur mobile */}
                 <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                   <div className="flex-1">
@@ -448,24 +430,6 @@ export const EstablishmentTab = () => {
                   <Switch
                     checked={formData.ordering.mobile_payment_enabled !== false}
                     onCheckedChange={(checked) => handleFieldChange('ordering', 'mobile_payment_enabled', checked)}
-                  />
-                </div>
-
-                {/* Alerte commande sans paiement */}
-                <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
-                  <div className="flex-1">
-                    <p className="font-medium text-foreground flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" />
-                      Alerte commande sans paiement
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      Demande une confirmation sur le POS avant de créer une commande pour laquelle aucun paiement n'a
-                      été saisi
-                    </p>
-                  </div>
-                  <Switch
-                    checked={formData.ordering.unpaid_order_warning !== false}
-                    onCheckedChange={(checked) => handleFieldChange('ordering', 'unpaid_order_warning', checked)}
                   />
                 </div>
               </div>
@@ -507,7 +471,7 @@ export const EstablishmentTab = () => {
                 <Utensils className="h-5 w-5" />
                 Formulaire client
               </CardTitle>
-              <CardDescription>Définissez les informations client requises pour chaque mode de commande</CardDescription>
+              <CardDescription>Définissez ce qui est demandé lors de la prise de commande, pour chaque mode de commande</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -540,6 +504,47 @@ export const EstablishmentTab = () => {
                         </tr>
                       );
                     })}
+                    {/* Mêmes réglages et même disposition que le popup « Formulaire client » du POS. */}
+                    <tr className="border-t">
+                      <td className="py-3 pr-4">
+                        <p className="font-medium text-foreground flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Nombre de couverts
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          Demande le nombre de couverts à la création d'une commande sur place, après le choix de la
+                          table, pré-rempli avec ses places
+                        </p>
+                      </td>
+                      <td className="text-center py-3 px-2">
+                        <Switch
+                          checked={!!formData.ordering.covers_count_required}
+                          onCheckedChange={(checked) => handleFieldChange('ordering', 'covers_count_required', checked)}
+                        />
+                      </td>
+                      {/* Le nombre de couverts n'existe qu'en sur place. */}
+                      <td className="text-center py-3 px-2 text-muted-foreground">—</td>
+                      <td className="text-center py-3 px-2 text-muted-foreground">—</td>
+                    </tr>
+                    <tr className="border-t">
+                      <td className="py-3 pr-4">
+                        <p className="font-medium text-foreground flex items-center gap-2">
+                          <CreditCard className="h-4 w-4" />
+                          Alerte commande sans paiement
+                        </p>
+                        <p className="text-muted-foreground mt-1">
+                          Demande une confirmation sur le POS avant de créer une commande pour laquelle aucun paiement
+                          n'a été saisi
+                        </p>
+                      </td>
+                      {/* Un seul réglage pour tous les modes de commande. */}
+                      <td colSpan={CUSTOMER_FORM_MODES.length} className="text-center py-3 px-2">
+                        <Switch
+                          checked={formData.ordering.unpaid_order_warning !== false}
+                          onCheckedChange={(checked) => handleFieldChange('ordering', 'unpaid_order_warning', checked)}
+                        />
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
