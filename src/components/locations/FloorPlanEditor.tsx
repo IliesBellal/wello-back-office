@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Redo2, RotateCcw, Save, Undo2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, PanelLeftClose, PanelLeftOpen, Redo2, RotateCcw, Save, Undo2 } from 'lucide-react';
 import { AreaPropertiesPanel } from './AreaPropertiesPanel';
 import { FloorPlanCanvas, type FloorPlanCanvasHandle } from './FloorPlanCanvas';
 import { FloorSelector } from './FloorSelector';
@@ -19,6 +19,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { useFloorPlan } from '@/hooks/useFloorPlan';
 import { useFloorPlanShortcuts } from '@/hooks/useFloorPlanShortcuts';
 import { alignChanges, alignableEntries, distributeChanges, type AlignMode, type DistributeAxis } from '@/lib/floorplan/align';
@@ -39,6 +40,9 @@ export function FloorPlanEditor() {
   const canvasRef = useRef<FloorPlanCanvasHandle>(null);
   const [tool, setTool] = useState<Tool>(SELECT_TOOL);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const isMobile = useIsMobile();
+  // Sur mobile, le panneau de gauche est un tiroir qu'on affiche / masque pour dégager le plan.
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { clearSelection, select, update, addTables, addObstacle, addObstacles, addArea } = plan;
 
@@ -47,6 +51,8 @@ export function FloorPlanEditor() {
   const changeTool = useCallback(
     (next: Tool) => {
       setTool(next);
+      // Un outil armé : on libère le plan pour pouvoir poser (mobile).
+      if (next.kind !== 'select') setDrawerOpen(false);
       // Un outil de pose ne travaille pas sur une sélection : on la libère.
       if (next.kind !== 'select') clearSelection();
     },
@@ -65,6 +71,10 @@ export function FloorPlanEditor() {
   }, [plan.state.present]);
 
   const info = plan.selectionInfo;
+  const hasSelection = info.kind !== 'none';
+  useEffect(() => {
+    if (isMobile && hasSelection) setDrawerOpen(true);
+  }, [isMobile, hasSelection, plan.selection]);
   const canEdit = plan.activeFloorId !== null;
   const showPanel = tool.kind === 'select';
   const overlappingHere = plan.floorLocations.filter(l => plan.overlapping.has(l.location_id)).length;
@@ -153,9 +163,23 @@ export function FloorPlanEditor() {
 
         </header>
 
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          {/* Colonne de gauche : étages, outils, liste des tables */}
-          <aside className="max-h-[42vh] w-full shrink-0 space-y-5 overflow-y-auto border-b border-border bg-sidebar p-4 md:max-h-none md:w-80 md:border-b-0 md:border-r">
+        <div className="relative flex min-h-0 flex-1 md:flex-row">
+          {/* Colonne de gauche : étages, outils de pose, puis propriétés de la sélection.
+              Sur mobile : tiroir par-dessus le plan, à afficher / masquer. */}
+          <aside
+            id="floor-plan-sidebar"
+            aria-label="Panneau du plan de salle"
+            className={`absolute inset-y-0 left-0 z-30 flex w-80 max-w-[85vw] flex-col gap-5 overflow-y-auto border-r border-border bg-sidebar p-4 shadow-xl transition-transform duration-200 md:static md:z-auto md:max-w-none md:shrink-0 md:translate-x-0 md:shadow-none ${
+              drawerOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
+          >
+            <div className="flex items-center justify-between md:hidden">
+              <span className="text-sm font-semibold text-foreground">Plan de salle</span>
+              <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={() => setDrawerOpen(false)} aria-label="Masquer le panneau">
+                <PanelLeftClose className="h-4 w-4" />
+              </Button>
+            </div>
+
             <FloorSelector
               floors={plan.floors}
               selectedFloorId={plan.activeFloorId}
@@ -167,49 +191,85 @@ export function FloorPlanEditor() {
             />
 
             <div className="border-t border-border pt-5">
-              <ToolBar
-                tool={tool}
-                disabled={!canEdit}
-                onToolChange={changeTool}
-                onAddSeries={(count, seats) => addTables({ shape: 'square', seats }, count)}
-              />
+              <ToolBar tool={tool} disabled={!canEdit} onToolChange={changeTool} />
             </div>
 
+            {/* Propriétés de la sélection : occupe la place restante du panneau. */}
             <div className="border-t border-border pt-5">
-              <h3 className="mb-3 text-sm font-semibold text-foreground">Tables ({plan.floorLocations.length})</h3>
-              <div className="max-h-72 space-y-1.5 overflow-y-auto">
-                {plan.floorLocations.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Aucune table sur cet étage</p>
-                ) : (
-                  plan.floorLocations.map(location => {
-                    const selected = plan.selection.some(r => r.kind === 'table' && r.id === location.location_id);
-                    const flagged = plan.overlapping.has(location.location_id) || plan.duplicateNames.has(location.location_id);
-                    return (
-                      <button
-                        key={location.location_id}
-                        type="button"
-                        onClick={e =>
-                          select([{ kind: 'table', id: location.location_id }], e.shiftKey || e.ctrlKey || e.metaKey ? 'toggle' : 'replace')
-                        }
-                        className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm transition-colors ${
-                          selected ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground hover:bg-muted/80'
-                        }`}
-                      >
-                        <span>
-                          <span className="block font-medium">{location.location_name || '(sans nom)'}</span>
-                          <span className="block text-xs opacity-75">{plural(location.seats, 'place', 'places')}</span>
-                        </span>
-                        {flagged && <AlertTriangle className="h-4 w-4 shrink-0 text-amber-500" aria-label="À vérifier" />}
-                      </button>
-                    );
-                  })
-                )}
-              </div>
+              {showPanel && info.kind === 'table' && (
+                <TablePropertiesPanel
+                  key={info.item.location_id}
+                  location={info.item}
+                  floors={plan.floors}
+                  isDuplicateName={plan.duplicateNames.has(info.item.location_id)}
+                  isOverlapping={plan.overlapping.has(info.item.location_id)}
+                  onUpdate={(patch, key) => update([{ ref: { kind: 'table', id: info.item.location_id }, patch }], key)}
+                  onDuplicate={plan.duplicateSelection}
+                  onDelete={plan.deleteSelection}
+                  onClose={clearSelection}
+                />
+              )}
+
+              {showPanel && info.kind === 'obstacle' && (
+                <ObstaclePropertiesPanel
+                  key={info.item.id}
+                  obstacle={info.item}
+                  onUpdate={(patch, key) => update([{ ref: { kind: 'obstacle', id: info.item.id }, patch }], key)}
+                  onDuplicate={plan.duplicateSelection}
+                  onDelete={plan.deleteSelection}
+                  onClose={clearSelection}
+                />
+              )}
+
+              {showPanel && info.kind === 'area' && (
+                <AreaPropertiesPanel
+                  key={info.item.id}
+                  area={info.item}
+                  onUpdate={(patch, key) => update([{ ref: { kind: 'area', id: info.item.id }, patch }], key)}
+                  onDelete={plan.deleteSelection}
+                  onClose={clearSelection}
+                />
+              )}
+
+              {showPanel && info.kind === 'multiple' && (
+                <MultiSelectionPanel
+                  count={info.count}
+                  tables={info.tables}
+                  obstacles={info.obstacles}
+                  areas={info.areas}
+                  floors={plan.floors}
+                  activeFloorId={plan.activeFloorId}
+                  onAlign={alignSelection}
+                  onDistribute={distributeSelection}
+                  onMoveToFloor={moveSelectedTablesToFloor}
+                  onDuplicate={plan.duplicateSelection}
+                  onDelete={plan.deleteSelection}
+                  onClose={clearSelection}
+                />
+              )}
+
+              {(!showPanel || info.kind === 'none') && (
+                <p className="text-xs text-muted-foreground">Sélectionnez une table ou un obstacle sur le plan pour modifier ses propriétés.</p>
+              )}
             </div>
           </aside>
 
           {/* Plan */}
           <main className="relative min-h-[420px] min-w-0 flex-1">
+            {isMobile && !drawerOpen && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="absolute left-3 top-3 z-20 gap-2 bg-card shadow-md"
+                onClick={() => setDrawerOpen(true)}
+                aria-expanded={drawerOpen}
+                aria-controls="floor-plan-sidebar"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+                Panneau
+              </Button>
+            )}
             <FloorPlanCanvas
               ref={canvasRef}
               floorId={plan.activeFloorId}
@@ -284,58 +344,6 @@ export function FloorPlanEditor() {
                   </Button>
                 </div>
               </div>
-            )}
-
-            {showPanel && info.kind === 'table' && (
-              <TablePropertiesPanel
-                key={info.item.location_id}
-                location={info.item}
-                floors={plan.floors}
-                isDuplicateName={plan.duplicateNames.has(info.item.location_id)}
-                isOverlapping={plan.overlapping.has(info.item.location_id)}
-                onUpdate={(patch, key) => update([{ ref: { kind: 'table', id: info.item.location_id }, patch }], key)}
-                onDuplicate={plan.duplicateSelection}
-                onDelete={plan.deleteSelection}
-                onClose={clearSelection}
-              />
-            )}
-
-            {showPanel && info.kind === 'obstacle' && (
-              <ObstaclePropertiesPanel
-                key={info.item.id}
-                obstacle={info.item}
-                onUpdate={(patch, key) => update([{ ref: { kind: 'obstacle', id: info.item.id }, patch }], key)}
-                onDuplicate={plan.duplicateSelection}
-                onDelete={plan.deleteSelection}
-                onClose={clearSelection}
-              />
-            )}
-
-            {showPanel && info.kind === 'area' && (
-              <AreaPropertiesPanel
-                key={info.item.id}
-                area={info.item}
-                onUpdate={(patch, key) => update([{ ref: { kind: 'area', id: info.item.id }, patch }], key)}
-                onDelete={plan.deleteSelection}
-                onClose={clearSelection}
-              />
-            )}
-
-            {showPanel && info.kind === 'multiple' && (
-              <MultiSelectionPanel
-                count={info.count}
-                tables={info.tables}
-                obstacles={info.obstacles}
-                areas={info.areas}
-                floors={plan.floors}
-                activeFloorId={plan.activeFloorId}
-                onAlign={alignSelection}
-                onDistribute={distributeSelection}
-                onMoveToFloor={moveSelectedTablesToFloor}
-                onDuplicate={plan.duplicateSelection}
-                onDelete={plan.deleteSelection}
-                onClose={clearSelection}
-              />
             )}
           </main>
         </div>

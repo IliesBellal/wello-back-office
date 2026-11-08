@@ -1,7 +1,7 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Layer, Rect, Shape, Stage, Transformer } from 'react-konva';
 import type Konva from 'konva';
-import { Maximize2, Minus, Plus } from 'lucide-react';
+import { Maximize2, Minus, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CANVAS_SIZE, GRID_SIZE, type Rect as Box } from '@/utils/floorPlanLayout';
 import {
@@ -870,9 +870,16 @@ export const FloorPlanCanvas = forwardRef<FloorPlanCanvasHandle, FloorPlanCanvas
       )}
 
       {hint && (
-        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-full border border-border bg-card/95 px-4 py-1.5 text-xs font-medium text-foreground shadow-md">
-          {hint}
-        </div>
+        <button
+          type="button"
+          onClick={() => props.onToolChange(SELECT_TOOL)}
+          title="Annuler la pose (Échap)"
+          aria-label={`${hint} — cliquer pour annuler la pose`}
+          className="absolute left-1/2 top-3 z-10 flex max-w-[calc(100%-1.5rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-card px-5 py-2.5 text-left text-base font-medium text-foreground shadow-lg transition-colors hover:bg-muted"
+        >
+          <span>{hint}</span>
+          <X className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+        </button>
       )}
 
       <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-lg border border-border bg-card/95 p-1 shadow-md">
