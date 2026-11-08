@@ -2,7 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { loadGooglePlacesLibrary } from "@/lib/googlePlacesLoader";
-import type { ZonePreview } from "@/lib/deliveryZones";
+import { Button } from "@/components/ui/button";
+import type { LatLng, ZonePreview } from "@/lib/deliveryZones";
 
 // Couleurs des secteurs (cycliques). Les plages s'éclaircissent vers l'extérieur.
 const SECTOR_COLORS = ["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0891b2", "#db2777", "#ca8a04", "#4f46e5"];
@@ -65,9 +66,15 @@ const ORIGIN_STYLE: Partial<CSSStyleDeclaration> = {
 
 interface DeliveryZoneMapProps {
   preview: ZonePreview;
+  /** Mode « Sélectionner sur la carte » : le prochain clic renvoie sa position. */
+  onPick?: (position: LatLng) => void;
+  onCancelPick?: () => void;
 }
 
-export const DeliveryZoneMap = ({ preview }: DeliveryZoneMapProps) => {
+const COORD_DECIMALS = 6;
+const round = (value: number) => Number(value.toFixed(COORD_DECIMALS));
+
+export const DeliveryZoneMap = ({ preview, onPick, onCancelPick }: DeliveryZoneMapProps) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
   const libraryRef = useRef<{ maps: MapsLibrary; Label: ReturnType<typeof createLabelClass> } | null>(null);
@@ -137,6 +144,20 @@ export const DeliveryZoneMap = ({ preview }: DeliveryZoneMapProps) => {
     map.fitBounds(bounds, 16);
   }, [preview, status]);
 
+  useEffect(() => {
+    const map = mapRef.current;
+    if (status !== "ready" || !map || !onPick) return;
+    map.setOptions({ draggableCursor: "crosshair" });
+    const listener = map.addListener("click", (event: google.maps.MapMouseEvent) => {
+      if (!event.latLng) return;
+      onPick({ lat: round(event.latLng.lat()), lng: round(event.latLng.lng()) });
+    });
+    return () => {
+      listener.remove();
+      map.setOptions({ draggableCursor: null });
+    };
+  }, [onPick, status]);
+
   useEffect(
     () => () => {
       overlaysRef.current.forEach((overlay) => overlay.setMap(null));
@@ -147,6 +168,16 @@ export const DeliveryZoneMap = ({ preview }: DeliveryZoneMapProps) => {
   return (
     <div className="relative h-[380px] w-full overflow-hidden rounded-md border bg-muted">
       <div ref={containerRef} className="h-full w-full" />
+      {onPick && status === "ready" && (
+        <div className="absolute inset-x-2 top-2 flex items-center justify-between gap-2 rounded-md bg-background/95 px-3 py-2 text-sm shadow">
+          <span>Cliquez sur la carte pour placer le point d'origine.</span>
+          {onCancelPick && (
+            <Button type="button" variant="ghost" size="sm" className="h-7" onClick={onCancelPick}>
+              Annuler
+            </Button>
+          )}
+        </div>
+      )}
       {status === "loading" && (
         <div className="absolute inset-0 flex items-center justify-center">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

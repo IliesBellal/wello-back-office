@@ -80,15 +80,21 @@ export const EstablishmentTab = () => {
     }
   }, [settings]);
 
+  // Mise à jour fonctionnelle : plusieurs appels enchaînés dans le même
+  // événement (ex. latitude puis longitude d'origine) se cumulent au lieu que
+  // le dernier écrase les précédents.
   const handleFieldChange = (group: keyof EstablishmentSettings, key: string, value: unknown) => {
-    if (!formData) return;
-    setFormData({
-      ...formData,
-      [group]: {
-        ...formData[group],
-        [key]: value
-      }
-    });
+    setFormData((prev) =>
+      prev
+        ? {
+            ...prev,
+            [group]: {
+              ...prev[group],
+              [key]: value,
+            },
+          }
+        : prev,
+    );
   };
 
   const handleCustomerFormChange = (fieldKey: string, modeKey: 'dine_in' | 'take_away' | 'delivery', value: boolean) => {

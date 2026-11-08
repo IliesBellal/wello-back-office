@@ -30,10 +30,14 @@ Détails :
   trié. Une borne max ≥ 100 km vaut « sans limite » (le défaut en base est
   `5-999`) : la plage est dessinée tronquée (rayon `max(1,5 × min, min + 2)`)
   et affichée « au-delà de X km ». Bornes : min incluse, max exclue.
-- **Cardinal** : seuls 4, 8 et 16 secteurs ont des noms (N/E/S/O,
-  N/NE/…/NO, N/NNE/…/NNO, en français : O = ouest). Le champ est passé d'un
-  nombre libre (2–16) à une liste 4 / 8 / 16 ; une valeur non standard déjà en
-  base reste affichée dans la liste et ses secteurs retombent sur des lettres.
+- **Cardinal** : seuls 4 et 8 secteurs sont proposés (N/E/S/O, N/NE/…/NO, en
+  français : O = ouest). 16 a été retiré le 2026-11-08 (48 zones avec 3 plages,
+  noms NNE/ESE peu lisibles en livraison) ; ses noms restent connus pour qu'une
+  valeur 16 déjà en base s'affiche correctement. Toute autre valeur non standard
+  reste affichée dans la liste et ses secteurs retombent sur des lettres.
+- **Origine** : seule la grille a un point d'origine. Radial et Cardinal
+  restent centrés sur l'établissement, car leurs plages sont des distances au
+  restaurant (décision du 2026-11-08).
 - **Grille** : centrée sur le point d'origine, qui vaut par défaut les
   coordonnées de l'établissement quand `grid_origin_lat/lng` sont vides (choix
   d'Ilies). La grille est bornée pour que les lettres existent : elle couvre au
@@ -69,9 +73,59 @@ Sans adresse géolocalisée (et, en grille, sans origine saisie), l'aperçu
 affiche « Renseignez l'adresse de l'établissement… ». Si Google Maps ne charge
 pas, un message neutre remplace la carte.
 
+Mise en page : deux colonnes à partir de `lg` (paramètres à gauche, aperçu
+collant à droite), empilées en dessous.
+
+### Origine de la grille (2026-11-08)
+
+- « Utiliser l'adresse de l'établissement » ne renseignait que la longitude :
+  les deux `onChange` successifs partaient du même `formData` (fermeture) et le
+  second écrasait le premier. `EstablishmentTab.handleFieldChange` passe en mise
+  à jour fonctionnelle (`setFormData(prev => …)`), ce qui corrige aussi tout
+  autre appel enchaîné du formulaire.
+- « Sélectionner sur la carte » : bascule la carte en mode pointage (curseur en
+  croix, bandeau « Cliquez sur la carte… » + Annuler) ; le clic renseigne
+  latitude et longitude (6 décimales) et quitte le mode. Désactivé tant que la
+  carte n'est pas affichable.
+- Limite API connue : `PATCH /pos/settings` ignore un `grid_origin_lat/lng`
+  nul (pointeur `nil` = champ absent). Vider l'origine pour revenir à
+  l'établissement n'est donc pas enregistré ; l'ancienne origine revient au
+  rechargement.
+
+## Données héritées et affichage (constat du 2026-11-08)
+
+- `customer.customer_zone_code` (varchar(4)) existe, est lu par l'API
+  (`orders_fetcher_builder.go`) et renvoyé avec les commandes, mais **plus aucun
+  code ne l'écrit** ; ni le POS ni le back-office ne l'affichent. Sur staging,
+  10 clients sur 26 226 en ont un, tous chez des marchands en CARDINAL à
+  4 secteurs : N1, N3, S2, W1, W2, W3.
+- Ces codes ont été recalculés contre les positions : l'ancien moteur
+  (vraisemblablement l'API PHP) utilisait des secteurs **centrés**, les lettres
+  anglaises **N/E/S/W**, des plages numérotées à partir de 1, et un cap calculé
+  sur les écarts bruts en degrés (sans correction `cos(latitude)`, ce qui élargit
+  les secteurs E/W). 9 codes sur 10 tombent juste ; le 10ᵉ (N1 à 51 km) a une
+  adresse modifiée depuis. La convention actuelle reprend le principe mais avec
+  O (ouest) et une géométrie exacte.
+- La fiche client du back-office (`CustomerDetailsSheet.tsx`) affiche en dur
+  « Distance: ~2.5km » et « Zone de Livraison A » pour tout client géolocalisé :
+  valeurs factices.
+- Coordonnées à 0 : sur staging, 3 665 clients ont `customer_lat = 0` au lieu
+  de NULL (Uber Eats 2 285, import EXPORT_226 662, Deliveroo 473, Wello Resto
+  245). Côté code, Deliveroo enregistre `0,0` pour les commandes sans adresse
+  (à emporter, livrées par Deliveroo) — `deliveroo_orders/customer.go`. Un futur
+  moteur doit traiter `0,0` comme « pas de position ».
+
+## Moteur côté API (2026-11-08)
+
+L'API calcule et enregistre désormais la zone du client à chaque commande en
+livraison (`customer.customer_zone_code`), avec un portage Go de
+`zoneLabelForPoint` (`ib-welloresto-api/internal/modules/deliveryzone`, mêmes
+cas de test) ; le POS l'affiche dans la production à droite de l'adresse.
+Ouest = **O** (décision du 2026-11-08). Détails :
+`ib-welloresto-api/docs/zones-livraison.md`. Toute évolution de la convention
+se fait dans les deux implémentations.
+
 ## Reste à faire
 
 - Recette visuelle dans le back-office (non faite : pas lancée en local).
-- Moteur d'attribution d'une zone à une commande (API ou POS) : à construire
-  sur `zoneLabelForPoint`, si la fonctionnalité doit servir au-delà de
-  l'aperçu.
+- Fiche client : remplacer l'encart factice par la vraie zone.

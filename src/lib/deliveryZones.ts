@@ -1,10 +1,11 @@
 /**
  * Découpe des zones de livraison (Paramètres > Établissement > Livraison).
  *
- * Ce module est la RÉFÉRENCE de la convention de nommage des zones : aucun
- * autre composant (API, POS, ScanNOrder) ne calcule aujourd'hui de libellé de
- * zone. Un futur moteur qui attribue une zone à une adresse doit reproduire
- * exactement `zoneLabelForPoint`. Voir docs/zones-livraison-apercu.md.
+ * Ce module est la RÉFÉRENCE de la convention de nommage des zones. L'API en a
+ * un portage Go (ib-welloresto-api/internal/modules/deliveryzone) qui attribue
+ * la zone du client à chaque commande en livraison : `zoneLabelForPoint` et sa
+ * version Go doivent rester identiques (mêmes cas de test des deux côtés).
+ * Voir docs/zones-livraison-apercu.md.
  *
  * Convention :
  * - RADIAL : secteurs égaux A, B, C… dans le sens horaire, le secteur A
@@ -84,7 +85,12 @@ export const CARDINAL_NAMES: Record<number, string[]> = {
   16: ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'],
 };
 
-export const CARDINAL_SECTOR_COUNTS = [4, 8, 16];
+/**
+ * Choix proposés. 16 secteurs n'est plus proposé (48 zones avec 3 plages, noms
+ * NNE/ESE peu lisibles en livraison) ; ses noms restent dans CARDINAL_NAMES pour
+ * qu'une valeur 16 déjà enregistrée s'affiche correctement.
+ */
+export const CARDINAL_SECTOR_COUNTS = [4, 8];
 
 export const letter = (index: number): string => String.fromCharCode(65 + index);
 

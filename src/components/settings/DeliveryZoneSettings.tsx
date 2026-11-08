@@ -1,11 +1,11 @@
-import { useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Trash2, LocateFixed } from "lucide-react";
+import { Plus, Trash2, LocateFixed, MousePointerClick } from "lucide-react";
 import { DeliveryZoningType, EstablishmentDeliveryZone } from "@/types/settings";
-import { CARDINAL_NAMES, CARDINAL_SECTOR_COUNTS, ZonePreview, buildZonePreview, isOpenEnded } from "@/lib/deliveryZones";
+import { CARDINAL_NAMES, CARDINAL_SECTOR_COUNTS, LatLng, ZonePreview, buildZonePreview, isOpenEnded } from "@/lib/deliveryZones";
 import { DeliveryZoneMap } from "./DeliveryZoneMap";
 
 interface DeliveryZoneSettingsProps {
@@ -148,11 +148,24 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
     ? CARDINAL_SECTOR_COUNTS
     : [...CARDINAL_SECTOR_COUNTS, values.cardinal_cone_count].sort((a, b) => a - b);
 
+  const [pickingOrigin, setPickingOrigin] = useState(false);
+  const isPickingOrigin = pickingOrigin && values.zoning_type === "GRID" && preview != null;
+
   const handleUseEstablishmentCoords = () => {
     if (establishmentCoords?.lat == null || establishmentCoords?.lng == null) return;
     onChange("grid_origin_lat", establishmentCoords.lat);
     onChange("grid_origin_lng", establishmentCoords.lng);
   };
+
+  const handlePickOrigin = useCallback(
+    (position: LatLng) => {
+      onChange("grid_origin_lat", position.lat);
+      onChange("grid_origin_lng", position.lng);
+      setPickingOrigin(false);
+    },
+    [onChange],
+  );
+  const handleCancelPick = useCallback(() => setPickingOrigin(false), []);
 
   // Paramètres à gauche, aperçu à droite (empilés sous lg).
   return (
@@ -268,16 +281,28 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
                 />
               </div>
             </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={establishmentCoords?.lat == null || establishmentCoords?.lng == null}
-              onClick={handleUseEstablishmentCoords}
-            >
-              <LocateFixed className="h-4 w-4 mr-2" />
-              Utiliser l'adresse de l'établissement
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={establishmentCoords?.lat == null || establishmentCoords?.lng == null}
+                onClick={handleUseEstablishmentCoords}
+              >
+                <LocateFixed className="h-4 w-4 mr-2" />
+                Utiliser l'adresse de l'établissement
+              </Button>
+              <Button
+                type="button"
+                variant={isPickingOrigin ? "secondary" : "outline"}
+                size="sm"
+                disabled={preview == null}
+                onClick={() => setPickingOrigin((current) => !current)}
+              >
+                <MousePointerClick className="h-4 w-4 mr-2" />
+                Sélectionner sur la carte
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
               Sans point d'origine, la grille est centrée sur l'adresse de l'établissement.
             </p>
@@ -290,7 +315,11 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
           <Label>Aperçu de la découpe</Label>
           {preview ? (
             <>
-              <DeliveryZoneMap preview={preview} />
+              <DeliveryZoneMap
+                preview={preview}
+                onPick={isPickingOrigin ? handlePickOrigin : undefined}
+                onCancelPick={handleCancelPick}
+              />
               <ZonePreviewLegend preview={preview} />
             </>
           ) : (
