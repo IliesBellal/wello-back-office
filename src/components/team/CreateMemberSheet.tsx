@@ -22,11 +22,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, Link2, AlertCircle, UserPlus } from "lucide-react";
+import { Link2, AlertCircle, UserPlus } from "lucide-react";
 
 import { usersApi, planningPositionsApi, planningRefsApi, rolesApi } from "@/services/welloApi";
 import { qk } from "@/lib/queryKeys";
-import type { LinkableUser, CreateUserRequest } from "@/types/adminUsers";
+import type { CreateUserRequest } from "@/types/adminUsers";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -363,30 +363,28 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-// ─── Link form (linkable-search → merchant-link) ──────────────────────────────
+// ─── Link form (link-by-email) ────────────────────────────────────────────────
+//
+// Volontairement anonyme : on ne cherche pas dans les comptes existants et on ne
+// montre jamais si l'adresse en a un. L'API répond pareil dans tous les cas ; le
+// titulaire du compte est prévenu par e-mail.
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function LinkForm({ onSuccess }: { onSuccess: () => void }) {
   const queryClient = useQueryClient();
-  const [search, setSearch] = useState("");
-  const [debounced, setDebounced] = useState("");
-  const [linking, setLinking] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
+  const [sending, setSending] = useState(false);
 
-  // Debounce search input
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(search.trim()), 250);
-    return () => clearTimeout(t);
-  }, [search]);
+  const trimmed = email.trim();
+  const valid = EMAIL_PATTERN.test(trimmed);
 
-  const { data: results = [], isFetching } = useQuery({
-    queryKey: qk.users.linkableSearch(debounced),
-    queryFn: () => usersApi.linkableSearch(debounced),
-    enabled: debounced.length >= 2,
-  });
-
-  const handleLink = async (user: LinkableUser) => {
-    setLinking(user.user_id);
+  const handleLink = async () => {
+    if (!valid) return;
+    setSending(true);
     try {
-      await usersApi.merchantLink(user.user_id, {
+      await usersApi.linkByEmail({
+        email: trimmed,
         rights: {
           admin: false,
           login_enabled: true,
@@ -405,72 +403,49 @@ function LinkForm({ onSuccess }: { onSuccess: () => void }) {
           },
         },
       });
-      toast.success(`${user.first_name} ${user.last_name} a été lié à l'établissement`);
+      toast.success(
+        "Si un compte existe avec cette adresse, il sera lié à l'établissement et son titulaire en sera informé par e-mail.",
+      );
       queryClient.invalidateQueries({ queryKey: qk.users.all });
       onSuccess();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Erreur lors du liage");
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la liaison");
     } finally {
-      setLinking(null);
+      setSending(false);
     }
   };
 
   return (
-    <div className="space-y-4 py-2">
+    <form
+      className="space-y-4 py-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void handleLink();
+      }}
+    >
       <div className="space-y-1.5">
-        <Label htmlFor="link-search" className="text-sm">
-          Rechercher un utilisateur existant
+        <Label htmlFor="link-email" className="text-sm">
+          Adresse e-mail du compte à lier
         </Label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="link-search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Email, nom ou téléphone…"
-            className="pl-9"
-          />
-        </div>
+        <Input
+          id="link-email"
+          type="email"
+          autoComplete="off"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="prenom.nom@exemple.fr"
+        />
         <p className="text-xs text-muted-foreground">
-          Au moins 2 caractères. L'utilisateur sera ajouté à cet établissement avec des droits
-          minimaux ; ajustez-les ensuite depuis l'onglet « Droits ».
+          Si un compte existe avec cette adresse, il sera lié à cet établissement avec des droits
+          minimaux et son titulaire en sera informé par e-mail. Ajustez ensuite ses droits depuis
+          l'onglet « Droits ».
         </p>
       </div>
 
-      {debounced.length < 2 ? (
-        <p className="text-sm text-muted-foreground text-center py-6">
-          Tapez pour rechercher.
-        </p>
-      ) : isFetching ? (
-        <p className="text-sm text-muted-foreground text-center py-6">Recherche…</p>
-      ) : results.length === 0 ? (
-        <p className="text-sm text-muted-foreground text-center py-6">
-          Aucun utilisateur trouvé.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {results.map((u) => (
-            <Card key={u.user_id}>
-              <CardContent className="p-3 flex items-center gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {u.first_name} {u.last_name}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">{u.email}</p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => handleLink(u)}
-                  disabled={linking === u.user_id}
-                >
-                  {linking === u.user_id ? "Liaison…" : "Lier"}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
-    </div>
+      <Button type="submit" disabled={!valid || sending} className="w-full">
+        <Link2 className="h-4 w-4 mr-2" />
+        {sending ? "Liaison…" : "Lier le compte"}
+      </Button>
+    </form>
   );
 }

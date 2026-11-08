@@ -26,6 +26,7 @@ import type {
   MerchantUserRightsUpsertRequest,
   MerchantUserPlanning,
   MerchantUserPlanningUpsertRequest,
+  LinkByEmailRequest,
   MerchantLinkRequest,
 } from "@/types/adminUsers";
 import type {
@@ -524,6 +525,13 @@ function merchantLink(id: string, payload: MerchantLinkRequest = {}): MerchantUs
   return newMember.detail;
 }
 
+/** Comme l'API : même issue (succès silencieux) que le compte existe ou non. */
+function linkByEmail(payload: LinkByEmailRequest): void {
+  const email = payload.email.trim().toLowerCase();
+  const linkable = linkableUsers.find((u) => u.email.toLowerCase() === email);
+  if (linkable) merchantLink(linkable.user_id, { rights: payload.rights });
+}
+
 function deleteMerchantLink(id: string): MerchantUserUnlinkResult {
   const idx = members.findIndex((m) => m.detail.user_id === id);
   if (idx < 0) notFound(`Mock: user ${id} introuvable`);
@@ -732,6 +740,7 @@ export const teamMocks = {
   createUser,
   linkableSearch,
   merchantLink,
+  linkByEmail,
   deleteMerchantLink,
   forceResetPassword,
   // planning refs

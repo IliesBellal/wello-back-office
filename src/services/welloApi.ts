@@ -24,6 +24,7 @@ import type {
   CreateUserResponse,
   MerchantUserRightsUpsertRequest,
   MerchantUserPlanningUpsertRequest,
+  LinkByEmailRequest,
   MerchantLinkRequest,
   ForceResetPasswordRequest,
   MerchantUserListFilters,
@@ -205,6 +206,23 @@ export const usersApi = {
         return apiClient
           .post<WelloApiResponse<ApiEnvelopeData>>(path, payload)
           .then((resp) => unwrap<{ user: MerchantUserDetail } & Record<string, unknown>>(resp).user);
+      },
+      { method: "POST", endpoint: path, payload, forceMock: TEAM_FORCE_MOCK },
+    );
+  },
+
+  /**
+   * POST /users/link-by-email – link the account with this e-mail to the merchant, if
+   * it exists, and notify its holder by e-mail. The API answers 202 whether or not
+   * the account exists: never show anything that depends on it.
+   */
+  linkByEmail(payload: LinkByEmailRequest): Promise<void> {
+    const path = `/users/link-by-email`;
+    return withMock(
+      () => teamMocks.linkByEmail(payload),
+      () => {
+        logAPI("POST", path, payload);
+        return apiClient.post<WelloApiResponse<ApiEnvelopeData>>(path, payload).then(() => undefined);
       },
       { method: "POST", endpoint: path, payload, forceMock: TEAM_FORCE_MOCK },
     );

@@ -199,6 +199,12 @@ export interface MerchantLinkRequest {
   planning?: MerchantUserPlanningUpsertRequest;
 }
 
+/** Body of `POST /users/link-by-email`. */
+export interface LinkByEmailRequest {
+  email: string;
+  rights?: MerchantUserRightsUpsertRequest;
+}
+
 /** Body of `POST /users/{id}/force-reset-password`. */
 export interface ForceResetPasswordRequest {
   new_password: string;
