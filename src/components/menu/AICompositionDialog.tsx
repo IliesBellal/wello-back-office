@@ -13,7 +13,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { SelectableChip } from '@/components/ui/selectable-chip';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import {
@@ -226,7 +225,11 @@ export const AICompositionDialog = ({ open, onOpenChange, products, onApplied }:
               </p>
             </div>
 
-            <ScrollArea className="-mx-6 flex-1 px-6">
+            {/* div native et non ScrollArea (Radix) : son viewport est en h-full,
+                un pourcentage qui ne se résout pas sous un simple max-h (celui du
+                dialogue) — la liste n'était alors jamais scrollable. min-h-0 laisse
+                la zone rétrécir dans la colonne flex au lieu de déborder. */}
+            <div className="-mx-6 min-h-0 flex-1 overflow-y-auto px-6">
               <ul className="space-y-3 py-1">
                 {preview.products.map((product) => (
                   <ProductRow
@@ -239,7 +242,7 @@ export const AICompositionDialog = ({ open, onOpenChange, products, onApplied }:
                   />
                 ))}
               </ul>
-            </ScrollArea>
+            </div>
           </>
         )}
 
