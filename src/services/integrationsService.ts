@@ -37,6 +37,9 @@ export interface IntegrationKPIs {
 export interface IntegrationStatus {
   platform: 'uber_eats' | 'deliveroo' | 'scannorder';
   active: boolean;
+  /** Compte affiché : restaurant Uber Eats (store_id) ou site Deliveroo (location_id). */
+  store_id?: string;
+  location_id?: string;
   closed_until?: string | null;
   commission_rate: number;
   auto_accept_orders: boolean;

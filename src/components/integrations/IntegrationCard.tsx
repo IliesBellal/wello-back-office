@@ -30,6 +30,10 @@ interface IntegrationCardProps {
   onSync: () => Promise<void>;
   tutorial: React.ReactNode;
   enablePreparationTime?: boolean;
+  /** Remplace l'écran « non active » (ex. parcours de connexion de la plateforme). */
+  inactiveContent?: React.ReactNode;
+  /** Texte de la confirmation de déconnexion, propre à la plateforme. */
+  disableDescription?: string;
 }
 
 export const IntegrationCard = ({
@@ -41,6 +45,8 @@ export const IntegrationCard = ({
   onSync,
   tutorial,
   enablePreparationTime = false,
+  inactiveContent,
+  disableDescription,
 }: IntegrationCardProps) => {
   const [editMode, setEditMode] = useState(false);
   const [commissionRate, setCommissionRate] = useState(status?.commission_rate || 0);
@@ -119,6 +125,7 @@ export const IntegrationCard = ({
   }
 
   if (!status.active) {
+    if (inactiveContent) return <>{inactiveContent}</>;
     return (
       <div className="space-y-6">
         <Card className="border-yellow-200 bg-yellow-50 dark:border-yellow-900 dark:bg-yellow-950">
@@ -414,7 +421,7 @@ export const IntegrationCard = ({
         open={showDisableDialog}
         onOpenChange={setShowDisableDialog}
         title={`Désactiver l'intégration ${name}`}
-        description={`Êtes-vous sûr de vouloir désactiver ${name} ? Les commandes ne seront plus reçues de cette plateforme.`}
+        description={disableDescription ?? `Êtes-vous sûr de vouloir désactiver ${name} ? Les commandes ne seront plus reçues de cette plateforme.`}
         onConfirm={handleDisable}
         isLoading={disabling}
         isDangerous={true}
