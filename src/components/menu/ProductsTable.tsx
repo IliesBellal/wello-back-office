@@ -1,4 +1,5 @@
 import { Product, ProductStatus, PRODUCT_STATUS_HINTS, Tag, Allergen } from '@/types/menu';
+import { PRODUCT_STATUS_LABELS, PRODUCT_STATUS_ORDER as STATUS_ORDER, getProductStatusValue } from './productFilters';
 import {
   Table,
   TableBody,
@@ -56,19 +57,10 @@ const SortIcon = ({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 // Les 4 statuts de vente canoniques (cf. ProductStatus) et leur rendu dans la
 // pastille + le menu déroulant qu'elle ouvre.
 const STATUS_CONFIG: Record<ProductStatus, { label: string; color: string; dot: string }> = {
-  available: { label: 'Disponible', color: 'bg-green-100 text-green-800', dot: 'bg-green-500' },
-  out_of_stock: { label: 'Rupture de stock', color: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500' },
-  not_available: { label: 'Indisponible', color: 'bg-red-100 text-red-800', dot: 'bg-red-500' },
-  removed_from_menu: { label: 'Retiré du menu', color: 'bg-gray-100 text-gray-800', dot: 'bg-gray-500' },
-};
-const STATUS_ORDER: ProductStatus[] = ['available', 'out_of_stock', 'not_available', 'removed_from_menu'];
-
-// `product.status` porte encore des valeurs héritées en base ('1', '0', vide) :
-// tout ce qui n'est pas une des 4 valeurs canoniques retombe sur "available",
-// comme l'ancien affichage figé le faisait déjà.
-const getProductStatusValue = (product: Product): ProductStatus => {
-  const raw = product.status?.toString();
-  return (raw && (STATUS_ORDER as string[]).includes(raw)) ? (raw as ProductStatus) : 'available';
+  available: { label: PRODUCT_STATUS_LABELS.available, color: 'bg-green-100 text-green-800', dot: 'bg-green-500' },
+  out_of_stock: { label: PRODUCT_STATUS_LABELS.out_of_stock, color: 'bg-orange-100 text-orange-800', dot: 'bg-orange-500' },
+  not_available: { label: PRODUCT_STATUS_LABELS.not_available, color: 'bg-red-100 text-red-800', dot: 'bg-red-500' },
+  removed_from_menu: { label: PRODUCT_STATUS_LABELS.removed_from_menu, color: 'bg-gray-100 text-gray-800', dot: 'bg-gray-500' },
 };
 
 const getTagLabel = (tag: string | Tag, tags?: Tag[]) => {

@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { BulkAssignProductsDialog } from '@/components/shared/BulkAssignProductsDialog';
 import { menuService } from '@/services/menuService';
+import { CategoryColorPicker } from '@/components/menu/CategoryColorPicker';
 import {
   DndContext,
   closestCenter,
@@ -45,6 +46,7 @@ interface SortableCategoryRowProps {
   onBulkAssign: (category: Category) => void;
   onImageUpload: (categoryId: string) => void;
   onImageDelete: (categoryId: string) => void;
+  onColorChange: (categoryId: string, hex: string) => Promise<void>;
   isImageUploading: boolean;
   canDeleteImage: boolean;
 }
@@ -57,6 +59,7 @@ const SortableCategoryRow = ({
   onBulkAssign,
   onImageUpload,
   onImageDelete,
+  onColorChange,
   isImageUploading,
   canDeleteImage,
 }: SortableCategoryRowProps) => {
@@ -83,6 +86,13 @@ const SortableCategoryRow = ({
         </div>
       </TableCell>
       <TableCell className="font-medium">{category.category_name || category.category}</TableCell>
+      <TableCell>
+        <CategoryColorPicker
+          value={category.bg_color}
+          categoryName={category.category_name || category.category}
+          onChange={(hex) => onColorChange(category.category_id, hex)}
+        />
+      </TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           <div className="h-12 w-12 rounded-md border border-border bg-muted/30 overflow-hidden flex items-center justify-center">
@@ -162,6 +172,7 @@ export default function CategoriesTable() {
     loading,
     createProductCategory,
     updateCategory,
+    updateCategoryColor,
     deleteCategory,
     uploadCategoryImage,
     deleteCategoryImage,
@@ -322,6 +333,19 @@ export default function CategoriesTable() {
     }
   };
 
+  const handleColorChange = async (categoryId: string, hex: string) => {
+    try {
+      await updateCategoryColor(categoryId, hex);
+    } catch (error) {
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour la couleur de la catégorie',
+        variant: 'destructive',
+      });
+      throw error; // le sélecteur revient à la couleur enregistrée
+    }
+  };
+
   const handleImageUploadClick = (categoryId: string) => {
     fileInputRefs.current[categoryId]?.click();
   };
@@ -462,6 +486,7 @@ export default function CategoriesTable() {
                 <TableRow>
                   <TableHead className="w-10"></TableHead>
                   <TableHead>Nom</TableHead>
+                  <TableHead className="w-40">Couleur</TableHead>
                   <TableHead className="w-64">Image</TableHead>
                   <TableHead className="w-20">Ordre</TableHead>
                   <TableHead className="w-32 text-center">Produits</TableHead>
@@ -471,7 +496,7 @@ export default function CategoriesTable() {
               <TableBody>
                 {categories.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                       Aucune catégorie. Créez-en une pour commencer.
                     </TableCell>
                   </TableRow>
@@ -500,6 +525,7 @@ export default function CategoriesTable() {
                                 autoFocus
                               />
                             </TableCell>
+                            <TableCell></TableCell>
                             <TableCell></TableCell>
                             <TableCell>
                               <Input
@@ -542,6 +568,7 @@ export default function CategoriesTable() {
                             onBulkAssign={handleBulkAssign}
                             onImageUpload={handleImageUploadClick}
                             onImageDelete={handleImageDelete}
+                            onColorChange={handleColorChange}
                             isImageUploading={imageUploadingCategoryId === category.category_id}
                             canDeleteImage={Boolean(category.image_url)}
                           />

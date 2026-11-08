@@ -1036,6 +1036,16 @@ export const menuService = {
     );
   },
 
+  /** Couleur de fond de la catégorie caisse (#RRGGBB), reprise par le POS. */
+  async updateCategoryColor(categoryId: string, bgColor: string): Promise<void> {
+    const payload = { bg_color: bgColor };
+    logAPI('PATCH', `/menu/products/categories/${categoryId}`, payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/products/categories/${categoryId}`, payload)
+    );
+  },
+
   async updateMarketingCategory(categoryId: string, name: string): Promise<void> {
     logAPI('PATCH', `/menu/marketing-categories/${categoryId}`, { name });
     return withMock(

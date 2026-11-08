@@ -112,6 +112,21 @@ export const useCategoryData = () => {
     }
   };
 
+  const updateCategoryColor = async (categoryId: string, bgColor: string) => {
+    try {
+      await menuService.updateCategoryColor(categoryId, bgColor);
+      setMenuData(prev => ({
+        ...prev,
+        products_types: prev.products_types.map(c =>
+          c.category_id === categoryId ? { ...c, bg_color: bgColor } : c
+        )
+      }));
+    } catch (error) {
+      console.error('Error updating category color:', error);
+      throw error;
+    }
+  };
+
   const deleteCategory = async (categoryId: string) => {
     try {
       await menuService.deleteCategory(categoryId);
@@ -166,6 +181,7 @@ export const useCategoryData = () => {
     loading,
     createProductCategory,
     updateCategory,
+    updateCategoryColor,
     deleteCategory,
     uploadCategoryImage,
     deleteCategoryImage,

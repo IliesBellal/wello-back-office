@@ -19,6 +19,15 @@ const sortSubProducts = (subProducts: SubProduct[]): SubProduct[] =>
     );
   });
 
+// La liste des produits porte la publication Uber Eats / Deliveroo dans
+// sync_ubereats / sync_deliveroo (cf. type Product), que lisent les filtres de
+// la page Produits. Les patchs locaux ne touchant que `integrations`, on y
+// reporte aussi ces drapeaux pour qu'ils ne restent pas périmés.
+const syncFlagsFromIntegrations = (integrations: Product['integrations']): Partial<Product> => ({
+  ...(integrations?.uber_eats?.enabled !== undefined && { sync_ubereats: integrations.uber_eats.enabled }),
+  ...(integrations?.deliveroo?.enabled !== undefined && { sync_deliveroo: integrations.deliveroo.enabled }),
+});
+
 export const useMenuData = () => {
   const [menuData, setMenuData] = useState<MenuData>({ products_types: [], products: [] });
   const [units, setUnits] = useState<UnitOfMeasure[]>([]);
@@ -153,7 +162,7 @@ export const useMenuData = () => {
   // qui alimentent les lignes dépliées du tableau et la fiche groupe.
   const updateProduct = async (productId: string, data: Partial<Product>) => {
     await menuService.updateProduct(productId, data);
-    patchProducts([productId], p => ({ ...p, ...data }));
+    patchProducts([productId], p => ({ ...p, ...data, ...syncFlagsFromIntegrations(data.integrations) }));
   };
 
   // Errors (e.g. duplicate name) are intentionally left to propagate: the caller
@@ -654,6 +663,8 @@ export const useMenuData = () => {
       if (fields.available_delivery !== undefined) next.available_delivery = fields.available_delivery;
       if (fields.is_available_on_sno !== undefined) next.is_available_on_sno = fields.is_available_on_sno;
       if (fields.is_available_on_kiosk !== undefined) next.is_available_on_kiosk = fields.is_available_on_kiosk;
+      if (fields.sync_uber_eats !== undefined) next.sync_ubereats = fields.sync_uber_eats;
+      if (fields.sync_deliveroo !== undefined) next.sync_deliveroo = fields.sync_deliveroo;
       if (fields.sync_uber_eats !== undefined || fields.sync_deliveroo !== undefined) {
         next.integrations = {
           ...p.integrations,

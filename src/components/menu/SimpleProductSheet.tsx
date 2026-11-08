@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
+import { ProductGeneralReadOnly } from './ProductGeneralReadOnly';
 import { CategorySelector } from '@/components/shared/CategorySelector';
 import { MultiSelectDropdown } from '@/components/shared/MultiSelectDropdown';
 import { menuService } from '@/services/menuService';
@@ -182,36 +183,25 @@ const TvaRateSelect = ({
 // Case « Alcool » (products.contains_alcohol) : article soumis à contrôle
 // d'âge, publié vers Deliveroo / Uber Eats. Saisie uniquement ici, onglet
 // Général de la fiche produit ; elle part avec le reste du formulaire au clic
-// sur « Enregistrer » / « Créer le produit ». Ne change pas la TVA.
+// sur « Enregistrer » / « Créer le produit ». Ne change pas la TVA. La
+// consultation de cette valeur est dans ProductGeneralReadOnly.
 const AlcoholField = ({
-  editing,
   checked,
   onChange,
   compact = false,
 }: {
-  editing: boolean;
   checked: boolean;
   onChange: (checked: boolean) => void;
   compact?: boolean;
-}) => {
-  if (!editing) {
-    return (
-      <div>
-        <Label className="text-xs font-semibold text-muted-foreground uppercase">Alcool</Label>
-        <p className="mt-1 text-sm text-foreground">{checked ? 'Oui, contrôle d’âge' : 'Non'}</p>
-      </div>
-    );
-  }
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
-      <div>
-        <Label htmlFor="product-contains-alcohol" className={compact ? 'text-xs' : undefined}>Contient de l'alcool</Label>
-        <p className="text-xs text-muted-foreground">Contrôle d'âge à la livraison (Deliveroo, Uber Eats).</p>
-      </div>
-      <Switch id="product-contains-alcohol" checked={checked} onCheckedChange={onChange} />
+}) => (
+  <div className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+    <div>
+      <Label htmlFor="product-contains-alcohol" className={compact ? 'text-xs' : undefined}>Contient de l'alcool</Label>
+      <p className="text-xs text-muted-foreground">Contrôle d'âge à la livraison (Deliveroo, Uber Eats).</p>
     </div>
-  );
-};
+    <Switch id="product-contains-alcohol" checked={checked} onCheckedChange={onChange} />
+  </div>
+);
 
 export const SimpleProductSheet = ({
   productId,
@@ -797,6 +787,11 @@ export const SimpleProductSheet = ({
   // dédiée depuis qu'ils ne vivent plus dans un onglet séparé.
   const selectedTagIds = (formData.tags || []).filter((t): t is string => typeof t === 'string');
   const selectedAllergenIds = (formData.allergens || []).filter((a): a is string => typeof a === 'string');
+  // Nom de la catégorie affiché dans l'onglet Général en consultation.
+  const viewCategoryName = product
+    ? categories.find((c) => c.category_id === (product.category_id || product.category))?.category_name
+      || product.category_name
+    : undefined;
   const handleTagsChange = (tagIds: string[]) => setFormData(prev => ({ ...prev, tags: tagIds }));
   const handleAllergensChange = (allergenIds: string[]) =>
     setFormData(prev => ({ ...prev, allergens: allergenIds }));
@@ -1048,61 +1043,13 @@ export const SimpleProductSheet = ({
 
                 <TabsContent value="general" className="space-y-3 mt-0">
                   {!isEditMode ? (
-                    <>
-                      {/* Mobile Product Image - Thumbnail size */}
-                      <div className="w-full h-40 rounded-lg bg-white border border-border overflow-hidden flex items-center justify-center">
-                        {product.image_url ? (
-                          <img 
-                            src={product.image_url} 
-                            alt={product.name} 
-                            className="w-full h-full object-cover"
-                          />
-                        ) : product.bg_color ? (
-                          <div 
-                            className="w-full h-full" 
-                            style={{ backgroundColor: product.bg_color }}
-                          />
-                        ) : (
-                          <div className="text-muted-foreground">
-                            <ImageIcon className="w-8 h-8 mx-auto mb-1 opacity-50" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Description */}
-                      <div className="space-y-2">
-                        <Label className="text-xs font-semibold text-muted-foreground uppercase">Description</Label>
-                        <p className="text-sm text-foreground leading-relaxed">
-                          {product.description || '—'}
-                        </p>
-                      </div>
-
-                      <AlcoholField editing={false} checked={Boolean(product.contains_alcohol)} onChange={() => {}} />
-
-                      {/* Colors stacked vertically */}
-                      <div className="space-y-3">
-                        <div>
-                          <Label className="text-xs font-semibold text-muted-foreground uppercase">Couleur fond</Label>
-                          <div className="mt-2 flex items-center gap-2">
-                            <div 
-                              className="w-8 h-8 rounded border border-border"
-                              style={{ backgroundColor: product.bg_color || '#ffffff' }}
-                            />
-                            <span className="text-xs text-foreground font-mono">{product.bg_color || '—'}</span>
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-xs font-semibold text-muted-foreground uppercase">Couleur production</Label>
-                          <div className="mt-2 flex items-center gap-2">
-                            <div 
-                              className="w-8 h-8 rounded border border-border"
-                              style={{ backgroundColor: product.production_color || '#ffffff' }}
-                            />
-                            <span className="text-xs text-foreground font-mono">{product.production_color || '—'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </>
+                    <ProductGeneralReadOnly
+                      product={product}
+                      categoryName={viewCategoryName}
+                      tags={tagsData}
+                      allergens={allergensData}
+                      layout="dialog"
+                    />
                   ) : (
                     <>
                       {/* Edit Mode - Mobile optimized */}
@@ -1204,7 +1151,6 @@ export const SimpleProductSheet = ({
                       </div>
 
                       <AlcoholField
-                        editing
                         compact
                         checked={Boolean(formData.contains_alcohol)}
                         onChange={(checked) => setFormData({ ...formData, contains_alcohol: checked })}
@@ -1839,71 +1785,13 @@ export const SimpleProductSheet = ({
 
             <TabsContent value="general" className="space-y-5 mt-0">
               {!isEditMode ? (
-                <>
-                  {/* Product Image & Basic Info */}
-                  <Card className="border-none bg-muted/50">
-                    <CardContent className="pt-6">
-                      <div className="flex gap-5">
-                        {/* Image */}
-                        <div className="flex-shrink-0">
-                          <div className="w-40 h-40 rounded-lg bg-white border border-border overflow-hidden flex items-center justify-center">
-                            {product.image_url ? (
-                              <img 
-                                src={product.image_url} 
-                                alt={product.name} 
-                                className="w-full h-full object-cover"
-                              />
-                            ) : product.bg_color ? (
-                              <div 
-                                className="w-full h-full" 
-                                style={{ backgroundColor: product.bg_color }}
-                              />
-                            ) : (
-                              <div className="text-muted-foreground">
-                                <ImageIcon className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        
-                        {/* Info */}
-                        <div className="flex-1 space-y-4">
-                          <div>
-                            <Label className="text-xs font-semibold text-muted-foreground uppercase">Description</Label>
-                            <p className="mt-1 text-sm text-foreground leading-relaxed">
-                              {product.description || '—'}
-                            </p>
-                          </div>
-
-                          <AlcoholField editing={false} checked={Boolean(product.contains_alcohol)} onChange={() => {}} />
-                          
-                          <div className="grid grid-cols-2 gap-3 pt-2">
-                            <div>
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase">Couleur fond</Label>
-                              <div className="mt-2 flex items-center gap-2">
-                                <div 
-                                  className="w-6 h-6 rounded border border-border"
-                                  style={{ backgroundColor: product.bg_color || '#ffffff' }}
-                                />
-                                <span className="text-xs text-foreground font-mono">{product.bg_color || '—'}</span>
-                              </div>
-                            </div>
-                            <div>
-                              <Label className="text-xs font-semibold text-muted-foreground uppercase">Couleur production</Label>
-                              <div className="mt-2 flex items-center gap-2">
-                                <div 
-                                  className="w-6 h-6 rounded border border-border"
-                                  style={{ backgroundColor: product.production_color || '#ffffff' }}
-                                />
-                                <span className="text-xs text-foreground font-mono">{product.production_color || '—'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
+                <ProductGeneralReadOnly
+                  product={product}
+                  categoryName={viewCategoryName}
+                  tags={tagsData}
+                  allergens={allergensData}
+                  layout="sheet"
+                />
               ) : (
                 <>
                   {/* Edit Mode - General Tab */}
@@ -2013,7 +1901,6 @@ export const SimpleProductSheet = ({
                         </div>
                         <div className="col-span-2">
                           <AlcoholField
-                            editing
                             checked={Boolean(formData.contains_alcohol)}
                             onChange={(checked) => setFormData({ ...formData, contains_alcohol: checked })}
                           />

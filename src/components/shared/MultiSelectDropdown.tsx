@@ -18,12 +18,19 @@ interface MultiSelectDropdownProps {
   placeholder?: string;
   className?: string;
   triggerClassName?: string;
+  /**
+   * Nom du champ rappelé dans le bouton dès qu'une valeur est cochée
+   * (« Statut : Disponible »). Utile dans une barre de filtres, où rien d'autre
+   * n'indique à quoi se rapporte la sélection.
+   */
+  triggerPrefix?: string;
 }
 
 const getTriggerLabel = (
   options: MultiSelectDropdownOption[],
   selectedIds: string[],
-  placeholder: string
+  placeholder: string,
+  prefix?: string
 ): string => {
   if (selectedIds.length === 0) {
     return placeholder;
@@ -33,11 +40,10 @@ const getTriggerLabel = (
     .filter((option) => selectedIds.includes(option.id))
     .map((option) => option.label);
 
-  if (selectedLabels.length <= 2) {
-    return selectedLabels.join(', ');
-  }
+  const summary =
+    selectedLabels.length <= 2 ? selectedLabels.join(', ') : `${selectedLabels.length} sélectionnés`;
 
-  return `${selectedLabels.length} sélectionnés`;
+  return prefix ? `${prefix} : ${summary}` : summary;
 };
 
 export const MultiSelectDropdown = ({
@@ -48,12 +54,13 @@ export const MultiSelectDropdown = ({
   placeholder = 'Tout sélectionner',
   className,
   triggerClassName,
+  triggerPrefix,
 }: MultiSelectDropdownProps) => {
   const [open, setOpen] = useState(false);
 
   const selectedLabel = useMemo(
-    () => getTriggerLabel(options, selectedIds, placeholder),
-    [options, placeholder, selectedIds]
+    () => getTriggerLabel(options, selectedIds, placeholder, triggerPrefix),
+    [options, placeholder, selectedIds, triggerPrefix]
   );
 
   const handleToggle = (id: string) => {

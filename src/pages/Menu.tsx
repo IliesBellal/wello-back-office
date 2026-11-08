@@ -6,15 +6,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, Plus, ChevronDown, CopyPlus, Upload, Camera, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon, PencilRuler, FolderPlus, Boxes } from 'lucide-react';
+import { MoreVertical, Plus, ChevronDown, CopyPlus, Upload, Camera, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon, PencilRuler, FolderPlus, Boxes, X } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
 import { useProductCreateSheet } from '@/contexts/ProductCreateSheetContext';
 import { useOrganizeModal } from '@/contexts/OrganizeModalContext';
 import { MultiFilter } from '@/components/shared/MultiFilter';
+import { MultiSelectDropdown } from '@/components/shared/MultiSelectDropdown';
+import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 import { ProductsTable } from '@/components/menu/ProductsTable';
 import { BulkEditDialog } from '@/components/menu/BulkEditDialog';
 import { AICompositionDialog } from '@/components/menu/AICompositionDialog';
 import { countProductRows } from '@/components/menu/productRows';
+import {
+  AVAILABILITY_OPTIONS,
+  CHANNEL_OPTIONS,
+  EMPTY_PRODUCT_FILTERS,
+  PRODUCT_STATUS_LABELS,
+  PRODUCT_STATUS_ORDER,
+  filterProductsByAttributes,
+  hasActiveProductFilters,
+  type AvailabilityFilter,
+  type ChannelFilter,
+  type ProductFilters,
+} from '@/components/menu/productFilters';
 import { SimpleProductSheet } from '@/components/menu/SimpleProductSheet';
 import { GroupProductSheet } from '@/components/menu/GroupProductSheet';
 import { OrganizeModal } from '@/components/menu/OrganizeModal';
@@ -134,6 +148,8 @@ export default function Menu() {
   // Filtres et tri
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [productFilters, setProductFilters] = useState<ProductFilters>(EMPTY_PRODUCT_FILTERS);
+  const { statuses: integrationStatuses } = useIntegrationStatus();
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
@@ -261,6 +277,35 @@ export default function Menu() {
     return ids;
   }, [menuData]);
 
+  // Options des filtres. Les canaux suivent la fiche produit : ScanNOrder est
+  // toujours proposé, les autres seulement si l'intégration est active.
+  const tagFilterOptions = useMemo(
+    () => tags.map(tag => ({ id: tag.id, label: tag.name })),
+    [tags]
+  );
+  const channelFilterOptions = useMemo(
+    () =>
+      CHANNEL_OPTIONS.filter(option => {
+        switch (option.id) {
+          case 'kiosk': return integrationStatuses.kiosks.active;
+          case 'uber_eats': return integrationStatuses.uberEats.active;
+          case 'deliveroo': return integrationStatuses.deliveroo.active;
+          default: return true;
+        }
+      }),
+    [integrationStatuses]
+  );
+  const statusFilterOptions = useMemo(
+    () => PRODUCT_STATUS_ORDER.map(status => ({ id: status, label: PRODUCT_STATUS_LABELS[status] })),
+    []
+  );
+  const hasActiveFilters = categoryFilter !== 'all' || hasActiveProductFilters(productFilters);
+
+  const handleResetFilters = () => {
+    setCategoryFilter('all');
+    setProductFilters(EMPTY_PRODUCT_FILTERS);
+  };
+
   // Get all products and apply filters/sorting
   const filteredProducts = useMemo(() => {
     if (!menuData) return [];
@@ -289,6 +334,9 @@ export default function Menu() {
       result = result.filter(p => p.category_id === categoryFilter);
     }
 
+    // Filtres tags / disponibilités / canaux / statuts
+    result = filterProductsByAttributes(result, productFilters);
+
     // Tri
     return [...result].sort((a, b) => {
       const va = getProductValue(a, sortKey, categoryMap);
@@ -302,7 +350,7 @@ export default function Menu() {
       const nb = vb as number;
       return sortDir === 'asc' ? na - nb : nb - na;
     });
-  }, [menuData, search, categoryFilter, sortKey, sortDir, categoryMap, nestedSubProductIds]);
+  }, [menuData, search, categoryFilter, productFilters, sortKey, sortDir, categoryMap, nestedSubProductIds]);
 
   // Un groupe déplié ajoute une ligne par sous-produit : le compteur doit
   // refléter les lignes affichées, pas seulement les produits filtrés.
@@ -451,7 +499,7 @@ export default function Menu() {
         {/* Filters */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-            <div className="flex flex-col sm:flex-row gap-3 flex-1">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 flex-1">
               {/* Recherche */}
               <div className="relative w-full sm:max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -495,6 +543,53 @@ export default function Menu() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Filtres multi-sélection : plusieurs valeurs cochables dans chacun */}
+              {tagFilterOptions.length > 0 && (
+                <MultiSelectDropdown
+                  className="w-full sm:w-52 space-y-0"
+                  options={tagFilterOptions}
+                  selectedIds={productFilters.tagIds}
+                  onChange={tagIds => setProductFilters(prev => ({ ...prev, tagIds }))}
+                  label="Tags"
+                  placeholder="Tous les tags"
+                  triggerPrefix="Tags"
+                />
+              )}
+              <MultiSelectDropdown
+                className="w-full sm:w-52 space-y-0"
+                options={AVAILABILITY_OPTIONS}
+                selectedIds={productFilters.availability}
+                onChange={ids => setProductFilters(prev => ({ ...prev, availability: ids as AvailabilityFilter[] }))}
+                label="Disponibilités"
+                placeholder="Toutes disponibilités"
+                triggerPrefix="Dispo"
+              />
+              <MultiSelectDropdown
+                className="w-full sm:w-52 space-y-0"
+                options={channelFilterOptions}
+                selectedIds={productFilters.channels}
+                onChange={ids => setProductFilters(prev => ({ ...prev, channels: ids as ChannelFilter[] }))}
+                label="Canaux de vente"
+                placeholder="Tous les canaux"
+                triggerPrefix="Canaux"
+              />
+              <MultiSelectDropdown
+                className="w-full sm:w-52 space-y-0"
+                options={statusFilterOptions}
+                selectedIds={productFilters.statuses}
+                onChange={ids => setProductFilters(prev => ({ ...prev, statuses: ids as ProductStatus[] }))}
+                label="Statuts"
+                placeholder="Tous les statuts"
+                triggerPrefix="Statut"
+              />
+
+              {hasActiveFilters && (
+                <Button variant="ghost" onClick={handleResetFilters} className="w-full sm:w-auto">
+                  <X className="w-4 h-4 mr-2" />
+                  Effacer les filtres
+                </Button>
+              )}
 
               {/* Compteur */}
               <div className="flex items-center text-sm text-muted-foreground whitespace-nowrap">

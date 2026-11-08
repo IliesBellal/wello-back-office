@@ -302,6 +302,11 @@ export interface Product {
   // Extended properties for forms
   availability?: ProductAvailability;
   integrations?: ProductIntegrations;
+  // Publication sur les plateformes, telle que renvoyée par GET /menu/products
+  // (liste) : cet endpoint ne remplit pas `integrations`. Notez l'orthographe
+  // `sync_ubereats` (sans tiret bas), propre à l'API.
+  sync_ubereats?: boolean;
+  sync_deliveroo?: boolean;
   tva_ids?: ProductTvaIds;
   tags?: (string | Tag)[] | null;        // Support both ID array and Tag objects + null
   allergens?: (string | Allergen)[] | null;  // Support both ID array and Allergen objects + null
