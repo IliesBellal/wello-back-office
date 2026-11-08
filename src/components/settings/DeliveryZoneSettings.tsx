@@ -154,136 +154,139 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
     onChange("grid_origin_lng", establishmentCoords.lng);
   };
 
+  // Paramètres à gauche, aperçu à droite (empilés sous lg).
   return (
-    <div className="space-y-6">
-      <div className="space-y-2">
-        <Label htmlFor="zoning_type">Type de zonage</Label>
-        <Select
-          value={values.zoning_type || NONE_SENTINEL}
-          onValueChange={(value) => onChange("zoning_type", value === NONE_SENTINEL ? "" : (value as DeliveryZoningType))}
-        >
-          <SelectTrigger id="zoning_type">
-            <SelectValue placeholder="Sélectionnez un type de zonage" />
-          </SelectTrigger>
-          <SelectContent>
-            {ZONING_TYPE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {values.zoning_type === "" && (
-        <p className="text-sm text-muted-foreground">
-          Aucun découpage par zone n'est configuré pour cet établissement.
-        </p>
-      )}
-
-      {values.zoning_type === "CARDINAL" && (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="cardinal_cone_count">Nombre de secteurs</Label>
-            <Select
-              value={String(values.cardinal_cone_count)}
-              onValueChange={(value) => onChange("cardinal_cone_count", Number(value))}
-            >
-              <SelectTrigger id="cardinal_cone_count">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {cardinalCountOptions.map((count) => (
-                  <SelectItem key={count} value={String(count)}>
-                    {CARDINAL_NAMES[count] ? `${count} secteurs (${CARDINAL_NAMES[count].join(" / ")})` : `${count} secteurs`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Plages de distance par secteur (km)</Label>
-            <RangeBandsEditor value={values.cardinal_zone_ranges} onChange={(value) => onChange("cardinal_zone_ranges", value)} />
-          </div>
+    <div className={values.zoning_type !== "" ? "grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start" : undefined}>
+      <div className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="zoning_type">Type de zonage</Label>
+          <Select
+            value={values.zoning_type || NONE_SENTINEL}
+            onValueChange={(value) => onChange("zoning_type", value === NONE_SENTINEL ? "" : (value as DeliveryZoningType))}
+          >
+            <SelectTrigger id="zoning_type">
+              <SelectValue placeholder="Sélectionnez un type de zonage" />
+            </SelectTrigger>
+            <SelectContent>
+              {ZONING_TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      )}
-
-      {values.zoning_type === "RADIAL" && (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="radial_cone_count">Nombre de secteurs</Label>
-            <Input
-              id="radial_cone_count"
-              type="number"
-              min={2}
-              max={16}
-              value={values.radial_cone_count}
-              onChange={(e) => onChange("radial_cone_count", Number(e.target.value))}
-            />
+  
+        {values.zoning_type === "" && (
+          <p className="text-sm text-muted-foreground">
+            Aucun découpage par zone n'est configuré pour cet établissement.
+          </p>
+        )}
+  
+        {values.zoning_type === "CARDINAL" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cardinal_cone_count">Nombre de secteurs</Label>
+              <Select
+                value={String(values.cardinal_cone_count)}
+                onValueChange={(value) => onChange("cardinal_cone_count", Number(value))}
+              >
+                <SelectTrigger id="cardinal_cone_count">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {cardinalCountOptions.map((count) => (
+                    <SelectItem key={count} value={String(count)}>
+                      {CARDINAL_NAMES[count] ? `${count} secteurs (${CARDINAL_NAMES[count].join(" / ")})` : `${count} secteurs`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Plages de distance par secteur (km)</Label>
+              <RangeBandsEditor value={values.cardinal_zone_ranges} onChange={(value) => onChange("cardinal_zone_ranges", value)} />
+            </div>
+          </div>
+        )}
+  
+        {values.zoning_type === "RADIAL" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="radial_cone_count">Nombre de secteurs</Label>
+              <Input
+                id="radial_cone_count"
+                type="number"
+                min={2}
+                max={16}
+                value={values.radial_cone_count}
+                onChange={(e) => onChange("radial_cone_count", Number(e.target.value))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Découpe la zone en secteurs angulaires égaux autour de l'établissement, nommés A, B, C… à partir du nord
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label>Plages de distance par secteur (km)</Label>
+              <RangeBandsEditor value={values.radial_zone_ranges} onChange={(value) => onChange("radial_zone_ranges", value)} />
+            </div>
+          </div>
+        )}
+  
+        {values.zoning_type === "GRID" && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="grid_cell_size_km">Taille de cellule (km)</Label>
+              <Input
+                id="grid_cell_size_km"
+                type="number"
+                min={1}
+                max={50}
+                value={values.grid_cell_size_km}
+                onChange={(e) => onChange("grid_cell_size_km", Number(e.target.value))}
+              />
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="grid_origin_lat">Latitude d'origine</Label>
+                <Input
+                  id="grid_origin_lat"
+                  type="number"
+                  step="any"
+                  value={values.grid_origin_lat ?? ""}
+                  onChange={(e) => onChange("grid_origin_lat", e.target.value === "" ? null : Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grid_origin_lng">Longitude d'origine</Label>
+                <Input
+                  id="grid_origin_lng"
+                  type="number"
+                  step="any"
+                  value={values.grid_origin_lng ?? ""}
+                  onChange={(e) => onChange("grid_origin_lng", e.target.value === "" ? null : Number(e.target.value))}
+                />
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={establishmentCoords?.lat == null || establishmentCoords?.lng == null}
+              onClick={handleUseEstablishmentCoords}
+            >
+              <LocateFixed className="h-4 w-4 mr-2" />
+              Utiliser l'adresse de l'établissement
+            </Button>
             <p className="text-xs text-muted-foreground">
-              Découpe la zone en secteurs angulaires égaux autour de l'établissement, nommés A, B, C… à partir du nord
+              Sans point d'origine, la grille est centrée sur l'adresse de l'établissement.
             </p>
           </div>
-          <div className="space-y-2">
-            <Label>Plages de distance par secteur (km)</Label>
-            <RangeBandsEditor value={values.radial_zone_ranges} onChange={(value) => onChange("radial_zone_ranges", value)} />
-          </div>
-        </div>
-      )}
-
-      {values.zoning_type === "GRID" && (
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="grid_cell_size_km">Taille de cellule (km)</Label>
-            <Input
-              id="grid_cell_size_km"
-              type="number"
-              min={1}
-              max={50}
-              value={values.grid_cell_size_km}
-              onChange={(e) => onChange("grid_cell_size_km", Number(e.target.value))}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="grid_origin_lat">Latitude d'origine</Label>
-              <Input
-                id="grid_origin_lat"
-                type="number"
-                step="any"
-                value={values.grid_origin_lat ?? ""}
-                onChange={(e) => onChange("grid_origin_lat", e.target.value === "" ? null : Number(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="grid_origin_lng">Longitude d'origine</Label>
-              <Input
-                id="grid_origin_lng"
-                type="number"
-                step="any"
-                value={values.grid_origin_lng ?? ""}
-                onChange={(e) => onChange("grid_origin_lng", e.target.value === "" ? null : Number(e.target.value))}
-              />
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={establishmentCoords?.lat == null || establishmentCoords?.lng == null}
-            onClick={handleUseEstablishmentCoords}
-          >
-            <LocateFixed className="h-4 w-4 mr-2" />
-            Utiliser l'adresse de l'établissement
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Sans point d'origine, la grille est centrée sur l'adresse de l'établissement.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
 
       {values.zoning_type !== "" && (
-        <div className="space-y-2">
+        <div className="space-y-2 lg:sticky lg:top-4">
           <Label>Aperçu de la découpe</Label>
           {preview ? (
             <>
@@ -294,7 +297,7 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
             <p className="text-sm text-muted-foreground">
               {establishment == null && !(values.zoning_type === "GRID" && values.grid_origin_lat != null && values.grid_origin_lng != null)
                 ? "Renseignez l'adresse de l'établissement pour afficher l'aperçu."
-                : "Complétez les paramètres ci-dessus pour afficher l'aperçu."}
+                : "Complétez les paramètres pour afficher l'aperçu."}
             </p>
           )}
         </div>
