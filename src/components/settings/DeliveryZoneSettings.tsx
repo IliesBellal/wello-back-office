@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, LocateFixed } from "lucide-react";
 import { DeliveryZoningType, EstablishmentDeliveryZone } from "@/types/settings";
+import { CARDINAL_NAMES, CARDINAL_SECTOR_COUNTS, ZonePreview, buildZonePreview, isOpenEnded } from "@/lib/deliveryZones";
+import { DeliveryZoneMap } from "./DeliveryZoneMap";
 
 interface DeliveryZoneSettingsProps {
   values: EstablishmentDeliveryZone;
@@ -94,7 +96,58 @@ const RangeBandsEditor = ({ value, onChange }: { value: string; onChange: (value
   );
 };
 
+const formatKm = (value: number) => value.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
+
+const ZonePreviewLegend = ({ preview }: { preview: ZonePreview }) => {
+  if (preview.type === "GRID") {
+    const last = preview.sectorNames[preview.sectorNames.length - 1];
+    return (
+      <div className="space-y-1 text-xs text-muted-foreground">
+        <p>
+          Chaque case = lettre de colonne + numéro de ligne. Colonnes A à {last} d'ouest en est, lignes 1 à {preview.gridSize}{" "}
+          du nord au sud.
+        </p>
+        <p>Le point d'origine est dans la case {preview.gridCenterLabel}, au centre de la grille.</p>
+      </div>
+    );
+  }
+
+  const example = preview.zones.find((zone) => zone.sectorIndex === 1 && zone.ringIndex === 1) ?? preview.zones[0];
+  const exampleBand = preview.bands[example.ringIndex];
+  return (
+    <div className="space-y-1 text-xs text-muted-foreground">
+      <p>
+        Chaque zone = {preview.type === "CARDINAL" ? "direction" : "lettre du secteur"} + numéro de la plage de distance. Ex. :{" "}
+        <span className="font-medium text-foreground">{example.label}</span> = secteur {preview.sectorNames[example.sectorIndex]},
+        plage {example.ringIndex + 1}
+        {exampleBand && !isOpenEnded(exampleBand) && ` (${formatKm(exampleBand.min)} à ${formatKm(exampleBand.max)} km)`}.
+      </p>
+      <p>
+        {preview.bands
+          .map((band, index) =>
+            isOpenEnded(band)
+              ? `${index + 1} : au-delà de ${formatKm(band.min)} km`
+              : `${index + 1} : ${formatKm(band.min)} à ${formatKm(band.max)} km`,
+          )
+          .join(" · ")}
+      </p>
+    </div>
+  );
+};
+
 export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: DeliveryZoneSettingsProps) => {
+  const establishment = useMemo(
+    () =>
+      establishmentCoords?.lat != null && establishmentCoords?.lng != null
+        ? { lat: establishmentCoords.lat, lng: establishmentCoords.lng }
+        : null,
+    [establishmentCoords?.lat, establishmentCoords?.lng],
+  );
+  const preview = useMemo(() => buildZonePreview(values, establishment), [values, establishment]);
+  const cardinalCountOptions = CARDINAL_SECTOR_COUNTS.includes(values.cardinal_cone_count)
+    ? CARDINAL_SECTOR_COUNTS
+    : [...CARDINAL_SECTOR_COUNTS, values.cardinal_cone_count].sort((a, b) => a - b);
+
   const handleUseEstablishmentCoords = () => {
     if (establishmentCoords?.lat == null || establishmentCoords?.lng == null) return;
     onChange("grid_origin_lat", establishmentCoords.lat);
@@ -132,17 +185,21 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="cardinal_cone_count">Nombre de secteurs</Label>
-            <Input
-              id="cardinal_cone_count"
-              type="number"
-              min={2}
-              max={16}
-              value={values.cardinal_cone_count}
-              onChange={(e) => onChange("cardinal_cone_count", Number(e.target.value))}
-            />
-            <p className="text-xs text-muted-foreground">
-              Ex : 4 secteurs = Nord / Est / Sud / Ouest, 8 secteurs = N / NE / E / SE / S / SO / O / NO
-            </p>
+            <Select
+              value={String(values.cardinal_cone_count)}
+              onValueChange={(value) => onChange("cardinal_cone_count", Number(value))}
+            >
+              <SelectTrigger id="cardinal_cone_count">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {cardinalCountOptions.map((count) => (
+                  <SelectItem key={count} value={String(count)}>
+                    {CARDINAL_NAMES[count] ? `${count} secteurs (${CARDINAL_NAMES[count].join(" / ")})` : `${count} secteurs`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>Plages de distance par secteur (km)</Label>
@@ -164,7 +221,7 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
               onChange={(e) => onChange("radial_cone_count", Number(e.target.value))}
             />
             <p className="text-xs text-muted-foreground">
-              Découpe la zone en secteurs angulaires égaux autour de l'établissement
+              Découpe la zone en secteurs angulaires égaux autour de l'établissement, nommés A, B, C… à partir du nord
             </p>
           </div>
           <div className="space-y-2">
@@ -219,6 +276,27 @@ export const DeliveryZoneSettings = ({ values, onChange, establishmentCoords }: 
             <LocateFixed className="h-4 w-4 mr-2" />
             Utiliser l'adresse de l'établissement
           </Button>
+          <p className="text-xs text-muted-foreground">
+            Sans point d'origine, la grille est centrée sur l'adresse de l'établissement.
+          </p>
+        </div>
+      )}
+
+      {values.zoning_type !== "" && (
+        <div className="space-y-2">
+          <Label>Aperçu de la découpe</Label>
+          {preview ? (
+            <>
+              <DeliveryZoneMap preview={preview} />
+              <ZonePreviewLegend preview={preview} />
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              {establishment == null && !(values.zoning_type === "GRID" && values.grid_origin_lat != null && values.grid_origin_lng != null)
+                ? "Renseignez l'adresse de l'établissement pour afficher l'aperçu."
+                : "Complétez les paramètres ci-dessus pour afficher l'aperçu."}
+            </p>
+          )}
         </div>
       )}
     </div>
