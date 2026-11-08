@@ -50,7 +50,15 @@
       "PowerShell($r='D:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\ib-welloresto-api'; Get-ChildItem \"$r\\\\internal\\\\modules\\\\customers\",\"$r\\\\internal\\\\infrastructure\\\\brevo_mailer\",\"$r\\\\internal\\\\infrastructure\\\\mailer\",\"$r\\\\internal\\\\infrastructure\\\\brevo\",\"$r\\\\internal\\\\modules\\\\discounts\" | Select-Object FullName,Length | Out-String -Width 300)",
       "WebFetch(domain:developers.brevo.com)",
       "Bash(python __TRACKED_VAR__/patch_sheet.py src/components/menu/IngredientDetailSheet.tsx __TRACKED_VAR__/render.tsx)",
-      "Bash(echo \"tsc-filter-exit:$?\")"
+      "Bash(echo \"tsc-filter-exit:$?\")",
+      "Bash(findstr /i \"Login.tsx\")",
+      "Bash(xargs grep -l \"ItemText\\\\|valueNode\")",
+      "Bash(git merge *)",
+      "Bash(git push *)",
+      "Bash(git rev-list *)",
+      "Bash(echo \"vet exit: $?\")",
+      "Bash(grep -n -B1 -A1 \"^ *editing$\" src/components/menu/SimpleProductSheet.tsx)",
+      "Bash(awk 'NR>=296 && NR<=500 && /async \\\\\\(\\\\\\) =>|apiClient|return |normalize/ {print NR\": \"$0}' src/services/menuService.ts)"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",
