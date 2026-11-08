@@ -128,10 +128,13 @@ const ProductRow = memo(({
   const productAllergens = product.allergens || [];
 
   return (
+    // transition-none : TableRow anime sa couleur de survol par défaut. Au
+    // défilement, chaque ligne qui passe sous le curseur lançait une animation ;
+    // le changement de fond reste, mais instantané.
     <TableRow
       className={`${isSubProduct ? 'bg-muted/30 border-l-2 border-l-muted-foreground/20' : ''} ${
         !isSubProduct && isSelected ? 'bg-primary/5' : ''
-      } hover:bg-muted/50 transition-colors`}
+      } hover:bg-muted/50 transition-none`}
     >
       {/* Sélection pour l'édition de groupe — pas de case sur un
           sous-produit : il suit son groupe côté API. */}
@@ -165,9 +168,17 @@ const ProductRow = memo(({
           </button>
         ) : (
           product.image_url ? (
+            // L'API conserve les photos telles qu'envoyées (souvent plusieurs
+            // Mo) : sans chargement différé, tout le catalogue se téléchargeait
+            // et se décodait d'un coup, et le décodage bloquait le défilement.
+            // Taille fixée pour que la ligne ne bouge pas à l'arrivée de l'image.
             <img
               src={product.image_url}
               alt={product.name}
+              width={40}
+              height={40}
+              loading="lazy"
+              decoding="async"
               className="w-10 h-10 rounded object-cover"
             />
           ) : (
