@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Check, ChevronDown, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,6 +24,14 @@ interface MultiSelectDropdownProps {
    * n'indique à quoi se rapporte la sélection.
    */
   triggerPrefix?: string;
+  /**
+   * Masque le libellé affiché au-dessus du bouton (il reste l'intitulé du
+   * panneau). Pour une barre de filtres, où les autres champs n'ont pas de
+   * libellé et où il décalerait le bouton vers le bas.
+   */
+  hideLabel?: boolean;
+  /** Entrée d'action en pied de panneau (ex. « Nouvelle catégorie »), distincte des valeurs cochables. */
+  footerAction?: { label: string; icon?: ReactNode; onClick: () => void };
 }
 
 const getTriggerLabel = (
@@ -55,6 +63,8 @@ export const MultiSelectDropdown = ({
   className,
   triggerClassName,
   triggerPrefix,
+  hideLabel = false,
+  footerAction,
 }: MultiSelectDropdownProps) => {
   const [open, setOpen] = useState(false);
 
@@ -78,14 +88,15 @@ export const MultiSelectDropdown = ({
 
   return (
     <div className={cn('space-y-2', className)}>
-      {label && <label className="text-xs font-medium text-muted-foreground block">{label}</label>}
+      {label && !hideLabel && <label className="text-xs font-medium text-muted-foreground block">{label}</label>}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
             variant="outline"
             className={cn(
-              'w-full justify-between border-input bg-background px-3 text-left font-normal hover:bg-background',
+              // Même gabarit et même fond blanc que Input / SelectTrigger.
+              'h-10 w-full justify-between border-input bg-card px-3 py-2 text-left text-sm font-normal hover:bg-card',
               triggerClassName
             )}
           >
@@ -125,6 +136,21 @@ export const MultiSelectDropdown = ({
               );
             })}
           </div>
+          {footerAction && (
+            <div className="border-t border-border p-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  footerAction.onClick();
+                }}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-primary transition hover:bg-muted"
+              >
+                {footerAction.icon}
+                {footerAction.label}
+              </button>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
     </div>

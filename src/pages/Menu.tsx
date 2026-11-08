@@ -1,10 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef, useDeferredValue } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Plus, ChevronDown, CopyPlus, Upload, Camera, Globe, Grid3x3, Search, ShieldAlert, ListChecks, Tags as TagsIcon, PencilRuler, FolderPlus, Boxes, X } from 'lucide-react';
 import { useMenuData } from '@/hooks/useMenuData';
@@ -43,7 +42,6 @@ import { GroupDeleteMode, Product, ProductStatus } from '@/types/menu';
 import { toast } from 'sonner';
 
 /** Valeur sentinelle du filtre : ouvre la création au lieu de filtrer. */
-const CREATE_CATEGORY_OPTION = '__create_category__';
 
 type SortKey = 'name' | 'category' | 'tags' | 'status' | 'available_in' | 'available_take_away' | 'available_delivery';
 type SortDir = 'asc' | 'desc';
@@ -71,6 +69,9 @@ function getProductValue(product: Product, key: SortKey, categories: Record<stri
     case 'available_delivery': return product.available_delivery ? 1 : 0;
   }
 }
+
+// Largeur commune des filtres de la barre : alignés sur la hauteur de la recherche.
+const FILTER_CLASS = 'w-full sm:w-56 space-y-0';
 
 export default function Menu() {
   const { 
@@ -147,16 +148,26 @@ export default function Menu() {
 
   // Filtres et tri
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
+  // Plusieurs catégories cochables ; vide = toutes.
+  const [categoryIds, setCategoryIds] = useState<string[]>([]);
   const [productFilters, setProductFilters] = useState<ProductFilters>(EMPTY_PRODUCT_FILTERS);
   const { statuses: integrationStatuses } = useIntegrationStatus();
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
 
-  const handleProductClick = (product: Product) => {
+  // Le filtrage et le rendu du tableau passent par des valeurs différées : un
+  // clic dans un filtre ou une frappe met d'abord à jour le champ lui-même
+  // (instantané), puis recalcule le tableau sans bloquer la saisie.
+  const deferredSearch = useDeferredValue(search);
+  const deferredCategoryIds = useDeferredValue(categoryIds);
+  const deferredProductFilters = useDeferredValue(productFilters);
+
+  // Callbacks passés au tableau : références stables, pour que les lignes
+  // mémoïsées (ProductsTable) ne se re-rendent que si leur produit change.
+  const handleProductClick = useCallback((product: Product) => {
     setSelectedProduct(product);
     setSheetOpen(true);
-  };
+  }, []);
 
   // selectedProduct est un instantané pris au clic, pas une référence vivante
   // dans menuData : sans ce resync, la fiche ouverte (groupe ou produit)
@@ -180,17 +191,17 @@ export default function Menu() {
     handleProductClick(subProduct ?? ({ product_id: productId, name: '', is_product_group: false } as Product));
   };
 
-  const handleToggleGroup = (productId: string) => {
+  const handleToggleGroup = useCallback((productId: string) => {
     setExpandedGroups(prev => ({
       ...prev,
       [productId]: !prev[productId]
     }));
-  };
+  }, []);
 
   // La sélection survit aux changements de filtre : on peut chercher « pizza »,
   // cocher, puis chercher autre chose et compléter. Le compteur du bouton
   // d'édition de groupe reste la source de vérité sur ce qui sera modifié.
-  const handleToggleSelect = (productId: string) => {
+  const handleToggleSelect = useCallback((productId: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
       if (next.has(productId)) {
@@ -200,7 +211,7 @@ export default function Menu() {
       }
       return next;
     });
-  };
+  }, []);
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -215,17 +226,21 @@ export default function Menu() {
   // seul ID plutôt qu'un endpoint dédié — bulkSetProductsStatus gère déjà
   // l'appel API et le patch optimiste de menuData.products (dont resync
   // automatique de selectedProduct si la fiche de ce produit est ouverte).
-  const handleProductStatusChange = async (productId: string, status: ProductStatus) => {
+  // bulkSetProductsStatus change à chaque rendu : on lit la dernière version via
+  // une ref pour garder un callback stable.
+  const bulkSetProductsStatusRef = useRef(bulkSetProductsStatus);
+  bulkSetProductsStatusRef.current = bulkSetProductsStatus;
+  const handleProductStatusChange = useCallback(async (productId: string, status: ProductStatus) => {
     setUpdatingProductId(productId);
     try {
-      await bulkSetProductsStatus([productId], status);
+      await bulkSetProductsStatusRef.current([productId], status);
       toast.success('Statut mis à jour');
     } catch (error) {
       toast.error('Erreur lors de la mise à jour du statut');
     } finally {
       setUpdatingProductId(null);
     }
-  };
+  }, []);
 
   const handleDeleteProduct = async (productId: string) => {
     try {
@@ -299,10 +314,14 @@ export default function Menu() {
     () => PRODUCT_STATUS_ORDER.map(status => ({ id: status, label: PRODUCT_STATUS_LABELS[status] })),
     []
   );
-  const hasActiveFilters = categoryFilter !== 'all' || hasActiveProductFilters(productFilters);
+  const categoryFilterOptions = useMemo(
+    () => (menuData?.products_types ?? []).map(cat => ({ id: cat.category_id, label: cat.category_name || cat.category })),
+    [menuData]
+  );
+  const hasActiveFilters = categoryIds.length > 0 || hasActiveProductFilters(productFilters);
 
   const handleResetFilters = () => {
-    setCategoryFilter('all');
+    setCategoryIds([]);
     setProductFilters(EMPTY_PRODUCT_FILTERS);
   };
 
@@ -313,8 +332,8 @@ export default function Menu() {
     let result = menuData.products || [];
 
     // Filtre recherche
-    if (search.trim()) {
-      const q = search.trim().toLowerCase();
+    if (deferredSearch.trim()) {
+      const q = deferredSearch.trim().toLowerCase();
       result = result.filter(p =>
         p.name.toLowerCase().includes(q) ||
         (p.description && p.description.toLowerCase().includes(q))
@@ -330,12 +349,12 @@ export default function Menu() {
     }
 
     // Filtre catégorie
-    if (categoryFilter !== 'all') {
-      result = result.filter(p => p.category_id === categoryFilter);
+    if (deferredCategoryIds.length > 0) {
+      result = result.filter(p => deferredCategoryIds.includes(p.category_id));
     }
 
     // Filtres tags / disponibilités / canaux / statuts
-    result = filterProductsByAttributes(result, productFilters);
+    result = filterProductsByAttributes(result, deferredProductFilters);
 
     // Tri
     return [...result].sort((a, b) => {
@@ -350,7 +369,7 @@ export default function Menu() {
       const nb = vb as number;
       return sortDir === 'asc' ? na - nb : nb - na;
     });
-  }, [menuData, search, categoryFilter, productFilters, sortKey, sortDir, categoryMap, nestedSubProductIds]);
+  }, [menuData, deferredSearch, deferredCategoryIds, deferredProductFilters, sortKey, sortDir, categoryMap, nestedSubProductIds]);
 
   // Un groupe déplié ajoute une ligne par sous-produit : le compteur doit
   // refléter les lignes affichées, pas seulement les produits filtrés.
@@ -499,7 +518,7 @@ export default function Menu() {
         {/* Filters */}
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 flex-1">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3 flex-1">
               {/* Recherche */}
               <div className="relative w-full sm:max-w-xs">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -511,43 +530,28 @@ export default function Menu() {
                 />
               </div>
 
-              {/* Filtre catégorie */}
-              <Select
-                value={categoryFilter}
-                onValueChange={value => {
-                  // Entrée d'action et non valeur de filtre : on ouvre la
-                  // création et on laisse le filtre courant intact.
-                  if (value === CREATE_CATEGORY_OPTION) {
-                    setCreateCategoryOpen(true);
-                    return;
-                  }
-                  setCategoryFilter(value);
+              {/* Filtre catégories : plusieurs valeurs cochables */}
+              <MultiSelectDropdown
+                className={FILTER_CLASS}
+                options={categoryFilterOptions}
+                selectedIds={categoryIds}
+                onChange={setCategoryIds}
+                label="Catégories"
+                hideLabel
+                placeholder="Toutes les catégories"
+                triggerPrefix="Catégories"
+                footerAction={{
+                  label: 'Nouvelle catégorie caisse',
+                  icon: <FolderPlus className="w-4 h-4" />,
+                  onClick: () => setCreateCategoryOpen(true),
                 }}
-              >
-                <SelectTrigger className="w-full sm:w-52">
-                  <SelectValue placeholder="Toutes les catégories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Toutes les catégories</SelectItem>
-                  {menuData?.products_types?.map(cat => (
-                    <SelectItem key={cat.category_id} value={cat.category_id}>
-                      {cat.category_name || cat.category}
-                    </SelectItem>
-                  ))}
-                  <SelectSeparator />
-                  <SelectItem value={CREATE_CATEGORY_OPTION} className="text-primary">
-                    <span className="flex items-center gap-2">
-                      <FolderPlus className="w-4 h-4" />
-                      Nouvelle catégorie caisse
-                    </span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              />
 
               {/* Filtres multi-sélection : plusieurs valeurs cochables dans chacun */}
               {tagFilterOptions.length > 0 && (
                 <MultiSelectDropdown
-                  className="w-full sm:w-52 space-y-0"
+                  className={FILTER_CLASS}
+                  hideLabel
                   options={tagFilterOptions}
                   selectedIds={productFilters.tagIds}
                   onChange={tagIds => setProductFilters(prev => ({ ...prev, tagIds }))}
@@ -557,7 +561,8 @@ export default function Menu() {
                 />
               )}
               <MultiSelectDropdown
-                className="w-full sm:w-52 space-y-0"
+                className={FILTER_CLASS}
+                hideLabel
                 options={AVAILABILITY_OPTIONS}
                 selectedIds={productFilters.availability}
                 onChange={ids => setProductFilters(prev => ({ ...prev, availability: ids as AvailabilityFilter[] }))}
@@ -566,7 +571,8 @@ export default function Menu() {
                 triggerPrefix="Dispo"
               />
               <MultiSelectDropdown
-                className="w-full sm:w-52 space-y-0"
+                className={FILTER_CLASS}
+                hideLabel
                 options={channelFilterOptions}
                 selectedIds={productFilters.channels}
                 onChange={ids => setProductFilters(prev => ({ ...prev, channels: ids as ChannelFilter[] }))}
@@ -575,7 +581,8 @@ export default function Menu() {
                 triggerPrefix="Canaux"
               />
               <MultiSelectDropdown
-                className="w-full sm:w-52 space-y-0"
+                className={FILTER_CLASS}
+                hideLabel
                 options={statusFilterOptions}
                 selectedIds={productFilters.statuses}
                 onChange={ids => setProductFilters(prev => ({ ...prev, statuses: ids as ProductStatus[] }))}
