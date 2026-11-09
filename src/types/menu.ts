@@ -41,6 +41,11 @@ export interface SubProduct {
   display_order?: number;
   tags?: (string | Tag)[] | null;      // Support both ID array and Tag objects
   allergens?: (string | Allergen)[] | null;  // Support both ID array and Allergen objects
+  // Publication Uber Eats / Deliveroo du sous-produit (publié à la place de
+  // son groupe, selon ses propres cases) — mêmes champs que Product.
+  sync_ubereats?: boolean;
+  sync_deliveroo?: boolean;
+  integrations?: ProductIntegrations;
 }
 
 export interface UnitOfMeasure {
@@ -303,8 +308,10 @@ export interface Product {
   availability?: ProductAvailability;
   integrations?: ProductIntegrations;
   // Publication sur les plateformes, telle que renvoyée par GET /menu/products
-  // (liste) : cet endpoint ne remplit pas `integrations`. Notez l'orthographe
-  // `sync_ubereats` (sans tiret bas), propre à l'API.
+  // (liste). Notez l'orthographe `sync_ubereats` (sans tiret bas), propre à
+  // l'API. La liste ne remplissait pas `integrations` (toujours enabled:false)
+  // avant le correctif API de la grille de prix : lire ces drapeaux en
+  // priorité (cf. utils/marketplacePricing.ts).
   sync_ubereats?: boolean;
   sync_deliveroo?: boolean;
   tva_ids?: ProductTvaIds;

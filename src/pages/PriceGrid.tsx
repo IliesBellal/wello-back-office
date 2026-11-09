@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { TabSystem, PageContainer } from '@/components/shared';
 import { Input } from '@/components/ui/input';
@@ -7,14 +8,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowUpDown, ArrowUp, ArrowDown, Search, Tag, TrendingUp, TrendingDown, ShoppingCart, BadgePercent, Edit2, Save, X, Loader2 } from 'lucide-react';
-import { usePriceGridData } from '@/hooks/usePriceGridData';
+import { Switch } from '@/components/ui/switch';
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, Tag, TrendingUp, TrendingDown, ShoppingCart, BadgePercent, Edit2, Save, X, Loader2, AlertTriangle } from 'lucide-react';
+import { usePriceGridData, PriceGridPriceUpdate } from '@/hooks/usePriceGridData';
 import { Product, Category } from '@/types/menu';
 import { Skeleton } from '@/components/ui/skeleton';
-import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
+import { useMarketplaceCommissionRates, MarketplaceCommissionRate } from '@/hooks/useMarketplaceCommissionRates';
+import { usePermissions } from '@/hooks/usePermissions';
+import {
+  MarketplacePlatform,
+  MarketplacePrice,
+  effectiveMarketplacePrice,
+  inheritedMarketplacePrice,
+  isPublishedOn,
+  marketplaceMargin,
+  marketplacePriceOverride,
+} from '@/utils/marketplacePricing';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -23,18 +35,44 @@ const formatPrice = (cents: number | undefined): string => {
   return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 };
 
+const PLATFORM_LABEL: Record<MarketplacePlatform, string> = {
+  uber_eats: 'Uber Eats',
+  deliveroo: 'Deliveroo',
+};
+
+const PRICE_SOURCE_HINT: Record<MarketplacePrice['source'], string> = {
+  override: 'Prix spécifique à la plateforme',
+  delivery: 'Aucun prix spécifique : prix livraison appliqué',
+  on_site: 'Aucun prix spécifique ni prix livraison : prix sur place appliqué',
+};
+
 type SortKey = 'name' | 'category' | 'price' | 'price_take_away' | 'price_delivery' | 'uber_eats' | 'deliveroo';
 type SortDir = 'asc' | 'desc';
+type PriceField = 'price' | 'price_take_away' | 'price_delivery' | 'price_uber_eats' | 'price_deliveroo';
 
-function getProductValue(product: Product & { categoryName: string }, key: SortKey): string | number {
+const PLATFORM_PRICE_FIELD: Record<MarketplacePlatform, PriceField> = {
+  uber_eats: 'price_uber_eats',
+  deliveroo: 'price_deliveroo',
+};
+
+type EnrichedProduct = Product & { categoryName: string };
+
+const isGroupProduct = (product: Product): boolean => Boolean(product.is_product_group || product.is_group);
+
+/** Un groupe n'est jamais publié lui-même : ses sous-produits le sont à sa place. */
+const groupSubProducts = (product: Product): Product[] =>
+  isGroupProduct(product) ? ((product.sub_products ?? []) as Product[]).filter((s) => !!s.product_id) : [];
+
+function getProductValue(product: EnrichedProduct, key: SortKey): string | number {
   switch (key) {
     case 'name': return (product.name || '').toLowerCase();
     case 'category': return (product.categoryName || '').toLowerCase();
     case 'price': return product.price ?? -1;
     case 'price_take_away': return product.price_take_away ?? -1;
     case 'price_delivery': return product.price_delivery ?? -1;
-    case 'uber_eats': return product.integrations?.uber_eats?.enabled ? (product.integrations.uber_eats.price_override ?? -1) : -1;
-    case 'deliveroo': return product.integrations?.deliveroo?.enabled ? (product.integrations.deliveroo.price_override ?? -1) : -1;
+    case 'uber_eats':
+    case 'deliveroo':
+      return isPublishedOn(product, key) ? effectiveMarketplacePrice(product, key).cents : -1;
   }
 }
 
@@ -54,8 +92,6 @@ const SortIcon = ({ col, sortKey, sortDir }: SortIconProps) => {
 
 // ─── main table ──────────────────────────────────────────────────────────────
 
-type EnrichedProduct = Product & { categoryName: string };
-
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Produit' },
   { key: 'category', label: 'Catégorie' },
@@ -66,17 +102,34 @@ const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'deliveroo', label: 'Deliveroo' },
 ];
 
-function ProductPriceTable({ products, categories, bulkUpdatePrices }: { products: EnrichedProduct[]; categories: Category[]; bulkUpdatePrices: (products: Array<{ product_id: string; price?: number; price_take_away?: number; price_delivery?: number; }>) => Promise<void> }) {
+interface ProductPriceTableProps {
+  products: EnrichedProduct[];
+  categories: Category[];
+  bulkUpdatePrices: (updates: PriceGridPriceUpdate[]) => Promise<void>;
+  setMarketplacePublication: (productIds: string[], platform: MarketplacePlatform, enabled: boolean) => Promise<void>;
+}
+
+function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketplacePublication }: ProductPriceTableProps) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<SortDir>('asc');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [editedPrices, setEditedPrices] = useState<Record<string, Record<string, number>>>({});
-  const [priceDisplayValues, setPriceDisplayValues] = useState<Record<string, Record<string, string>>>({});
+  const [editedPrices, setEditedPrices] = useState<Record<string, Partial<Record<PriceField, number>>>>({});
+  const [priceDisplayValues, setPriceDisplayValues] = useState<Record<string, Partial<Record<PriceField, string>>>>({});
+  // Switches en cours d'enregistrement, clé `${product_id}:${plateforme}`.
+  const [pendingToggles, setPendingToggles] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { statuses } = useIntegrationStatus();
+  const { canManageMenu } = usePermissions();
+
+  const activePlatforms = useMemo(() => {
+    const list: MarketplacePlatform[] = [];
+    if (statuses.uberEats.active) list.push('uber_eats');
+    if (statuses.deliveroo.active) list.push('deliveroo');
+    return list;
+  }, [statuses]);
 
   const visibleColumns = useMemo(
     () => COLUMNS.filter((col) => {
@@ -97,7 +150,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
   };
 
   // Mise à jour d'un prix lors de l'édition
-  const updatePrice = useCallback((productId: string, priceField: string, cents: number) => {
+  const updatePrice = useCallback((productId: string, priceField: PriceField, cents: number) => {
     setEditedPrices(prev => ({
       ...prev,
       [productId]: {
@@ -108,7 +161,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
   }, []);
 
   // Mise à jour de la valeur d'affichage d'un prix (pour éviter la perte de focus)
-  const updatePriceDisplay = useCallback((productId: string, priceField: string, displayValue: string) => {
+  const updatePriceDisplay = useCallback((productId: string, priceField: PriceField, displayValue: string) => {
     setPriceDisplayValues(prev => ({
       ...prev,
       [productId]: {
@@ -119,7 +172,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
   }, []);
 
   // Récupère la valeur d'affichage d'un prix
-  const getDisplayPriceValue = (productId: string, field: string, originalPrice: number | undefined) => {
+  const getDisplayPriceValue = (productId: string, field: PriceField, originalPrice: number | undefined) => {
     const displayValue = priceDisplayValues[productId]?.[field];
     if (displayValue !== undefined) return displayValue;
     return priceToDisplayValue(originalPrice);
@@ -134,7 +187,11 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
 
   // Valide et enregistre tous les prix modifiés
   const saveChanges = useCallback(async () => {
-    if (Object.keys(editedPrices).length === 0) {
+    const productsToUpdate: PriceGridPriceUpdate[] = Object.entries(editedPrices)
+      .filter(([, fields]) => Object.keys(fields).length > 0)
+      .map(([productId, fields]) => ({ product_id: productId, ...fields }));
+
+    if (productsToUpdate.length === 0) {
       toast({
         title: 'Aucun changement',
         description: 'Aucun prix n\'a été modifié',
@@ -145,37 +202,13 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
 
     setIsSaving(true);
     try {
-      // Prépare les données pour le bulk update
-      const productsToUpdate: Array<{
-        product_id: string;
-        price?: number;
-        price_take_away?: number;
-        price_delivery?: number;
-      }> = [];
-
-      Object.entries(editedPrices).forEach(([productId, priceUpdates]) => {
-        const product: {
-          product_id: string;
-          price?: number;
-          price_take_away?: number;
-          price_delivery?: number;
-        } = {
-          product_id: productId,
-        };
-        // Ajoute uniquement les prix qui ont été modifiés
-        if ('price' in priceUpdates) product.price = priceUpdates.price;
-        if ('price_take_away' in priceUpdates) product.price_take_away = priceUpdates.price_take_away;
-        if ('price_delivery' in priceUpdates) product.price_delivery = priceUpdates.price_delivery;
-        productsToUpdate.push(product);
-      });
-
       await bulkUpdatePrices(productsToUpdate);
-      
+
       toast({
         title: 'Succès',
         description: `${productsToUpdate.length} produit(s) mis à jour avec succès`,
       });
-      
+
       setIsEditing(false);
       setEditedPrices({});
       setPriceDisplayValues({});
@@ -189,7 +222,27 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
     } finally {
       setIsSaving(false);
     }
-  }, [editedPrices, toast]);
+  }, [editedPrices, bulkUpdatePrices, toast]);
+
+  const togglePublication = useCallback(async (product: Product, platform: MarketplacePlatform, enabled: boolean) => {
+    const subs = groupSubProducts(product);
+    // Groupe : on (dé)coche ses sous-produits — ce sont eux qui sont publiés —
+    // et le groupe lui-même pour garder sa case cohérente.
+    const ids = [product.product_id, ...subs.map((s) => s.product_id)];
+    const key = `${product.product_id}:${platform}`;
+    setPendingToggles((prev) => new Set(prev).add(key));
+    try {
+      await setMarketplacePublication(ids, platform, enabled);
+    } catch {
+      // Toast d'erreur et annulation déjà gérés par le hook.
+    } finally {
+      setPendingToggles((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  }, [setMarketplacePublication]);
 
   const filtered = useMemo(() => {
     let result = products;
@@ -214,6 +267,92 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
       return sortDir === 'asc' ? na - nb : nb - na;
     });
   }, [products, search, categoryFilter, sortKey, sortDir]);
+
+  const editedCount = Object.values(editedPrices).filter((fields) => Object.keys(fields).length > 0).length;
+
+  const renderPriceInput = (product: EnrichedProduct, field: PriceField, value: number | undefined, placeholder = '0,00') => (
+    <Input
+      type="text"
+      inputMode="decimal"
+      value={getDisplayPriceValue(product.product_id, field, value)}
+      onChange={(e) => {
+        updatePriceDisplay(product.product_id, field, e.target.value);
+        updatePrice(product.product_id, field, parsePriceInput(e.target.value));
+      }}
+      onBlur={(e) => {
+        const cents = parsePriceInput(e.target.value);
+        // Sur une plateforme, un champ vidé = pas de prix spécifique : on
+        // laisse le champ vide plutôt que d'afficher « 0,00 ».
+        const isPlatformField = field === 'price_uber_eats' || field === 'price_deliveroo';
+        updatePriceDisplay(product.product_id, field, isPlatformField && cents === 0 ? '' : priceToDisplayValue(cents));
+      }}
+      placeholder={placeholder}
+      className="h-8 text-xs font-mono min-w-[5.5rem]"
+    />
+  );
+
+  const renderMarketplaceCell = (product: EnrichedProduct, platform: MarketplacePlatform) => {
+    const label = PLATFORM_LABEL[platform];
+    const pending = pendingToggles.has(`${product.product_id}:${platform}`);
+    const subs = groupSubProducts(product);
+
+    // Ligne groupe : la case pilote tous ses sous-produits.
+    if (isGroupProduct(product)) {
+      if (subs.length === 0) {
+        return <span className="text-muted-foreground text-xs">—</span>;
+      }
+      const publishedCount = subs.filter((s) => isPublishedOn(s, platform)).length;
+      const allPublished = publishedCount === subs.length;
+      return (
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={allPublished}
+            disabled={pending || !canManageMenu}
+            onCheckedChange={(checked) => togglePublication(product, platform, checked)}
+            aria-label={`${allPublished ? 'Retirer' : 'Publier'} les sous-produits de ${product.name} sur ${label}`}
+            title={allPublished ? `Retirer tous les sous-produits de ${label}` : `Publier tous les sous-produits sur ${label}`}
+          />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">
+            {publishedCount}/{subs.length} publié{publishedCount > 1 ? 's' : ''}
+          </span>
+        </div>
+      );
+    }
+
+    const published = isPublishedOn(product, platform);
+    const effective = effectiveMarketplacePrice(product, platform);
+    const priceField = PLATFORM_PRICE_FIELD[platform];
+
+    return (
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={published}
+          disabled={pending || !canManageMenu}
+          onCheckedChange={(checked) => togglePublication(product, platform, checked)}
+          aria-label={`${published ? 'Retirer' : 'Publier'} ${product.name} sur ${label}`}
+          title={published ? `Publié sur ${label}` : `Non publié sur ${label}`}
+        />
+        {isEditing ? (
+          renderPriceInput(
+            product,
+            priceField,
+            marketplacePriceOverride(product, platform),
+            // Le placeholder montre le prix appliqué si le champ reste vide.
+            `auto ${priceToDisplayValue(inheritedMarketplacePrice(product).cents)}`,
+          )
+        ) : (
+          <span
+            className={`font-mono text-sm whitespace-nowrap ${
+              !published ? 'text-muted-foreground/60 line-through' : effective.source === 'override' ? '' : 'text-muted-foreground'
+            }`}
+            title={published ? PRICE_SOURCE_HINT[effective.source] : `Non publié sur ${label}`}
+          >
+            {formatPrice(effective.cents)}
+          </span>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -248,43 +387,45 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
         </div>
 
         {/* Boutons d'action */}
-        <div className="flex gap-2">
-          {isEditing ? (
-            <>
+        {canManageMenu && (
+          <div className="flex gap-2">
+            {isEditing ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={cancelEdit}
+                  disabled={isSaving}
+                >
+                  <X className="w-4 h-4 mr-1" />
+                  Annuler
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-gradient-primary"
+                  onClick={saveChanges}
+                  disabled={isSaving || editedCount === 0}
+                >
+                  {isSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
+                  Enregistrer ({editedCount})
+                </Button>
+              </>
+            ) : (
               <Button
+                size="sm"
                 variant="outline"
-                size="sm"
-                onClick={cancelEdit}
-                disabled={isSaving}
+                onClick={() => setIsEditing(true)}
               >
-                <X className="w-4 h-4 mr-1" />
-                Annuler
+                <Edit2 className="w-4 h-4 mr-1" />
+                Modifier les prix
               </Button>
-              <Button
-                size="sm"
-                className="bg-gradient-primary"
-                onClick={saveChanges}
-                disabled={isSaving || Object.keys(editedPrices).length === 0}
-              >
-                {isSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
-                Enregistrer ({Object.keys(editedPrices).length})
-              </Button>
-            </>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setIsEditing(true)}
-            >
-              <Edit2 className="w-4 h-4 mr-1" />
-              Modifier les prix
-            </Button>
-          )}
-        </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -311,139 +452,76 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
               </TableRow>
             ) : (
               filtered.map((product, index) => {
-                const uberPrice = product.integrations?.uber_eats?.enabled
-                  ? product.integrations.uber_eats.price_override
-                  : undefined;
-            const deliverooPrice = product.integrations?.deliveroo?.enabled
-              ? product.integrations.deliveroo.price_override
-              : undefined;
-            
-            // Check if this is a group product
-            const isGroup = product.is_product_group || product.is_group;
+                const isGroup = isGroupProduct(product);
 
-            return (
-              <TableRow key={`${product.product_id}-${index}`} className={`hover:bg-muted/20 transition-colors ${isGroup ? 'bg-muted/15 font-semibold' : ''}`}>
-                {/* Produit */}
-                <TableCell>
-                  <div className="flex items-center gap-3 min-w-0">
-                    {product.image_url ? (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div
-                        className="w-10 h-10 rounded-lg flex-shrink-0"
-                        style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
-                      />
-                    )}
-                    <span className="font-medium truncate">{product.name}</span>
-                  </div>
-                </TableCell>
-                {/* Catégorie */}
-                <TableCell>
-                  {product.categoryName ? (
-                    <Badge variant="secondary" className="whitespace-nowrap">
-                      {product.categoryName}
-                    </Badge>
-                  ) : (
-                    <span className="text-muted-foreground text-sm">—</span>
-                  )}
-                </TableCell>
-                {/* Prix sur place */}
-                <TableCell className="font-mono text-sm">
-                  {isEditing ? (
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={getDisplayPriceValue(product.product_id, 'price', product.price)}
-                      onChange={(e) => {
-                        updatePriceDisplay(product.product_id, 'price', e.target.value);
-                        updatePrice(product.product_id, 'price', parsePriceInput(e.target.value));
-                      }}
-                      onBlur={(e) => {
-                        const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
-                        updatePriceDisplay(product.product_id, 'price', formatted);
-                      }}
-                      placeholder="0,00"
-                      className="h-8 text-xs font-mono"
-                    />
-                  ) : (
-                    formatPrice(product.price)
-                  )}
-                </TableCell>
-                {/* À emporter */}
-                <TableCell className="font-mono text-sm">
-                  {isEditing ? (
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={getDisplayPriceValue(product.product_id, 'price_take_away', product.price_take_away)}
-                      onChange={(e) => {
-                        updatePriceDisplay(product.product_id, 'price_take_away', e.target.value);
-                        updatePrice(product.product_id, 'price_take_away', parsePriceInput(e.target.value));
-                      }}
-                      onBlur={(e) => {
-                        const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
-                        updatePriceDisplay(product.product_id, 'price_take_away', formatted);
-                      }}
-                      placeholder="0,00"
-                      className="h-8 text-xs font-mono"
-                    />
-                  ) : (
-                    formatPrice(product.price_take_away)
-                  )}
-                </TableCell>
-                {/* Livraison */}
-                <TableCell className="font-mono text-sm">
-                  {isEditing ? (
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={getDisplayPriceValue(product.product_id, 'price_delivery', product.price_delivery)}
-                      onChange={(e) => {
-                        updatePriceDisplay(product.product_id, 'price_delivery', e.target.value);
-                        updatePrice(product.product_id, 'price_delivery', parsePriceInput(e.target.value));
-                      }}
-                      onBlur={(e) => {
-                        const formatted = priceToDisplayValue(parsePriceInput(e.target.value));
-                        updatePriceDisplay(product.product_id, 'price_delivery', formatted);
-                      }}
-                      placeholder="0,00"
-                      className="h-8 text-xs font-mono"
-                    />
-                  ) : (
-                    formatPrice(product.price_delivery)
-                  )}
-                </TableCell>
-                {/* Uber Eats */}
-                {statuses.uberEats.active && (
-                  <TableCell className="font-mono text-sm">
-                    {uberPrice !== undefined ? (
-                      formatPrice(uberPrice)
-                    ) : (
-                      <span className="text-muted-foreground text-xs">Non active</span>
-                    )}
-                  </TableCell>
-                )}
-                {/* Deliveroo */}
-                {statuses.deliveroo.active && (
-                  <TableCell className="font-mono text-sm">
-                    {deliverooPrice !== undefined ? (
-                      formatPrice(deliverooPrice)
-                    ) : (
-                      <span className="text-muted-foreground text-xs">Non active</span>
-                    )}
-                  </TableCell>
-                )}
-              </TableRow>
-            );
-          })
+                return (
+                  <TableRow key={`${product.product_id}-${index}`} className={`hover:bg-muted/20 transition-colors ${isGroup ? 'bg-muted/15 font-semibold' : ''}`}>
+                    {/* Produit */}
+                    <TableCell>
+                      <div className="flex items-center gap-3 min-w-0">
+                        {product.image_url ? (
+                          <img
+                            src={product.image_url}
+                            alt={product.name}
+                            className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div
+                            className="w-10 h-10 rounded-lg flex-shrink-0"
+                            style={{ backgroundColor: product.bg_color || '#e5e7eb' }}
+                          />
+                        )}
+                        <span className="font-medium truncate">{product.name}</span>
+                      </div>
+                    </TableCell>
+                    {/* Catégorie */}
+                    <TableCell>
+                      {product.categoryName ? (
+                        <Badge variant="secondary" className="whitespace-nowrap">
+                          {product.categoryName}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">—</span>
+                      )}
+                    </TableCell>
+                    {/* Prix sur place */}
+                    <TableCell className="font-mono text-sm">
+                      {isEditing ? renderPriceInput(product, 'price', product.price) : formatPrice(product.price)}
+                    </TableCell>
+                    {/* À emporter */}
+                    <TableCell className="font-mono text-sm">
+                      {isEditing ? renderPriceInput(product, 'price_take_away', product.price_take_away) : formatPrice(product.price_take_away)}
+                    </TableCell>
+                    {/* Livraison */}
+                    <TableCell className="font-mono text-sm">
+                      {isEditing ? renderPriceInput(product, 'price_delivery', product.price_delivery) : formatPrice(product.price_delivery)}
+                    </TableCell>
+                    {/* Uber Eats / Deliveroo */}
+                    {activePlatforms.map((platform) => (
+                      <TableCell key={platform}>
+                        {renderMarketplaceCell(product, platform)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
+
+      {activePlatforms.length > 0 && (
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p>
+            * Le switch publie ou retire le produit de la plateforme ; il est pris en compte à la prochaine publication du menu.
+            Sur une ligne de groupe, il s'applique à tous ses sous-produits (un groupe n'est jamais publié lui-même).
+          </p>
+          <p>
+            * Prix en gris : aucun prix spécifique, la plateforme reprend le prix livraison (à défaut le prix sur place).
+            {isEditing && ' Laissez le champ vide pour ne pas fixer de prix spécifique.'}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -454,19 +532,29 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices }: { product
 
 type ProfitSortKey = 'name' | 'price' | 'cost' | 'margin' | 'margin_rate' | 'uber_rate' | 'deliveroo_rate';
 
+interface PlatformProfit {
+  published: boolean;
+  price: number;        // cents, prix publié sur la plateforme
+  netRevenue: number;   // cents, après commission
+  margin: number;       // cents, après commission et coût matières
+  marginRate: number;   // 0-100, rapporté au prix plateforme
+}
+
 interface ProfitRow {
   product: EnrichedProduct;
   price: number;        // cents
   cost: number;         // cents
   margin: number;       // cents (price - cost)
   marginRate: number;   // 0-100
-  uberPrice: number;    // cents (override or price)
-  uberNetRevenue: number; // cents after commission
-  uberMarginRate: number; // 0-100
-  deliverooPrice: number; // cents (override or price)
-  deliverooNetRevenue: number; // cents after commission
-  deliverooMarginRate: number; // 0-100
+  uberEats: PlatformProfit;
+  deliveroo: PlatformProfit;
   hasData: boolean;
+}
+
+function buildPlatformProfit(p: EnrichedProduct, platform: MarketplacePlatform, cost: number, commissionRate: number): PlatformProfit {
+  const { cents } = effectiveMarketplacePrice(p, platform);
+  const { netRevenue, margin, marginRate } = marketplaceMargin(cents, cost, commissionRate);
+  return { published: isPublishedOn(p, platform), price: cents, netRevenue, margin, marginRate };
 }
 
 function buildProfitRow(p: EnrichedProduct, uberCommissionRate: number, deliverooCommissionRate: number): ProfitRow {
@@ -475,22 +563,6 @@ function buildProfitRow(p: EnrichedProduct, uberCommissionRate: number, delivero
   const hasData = price > 0 && p.cost_price !== undefined;
   const margin = price - cost;
   const marginRate = price > 0 ? (margin / price) * 100 : 0;
-  const uberCommission = uberCommissionRate / 100;
-  const deliverooCommission = deliverooCommissionRate / 100;
-
-  const uberEnabled = p.integrations?.uber_eats?.enabled;
-  const uberPrice = uberEnabled && p.integrations?.uber_eats?.price_override
-    ? p.integrations.uber_eats.price_override
-    : price;
-  const uberNetRevenue = uberPrice * (1 - uberCommission);
-  const uberMarginRate = uberNetRevenue > 0 ? ((uberNetRevenue - cost) / uberNetRevenue) * 100 : 0;
-
-  const deliverooEnabled = p.integrations?.deliveroo?.enabled;
-  const deliverooPrice = deliverooEnabled && p.integrations?.deliveroo?.price_override
-    ? p.integrations.deliveroo.price_override
-    : price;
-  const deliverooNetRevenue = deliverooPrice * (1 - deliverooCommission);
-  const deliverooMarginRate = deliverooNetRevenue > 0 ? ((deliverooNetRevenue - cost) / deliverooNetRevenue) * 100 : 0;
 
   return {
     product: p,
@@ -498,12 +570,8 @@ function buildProfitRow(p: EnrichedProduct, uberCommissionRate: number, delivero
     cost,
     margin,
     marginRate,
-    uberPrice,
-    uberNetRevenue,
-    uberMarginRate,
-    deliverooPrice,
-    deliverooNetRevenue,
-    deliverooMarginRate,
+    uberEats: buildPlatformProfit(p, 'uber_eats', cost, uberCommissionRate),
+    deliveroo: buildPlatformProfit(p, 'deliveroo', cost, deliverooCommissionRate),
     hasData
   };
 }
@@ -515,8 +583,8 @@ function rateColor(rate: number): string {
   return 'text-red-500 dark:text-red-400';
 }
 
-/** Same scale for Uber (30pp lower threshold because commission eats into margin) */
-function uberRateColor(rate: number): string {
+/** Seuils abaissés pour les plateformes : la commission ampute le taux de marge */
+function platformRateColor(rate: number): string {
   if (rate >= 30) return 'text-green-600 dark:text-green-400';
   if (rate >= 10) return 'text-amber-500 dark:text-amber-400';
   return 'text-red-500 dark:text-red-400';
@@ -534,6 +602,10 @@ function fmt(cents: number): string {
 
 function fmtPct(v: number): string {
   return v.toFixed(1) + ' %';
+}
+
+function fmtRate(v: number): string {
+  return `${Number.isInteger(v) ? v : v.toFixed(1)} %`;
 }
 
 // ── KPI cards ──
@@ -580,6 +652,10 @@ const PROFIT_COLS: { key: ProfitSortKey; label: string }[] = [
   { key: 'margin_rate', label: 'Taux de marge' },
 ];
 
+// Un produit non publié (ou sans coût) n'a pas de taux plateforme : il passe
+// après tous les autres, quel que soit le sens du tri.
+const NO_PLATFORM_RATE = Number.NEGATIVE_INFINITY;
+
 function getProfitValue(row: ProfitRow, key: ProfitSortKey): number | string {
   switch (key) {
     case 'name': return row.product.name.toLowerCase();
@@ -587,16 +663,53 @@ function getProfitValue(row: ProfitRow, key: ProfitSortKey): number | string {
     case 'cost': return row.cost;
     case 'margin': return row.margin;
     case 'margin_rate': return row.marginRate;
-    case 'uber_rate': return row.uberMarginRate;
-    case 'deliveroo_rate': return row.deliverooMarginRate;
+    case 'uber_rate': return row.hasData && row.uberEats.published ? row.uberEats.marginRate : NO_PLATFORM_RATE;
+    case 'deliveroo_rate': return row.hasData && row.deliveroo.published ? row.deliveroo.marginRate : NO_PLATFORM_RATE;
   }
+}
+
+const compareNumbers = (a: number, b: number, dir: SortDir): number => {
+  if (a === b) return 0;
+  if (a === NO_PLATFORM_RATE) return 1;
+  if (b === NO_PLATFORM_RATE) return -1;
+  return dir === 'asc' ? a - b : b - a;
+};
+
+const PLATFORM_ROUTE: Record<MarketplacePlatform, string> = {
+  uber_eats: '/integrations/uber-eats',
+  deliveroo: '/integrations/deliveroo',
+};
+
+function CommissionNote({ platform, commission }: { platform: MarketplacePlatform; commission: MarketplaceCommissionRate }) {
+  const label = PLATFORM_LABEL[platform];
+  if (commission.rate === 0) {
+    return (
+      <p className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+        <span>
+          Aucun taux de commission {label} n'est renseigné : le calcul se fait à 0 %.{' '}
+          <Link to={PLATFORM_ROUTE[platform]} className="underline underline-offset-2">Renseigner le taux</Link>
+        </span>
+      </p>
+    );
+  }
+  return (
+    <p>
+      * Taux après {label} : (prix {label} × (1 − {fmtRate(commission.rate)}) − coût matières) ÷ prix {label}.
+      Le prix {label} est le prix spécifique s'il est renseigné, sinon le prix livraison, à défaut le prix sur place.
+      {commission.source === 'session' && ' Taux lu dans votre session (le taux à jour n\'a pas pu être chargé).'}
+    </p>
+  );
 }
 
 function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<ProfitSortKey>('margin_rate');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-  const { statuses, commissionRates } = useIntegrationStatus();
+  const { statuses } = useIntegrationStatus();
+  const commissions = useMarketplaceCommissionRates();
+  const uberRate = commissions.uberEats.rate;
+  const deliverooRate = commissions.deliveroo.rate;
 
   const visibleProfitCols = useMemo(() => {
     const dynamicCols: { key: ProfitSortKey; label: string }[] = [...PROFIT_COLS];
@@ -604,19 +717,19 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
     if (statuses.uberEats.active) {
       dynamicCols.push({
         key: 'uber_rate',
-        label: `Uber Eats (${commissionRates.uberEats}%)`,
+        label: `Uber Eats (${fmtRate(uberRate)})`,
       });
     }
 
     if (statuses.deliveroo.active) {
       dynamicCols.push({
         key: 'deliveroo_rate',
-        label: `Deliveroo (${commissionRates.deliveroo}%)`,
+        label: `Deliveroo (${fmtRate(deliverooRate)})`,
       });
     }
 
     return dynamicCols;
-  }, [statuses, commissionRates]);
+  }, [statuses, uberRate, deliverooRate]);
 
   const handleSort = (key: ProfitSortKey) => {
     if (sortKey === key) setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
@@ -625,13 +738,13 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
 
   // Only simple products with a price
   const eligibleProducts = useMemo(
-    () => products.filter(p => !p.is_product_group && !p.is_group && (p.price ?? 0) > 0),
+    () => products.filter(p => !isGroupProduct(p) && (p.price ?? 0) > 0),
     [products]
   );
 
   const rows: ProfitRow[] = useMemo(
-    () => eligibleProducts.map((p) => buildProfitRow(p, commissionRates.uberEats, commissionRates.deliveroo)),
-    [eligibleProducts, commissionRates]
+    () => eligibleProducts.map((p) => buildProfitRow(p, uberRate, deliverooRate)),
+    [eligibleProducts, uberRate, deliverooRate]
   );
 
   const rowsWithData = useMemo(() => rows.filter(r => r.hasData), [rows]);
@@ -654,9 +767,29 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
       const vb = getProfitValue(b, sortKey);
       if (typeof va === 'string' && typeof vb === 'string')
         return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-      return sortDir === 'asc' ? (va as number) - (vb as number) : (vb as number) - (va as number);
+      return compareNumbers(va as number, vb as number, sortDir);
     });
   }, [rows, search, sortKey, sortDir]);
+
+  const renderPlatformRate = (row: ProfitRow, platform: MarketplacePlatform) => {
+    const profit = platform === 'uber_eats' ? row.uberEats : row.deliveroo;
+    if (!profit.published) {
+      return <span className="text-muted-foreground text-xs">Non publié</span>;
+    }
+    if (!row.hasData) {
+      return <span className="text-muted-foreground text-xs">—</span>;
+    }
+    return (
+      <div className="leading-tight">
+        <span className={`font-mono text-sm font-semibold ${platformRateColor(profit.marginRate)}`}>
+          {fmtPct(profit.marginRate)}
+        </span>
+        <p className="text-xs text-muted-foreground font-mono whitespace-nowrap">
+          marge {fmt(Math.round(profit.margin))} · prix {fmt(profit.price)}
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -709,7 +842,7 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
       </div>
 
       {/* Table */}
-      <div className="bg-card rounded-lg border border-border overflow-hidden">
+      <div className="bg-card rounded-lg border border-border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/40">
@@ -793,24 +926,12 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
 
                   {/* Taux après Uber */}
                   {statuses.uberEats.active && (
-                    <TableCell>
-                      {row.hasData ? (
-                        <span className={`font-mono text-sm font-semibold ${uberRateColor(row.uberMarginRate)}`}>
-                          {fmtPct(row.uberMarginRate)}
-                        </span>
-                      ) : <span className="text-muted-foreground text-xs">—</span>}
-                    </TableCell>
+                    <TableCell>{renderPlatformRate(row, 'uber_eats')}</TableCell>
                   )}
 
                   {/* Taux après Deliveroo */}
                   {statuses.deliveroo.active && (
-                    <TableCell>
-                      {row.hasData ? (
-                        <span className={`font-mono text-sm font-semibold ${uberRateColor(row.deliverooMarginRate)}`}>
-                          {fmtPct(row.deliverooMarginRate)}
-                        </span>
-                      ) : <span className="text-muted-foreground text-xs">—</span>}
-                    </TableCell>
+                    <TableCell>{renderPlatformRate(row, 'deliveroo')}</TableCell>
                   )}
                 </TableRow>
               ))
@@ -820,16 +941,8 @@ function ProfitabilityTable({ products }: { products: EnrichedProduct[] }) {
       </div>
 
       <div className="text-xs text-muted-foreground space-y-1">
-        {statuses.uberEats.active && (
-          <p>
-            * Le taux après Uber Eats est calculé après déduction de la commission de {commissionRates.uberEats}% sur le prix de vente Uber Eats.
-          </p>
-        )}
-        {statuses.deliveroo.active && (
-          <p>
-            * Le taux après Deliveroo est calculé après déduction de la commission de {commissionRates.deliveroo}% sur le prix de vente Deliveroo.
-          </p>
-        )}
+        {statuses.uberEats.active && <CommissionNote platform="uber_eats" commission={commissions.uberEats} />}
+        {statuses.deliveroo.active && <CommissionNote platform="deliveroo" commission={commissions.deliveroo} />}
       </div>
     </div>
   );
@@ -866,7 +979,7 @@ function TableSkeleton({ colCount = 7 }: { colCount?: number }) {
 // ─── page ────────────────────────────────────────────────────────────────────
 
 export default function PriceGrid() {
-  const { menuData, loading, bulkUpdatePrices } = usePriceGridData();
+  const { menuData, loading, bulkUpdatePrices, setMarketplacePublication } = usePriceGridData();
   const [activeTab, setActiveTab] = useState('products');
   const { statuses } = useIntegrationStatus();
 
@@ -892,17 +1005,17 @@ export default function PriceGrid() {
   const enrichedProducts: EnrichedProduct[] = useMemo(() => {
     return categories.flatMap(cat => {
       const products: EnrichedProduct[] = [];
-      
+
       (cat.products ?? []).forEach(p => {
         const enriched = {
           ...p,
           category_id: p.category_id ?? cat.category_id,
           categoryName: cat.category || cat.category_name || '',
         };
-        
+
         // Add product (group or simple)
         products.push(enriched);
-        
+
         // If it's a group, also add its sub-products
         if (p.is_product_group && p.sub_products && p.sub_products.length > 0) {
           p.sub_products.forEach(subProduct => {
@@ -914,7 +1027,7 @@ export default function PriceGrid() {
           });
         }
       });
-      
+
       return products;
     });
   }, [categories]);
@@ -945,7 +1058,12 @@ export default function PriceGrid() {
               return loading ? (
                 <TableSkeleton colCount={productTableColCount} />
               ) : (
-                <ProductPriceTable products={enrichedProducts} categories={categories} bulkUpdatePrices={bulkUpdatePrices} />
+                <ProductPriceTable
+                  products={enrichedProducts}
+                  categories={categories}
+                  bulkUpdatePrices={bulkUpdatePrices}
+                  setMarketplacePublication={setMarketplacePublication}
+                />
               );
             }
             if (tabId === 'profitability') {

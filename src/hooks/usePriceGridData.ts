@@ -1,7 +1,60 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { menuService } from '@/services/menuService';
-import { Menu, Category } from '@/types/menu';
+import { Menu, Category, Product } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
+import { MarketplacePlatform, isPublishedOn } from '@/utils/marketplacePricing';
+
+/** Prix modifiables depuis la grille (centimes). 0 sur une plateforme = pas de prix spécifique. */
+export interface PriceGridPriceUpdate {
+  product_id: string;
+  price?: number;
+  price_take_away?: number;
+  price_delivery?: number;
+  price_uber_eats?: number;
+  price_deliveroo?: number;
+}
+
+type ProductPatch = Partial<Product>;
+
+/**
+ * Applique `patchFor` aux produits (racines et sous-produits) dont l'id est
+ * dans `ids`, sans recharger le menu.
+ */
+const patchMenuProducts = (
+  menu: Menu,
+  ids: Set<string>,
+  patchFor: (product: Product) => ProductPatch,
+): Menu => {
+  const patchOne = <T extends { product_id?: string }>(p: T): T =>
+    p.product_id && ids.has(p.product_id) ? { ...p, ...patchFor(p as unknown as Product) } : p;
+
+  const productsTypes = (menu.products_types ?? []).map((cat) => ({
+    ...cat,
+    products: (cat.products ?? []).map((product) => {
+      const patched = patchOne(product);
+      return product.sub_products?.length
+        ? { ...patched, sub_products: product.sub_products.map(patchOne) }
+        : patched;
+    }),
+  }));
+
+  return {
+    ...menu,
+    products_types: productsTypes,
+    products: (menu.products ?? []).map(patchOne),
+  };
+};
+
+const publicationPatch = (platform: MarketplacePlatform, enabled: boolean) => (product: Product): ProductPatch =>
+  platform === 'uber_eats'
+    ? {
+        sync_ubereats: enabled,
+        integrations: { ...product.integrations, uber_eats: { ...product.integrations?.uber_eats, enabled } },
+      }
+    : {
+        sync_deliveroo: enabled,
+        integrations: { ...product.integrations, deliveroo: { ...product.integrations?.deliveroo, enabled } },
+      };
 
 /**
  * Hook spécialisé pour la page PriceGrid
@@ -63,33 +116,87 @@ export const usePriceGridData = () => {
     }
   };
 
-  const bulkUpdatePrices = async (products: Array<{ product_id: string; price?: number; price_take_away?: number; price_delivery?: number }>) => {
-    try {
-      const updatePromises = products.map(p =>
-        menuService.updateProduct(p.product_id, {
-          price: p.price,
-          price_take_away: p.price_take_away,
-          price_delivery: p.price_delivery,
-        })
+  /**
+   * Enregistre les prix modifiés en une seule requête (PATCH /menu/products/bulk)
+   * puis les reporte dans la grille. L'appelant gère les toasts.
+   */
+  const bulkUpdatePrices = useCallback(async (updates: PriceGridPriceUpdate[]) => {
+    if (updates.length === 0) return;
+    await menuService.bulkUpdatePrices(updates);
+
+    const byId = new Map(updates.map((u) => [u.product_id, u]));
+    setMenuData((prev) =>
+      patchMenuProducts(prev, new Set(byId.keys()), (product) => {
+        const u = byId.get(product.product_id);
+        if (!u) return {};
+        const patch: ProductPatch = {};
+        if (u.price !== undefined) patch.price = u.price;
+        if (u.price_take_away !== undefined) patch.price_take_away = u.price_take_away;
+        if (u.price_delivery !== undefined) patch.price_delivery = u.price_delivery;
+        if (u.price_uber_eats !== undefined || u.price_deliveroo !== undefined) {
+          const integrations = { ...product.integrations };
+          if (u.price_uber_eats !== undefined) {
+            patch.price_uber_eats = u.price_uber_eats;
+            integrations.uber_eats = { ...integrations.uber_eats, price_override: u.price_uber_eats || undefined };
+          }
+          if (u.price_deliveroo !== undefined) {
+            patch.price_deliveroo = u.price_deliveroo;
+            integrations.deliveroo = { ...integrations.deliveroo, price_override: u.price_deliveroo || undefined };
+          }
+          patch.integrations = integrations;
+        }
+        return patch;
+      }),
+    );
+  }, []);
+
+  /**
+   * Coche / décoche la publication d'un ou plusieurs produits sur une
+   * plateforme (PATCH /menu/products/bulk/availability, champs sync_*).
+   * Mise à jour optimiste, annulée si l'API refuse.
+   */
+  const setMarketplacePublication = useCallback(
+    async (productIds: string[], platform: MarketplacePlatform, enabled: boolean) => {
+      if (productIds.length === 0) return;
+      const ids = new Set(productIds);
+      // État de chaque produit avant le changement, pour une annulation qui ne
+      // touche que ces produits (un autre switch peut être en cours).
+      const previous = new Map<string, boolean>();
+      setMenuData((prev) =>
+        patchMenuProducts(prev, ids, (product) => {
+          if (!previous.has(product.product_id)) {
+            previous.set(product.product_id, isPublishedOn(product, platform));
+          }
+          return publicationPatch(platform, enabled)(product);
+        }),
       );
-      await Promise.all(updatePromises);
-      toast({
-        title: 'Succès',
-        description: `${products.length} produit(s) mis à jour`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de mettre à jour les prix',
-        variant: 'destructive',
-      });
-      throw error;
-    }
-  };
+
+      try {
+        await menuService.bulkSetProductsAvailability(
+          productIds,
+          platform === 'uber_eats' ? { sync_uber_eats: enabled } : { sync_deliveroo: enabled },
+        );
+      } catch (error) {
+        setMenuData((prev) =>
+          patchMenuProducts(prev, ids, (product) =>
+            publicationPatch(platform, previous.get(product.product_id) ?? !enabled)(product),
+          ),
+        );
+        toast({
+          title: 'Erreur',
+          description: `Impossible de modifier la publication sur ${platform === 'uber_eats' ? 'Uber Eats' : 'Deliveroo'}`,
+          variant: 'destructive',
+        });
+        throw error;
+      }
+    },
+    [toast],
+  );
 
   return {
     menuData,
     loading,
     bulkUpdatePrices,
+    setMarketplacePublication,
   };
 };

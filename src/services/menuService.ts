@@ -1430,12 +1430,17 @@ export const menuService = {
     );
   },
 
-  async bulkUpdatePrices(products: Array<{
+  // PATCH /menu/products/bulk : seuls les champs présents sont écrits. Sur
+  // price_uber_eats / price_deliveroo, 0 retire le prix spécifique (la
+  // plateforme reprend alors le prix livraison, à défaut le prix sur place).
+  async bulkUpdatePrices<T extends {
     product_id: string;
     price?: number;
     price_take_away?: number;
     price_delivery?: number;
-  }>): Promise<Array<{ product_id: string; price?: number; price_take_away?: number; price_delivery?: number }>> {
+    price_uber_eats?: number;
+    price_deliveroo?: number;
+  }>(products: T[]): Promise<T[]> {
     logAPI('PATCH', '/menu/products/bulk', { products });
     return withMock(
       () => products,
