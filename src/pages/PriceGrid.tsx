@@ -27,6 +27,12 @@ import {
   marketplaceMargin,
   marketplacePriceOverride,
 } from '@/utils/marketplacePricing';
+import {
+  SalesChannel,
+  SALES_CHANNEL_LABEL,
+  isChannelEnabled,
+  isMarketplaceChannel,
+} from '@/utils/salesChannelAvailability';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -106,10 +112,19 @@ interface ProductPriceTableProps {
   products: EnrichedProduct[];
   categories: Category[];
   bulkUpdatePrices: (updates: PriceGridPriceUpdate[]) => Promise<void>;
-  setMarketplacePublication: (productIds: string[], platform: MarketplacePlatform, enabled: boolean) => Promise<void>;
+  setChannelAvailability: (productIds: string[], channel: SalesChannel, enabled: boolean) => Promise<void>;
 }
 
-function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketplacePublication }: ProductPriceTableProps) {
+/** Canaux propres de l'établissement : switch = colonne available_* du produit. */
+type LocalChannel = 'on_site' | 'take_away' | 'delivery';
+const LOCAL_CHANNELS: LocalChannel[] = ['on_site', 'take_away', 'delivery'];
+const LOCAL_CHANNEL_PRICE_FIELD: Record<LocalChannel, PriceField> = {
+  on_site: 'price',
+  take_away: 'price_take_away',
+  delivery: 'price_delivery',
+};
+
+function ProductPriceTable({ products, categories, bulkUpdatePrices, setChannelAvailability }: ProductPriceTableProps) {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortKey, setSortKey] = useState<SortKey>('name');
@@ -118,7 +133,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
   const [isSaving, setIsSaving] = useState(false);
   const [editedPrices, setEditedPrices] = useState<Record<string, Partial<Record<PriceField, number>>>>({});
   const [priceDisplayValues, setPriceDisplayValues] = useState<Record<string, Partial<Record<PriceField, string>>>>({});
-  // Switches en cours d'enregistrement, clé `${product_id}:${plateforme}`.
+  // Switches en cours d'enregistrement, clé `${product_id}:${canal}`.
   const [pendingToggles, setPendingToggles] = useState<Set<string>>(new Set());
   const { toast } = useToast();
   const { statuses } = useIntegrationStatus();
@@ -224,15 +239,18 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
     }
   }, [editedPrices, bulkUpdatePrices, toast]);
 
-  const togglePublication = useCallback(async (product: Product, platform: MarketplacePlatform, enabled: boolean) => {
-    const subs = groupSubProducts(product);
-    // Groupe : on (dé)coche ses sous-produits — ce sont eux qui sont publiés —
-    // et le groupe lui-même pour garder sa case cohérente.
-    const ids = [product.product_id, ...subs.map((s) => s.product_id)];
-    const key = `${product.product_id}:${platform}`;
+  const toggleChannel = useCallback(async (product: Product, channel: SalesChannel, enabled: boolean) => {
+    // Plateforme + groupe : on (dé)coche ses sous-produits — ce sont eux qui
+    // sont publiés — et le groupe lui-même pour garder sa case cohérente.
+    // Sur place / à emporter / livraison : le groupe a sa propre disponibilité,
+    // chaque sous-produit garde la sienne (sa propre ligne).
+    const ids = isMarketplaceChannel(channel)
+      ? [product.product_id, ...groupSubProducts(product).map((s) => s.product_id)]
+      : [product.product_id];
+    const key = `${product.product_id}:${channel}`;
     setPendingToggles((prev) => new Set(prev).add(key));
     try {
-      await setMarketplacePublication(ids, platform, enabled);
+      await setChannelAvailability(ids, channel, enabled);
     } catch {
       // Toast d'erreur et annulation déjà gérés par le hook.
     } finally {
@@ -242,7 +260,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
         return next;
       });
     }
-  }, [setMarketplacePublication]);
+  }, [setChannelAvailability]);
 
   const filtered = useMemo(() => {
     let result = products;
@@ -291,6 +309,37 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
     />
   );
 
+  // Sur place / à emporter / livraison : switch de disponibilité + prix du canal.
+  const renderLocalChannelCell = (product: EnrichedProduct, channel: LocalChannel) => {
+    const label = SALES_CHANNEL_LABEL[channel];
+    const field = LOCAL_CHANNEL_PRICE_FIELD[channel];
+    const price = product[field];
+    const enabled = isChannelEnabled(product, channel);
+    const pending = pendingToggles.has(`${product.product_id}:${channel}`);
+
+    return (
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={enabled}
+          disabled={pending || !canManageMenu}
+          onCheckedChange={(checked) => toggleChannel(product, channel, checked)}
+          aria-label={`${enabled ? 'Désactiver' : 'Activer'} ${product.name} en ${label.toLowerCase()}`}
+          title={enabled ? `Disponible en ${label.toLowerCase()}` : `Non disponible en ${label.toLowerCase()}`}
+        />
+        {isEditing ? (
+          renderPriceInput(product, field, price)
+        ) : (
+          <span
+            className={`font-mono text-sm whitespace-nowrap ${enabled ? '' : 'text-muted-foreground/60 line-through'}`}
+            title={enabled ? undefined : `Non disponible en ${label.toLowerCase()}`}
+          >
+            {formatPrice(price)}
+          </span>
+        )}
+      </div>
+    );
+  };
+
   const renderMarketplaceCell = (product: EnrichedProduct, platform: MarketplacePlatform) => {
     const label = PLATFORM_LABEL[platform];
     const pending = pendingToggles.has(`${product.product_id}:${platform}`);
@@ -308,7 +357,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
           <Switch
             checked={allPublished}
             disabled={pending || !canManageMenu}
-            onCheckedChange={(checked) => togglePublication(product, platform, checked)}
+            onCheckedChange={(checked) => toggleChannel(product, platform, checked)}
             aria-label={`${allPublished ? 'Retirer' : 'Publier'} les sous-produits de ${product.name} sur ${label}`}
             title={allPublished ? `Retirer tous les sous-produits de ${label}` : `Publier tous les sous-produits sur ${label}`}
           />
@@ -328,7 +377,7 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
         <Switch
           checked={published}
           disabled={pending || !canManageMenu}
-          onCheckedChange={(checked) => togglePublication(product, platform, checked)}
+          onCheckedChange={(checked) => toggleChannel(product, platform, checked)}
           aria-label={`${published ? 'Retirer' : 'Publier'} ${product.name} sur ${label}`}
           title={published ? `Publié sur ${label}` : `Non publié sur ${label}`}
         />
@@ -484,18 +533,12 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
                         <span className="text-muted-foreground text-sm">—</span>
                       )}
                     </TableCell>
-                    {/* Prix sur place */}
-                    <TableCell className="font-mono text-sm">
-                      {isEditing ? renderPriceInput(product, 'price', product.price) : formatPrice(product.price)}
-                    </TableCell>
-                    {/* À emporter */}
-                    <TableCell className="font-mono text-sm">
-                      {isEditing ? renderPriceInput(product, 'price_take_away', product.price_take_away) : formatPrice(product.price_take_away)}
-                    </TableCell>
-                    {/* Livraison */}
-                    <TableCell className="font-mono text-sm">
-                      {isEditing ? renderPriceInput(product, 'price_delivery', product.price_delivery) : formatPrice(product.price_delivery)}
-                    </TableCell>
+                    {/* Sur place / À emporter / Livraison */}
+                    {LOCAL_CHANNELS.map((channel) => (
+                      <TableCell key={channel}>
+                        {renderLocalChannelCell(product, channel)}
+                      </TableCell>
+                    ))}
                     {/* Uber Eats / Deliveroo */}
                     {activePlatforms.map((platform) => (
                       <TableCell key={platform}>
@@ -510,18 +553,25 @@ function ProductPriceTable({ products, categories, bulkUpdatePrices, setMarketpl
         </Table>
       </div>
 
-      {activePlatforms.length > 0 && (
-        <div className="text-xs text-muted-foreground space-y-1">
-          <p>
-            * Le switch publie ou retire le produit de la plateforme ; il est pris en compte à la prochaine publication du menu.
-            Sur une ligne de groupe, il s'applique à tous ses sous-produits (un groupe n'est jamais publié lui-même).
-          </p>
-          <p>
-            * Prix en gris : aucun prix spécifique, la plateforme reprend le prix livraison (à défaut le prix sur place).
-            {isEditing && ' Laissez le champ vide pour ne pas fixer de prix spécifique.'}
-          </p>
-        </div>
-      )}
+      <div className="text-xs text-muted-foreground space-y-1">
+        <p>
+          * Sur place, à emporter, livraison : le switch rend le produit disponible ou non sur ce type de commande
+          (prix barré = non disponible). « Livraison » est votre propre livraison, indépendante des plateformes.
+          Sur une ligne de groupe, il ne concerne que le groupe : chaque sous-produit a son propre switch.
+        </p>
+        {activePlatforms.length > 0 && (
+          <>
+            <p>
+              * Uber Eats, Deliveroo : le switch publie ou retire le produit de la plateforme ; il est pris en compte à la prochaine publication du menu.
+              Sur une ligne de groupe, il s'applique à tous ses sous-produits (un groupe n'est jamais publié lui-même).
+            </p>
+            <p>
+              * Prix plateforme en gris : aucun prix spécifique, la plateforme reprend le prix livraison (à défaut le prix sur place).
+              {isEditing && ' Laissez le champ vide pour ne pas fixer de prix spécifique.'}
+            </p>
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -979,7 +1029,7 @@ function TableSkeleton({ colCount = 7 }: { colCount?: number }) {
 // ─── page ────────────────────────────────────────────────────────────────────
 
 export default function PriceGrid() {
-  const { menuData, loading, bulkUpdatePrices, setMarketplacePublication } = usePriceGridData();
+  const { menuData, loading, bulkUpdatePrices, setChannelAvailability } = usePriceGridData();
   const [activeTab, setActiveTab] = useState('products');
   const { statuses } = useIntegrationStatus();
 
@@ -1062,7 +1112,7 @@ export default function PriceGrid() {
                   products={enrichedProducts}
                   categories={categories}
                   bulkUpdatePrices={bulkUpdatePrices}
-                  setMarketplacePublication={setMarketplacePublication}
+                  setChannelAvailability={setChannelAvailability}
                 />
               );
             }

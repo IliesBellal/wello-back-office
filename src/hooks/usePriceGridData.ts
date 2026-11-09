@@ -2,7 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { menuService } from '@/services/menuService';
 import { Menu, Category, Product } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
-import { MarketplacePlatform, isPublishedOn } from '@/utils/marketplacePricing';
+import {
+  SalesChannel,
+  SALES_CHANNEL_LABEL,
+  channelAvailabilityFields,
+  channelAvailabilityPatch,
+  isChannelEnabled,
+} from '@/utils/salesChannelAvailability';
 
 /** Prix modifiables depuis la grille (centimes). 0 sur une plateforme = pas de prix spécifique. */
 export interface PriceGridPriceUpdate {
@@ -44,17 +50,6 @@ const patchMenuProducts = (
     products: (menu.products ?? []).map(patchOne),
   };
 };
-
-const publicationPatch = (platform: MarketplacePlatform, enabled: boolean) => (product: Product): ProductPatch =>
-  platform === 'uber_eats'
-    ? {
-        sync_ubereats: enabled,
-        integrations: { ...product.integrations, uber_eats: { ...product.integrations?.uber_eats, enabled } },
-      }
-    : {
-        sync_deliveroo: enabled,
-        integrations: { ...product.integrations, deliveroo: { ...product.integrations?.deliveroo, enabled } },
-      };
 
 /**
  * Hook spécialisé pour la page PriceGrid
@@ -151,12 +146,13 @@ export const usePriceGridData = () => {
   }, []);
 
   /**
-   * Coche / décoche la publication d'un ou plusieurs produits sur une
-   * plateforme (PATCH /menu/products/bulk/availability, champs sync_*).
-   * Mise à jour optimiste, annulée si l'API refuse.
+   * Active / désactive un ou plusieurs produits sur un canal de vente — sur
+   * place, à emporter, livraison (available_*) ou plateforme (sync_*) — via
+   * PATCH /menu/products/bulk/availability. Mise à jour optimiste, annulée si
+   * l'API refuse.
    */
-  const setMarketplacePublication = useCallback(
-    async (productIds: string[], platform: MarketplacePlatform, enabled: boolean) => {
+  const setChannelAvailability = useCallback(
+    async (productIds: string[], channel: SalesChannel, enabled: boolean) => {
       if (productIds.length === 0) return;
       const ids = new Set(productIds);
       // État de chaque produit avant le changement, pour une annulation qui ne
@@ -165,26 +161,23 @@ export const usePriceGridData = () => {
       setMenuData((prev) =>
         patchMenuProducts(prev, ids, (product) => {
           if (!previous.has(product.product_id)) {
-            previous.set(product.product_id, isPublishedOn(product, platform));
+            previous.set(product.product_id, isChannelEnabled(product, channel));
           }
-          return publicationPatch(platform, enabled)(product);
+          return channelAvailabilityPatch(product, channel, enabled);
         }),
       );
 
       try {
-        await menuService.bulkSetProductsAvailability(
-          productIds,
-          platform === 'uber_eats' ? { sync_uber_eats: enabled } : { sync_deliveroo: enabled },
-        );
+        await menuService.bulkSetProductsAvailability(productIds, channelAvailabilityFields(channel, enabled));
       } catch (error) {
         setMenuData((prev) =>
           patchMenuProducts(prev, ids, (product) =>
-            publicationPatch(platform, previous.get(product.product_id) ?? !enabled)(product),
+            channelAvailabilityPatch(product, channel, previous.get(product.product_id) ?? !enabled),
           ),
         );
         toast({
           title: 'Erreur',
-          description: `Impossible de modifier la publication sur ${platform === 'uber_eats' ? 'Uber Eats' : 'Deliveroo'}`,
+          description: `Impossible de modifier le canal « ${SALES_CHANNEL_LABEL[channel]} »`,
           variant: 'destructive',
         });
         throw error;
@@ -197,6 +190,6 @@ export const usePriceGridData = () => {
     menuData,
     loading,
     bulkUpdatePrices,
-    setMarketplacePublication,
+    setChannelAvailability,
   };
 };
