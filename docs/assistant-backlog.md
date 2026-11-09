@@ -11,6 +11,53 @@ non comprises, elles aussi enregistrées.
 
 ---
 
+## 0. Auto-apprentissage (le modèle progresse seul)
+
+Quand une requête tombe en repli et que l'utilisateur clique une suggestion
+puis confirme l'action avec succès, la phrase devient un **synonyme candidat**
+de cette intention. L'humain n'intervient que pour corriger.
+
+### 0.1 Ce qui est appris
+- [ ] **Synonymes d'intention** : on retire de la phrase l'entité reconnue
+  (produit, personne, date) et les mots vides, puis on garde le reste.
+  « mets le tiramisu en pause » → `en pause` = Rupture.
+- [ ] **Alias d'entités, par établissement** : « le dessert du jour » →
+  *Tiramisu maison* si l'utilisateur a choisi ce produit dans la liste.
+  Un alias reste propre à l'établissement, il n'est jamais global.
+- [ ] Une phrase n'est retenue que si elle a été suivie d'une confirmation
+  **et** d'une action réussie. Un simple clic ne suffit pas.
+
+### 0.2 Cycle de vie d'un synonyme appris
+`candidat` → `actif (auto)` → `validé (humain)` ou `rejeté`
+
+- [ ] **Candidat** : enregistré, pas encore utilisé pour reconnaître.
+- [ ] **Promotion automatique en actif** (seuils à ajuster) :
+  - vu au moins 3 fois ;
+  - par au moins 2 utilisateurs différents ;
+  - sans être en conflit avec une autre intention (le même synonyme n'a pas
+    été associé à une autre intention plus de 20 % du temps).
+- [ ] **Portée progressive** : actif d'abord pour l'établissement où il a été
+  appris, puis global une fois observé dans au moins 3 établissements.
+- [ ] **Poids réduit** : un synonyme appris compte moins qu'un synonyme
+  saisi par un humain tant qu'il n'est pas validé.
+- [ ] **Rétrogradation automatique** : si, une fois actif, ses propositions
+  sont annulées (✗) ou reformulées plus de 30 % du temps, il redevient
+  candidat.
+- [ ] **Intentions sensibles** (annulation de commande, remboursement,
+  suppression, actions sur la caisse) : pas de promotion automatique, une
+  validation humaine est obligatoire.
+- [ ] **Liste noire** : mots trop génériques jamais appris seuls (« fais »,
+  « mets », « truc », « ok »…), plus les mots rejetés par un humain.
+
+### 0.3 Correction humaine (plateforme admin)
+- [ ] Liste « appris récemment », avec leur origine (phrases, utilisateurs,
+  établissements) et leurs statistiques.
+- [ ] Valider, rejeter, déplacer vers une autre intention, changer la portée.
+- [ ] Un rejet humain est définitif : le synonyme passe en liste noire pour
+  cette intention.
+
+---
+
 ## 1. Plateforme admin (plus tard, hors de ce repo)
 
 L'écran d'administration de l'assistant sera intégré à la future plateforme
@@ -83,12 +130,19 @@ admin. Il ne fait pas partie du back-office restaurateur.
   durée, issue : `action` / `abandon` / `fallback`).
 - [ ] `assistant_events` : une ligne par interaction (session, type, horodatage
   en ms, charge utile JSON).
+- [ ] `assistant_learned_terms` : synonymes et alias appris (texte, intention
+  ou entité, portée, statut, compteurs d'occurrences, d'utilisateurs,
+  d'établissements, de succès et d'annulations).
 - [ ] Index sur `created_at`, `merchant_id`, `event_type`, `session_id`.
 
 ### 2.2 Endpoints back-office
 - [ ] `GET /assistant/model` : modèle courant, avec ETag pour le cache.
 - [ ] `POST /assistant/events` : réception par lots, idempotente (identifiant
   d'événement généré côté client).
+- [ ] Tâche d'apprentissage (par ex. toutes les heures) : lit les séquences
+  repli → suggestion → confirmation → succès, met à jour
+  `assistant_learned_terms`, applique les seuils de la section 0.2 et publie
+  une nouvelle version du modèle si quelque chose a changé.
 - [ ] Vérification serveur des permissions sur toutes les actions déclenchées.
   Le serveur ne fait jamais confiance au front sur ce point.
 
