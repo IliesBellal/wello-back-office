@@ -9,7 +9,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Sparkles, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useAssistantAnchored } from './anchor';
@@ -121,9 +121,21 @@ function AssistantFab({ open, onClick }: { open: boolean; onClick: () => void })
           transition={{ duration: 0.15 }}
           className="flex"
         >
-          {open ? <X className="h-6 w-6" strokeWidth={2.2} /> : <Sparkles className="h-6 w-6" strokeWidth={2} />}
+          {open ? <X className="h-6 w-6" strokeWidth={2.2} /> : <ChatBubbleIcon className="h-[26px] w-[26px]" />}
         </motion.span>
       </AnimatePresence>
     </motion.button>
+  );
+}
+
+/**
+ * Bulle de discussion : cercle parfait (r = 8,5) avec une courte pointe en
+ * bas à gauche, trait unique et arrondi, sans décor.
+ */
+function ChatBubbleIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
+      <path d="M12 3.5a8.5 8.5 0 1 1-4.1 15.95L4 20.5l.91-3.81A8.5 8.5 0 0 1 12 3.5z" />
+    </svg>
   );
 }

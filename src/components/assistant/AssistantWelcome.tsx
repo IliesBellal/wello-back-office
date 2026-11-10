@@ -22,12 +22,15 @@ export function AssistantWelcome({ firstName, index, showOnboarding, onDismissOn
 
   return (
     <div className="flex min-h-full flex-col px-1 pb-2 pt-4">
-      <div className="mb-6 px-1">
-        <AssistantOrb size={44} className="mb-4" />
-        <h2 className="text-[26px] font-semibold leading-tight tracking-tight">
-          {firstName ? `Bonjour ${firstName},` : 'Bonjour,'}
-        </h2>
-        <p className="text-[26px] font-semibold leading-tight tracking-tight text-muted-foreground/70">que puis-je faire&nbsp;?</p>
+      {/* Marque à gauche, haute comme les deux lignes de la salutation. */}
+      <div className="mb-6 flex items-center gap-3.5 px-1">
+        <AssistantOrb size={60} />
+        <div className="min-w-0">
+          <h2 className="text-[26px] font-semibold leading-tight tracking-tight">
+            {firstName ? `Bonjour ${firstName},` : 'Bonjour,'}
+          </h2>
+          <p className="text-[26px] font-semibold leading-tight tracking-tight text-muted-foreground/70">que puis-je faire&nbsp;?</p>
+        </div>
       </div>
 
       {showOnboarding && (
@@ -53,21 +56,21 @@ export function AssistantWelcome({ firstName, index, showOnboarding, onDismissOn
       )}
 
       {actions.length > 0 && (
-        // Une action par ligne : icône, puis titre et description côte à côte.
+        // Une action par ligne : icône carrée haute comme les deux lignes, titre, description dessous.
         <div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
           {actions.map((a) => (
             <button
               key={a.id}
               type="button"
               onClick={() => onQuickAction(a)}
-              className="flex h-11 w-full items-center gap-3 px-3 text-left transition-colors hover:bg-muted/60 active:bg-muted"
+              className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-muted/60 active:bg-muted"
             >
-              <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', a.tint)}>
-                <a.icon className="h-4 w-4" strokeWidth={2.2} />
+              <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', a.tint)}>
+                <a.icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
               </span>
-              <span className="flex min-w-0 flex-1 items-baseline gap-2">
-                <span className="shrink-0 text-[14px] font-medium">{a.label}</span>
-                <span className="truncate text-[13px] text-muted-foreground">{a.sublabel}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-medium leading-[18px]">{a.label}</span>
+                <span className="block truncate text-xs leading-4 text-muted-foreground">{a.sublabel}</span>
               </span>
             </button>
           ))}

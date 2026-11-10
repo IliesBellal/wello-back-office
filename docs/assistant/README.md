@@ -1,10 +1,13 @@
 # Assistant du back-office
 
-Bouton flottant ✨ présent sur toutes les pages du back-office (au-dessus de la
+Bouton flottant (bulle de discussion) présent sur toutes les pages du back-office (au-dessus de la
 barre du bas sur mobile, en bas à droite sur ordinateur, raccourci ⌘J / Ctrl+J).
 Il ouvre une bulle de conversation, en plein écran sur mobile, qui reprend les
 actions rapides du tableau de bord et comprend les demandes en langage courant,
 au clavier ou à la voix.
+
+Marque de l'assistant : le W de WelloResto avec une étincelle au bout de sa
+pointe (`WelloAssistantMark.tsx`, fichier `public/wello-assistant.svg`).
 
 API : `ib-welloresto-api/docs/assistant.md`. Backlog : [`../assistant-backlog.md`](../assistant-backlog.md).
 

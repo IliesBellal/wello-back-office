@@ -5,23 +5,16 @@ import { normalize } from '@/lib/assistant/normalize';
 import type { EngineIndex } from '@/lib/assistant/engine';
 import { cn } from '@/lib/utils';
 import type { Block, Message } from './types';
+import { WelloAssistantMark } from './WelloAssistantMark';
 
 // ─── Avatar ─────────────────────────────────────────────────────────────────
 
 export function AssistantOrb({ size = 28, className }: { size?: number; className?: string }) {
   return (
-    <span
-      aria-hidden
-      className={cn(
-        'relative inline-flex shrink-0 items-center justify-center rounded-full text-white',
-        'bg-gradient-to-br from-[hsl(var(--primary-gradient-from))] to-[hsl(var(--primary-gradient-to))]',
-        'shadow-[inset_0_1px_0_rgb(255_255_255/0.35),0_4px_12px_-4px_hsl(var(--primary)/0.6)]',
-        className,
-      )}
-      style={{ width: size, height: size }}
-    >
-      <Sparkles style={{ width: size * 0.5, height: size * 0.5 }} strokeWidth={2.2} />
-    </span>
+    <WelloAssistantMark
+      size={size}
+      className={cn('shadow-[0_4px_12px_-4px_hsl(var(--primary)/0.55)]', className)}
+    />
   );
 }
 
