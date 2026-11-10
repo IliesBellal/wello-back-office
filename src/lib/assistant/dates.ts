@@ -15,7 +15,8 @@ export type DateSpec =
   | { kind: 'weekday'; weekday: number; direction: 'last' | 'next' | 'nearest' }
   | { kind: 'period'; unit: 'week' | 'month' | 'year'; offset: number }
   | { kind: 'lastDays'; days: number }
-  | { kind: 'absolute'; day: number; month?: number; year?: number };
+  | { kind: 'absolute'; day: number; month?: number; year?: number }
+  | { kind: 'month'; month: number; year?: number };
 
 export interface DateMention {
   start: number;
@@ -27,6 +28,7 @@ export interface DateMention {
 /** Lundi = 0 … dimanche = 6. */
 export const WEEKDAYS = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
 const MONTHS = ['janvier', 'fevrier', 'mars', 'avril', 'mai', 'juin', 'juillet', 'aout', 'septembre', 'octobre', 'novembre', 'decembre'];
+const MONTH_LABELS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
 const MONTH_ALIASES: Record<string, number> = {
   janv: 0, fev: 1, fevr: 1, avr: 3, juil: 6, sept: 8, oct: 9, nov: 10, dec: 11,
 };
@@ -167,6 +169,16 @@ const DAY_MATCHERS: Matcher = anyOf(
     }
     return { len, spec: { kind: 'absolute', day, month, year } };
   },
+  // Un mois seul : « janvier », « mois de mars », « septembre 2025 ».
+  (t, i) => {
+    const off = t[i] === 'mois' && (t[i + 1] === 'de' || t[i + 1] === 'd') ? 2 : 0;
+    const month = monthOf(t[i + off]);
+    // Les abréviations seules (« sept », « oct ») restent des nombres ou des mots courants.
+    if (month === null || (off === 0 && MONTH_ALIASES[t[i]] !== undefined)) return null;
+    const y = t[i + off + 1];
+    if (y && /^\d{4}$/.test(y)) return { len: off + 2, spec: { kind: 'month', month, year: Number(y) } };
+    return { len: off + 1, spec: { kind: 'month', month } };
+  },
 );
 
 /**
@@ -297,6 +309,19 @@ export function resolveDate(mention: Pick<DateMention, 'spec' | 'daypart'>, now:
     case 'lastDays': {
       const from = addDays(today, -(spec.days - 1));
       return { from: toISODate(from), to: toISODate(today), label: `les ${spec.days} derniers jours`, grain: spec.days <= 7 ? 'week' : 'month' };
+    }
+    case 'month': {
+      let year = spec.year ?? today.getFullYear();
+      if (spec.year === undefined) {
+        if (prefer === 'past' && spec.month > today.getMonth()) year -= 1;
+        if (prefer === 'future' && spec.month < today.getMonth()) year += 1;
+      }
+      const first = new Date(year, spec.month, 1);
+      const last = new Date(year, spec.month + 1, 0);
+      const isCurrent = year === today.getFullYear() && spec.month === today.getMonth();
+      const to = isCurrent && prefer === 'past' ? today : last;
+      const name = MONTH_LABELS[spec.month];
+      return { from: toISODate(first), to: toISODate(to), label: year === today.getFullYear() ? name : `${name} ${year}`, grain: 'month' };
     }
     case 'absolute': {
       let year = spec.year ?? today.getFullYear();

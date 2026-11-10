@@ -13,6 +13,7 @@ import { ProductCreateSheetContext } from '@/contexts/ProductCreateSheetContext'
 import { SEED_BLACKLIST } from '@/lib/assistant/defaultModel';
 import { buildCatalog, prepareModel } from '@/lib/assistant/engine';
 import { getModelStore } from '@/lib/assistant/modelStore';
+import { CHANNEL_RECORDS } from '@/lib/assistant/channels';
 import { AssistantTracker, detectDevice, detectPlatform } from '@/lib/assistant/tracking';
 import type { EntityRecord } from '@/lib/assistant/types';
 import { checkPermission } from '@/lib/permissions';
@@ -45,6 +46,19 @@ const safeSet = (k: string, v: string) => {
   }
 };
 
+/**
+ * Nom de l'établissement ; avec plusieurs établissements (franchise, même
+ * enseigne), on ajoute la rue pour les distinguer.
+ */
+function merchantLabel(authData: ReturnType<typeof useAuth>['authData']): string | undefined {
+  if (!authData) return undefined;
+  const name = authData.merchant.business_name || authData.merchant.name;
+  if ((authData.session.merchants?.length ?? 0) < 2) return name;
+  const current = authData.session.merchants.find((m) => m.id === authData.session.merchant_id);
+  const street = (current?.address || authData.merchant.address || '').split(',')[0].trim();
+  return street ? `${name} · ${street}` : name;
+}
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -68,7 +82,8 @@ export default function AssistantPanel({ open, onClose }: Props) {
   );
   const index = useMemo(() => prepareModel(withNavigation(model, authData), SEED_BLACKLIST), [model, authData]);
   const [records, setRecords] = useState<EntityRecord[]>(() => cachedProducts());
-  const catalog = useMemo(() => buildCatalog(index, records), [index, records]);
+  // Produits et équipiers de l'établissement + canaux de vente (« CA borne »).
+  const catalog = useMemo(() => buildCatalog(index, [...records, ...CHANNEL_RECORDS]), [index, records]);
   const products = useMemo(() => records.filter((r) => r.type === 'product'), [records]);
 
   // ─── Mesure d'usage : une session par ouverture ───────────────────────────
@@ -96,6 +111,8 @@ export default function AssistantPanel({ open, onClose }: Props) {
     baseContext: { permissions, path: location.pathname },
     tracker,
     actions: {
+      merchantId: authData?.session.merchant_id ? String(authData.session.merchant_id) : undefined,
+      merchantLabel: merchantLabel(authData),
       navigate,
       logout,
       queryClient,

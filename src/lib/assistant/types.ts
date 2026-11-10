@@ -19,7 +19,8 @@ export type TermSource = 'seed' | 'manual' | 'learned';
 export type TermStatus = 'candidate' | 'active' | 'validated' | 'rejected';
 
 /** Types d'entités reconnues dans une phrase. */
-export type EntityType = 'product' | 'employee' | 'customer' | 'date' | 'quantity' | 'text';
+/** `channel` : canal de vente (borne, ScanNOrder, à emporter…), voir channels.ts. */
+export type EntityType = 'product' | 'employee' | 'customer' | 'channel' | 'date' | 'quantity' | 'text';
 
 export interface SlotDef {
   name: string;

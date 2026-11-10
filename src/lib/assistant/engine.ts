@@ -55,6 +55,8 @@ const W_COVERAGE = 0.45;
 const BONUS_SLOT = 8;
 const PENALTY_MISSING_SLOT = 4;
 const BONUS_HINT = 6;
+/** L'intention accepte une période et la phrase en contient une (« caisse de janvier »). */
+const BONUS_DATE_FIT = 10;
 const PRIORITY_FACTOR = 0.3;
 const MAX_CANDIDATES = 4;
 
@@ -308,6 +310,7 @@ function scoreIntent(index: EngineIndex, pi: PreparedIntent, analysis: Analysis,
     if (slots[slot.name] && slots[slot.name].start >= 0) score += BONUS_SLOT;
     else if (slots[slot.name]) score += BONUS_SLOT / 2; // repris du contexte
   }
+  if (pi.slotTypes.has('date') && analysis.dates.length > 0) score += BONUS_DATE_FIT;
   score -= missing.length * PENALTY_MISSING_SLOT;
   score += pi.intent.priority * PRIORITY_FACTOR;
   score = Math.max(0, Math.min(100, score));
@@ -482,7 +485,10 @@ export function buildLearningSignal(
       if (words.length <= MAX_ALIAS_TOKENS && !signal.alias) {
         signal.alias = { entity_type: pickedEntity.type, entity_id: pickedEntity.id, text: words.join(' ') };
       }
-    } else if (significant.length <= MAX_TERM_TOKENS) {
+    } else if (significant.length <= MAX_TERM_TOKENS && chosen.consumed.length === 0) {
+      // Synonyme seulement si l'intention n'expliquait AUCUN mot de la phrase :
+      // sinon les mots restants sont des précisions (période, filtre…), pas un
+      // autre nom de l'intention (« caisse de janvier » n'apprend pas « janvier »).
       signal.term = significant.length === 1
         ? { text: significant[0], kind: 'keyword' }
         : { text: words.join(' '), kind: 'phrase' };

@@ -295,9 +295,10 @@ function Delta({ value }: { value?: number | null }) {
 }
 
 function CardHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+  // Titre puis contexte (période, établissement) dessous : jamais tronqués l'un par l'autre.
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <p className="text-[14px] font-semibold">{title}</p>
+    <div className="min-w-0">
+      <p className="text-[14px] font-semibold leading-snug">{title}</p>
       {subtitle && <p className="truncate text-xs text-muted-foreground">{subtitle}</p>}
     </div>
   );

@@ -1,13 +1,15 @@
-import { ArrowLeft, Ban, Brain, ListChecks, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Info, ListChecks, Sparkles } from 'lucide-react';
 import type { EngineIndex } from '@/lib/assistant/engine';
 import { CapabilitiesView } from './AssistantBlocks';
 
-const LIMITS = [
-  ['Une demande à la fois', '« Mets le saumon en rupture et dis-moi le CA » : je fais la première, puis je vous propose la suite.'],
-  ['Un produit à la fois', 'Pour plusieurs produits, je les traite l’un après l’autre.'],
-  ['Pas de conversation libre', 'Je ne rédige pas de texte et je ne donne pas de conseils : je réponds aux demandes courantes du restaurant.'],
-  ['Pas de mémoire d’une fois sur l’autre', 'Je me souviens du produit dont on parle (« remets-le en vente »), le temps de la conversation seulement.'],
-  ['Toujours votre accord', 'Une action qui modifie quelque chose (rupture, déconnexion…) attend votre confirmation.'],
+/**
+ * « Comment je fonctionne » : seulement ce qui sert au restaurateur (quoi
+ * demander, à quoi s'attendre). Aucun détail sur la technologie.
+ */
+const GOOD_TO_KNOW = [
+  'Une demande à la fois : je vous propose la suite ensuite.',
+  'Je vous demande toujours votre accord avant de modifier quelque chose.',
+  'Parlez naturellement : « plus de tiramisu », « CA à emporter hier ».',
 ];
 
 export function AssistantInfo({ index, onBack, onExample }: { index: EngineIndex; onBack: () => void; onExample: (text: string) => void }) {
@@ -20,46 +22,27 @@ export function AssistantInfo({ index, onBack, onExample }: { index: EngineIndex
         <p className="text-[15px] font-semibold">Comment je fonctionne</p>
       </div>
       <div className="flex-1 space-y-7 overflow-y-auto overscroll-contain px-5 py-5">
-        <Section icon={Brain} title="J'apprends de vos demandes">
-          <p>
-            Je reconnais vos demandes grâce à un vocabulaire de mots et d'expressions, directement dans votre navigateur : c'est instantané,
-            gratuit et rien n'est envoyé à une IA externe.
-          </p>
-          <p>
-            Quand je ne comprends pas, je vous propose les options les plus proches. Si vous en choisissez une et que l'action aboutit, je retiens
-            votre formulation. Après quelques confirmations, elle rejoint mon vocabulaire pour votre restaurant, puis pour tous si elle est
-            utilisée ailleurs.
-          </p>
-          <p>Si un mot appris me fait souvent proposer la mauvaise action, je l'oublie de moi-même. L'équipe Wello peut aussi corriger.</p>
+        <Section icon={Sparkles} title="Je m'améliore avec vous">
+          <p>Plus vous m'utilisez, mieux je comprends votre façon de dire les choses.</p>
         </Section>
 
         <Section icon={ListChecks} title="Ce que je sais faire">
           <CapabilitiesView index={index} onExample={onExample} />
         </Section>
 
-        <Section icon={Ban} title="Mes limites">
-          <ul className="space-y-3">
-            {LIMITS.map(([title, text]) => (
-              <li key={title}>
-                <p className="font-medium text-foreground">{title}</p>
-                <p>{text}</p>
-              </li>
+        <Section icon={Info} title="Bon à savoir">
+          <ul className="list-disc space-y-1.5 pl-4">
+            {GOOD_TO_KNOW.map((t) => (
+              <li key={t}>{t}</li>
             ))}
           </ul>
-        </Section>
-
-        <Section icon={ShieldCheck} title="Vos données">
-          <p>
-            Pour m'améliorer, j'enregistre vos demandes et ce que vous en faites. Les e-mails et numéros de téléphone sont masqués avant tout envoi,
-            le texte des demandes est effacé au bout de 90 jours, et seule l'équipe Wello y a accès.
-          </p>
         </Section>
       </div>
     </div>
   );
 }
 
-function Section({ icon: Icon, title, children }: { icon: typeof Brain; title: string; children: React.ReactNode }) {
+function Section({ icon: Icon, title, children }: { icon: typeof Info; title: string; children: React.ReactNode }) {
   return (
     <section>
       <h3 className="mb-2.5 flex items-center gap-2 text-[15px] font-semibold">

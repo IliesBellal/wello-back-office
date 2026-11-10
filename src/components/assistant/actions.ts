@@ -14,12 +14,19 @@ import { analyticsService } from '@/services/analyticsService';
 import { menuService } from '@/services/menuService';
 import { listBookings } from '@/services/reservationsService';
 import { planningWeeksApi } from '@/services/welloApi';
-import { cachedEmployees, cachedProducts, patchProductAvailability } from './catalog';
+import { cachedEmployees, cachedProducts, patchProductStatus, productStatus } from './catalog';
 import { capitalize, deltaPct, formatEuros, formatNumber, hhmm } from './format';
 import type { Block } from './types';
 import { uuid } from '@/lib/assistant/tracking';
+import { channelMeta } from '@/lib/assistant/channels';
+import { withFilters, type PageFilters } from '@/lib/pageFilters';
+import { DEFAULT_ORDER_FILTER, type OrderFilterSelection } from '@/utils/orderFilters';
 
 export interface ActionContext {
+  /** Établissement de la session : les chiffres ne portent que sur lui. */
+  merchantId?: string;
+  /** « Le Bistrot » ou, si plusieurs établissements, « Le Bistrot · 12 rue X ». */
+  merchantLabel?: string;
   navigate: (path: string) => void;
   logout: () => void;
   openCreateProduct: () => boolean;
@@ -43,6 +50,19 @@ export type ActionHandler = (intent: ModelIntent, slots: Record<string, EntityMa
 const b = <T extends Omit<Block, 'id'>>(block: T) => ({ id: uuid(), ...block }) as Block;
 
 const periodOf = (slots: Record<string, EntityMatch>): DateRange | undefined => slots.period?.date;
+
+/** Canal demandé → filtre canal × type de l'API (l'autre dimension reste « tout »). */
+function channelFilter(slots: Record<string, EntityMatch>): { filter?: OrderFilterSelection; label?: string; url: PageFilters } {
+  const meta = channelMeta(slots.channel?.record);
+  if (!meta) return { url: {} };
+  const filter: OrderFilterSelection = {
+    sources: meta.field === 'sources' ? [meta.value] : DEFAULT_ORDER_FILTER.sources,
+    orderTypes: meta.field === 'orderTypes' ? [meta.value] : DEFAULT_ORDER_FILTER.orderTypes,
+  };
+  return { filter, label: meta.label, url: meta.field === 'sources' ? { sources: [meta.value] } : { types: [meta.value] } };
+}
+
+const subtitleOf = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' · ');
 
 const DAYPART_NAME: Record<NonNullable<DateRange['daypart']>, string> = {
   morning: 'le matin',
@@ -76,17 +96,33 @@ function inDaypart(time: string, daypart: NonNullable<DateRange['daypart']>): bo
 }
 
 export const ACTIONS: Record<string, ActionHandler> = {
-  async navigate(intent, _slots, ctx) {
-    const path = String(intent.params.path ?? '/');
+  async navigate(intent, slots, ctx) {
+    // Période dite dans la phrase (« caisses de janvier ») : la page s'ouvre filtrée.
+    const period = slots.period && slots.period.start >= 0 ? slots.period.date : undefined;
+    const base = String(intent.params.path ?? '/');
+    const path = period ? withFilters(base, { from: period.from, to: period.to, tab: intent.params.tab as string | undefined }) : base;
     ctx.navigate(path);
-    return { outcome: 'navigate', close: 'mobile', blocks: [b({ type: 'text', text: `C'est parti pour « ${intent.label} ».`, tone: 'muted' })] };
+    return {
+      outcome: 'navigate',
+      close: 'mobile',
+      blocks: [
+        b({
+          type: 'text',
+          tone: 'muted',
+          text: period ? `Voici « ${intent.label} » pour ${period.label}.` : `Voici « ${intent.label} ».`,
+        }),
+      ],
+    };
   },
 
   async 'product.set_availability'(intent, slots, ctx) {
     const product = slots.product.record!;
     const available = Boolean(intent.params.available);
-    await menuService.updateProductAvailability(product.id, available);
-    patchProductAvailability(product.id, available);
+    // Statut de vente réel, comme l'édition groupée du tableau produits :
+    // « out_of_stock » (rupture) ou « available » (de nouveau en vente).
+    const status = available ? 'available' : 'out_of_stock';
+    await menuService.bulkUpdateProductsStatus([product.id], status);
+    patchProductStatus(product.id, status);
     void ctx.queryClient.invalidateQueries({ queryKey: ['menu'] });
     return {
       outcome: 'action',
@@ -110,9 +146,13 @@ export const ACTIONS: Record<string, ActionHandler> = {
     };
   },
 
-  async 'info.revenue'(_intent, slots) {
+  async 'info.revenue'(_intent, slots, ctx) {
     const period = periodOf(slots)!;
-    const data = await analyticsService.getRevenueAnalytics(period.from, period.to);
+    const channel = channelFilter(slots);
+    const data = await analyticsService.getRevenueAnalytics(period.from, period.to, {
+      merchantIds: ctx.merchantId ? [ctx.merchantId] : undefined,
+      orderFilter: channel.filter,
+    });
     const cur = data.current_period;
     const prev = data.previous_period;
     const basket = cur.order_count ? Math.round(cur.total_ttc_cents / cur.order_count) : 0;
@@ -122,8 +162,8 @@ export const ACTIONS: Record<string, ActionHandler> = {
       blocks: [
         b({
           type: 'metrics',
-          title: "Chiffre d'affaires",
-          subtitle: capitalize(period.label),
+          title: channel.label ? `Chiffre d'affaires · ${channel.label}` : "Chiffre d'affaires",
+          subtitle: subtitleOf(capitalize(period.label), ctx.merchantLabel),
           items: [
             { label: 'CA TTC', value: formatEuros(cur.total_ttc_cents), delta: prev ? deltaPct(cur.total_ttc_cents, prev.total_ttc_cents) : null },
             { label: 'Commandes', value: formatNumber(cur.order_count), delta: prev ? deltaPct(cur.order_count, prev.order_count) : null },
@@ -134,22 +174,29 @@ export const ACTIONS: Record<string, ActionHandler> = {
             : prev
               ? 'Comparé à la période précédente.'
               : undefined,
-          link: { label: "Voir l'analyse", path: '/dashboard/analysis' },
+          link: { label: "Voir l'analyse", path: withFilters('/dashboard/analysis', { tab: 'ca', from: period.from, to: period.to, ...channel.url }) },
         }),
       ],
     };
   },
 
-  async 'info.top_products'(_intent, slots) {
+  async 'info.top_products'(_intent, slots, ctx) {
     const period = periodOf(slots)!;
-    const data = await analyticsService.getProductsAnalytics(period.from, period.to, { sortBy: 'quantity', sortDir: 'desc', pageSize: 5 });
+    const channel = channelFilter(slots);
+    const data = await analyticsService.getProductsAnalytics(period.from, period.to, {
+      sortBy: 'quantity',
+      sortDir: 'desc',
+      pageSize: 5,
+      merchantIds: ctx.merchantId ? [ctx.merchantId] : undefined,
+      orderFilter: channel.filter,
+    });
     return {
       outcome: 'info',
       blocks: [
         b({
           type: 'list',
-          title: 'Meilleures ventes',
-          subtitle: capitalize(period.label),
+          title: channel.label ? `Meilleures ventes · ${channel.label}` : 'Meilleures ventes',
+          subtitle: subtitleOf(capitalize(period.label), ctx.merchantLabel),
           empty: 'Aucune vente sur cette période.',
           items: data.rows.slice(0, 5).map((r, i) => ({
             id: r.product_id,
@@ -157,7 +204,7 @@ export const ACTIONS: Record<string, ActionHandler> = {
             secondary: r.category_name || undefined,
             trailing: `${formatNumber(r.quantity_sold)} · ${formatEuros(r.revenue_ttc_cents)}`,
           })),
-          link: { label: 'Analyse produits', path: '/dashboard/analysis' },
+          link: { label: 'Analyse produits', path: withFilters('/dashboard/analysis', { tab: 'produits', from: period.from, to: period.to, ...channel.url }) },
         }),
       ],
     };
@@ -167,9 +214,9 @@ export const ACTIONS: Record<string, ActionHandler> = {
     let products = cachedProducts();
     if (!products.length) {
       const list = await menuService.getProducts();
-      products = list.map((p) => ({ type: 'product' as const, id: String(p.product_id), name: p.name, meta: { available: p.available !== false } }));
+      products = list.map((p) => ({ type: 'product' as const, id: String(p.product_id), name: p.name, meta: { status: productStatus(p) } }));
     }
-    const out = products.filter((p) => p.meta?.available === false);
+    const out = products.filter((p) => p.meta?.status === 'out_of_stock');
     return {
       outcome: 'info',
       blocks: [

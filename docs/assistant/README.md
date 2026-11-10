@@ -16,8 +16,8 @@ API : `ib-welloresto-api/docs/assistant.md`. Backlog : [`../assistant-backlog.md
 | Type | Exemples |
 |---|---|
 | Agir (toujours confirmé) | « Plus de tiramisu », « remets la margherita en vente », « crée un produit » |
-| Répondre | « CA d'hier », « combien on a fait samedi ? », « meilleures ventes de la semaine », « qu'est-ce qui est en rupture ? », « qui bosse demain soir ? », « réservations de ce soir » |
-| Emmener | N'importe quelle page de la navigation : « ouvre la TVA », « plan de salle », « mes horaires » |
+| Répondre | « CA d'hier », « CA borne aujourd'hui », « CA à emporter cette année », « CA ScanNOrder en janvier », « combien on a fait samedi ? », « meilleures ventes de la semaine », « qu'est-ce qui est en rupture ? », « qui bosse demain soir ? », « réservations de ce soir » |
+| Emmener | N'importe quelle page de la navigation : « ouvre la TVA », « plan de salle », « mes horaires ». Avec une période pour les registres et l'analyse : « caisses de janvier » ouvre les registres de janvier |
 | Comprendre | Fautes de frappe, oral familier, dates naturelles (« samedi dernier », « la semaine dernière », « le 12 novembre », « ce midi »), pronoms (« remets-le en vente »), voix (Web Speech API) |
 
 Limites, annoncées dans l'interface (« Comment je fonctionne ») : une demande à
@@ -77,6 +77,13 @@ src/components/assistant/
 Le panneau est chargé à la demande (survol ou toucher du bouton) : rien n'est
 ajouté au chargement initial. Le moteur répond en moins de 50 ms sur un
 catalogue de 3 000 produits (test `engine.test.ts`).
+
+## Liens filtrés
+
+Les pages Analyse et Registres de caisse lisent leurs filtres dans l'URL
+(`src/lib/pageFilters.ts`) : `?tab=ca&from=2026-01-01&to=2026-01-31&sources=KIOSK&types=TAKE_AWAY`.
+Les liens « Voir l'analyse » de l'assistant reprennent la période et le canal
+demandés. CA et meilleures ventes portent sur l'établissement de la session.
 
 ## Ajouter une capacité
 

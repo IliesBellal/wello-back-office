@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { readDateRange } from '@/lib/pageFilters';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Badge } from '@/components/ui/badge';
@@ -48,12 +50,22 @@ import { cn } from '@/lib/utils';
 const PAGE_LIMIT = 31;
 
 const CashRegisterHistory = () => {
+  // Période initiale lue dans l'URL (?from=…&to=…), sinon les 30 derniers jours.
+  const [searchParams] = useSearchParams();
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
+    const fromUrl = readDateRange(searchParams);
+    if (fromUrl) return fromUrl;
     const to = new Date();
     const from = new Date();
     from.setDate(from.getDate() - 30);
     return { from, to };
   });
+
+  const searchKey = searchParams.toString();
+  useEffect(() => {
+    const range = readDateRange(new URLSearchParams(searchKey));
+    if (range) setDateRange(range);
+  }, [searchKey]);
 
   const [registers, setRegisters] = useState<CashRegisterHistoryRecord[]>([]);
   const [page, setPage] = useState(1);

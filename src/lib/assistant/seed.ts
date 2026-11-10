@@ -56,6 +56,8 @@ const PRODUCT_SLOT: SlotDef = {
   prompt: 'Quel produit ?',
 };
 
+/** Canal de vente facultatif (« CA borne », « ventes à emporter »). */
+const CHANNEL: SlotDef = { name: 'channel', entity: 'channel', required: false };
 const PERIOD_TODAY: SlotDef = { name: 'period', entity: 'date', required: false, default: 'today', prefer: 'past' };
 /** « samedi » = samedi qui vient : planning, réservations. */
 const PERIOD_UPCOMING: SlotDef = { name: 'period', entity: 'date', required: false, default: 'today', prefer: 'future' };
@@ -149,10 +151,10 @@ const CORE_INTENTS: SeedIntent[] = [
     description: "CA, nombre de commandes et panier moyen sur une période",
     kind: 'info',
     action: 'info.revenue',
-    slots: [PERIOD_TODAY],
+    slots: [PERIOD_TODAY, CHANNEL],
     permission: 'reports.sales.read',
     priority: 8,
-    examples: ["CA d'aujourd'hui", "Combien on a fait hier ?", 'Chiffre de la semaine dernière'],
+    examples: ["CA d'aujourd'hui", "Combien on a fait hier ?", 'CA à emporter cette année', 'CA borne en janvier'],
     keywords: [['ca', 1.4], 'chiffre', 'recette', 'recettes', 'encaisse', ['ventes', 0.7], ['vente', 0.6], ['total', 0.5], ['commandes', 0.6]],
     phrases: [
       ["chiffre d affaires", 2],
@@ -171,7 +173,7 @@ const CORE_INTENTS: SeedIntent[] = [
     description: 'Les produits les plus vendus sur une période',
     kind: 'info',
     action: 'info.top_products',
-    slots: [{ name: 'period', entity: 'date', required: false, default: 'week', prefer: 'past' }],
+    slots: [{ name: 'period', entity: 'date', required: false, default: 'week', prefer: 'past' }, CHANNEL],
     permission: 'reports.sales.read',
     priority: 7,
     examples: ['Meilleures ventes de la semaine', "Qu'est-ce qui se vend le mieux ?"],

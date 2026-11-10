@@ -5,7 +5,8 @@
  */
 
 import { useState, useMemo, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
+import { readDateRange, readOrderFilter } from '@/lib/pageFilters';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,6 +48,9 @@ interface DateRange {
   to: Date;
 }
 
+const TABS: readonly TabType[] = ['ca', 'commandes', 'produits', 'options', 'annulations', 'upsell', 'remises', 'clients', 'scannorder', 'borne', 'paiements', 'tva'];
+const isTab = (v: string | null): v is TabType => !!v && (TABS as readonly string[]).includes(v);
+
 export const DashboardAnalysis = () => {
   const { canViewAnalytics } = usePermissions();
 
@@ -63,8 +67,12 @@ export const DashboardAnalysis = () => {
 const DashboardAnalysisContent = () => {
   const isMobile = useIsMobile();
   const { authData } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('ca');
-  const [dateRange, setDateRange] = useState<DateRange>({
+  // Filtres initiaux lus dans l'URL (?tab=produits&from=…&to=…&sources=…&types=…),
+  // par exemple depuis un lien de l'assistant ; sinon les 30 derniers jours.
+  const [searchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState<TabType>(() => (isTab(urlTab) ? urlTab : 'ca'));
+  const [dateRange, setDateRange] = useState<DateRange>(() => readDateRange(searchParams) ?? {
     from: subDays(new Date(), 30),
     to: new Date(),
   });
@@ -76,7 +84,19 @@ const DashboardAnalysisContent = () => {
   const [accessibleMerchants, setAccessibleMerchants] = useState<AccessibleMerchant[]>([]);
   const [selectedMerchantIds, setSelectedMerchantIds] = useState<string[]>([]);
   const [comparisonMode, setComparisonMode] = useState<ComparisonMode>('cumule');
-  const [orderFilter, setOrderFilter] = useState<OrderFilterSelection>(DEFAULT_ORDER_FILTER);
+  const [orderFilter, setOrderFilter] = useState<OrderFilterSelection>(() => readOrderFilter(searchParams) ?? DEFAULT_ORDER_FILTER);
+
+  // Nouveau lien alors que la page est déjà ouverte : on applique ses filtres.
+  const searchKey = searchParams.toString();
+  useEffect(() => {
+    if (!searchKey) return;
+    const params = new URLSearchParams(searchKey);
+    const tab = params.get('tab');
+    if (isTab(tab)) setActiveTab(tab);
+    const range = readDateRange(params);
+    if (range) setDateRange(range);
+    setOrderFilter(readOrderFilter(params) ?? DEFAULT_ORDER_FILTER);
+  }, [searchKey]);
 
   useEffect(() => {
     let isMounted = true;

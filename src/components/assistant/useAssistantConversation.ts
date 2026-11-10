@@ -48,6 +48,10 @@ export interface ConversationDeps {
 }
 
 const REPHRASE_WINDOW_MS = 30_000;
+/** Temps de « réflexion » affiché avant chaque réponse : entre 1 et 1,8 s. */
+const THINK_MIN_MS = 1000;
+const THINK_SPREAD_MS = 800;
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const OUTCOME_RANK: Record<Outcome, number> = { action: 4, info: 3, navigate: 2, fallback: 1, abandon: 0 };
 
 const block = <T extends Omit<Block, 'id'>>(b: T) => ({ id: uuid(), ...b }) as Block;
@@ -62,7 +66,13 @@ function learnedIds(scored?: ScoredIntent) {
 
 export function useAssistantConversation(deps: ConversationDeps) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [busy, setBusy] = useState(false);
+  /** Réponses en attente d'affichage + action en cours : indicateur d'écriture. */
+  const [pending, setPending] = useState(0);
+  const [working, setWorking] = useState(false);
+  const busy = pending > 0 || working;
+  const replyAt = useRef(0);
+  const queue = useRef<Promise<void>>(Promise.resolve());
+  const generation = useRef(0);
   const depsRef = useRef(deps);
   depsRef.current = deps;
   const lastTurn = useRef<Turn | null>(null);
@@ -77,9 +87,28 @@ export function useAssistantConversation(deps: ConversationDeps) {
   const pushUser = (text: string, input: 'text' | 'voice' | 'chip') =>
     setMessages((m) => [...m, { id: uuid(), role: 'user', text, input }]);
 
-  const pushAssistant = (blocks: Block[]): string => {
+  /** L'assistant « réfléchit » : la prochaine réponse s'affiche dans 1 à 1,8 s. */
+  const think = () => {
+    replyAt.current = Date.now() + THINK_MIN_MS + Math.random() * THINK_SPREAD_MS;
+  };
+
+  /**
+   * Réponses affichées dans l'ordre, pas avant la fin de la réflexion. Un appel
+   * API plus long que la réflexion n'ajoute pas d'attente supplémentaire.
+   */
+  const pushAssistant = (blocks: Block[], after?: () => void): string => {
     const id = uuid();
-    setMessages((m) => [...m, { id, role: 'assistant', blocks }]);
+    const gen = generation.current;
+    setPending((c) => c + 1);
+    queue.current = queue.current
+      .then(() => wait(Math.max(0, replyAt.current - Date.now())))
+      .then(() => {
+        if (gen === generation.current) {
+          setMessages((m) => [...m, { id, role: 'assistant', blocks }]);
+          after?.();
+        }
+        setPending((c) => Math.max(0, c - 1));
+      });
     return id;
   };
 
@@ -106,7 +135,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
         pushAssistant([block({ type: 'text', tone: 'error', text: "Je ne sais pas encore faire ça depuis cet écran." })]);
         return;
       }
-      setBusy(true);
+      setWorking(true);
       const t0 = Date.now();
       try {
         const result = await handler(scored.intent, scored.slots, { ...d.actions, runIntent: (key, slots) => runIntent(key, slots, 'followup') });
@@ -124,13 +153,8 @@ export function useAssistantConversation(deps: ConversationDeps) {
         });
         if (result.outcome === 'navigate') d.tracker.track('navigated', { ...meta, data: { path: scored.intent.params.path ?? null } });
 
+        // L'apprentissage reste invisible pour l'utilisateur (signal envoyé à l'API).
         const blocks = [...result.blocks];
-        if (learning) {
-          const text = learning.alias
-            ? `J'apprends que « ${learning.alias.text} » désigne ${picked ? (d.products.find((p) => p.id === picked.id)?.name ?? 'ce produit') : 'ce produit'}.`
-            : `J'apprends que « ${learning.term!.text} » veut dire « ${scored.intent.label} ».`;
-          blocks.push(block({ type: 'learning', text }));
-        }
         if (result.outcome === 'info') {
           const feedbackId = uuid();
           blocks.push({
@@ -142,11 +166,10 @@ export function useAssistantConversation(deps: ConversationDeps) {
             },
           });
         }
-        pushAssistant(blocks);
-
         const productSlot = Object.values(scored.slots).find((s) => s.type === 'product' && s.record);
         if (productSlot) lastEntity.current = productSlot;
-        if (result.close) d.closeAfter(result.close);
+        // Fermeture (plein écran mobile) seulement une fois la réponse affichée.
+        pushAssistant(blocks, result.close ? () => d.closeAfter(result.close!) : undefined);
       } catch (err) {
         const status = isApiHttpError(err) ? err.status : undefined;
         d.tracker.track('action_failed', { ...meta, data: { error: err instanceof Error ? err.message.slice(0, 200) : 'error', status } });
@@ -158,7 +181,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
           }),
         ]);
       } finally {
-        setBusy(false);
+        setWorking(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -203,7 +226,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
       const meta = { turn_id: turn.id, intent_key: scored.intent.key, score: scored.score };
 
       // 1. Entité ambiguë (« saumon » → pavé ou fumé ?) ou produit manquant.
-      const ambiguousSlot = picked ? undefined : scored.intent.slots.find((s) => scored.slots[s.name]?.alternatives?.length);
+      const ambiguousSlot = picked ? undefined : scored.intent.slots.find((s) => s.entity === 'product' && scored.slots[s.name]?.alternatives?.length);
       const missing = scored.missingSlots[0];
       const slot = ambiguousSlot ?? (missing?.entity === 'product' ? missing : undefined);
       if (!slot && missing) {
@@ -228,6 +251,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
             searchIn: sorted,
             state: 'pending',
             onPick: (record) => {
+              think();
               patchBlock(pickerId, { state: 'done', chosen: record.id } as Partial<Block>);
               d.tracker.track('slot_filled', { ...meta, data: { slot: slot.name, entity_id: record.id, from: options.some((o) => o.id === record.id) ? 'options' : 'search' } });
               const match: EntityMatch = { type: record.type, start: -1, end: -1, text: record.name, score: 1, record };
@@ -255,11 +279,13 @@ export function useAssistantConversation(deps: ConversationDeps) {
             ...c,
             state: 'pending',
             onConfirm: () => {
+              think();
               d.tracker.track('confirmed', meta);
               patchBlock(confirmId, { state: 'running' } as Partial<Block>);
               void execute(turn, scored, origin, picked).then(() => patchBlock(confirmId, { state: turn.succeeded ? 'done' : 'failed' } as Partial<Block>));
             },
             onCancel: () => {
+              think();
               d.tracker.track('cancelled', { ...meta, data: learnedIds(scored) });
               patchBlock(confirmId, { state: 'cancelled' } as Partial<Block>);
               pushAssistant([block({ type: 'text', tone: 'muted', text: "D'accord, je n'ai rien changé." })]);
@@ -285,6 +311,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
       const turn: Turn = { id: uuid(), text, at: now, succeeded: false, learnedTermIds: [], aliasIds: [] };
       turns.current++;
       pushUser(text, input);
+      think();
 
       // Reformulation : la demande précédente n'a pas abouti.
       const prev = lastTurn.current;
@@ -339,6 +366,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
         id: uuid(),
         ...suggestionLabel(c.intent, c.slots),
         onSelect: () => {
+          think();
           disableSuggestions(suggestionsId);
           d.tracker.track('suggestion_clicked', { turn_id: turn.id, intent_key: c.intent.key, score: c.score, data: { rank, source: u.status } });
           proceed(turn, c, 'suggestion');
@@ -397,12 +425,14 @@ export function useAssistantConversation(deps: ConversationDeps) {
       });
       const missing = intent.slots.filter((s) => s.required && !resolved[s.name]);
       if (origin === 'chip') pushUser(intent.label, 'chip');
+      think();
       proceed(turn, { intent, score: 100, matchedTerms: [], slots: resolved, missingSlots: missing, consumed: [] }, origin);
     },
     [proceed],
   );
 
   const reset = useCallback(() => {
+    generation.current++;
     setMessages([]);
     lastTurn.current = null;
     lastEntity.current = undefined;

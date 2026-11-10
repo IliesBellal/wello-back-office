@@ -12,6 +12,15 @@ import { normalize } from '@/lib/assistant/normalize';
 import type { AssistantModel, ModelIntent, ModelTerm } from '@/lib/assistant/types';
 import type { AuthData } from '@/types/auth';
 
+/**
+ * Pages qui savent ouvrir une période donnée (?from=…&to=…, voir
+ * lib/pageFilters.ts) : « caisses de janvier » ouvre les registres de janvier.
+ */
+const DATE_PAGES: Record<string, { tab?: string }> = {
+  'cash-registers-history': {},
+  'dashboard-analysis': { tab: 'ca' },
+};
+
 const GENERIC_TITLES = new Set(['Paramètres', 'Gestion', 'Activité', 'Hub', 'Statistiques', "Vue d'ensemble"]);
 
 interface NavPage {
@@ -70,8 +79,8 @@ export function withNavigation(model: AssistantModel, authData: AuthData | null 
       label: page.label,
       kind: 'navigate',
       action: 'navigate',
-      params: { ...(existing?.params ?? {}), nav_id: page.id, path: page.path },
-      slots: [],
+      params: { ...(existing?.params ?? {}), nav_id: page.id, path: page.path, ...(DATE_PAGES[page.id] ?? {}) },
+      slots: DATE_PAGES[page.id] ? [{ name: 'period', entity: 'date', required: false, prefer: 'past' }] : [],
       permission: null, // déjà filtré par navConfig
       module: null,
       confirm: false,

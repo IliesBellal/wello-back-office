@@ -122,6 +122,12 @@ export class EntityCatalog {
           }
           j++;
         }
+        // Certains noms ne valent que complets (canaux : « commande en ligne »
+        // ne doit pas se déclencher sur « commandes »).
+        if (this.records[idx].record.meta?.fullNameOnly && matched < nameTokens.length) {
+          i = j;
+          continue;
+        }
         const avgSim = simSum / matched;
         const coverage = Math.min(1, matched / nameTokens.length);
         // Nom complet : avgSim ; nom partiel : pénalisé selon la part du nom citée.

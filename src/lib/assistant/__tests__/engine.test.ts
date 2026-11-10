@@ -204,3 +204,64 @@ describe('apprentissage', () => {
     expect(best(r).slots.product).toMatchObject({ viaAlias: true, record: { id: 'p1' } });
   });
 });
+
+describe('retours de recette (10/11)', () => {
+  it('un mois seul est une période, pas un mot à apprendre', () => {
+    const [m] = findDates(normalize('caisse de janvier').split(' '));
+    expect(resolveDate(m, NOW)).toMatchObject({ from: '2026-01-01', to: '2026-01-31', grain: 'month', label: 'janvier' });
+    const [dec] = findDates(normalize('ventes de décembre').split(' '));
+    expect(resolveDate(dec, NOW).from).toBe('2025-12-01');
+    expect(findDates(normalize('sept margherita').split(' '))).toEqual([]);
+  });
+
+  it('« caisse de janvier » ouvre les registres sur janvier, sans rien apprendre', async () => {
+    const { withNavigation } = await import('@/components/assistant/navIntents');
+    const { normalizeAuthData } = await import('@/types/auth');
+    const auth = normalizeAuthData({ access: { admin: true }, session: { merchant_id: 'm1' } } as never);
+    const idx = prepareModel(withNavigation(buildSeedModel(), auth), SEED_BLACKLIST);
+    const r = understand(idx, 'caisse de janvier', ctx, catalog);
+    expect(r.understanding.status).toBe('matched');
+    const chosen = r.understanding.status === 'matched' ? r.understanding.best : r.understanding.candidates[0];
+    expect(chosen.intent.key).toBe('nav.cash-registers-history');
+    // Sans période, « caisse » reste ambigu entre registres et catégories.
+    expect(understand(idx, 'caisse', ctx, catalog).understanding.status).toBe('ambiguous');
+    expect(chosen.slots.period).toMatchObject({ start: 2, date: { from: '2026-01-01', to: '2026-01-31' } });
+    expect(buildLearningSignal(idx, r, chosen)).toBeNull();
+  });
+
+  it('CA filtré par canal', async () => {
+    const { CHANNEL_RECORDS } = await import('../channels');
+    const cat = buildCatalog(index, [...PRODUCTS, ...CHANNEL_RECORDS]);
+    const cases: Array<[string, string, string]> = [
+      ["CA borne aujourd'hui", 'sources:KIOSK', '2026-11-09'],
+      ['CA à emporter cette année', 'orderTypes:TAKE_AWAY', '2026-01-01'],
+      ['CA scannorder hier', 'sources:SCANNORDER', '2026-11-08'],
+      ['chiffre des commandes en ligne de la semaine dernière', 'sources:SCANNORDER', '2026-11-02'],
+      ['CA uber eats ce mois-ci', 'sources:UBER_EATS', '2026-11-01'],
+      ['CA sur place samedi', 'orderTypes:IN', '2026-11-07'],
+    ];
+    for (const [text, channel, from] of cases) {
+      const r = understand(index, text, ctx, cat);
+      expect(bestKey(r), text).toBe('info.revenue');
+      expect(best(r).slots.channel?.record?.id, text).toBe(channel);
+      expect(best(r).slots.period.date?.from, text).toBe(from);
+    }
+    // Sans canal, pas de filtre ; « scannorder » seul reste la page ScanNOrder.
+    expect(best(understand(index, "CA d'hier", ctx, cat)).slots.channel).toBeUndefined();
+    expect(bestKey(understand(index, 'meilleures ventes borne', ctx, cat))).toBe('info.top_products');
+  });
+
+  it("n'apprend pas un synonyme quand l'intention expliquait déjà la phrase", () => {
+    const r = run('plus de margherita ce soir svp merci beaucoup');
+    const chosen = r.understanding.status === 'matched' ? r.understanding.best : r.understanding.candidates[0];
+    expect(buildLearningSignal(index, r, chosen)?.term).toBeUndefined();
+  });
+});
+
+it('les mots génériques ne déclenchent pas de canal', async () => {
+  const { CHANNEL_RECORDS } = await import('../channels');
+  const cat = buildCatalog(index, [...PRODUCTS, ...CHANNEL_RECORDS]);
+  for (const text of ['combien de commandes hier', 'ventes de la semaine', 'CA de la semaine']) {
+    expect(understand(index, text, ctx, cat).entities.filter((e) => e.type === 'channel'), text).toEqual([]);
+  }
+});
