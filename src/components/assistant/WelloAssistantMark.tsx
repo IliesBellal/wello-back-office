@@ -1,9 +1,8 @@
 /**
  * Marque de l'assistant : le W de WelloResto (vectorisé depuis
- * public/wello_resto_logo.png) en blanc sur une pastille au dégradé de la
- * marque, avec une étincelle au bout de sa pointe droite, le W « allume »
- * quelque chose. Sous 32 px, l'étincelle devient illisible : le W seul,
- * un peu plus grand. Version fichier : public/wello-assistant.svg.
+ * public/wello_resto_logo.png) au dégradé bleu de la marque sur une pastille
+ * blanche, accompagné de trois étoiles « IA » en haut à droite.
+ * Version fichier : public/wello-assistant.svg.
  */
 import { useId } from 'react';
 import { cn } from '@/lib/utils';
@@ -16,33 +15,34 @@ const SPARKLE_PATH = 'M0 -1C0.14 -0.14 0.14 -0.14 1 0C0.14 0.14 0.14 0.14 0 1C-0
 
 interface Props {
   size?: number;
-  /** Par défaut : affichée à partir de 32 px. */
-  sparkle?: boolean;
   className?: string;
 }
 
-export function WelloAssistantMark({ size = 40, sparkle, className }: Props) {
+/** Étoiles [x, y, rayon] : une grande (≈ 40 % du logo), une moyenne, une petite. */
+const STARS: Array<[number, number, number]> = [
+  [66, 32, 16],
+  [84, 50, 7.5],
+  [82, 15, 5],
+];
+
+export function WelloAssistantMark({ size = 40, className }: Props) {
   const id = useId().replace(/:/g, '');
-  const withSparkle = sparkle ?? size >= 32;
-  // Avec étincelle : W décalé à gauche et vers le bas pour lui laisser la place.
-  const w = withSparkle ? { s: 0.092, x: 17.4, y: 33.1 } : { s: 0.1, x: 16.75, y: 28.4 };
+  const fill = `url(#wam-${id})`;
+  // Sous 32 px, la petite étoile n'est plus lisible.
+  const stars = size >= 32 ? STARS : STARS.slice(0, 2);
   return (
-    <svg
-      viewBox="0 0 100 100"
-      width={size}
-      height={size}
-      aria-hidden
-      className={cn('shrink-0 rounded-full', className)}
-    >
+    <svg viewBox="0 0 100 100" width={size} height={size} aria-hidden className={cn('shrink-0 rounded-full', className)}>
       <defs>
         <linearGradient id={`wam-${id}`} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" style={{ stopColor: 'hsl(var(--primary-gradient-from))' }} />
           <stop offset="1" style={{ stopColor: 'hsl(var(--primary-gradient-to))' }} />
         </linearGradient>
       </defs>
-      <circle cx="50" cy="50" r="50" fill={`url(#wam-${id})`} />
-      <path fill="#fff" fillRule="evenodd" transform={`translate(${w.x} ${w.y}) scale(${w.s})`} d={WELLO_W_PATH} />
-      {withSparkle && <path fill="#fff" transform="translate(79 24) scale(9.5)" d={SPARKLE_PATH} />}
+      <circle cx="50" cy="50" r="49.5" fill="#fff" stroke="hsl(var(--border))" strokeWidth="1" />
+      <path fill={fill} fillRule="evenodd" transform="translate(15 45) scale(0.072)" d={WELLO_W_PATH} />
+      {stars.map(([x, y, r]) => (
+        <path key={`${x}-${y}`} fill={fill} transform={`translate(${x} ${y}) scale(${r})`} d={SPARKLE_PATH} />
+      ))}
     </svg>
   );
 }

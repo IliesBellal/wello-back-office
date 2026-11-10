@@ -221,15 +221,15 @@ export default function AssistantPanel({ open, onClose }: Props) {
           className={cn(
             'fixed z-[60] flex flex-col overflow-hidden',
             isMobile
-              ? 'inset-0 bg-background pt-[env(safe-area-inset-top)]'
-              : 'bottom-[5.5rem] right-6 h-[min(680px,calc(100vh-7.5rem))] w-[400px] origin-bottom-right rounded-[28px] border border-border/70 bg-card shadow-[0_24px_64px_-16px_rgb(15_23_42/0.28),0_2px_6px_rgb(15_23_42/0.06)]',
+              ? 'inset-0 bg-white pt-[env(safe-area-inset-top)] dark:bg-card'
+              : 'bottom-[5.5rem] right-6 h-[min(680px,calc(100vh-7.5rem))] w-[400px] origin-bottom-right rounded-[28px] border border-border/70 bg-white dark:bg-card shadow-[0_24px_64px_-16px_rgb(15_23_42/0.28),0_2px_6px_rgb(15_23_42/0.06)]',
           )}
         >
           {infoOpen ? (
             <AssistantInfo index={index} onBack={() => setInfoOpen(false)} onExample={(t) => runExample(t, 'info')} />
           ) : (
             <>
-              <header className="flex h-14 shrink-0 items-center gap-3 border-b border-border/60 pl-4 pr-2">
+              <header className={cn('flex h-14 shrink-0 items-center gap-3 border-b border-border/60 pl-4 pr-2', isMobile && 'bg-background')}>
                 <AssistantOrb size={30} />
                 <div className="min-w-0 flex-1 leading-tight">
                   <p className="text-[15px] font-semibold">Assistant</p>

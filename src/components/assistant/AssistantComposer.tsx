@@ -79,7 +79,7 @@ export const AssistantComposer = forwardRef<ComposerHandle, Props>(function Assi
 
   const hasText = text.trim().length > 0;
   return (
-    <div className="flex items-end gap-1 rounded-[26px] border border-border bg-background py-1.5 pl-4 pr-1.5 transition-shadow focus-within:border-primary/40 focus-within:shadow-[0_0_0_4px_hsl(var(--primary)/0.08)]">
+    <div className="flex items-end gap-1 rounded-[26px] border border-border/80 bg-white py-1.5 pl-4 pr-1.5 shadow-[0_2px_8px_-2px_rgb(15_23_42/0.10)] transition-shadow focus-within:border-primary/40 focus-within:shadow-[0_2px_8px_-2px_rgb(15_23_42/0.10),0_0_0_4px_hsl(var(--primary)/0.08)] dark:bg-card">
       <textarea
         ref={area}
         rows={1}

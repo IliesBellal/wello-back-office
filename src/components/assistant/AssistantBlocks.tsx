@@ -13,7 +13,7 @@ export function AssistantOrb({ size = 28, className }: { size?: number; classNam
   return (
     <WelloAssistantMark
       size={size}
-      className={cn('shadow-[0_4px_12px_-4px_hsl(var(--primary)/0.55)]', className)}
+      className={cn('shadow-[0_4px_12px_-4px_rgb(15_23_42/0.18)]', className)}
     />
   );
 }
