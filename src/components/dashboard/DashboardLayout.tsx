@@ -8,6 +8,7 @@ import { MobileHeader } from '@/components/mobile/MobileHeader';
 import { BottomNav } from '@/components/mobile/BottomNav';
 import { OfflineIndicator } from '@/components/mobile/OfflineIndicator';
 import { ActivationStatusBanner } from './ActivationStatusBanner';
+import { AssistantAnchor } from '@/components/assistant/anchor';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -48,6 +49,9 @@ export const DashboardLayout = ({ children }: DashboardLayoutProps) => {
         
         {/* Mobile Bottom Navigation */}
         {isMobile && <BottomNav />}
+
+        {/* Assistant : bouton flottant sur toutes les pages du back-office (monté dans App.tsx). */}
+        <AssistantAnchor />
       </div>
     </div>
   );

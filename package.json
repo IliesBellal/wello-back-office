@@ -9,7 +9,8 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "assistant:seed-sql": "vite-node scripts/assistant-seed-sql.ts --"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -1,173 +1,136 @@
-# Assistant mobile (FAB) : backlog
+# Assistant (FAB) : backlog
 
-Ce document liste tout ce qui reste à construire autour de l'assistant mobile,
-le bouton flottant qui donne les actions rapides et un champ de demande en
-langage naturel.
+Bouton flottant du back-office : actions rapides et demandes en langage
+courant, au clavier ou à la voix. Documentation : [`assistant/README.md`](assistant/README.md)
+(back-office) et `ib-welloresto-api/docs/assistant.md` (API).
 
-**Principe directeur.** L'assistant est 100 % gratuit. Il n'utilise aucun LLM
-payant. Il reconnaît des « intentions » à partir de mots-clés, de synonymes et
-de motifs. Ce « modèle » est stocké en base et s'améliore grâce aux requêtes
-non comprises, elles aussi enregistrées.
-
----
-
-## 0. Auto-apprentissage (le modèle progresse seul)
-
-Quand une requête tombe en repli et que l'utilisateur clique une suggestion
-puis confirme l'action avec succès, la phrase devient un **synonyme candidat**
-de cette intention. L'humain n'intervient que pour corriger.
-
-### 0.1 Ce qui est appris
-- [ ] **Synonymes d'intention** : on retire de la phrase l'entité reconnue
-  (produit, personne, date) et les mots vides, puis on garde le reste.
-  « mets le tiramisu en pause » → `en pause` = Rupture.
-- [ ] **Alias d'entités, par établissement** : « le dessert du jour » →
-  *Tiramisu maison* si l'utilisateur a choisi ce produit dans la liste.
-  Un alias reste propre à l'établissement, il n'est jamais global.
-- [ ] Une phrase n'est retenue que si elle a été suivie d'une confirmation
-  **et** d'une action réussie. Un simple clic ne suffit pas.
-
-### 0.2 Cycle de vie d'un synonyme appris
-`candidat` → `actif (auto)` → `validé (humain)` ou `rejeté`
-
-- [ ] **Candidat** : enregistré, pas encore utilisé pour reconnaître.
-- [ ] **Promotion automatique en actif** (seuils à ajuster) :
-  - vu au moins 3 fois ;
-  - par au moins 2 utilisateurs différents ;
-  - sans être en conflit avec une autre intention (le même synonyme n'a pas
-    été associé à une autre intention plus de 20 % du temps).
-- [ ] **Portée progressive** : actif d'abord pour l'établissement où il a été
-  appris, puis global une fois observé dans au moins 3 établissements.
-- [ ] **Poids réduit** : un synonyme appris compte moins qu'un synonyme
-  saisi par un humain tant qu'il n'est pas validé.
-- [ ] **Rétrogradation automatique** : si, une fois actif, ses propositions
-  sont annulées (✗) ou reformulées plus de 30 % du temps, il redevient
-  candidat.
-- [ ] **Intentions sensibles** (annulation de commande, remboursement,
-  suppression, actions sur la caisse) : pas de promotion automatique, une
-  validation humaine est obligatoire.
-- [ ] **Liste noire** : mots trop génériques jamais appris seuls (« fais »,
-  « mets », « truc », « ok »…), plus les mots rejetés par un humain.
-
-### 0.3 Correction humaine (plateforme admin)
-- [ ] Liste « appris récemment », avec leur origine (phrases, utilisateurs,
-  établissements) et leurs statistiques.
-- [ ] Valider, rejeter, déplacer vers une autre intention, changer la portée.
-- [ ] Un rejet humain est définitif : le synonyme passe en liste noire pour
-  cette intention.
+**Principe directeur.** L'assistant est 100 % gratuit. Il n'utilise aucun LLM.
+Il reconnaît des « intentions » à partir de mots-clés, de phrases et de
+synonymes. Ce « modèle » est stocké en base et progresse seul grâce aux
+requêtes non comprises, elles aussi enregistrées.
 
 ---
 
-## 1. Plateforme admin (plus tard, hors de ce repo)
+## 1. Plateforme admin (à faire, hors de ce repo)
 
 L'écran d'administration de l'assistant sera intégré à la future plateforme
-admin. Il ne fait pas partie du back-office restaurateur.
+admin. **Les routes API dont il a besoin existent déjà** (`/admin/assistant/*`,
+réservées au staff WelloResto) : il reste à construire l'interface.
 
 ### 1.1 Revue des requêtes non comprises (replis)
-- [ ] Liste des requêtes en repli, triée par fréquence, filtrable par
-  période, établissement, rôle et mode de saisie (clavier ou voix).
-- [ ] Regroupement des requêtes similaires (« plus de saumon », « y a plus de
-  saumon », « saumon fini ») pour traiter un groupe d'un coup.
-- [ ] Pour chaque groupe, affichage de ce que l'utilisateur a cliqué ensuite
-  (`suggestion_clicked`), qui sert d'étiquette proposée automatiquement.
+- [ ] Liste des requêtes en repli, triée par fréquence, filtrable par période
+  et établissement. API : `GET /admin/assistant/fallbacks`.
+- [x] Regroupement des requêtes par mots significatifs (« plus de saumon » et
+  « saumon plus » ensemble) — fait côté API.
+- [x] Pour chaque groupe, ce que les gens ont choisi ensuite et le nombre
+  d'abandons — fait côté API.
+- [ ] Filtres par rôle et par mode de saisie (clavier / voix) : les données
+  sont enregistrées, l'agrégat reste à ajouter.
 - [ ] Actions en un clic :
-  - [ ] ajouter comme synonyme d'une intention existante ;
-  - [ ] ajouter comme nouveau motif (avec variable, par ex. `plus de {produit}`) ;
-  - [ ] créer une nouvelle intention à partir du groupe ;
-  - [ ] marquer comme « hors périmètre » (bruit, test, insulte…).
-- [ ] Historique de qui a modifié quoi dans le modèle, et quand.
+  - [ ] ajouter comme synonyme d'une intention existante (API : `POST /admin/assistant/terms`) ;
+  - [ ] créer une nouvelle intention à partir du groupe (route API à ajouter) ;
+  - [ ] marquer comme « hors périmètre » (bruit, test, insulte…) (à ajouter).
+- [ ] Historique de qui a modifié quoi (`reviewed_by` / `reviewed_at` existent ; journal complet à ajouter).
 
-### 1.2 Gestion du « modèle » (intentions)
-- [ ] CRUD des intentions : nom, description, mots-clés, synonymes, motifs,
-  entités attendues, action déclenchée, permission requise, confirmation
-  obligatoire ou non, actif ou inactif.
-- [ ] Gestion des listes de synonymes partagées (par ex. « rupture » =
-  « plus de », « épuisé », « fini », « sold out »).
+### 1.2 Gestion du « modèle »
+- [ ] Revue des termes et surnoms appris : valider, rejeter, déplacer,
+  repondérer, passer en global. API : `GET|PATCH /admin/assistant/terms`, `/aliases`.
+- [ ] Liste des intentions et de leur vocabulaire. API : `GET /admin/assistant/intents`.
+- [ ] Création / modification d'intentions depuis l'interface (aujourd'hui :
+  `src/lib/assistant/seed.ts` puis migration générée).
 - [ ] Bac à sable : taper une phrase et voir l'intention reconnue, le score,
-  les entités extraites et les candidats concurrents.
-- [ ] Tests de non-régression : un jeu de phrases de référence rejoué à chaque
-  modification, avec une alerte si une phrase change d'intention.
-- [ ] Versionnage du modèle, avec retour arrière vers une version précédente.
-- [ ] Publication : les changements sont servis par `GET /assistant/model`.
-  Les clients rafraîchissent leur cache au prochain lancement.
+  les entités et les candidats (le moteur étant côté client, l'écran peut
+  l'importer tel quel).
+- [ ] Tests de non-régression : phrases de référence rejouées à chaque
+  modification (les tests `engine.test.ts` en sont la base).
+- [ ] Versionnage du modèle avec retour arrière (aujourd'hui : version =
+  empreinte, sans historique).
 
 ### 1.3 Tableau de bord d'analyse
-- [ ] **Taux de compréhension** (requêtes reconnues / requêtes totales) et son
-  évolution par semaine. C'est le KPI principal.
-- [ ] **Taux de succès réel** : sessions terminées par une action réussie.
-- [ ] Top des requêtes non comprises.
-- [ ] Top des intentions utilisées, par rôle, établissement et créneau horaire.
-- [ ] Utilisation des chips d'actions rapides par rapport au champ libre.
-- [ ] Clavier ou voix : répartition et taux d'échec de chacun.
-- [ ] Temps jusqu'à l'action, de l'ouverture du FAB à l'action réussie.
-- [ ] Taux de reformulation (nouvelle requête moins de 30 s après une autre).
-- [ ] Taux d'annulation des confirmations, par intention. Un taux élevé
-  indique une intention mal reconnue.
-- [ ] Échecs d'actions (`action_failed`) par code d'erreur.
-- [ ] Ambiguïtés fréquentes (intentions qui se « volent » les requêtes).
-- [ ] Feedback 👍 / 👎.
-- [ ] Adoption : utilisateurs actifs par jour et par semaine, rétention,
-  utilisateurs qui l'essaient une fois puis abandonnent.
-- [ ] Entonnoir : ouverture → saisie → intention → confirmation → succès.
-- [ ] Vue d'une session : rejeu chronologique des événements d'une session.
+API : `GET /admin/assistant/stats` fournit déjà : sessions, utilisateurs,
+établissements, taux de compréhension, taux de réussite, requêtes clavier /
+voix, actions rapides, annulations, reformulations, médianes du temps
+jusqu'à l'action et de la durée, issues, appareils, top intentions (succès,
+annulations, score moyen), courbe hebdomadaire, état de l'apprentissage.
+- [ ] Écran du tableau de bord.
+- [ ] Rejeu d'une session (API : `GET /admin/assistant/sessions/{id}/events`).
+- [ ] Ajouts possibles : intentions par rôle et par créneau horaire, entonnoir
+  ouverture → saisie → intention → confirmation → succès, rétention des
+  utilisateurs, échecs d'actions par code d'erreur, ambiguïtés fréquentes,
+  avis 👍 / 👎 (tous enregistrés, agrégats à écrire).
+- [ ] Déclencher un passage d'apprentissage (API : `POST /admin/assistant/learning/run`).
 
-### 1.4 RGPD et données
-- [ ] Accès aux analyses et au texte brut réservé aux admins.
-- [ ] Purge automatique ou anonymisation du texte brut après 90 jours (durée
-  à valider).
+### 1.4 RGPD
+- [x] Accès aux analyses et au texte brut réservé au staff WelloResto.
+- [x] Texte libre effacé après 90 jours, purge après 400 jours (tâche quotidienne).
+- [x] E-mails et numéros de téléphone masqués avant envoi.
 - [ ] Export et suppression des données d'un utilisateur sur demande.
-- [ ] Mention de l'assistant dans la politique de confidentialité.
+- [ ] Mention de l'assistant dans la politique de confidentialité (texte
+  d'information déjà présent dans « Comment je fonctionne »).
 
 ---
 
-## 2. Backend (`welloresto-api`)
+## 2. Livré
 
-### 2.1 Tables
-- [ ] `assistant_intents` : définition du modèle (voir 1.2), avec version.
-- [ ] `assistant_model_versions` : snapshots publiés du modèle.
-- [ ] `assistant_sessions` : une ligne par ouverture du FAB (utilisateur,
-  rôle, établissement, page d'origine, appareil, en ligne ou non, début, fin,
-  durée, issue : `action` / `abandon` / `fallback`).
-- [ ] `assistant_events` : une ligne par interaction (session, type, horodatage
-  en ms, charge utile JSON).
-- [ ] `assistant_learned_terms` : synonymes et alias appris (texte, intention
-  ou entité, portée, statut, compteurs d'occurrences, d'utilisateurs,
-  d'établissements, de succès et d'annulations).
-- [ ] Index sur `created_at`, `merchant_id`, `event_type`, `session_id`.
+### 2.1 Auto-apprentissage
+- [x] Synonymes d'intention appris : les mots non expliqués d'une phrase
+  (entités et mots vides retirés), après le choix d'une suggestion **et** une
+  action réussie.
+- [x] Surnoms d'entités par établissement (« dessert du jour » → produit
+  choisi à la main ; « saumon » → le saumon choisi entre deux homonymes).
+- [x] Cycle `candidat → actif (établissement) → actif (global) → validé / rejeté`.
+- [x] Promotion : ≥ 3 occurrences par ≥ 2 personnes. **Ajout** : ou 1 personne
+  sur ≥ 3 jours différents, sinon un restaurant tenu seul n'apprendrait jamais.
+- [x] Conflits entre intentions (< 80 %) → revue humaine.
+- [x] Global dès 3 établissements.
+- [x] Poids × 0,8 tant qu'un humain n'a pas validé.
+- [x] Rétrogradation : ≥ 5 usages dont > 30 % annulés ou reformulés.
+- [x] Intentions sensibles jamais promues automatiquement.
+- [x] Liste noire de mots génériques ; un rejet humain est définitif.
 
-### 2.2 Endpoints back-office
-- [ ] `GET /assistant/model` : modèle courant, avec ETag pour le cache.
-- [ ] `POST /assistant/events` : réception par lots, idempotente (identifiant
-  d'événement généré côté client).
-- [ ] Tâche d'apprentissage (par ex. toutes les heures) : lit les séquences
-  repli → suggestion → confirmation → succès, met à jour
-  `assistant_learned_terms`, applique les seuils de la section 0.2 et publie
-  une nouvelle version du modèle si quelque chose a changé.
-- [ ] Vérification serveur des permissions sur toutes les actions déclenchées.
-  Le serveur ne fait jamais confiance au front sur ce point.
+### 2.2 API (`ib-welloresto-api`)
+- [x] Migrations `206_assistant` (7 tables) et `207_assistant_seed`
+  (58 intentions, 347 termes, 192 entrées de lexique), générée depuis
+  `src/lib/assistant/seed.ts` (`npm run assistant:seed-sql`).
+- [x] `GET /assistant/model` (version courte si inchangé), `POST /assistant/events`
+  (lots, idempotent, identité tirée du jeton, sessions protégées).
+- [x] Tâche horaire d'apprentissage, tâche quotidienne de purge.
+- [x] Routes `/admin/assistant/*` (voir 1).
+- [x] Tests unitaires et d'intégration Postgres (cycle complet).
 
-### 2.3 Endpoints plateforme admin
-- [ ] CRUD intentions et synonymes, publication et retour arrière de version.
-- [ ] Bac à sable : évaluer une phrase contre le modèle.
-- [ ] Agrégats pour le tableau de bord (voir 1.3).
-- [ ] Liste et regroupement des replis.
-- [ ] Purge et export RGPD.
+Écarts par rapport au plan : pas de table `assistant_model_versions` (la
+version est une empreinte calculée) ; pas d'ETag HTTP (en-têtes non exposés
+par le CORS de l'API) mais un paramètre `version`.
+
+### 2.3 Back-office (ce repo)
+- [x] Bouton flottant sur toutes les pages du back-office (au-dessus de la
+  `BottomNav` sur mobile), raccourci ⌘J / Ctrl+J, panneau chargé à la demande.
+- [x] Bulle sur ordinateur, plein écran sur mobile.
+- [x] Accueil : actions rapides (rupture, créer un produit, planning du jour,
+  caisses, CA du jour, ruptures en cours) filtrées par droits, exemples,
+  présentation de l'apprentissage.
+- [x] Dictée vocale (Web Speech API, masquée si non supportée).
+- [x] Moteur local portable (`src/lib/assistant/`) : fautes, dates, entités,
+  quantités, pronoms, ambiguïtés, demandes enchaînées, < 50 ms sur 3 000 produits.
+- [x] Réponses : action confirmée, navigation, cartes (CA comparé, meilleures
+  ventes, ruptures avec remise en vente, équipe au planning, réservations),
+  sélecteur de produit avec recherche, suggestions de repli.
+- [x] Information sur l'apprentissage et les limites (« Comment je fonctionne »).
+- [x] Mesure d'usage complète, envoi par lots, `fetch keepalive` à la
+  fermeture, file hors ligne.
+- [x] Modèle embarqué + cache local + mode mock.
+
+Retiré : la bascule clair / sombre (le back-office n'a pas de fournisseur de
+thème branché, l'action n'aurait rien fait).
 
 ---
 
-## 3. Front back-office (ce repo)
+## 3. Plus tard
 
-- [ ] FAB mobile au-dessus de la `BottomNav`, ouvrant une bottom sheet.
-- [ ] Chips d'actions rapides (rupture, créer un produit, planning, caisses),
-  filtrées par permission. Même source que `QuickActions` sur desktop.
-- [ ] Champ de demande avec dictée (Web Speech API).
-- [ ] Moteur d'intentions local : normalisation, reconnaissance, extraction
-  d'entités, score, gestion des ambiguïtés.
-- [ ] Réponses : action avec confirmation, redirection, carte d'information
-  (CA, planning…), repli avec suggestions.
-- [ ] Chargement et cache du modèle (`GET /assistant/model`), avec un modèle
-  par défaut embarqué.
-- [ ] Tracking complet (voir 2.1) : envoi par lots, `sendBeacon` à la
-  fermeture, file d'attente hors ligne, masquage automatique des e-mails et
-  numéros de téléphone.
-- [ ] Mode mock (`VITE_USE_MOCK`) tant que l'API n'existe pas.
+- [ ] POS : intentions `surface = pos`, prise de commande orale (« deux
+  margherita et un coca » : quantités et entités multiples déjà reconnues),
+  portage Dart du moteur.
+- [ ] Plusieurs demandes ou plusieurs produits traités d'un coup.
+- [ ] Préremplissage du formulaire de création de produit (nom, prix) depuis
+  la phrase.
+- [ ] Repli vers un LLM derrière le même champ, si un jour le budget le permet.

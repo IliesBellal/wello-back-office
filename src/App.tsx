@@ -8,6 +8,7 @@ import { MFAProvider } from "./contexts/MFAContext";
 import { ProductCreateSheetProvider } from "./contexts/ProductCreateSheetContext";
 import { OrganizeModalProvider } from "./contexts/OrganizeModalContext";
 import { CommandPaletteProvider } from "./components/command-palette";
+import { AssistantRoot } from "./components/assistant/AssistantRoot";
 import { ProtectedRoute } from "./components/shared/ProtectedRoute";
 import { checkPermission } from "@/lib/permissions";
 import GlobalLoadingBar from "./components/GlobalLoadingBar";
@@ -84,6 +85,7 @@ const App = () => (
                 <GlobalLoadingBar />
                 <Toaster />
                 <Sonner />
+                <AssistantRoot />
                 <Routes>
               <Route path="/login" element={<Login />} />
               {/* Public: the visitor has lost their password, so no ProtectedRoute. */}
