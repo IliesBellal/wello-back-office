@@ -21,7 +21,7 @@ export const QUICK_ACTIONS: QuickAction[] = [
     id: 'rupture',
     intentKey: 'menu.product.out_of_stock',
     label: 'Marquer une rupture',
-    sublabel: 'Retirer un produit de la vente',
+    sublabel: 'Retirer de la vente',
     icon: AlertTriangle,
     tint: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
   },

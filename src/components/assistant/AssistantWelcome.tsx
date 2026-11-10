@@ -53,20 +53,21 @@ export function AssistantWelcome({ firstName, index, showOnboarding, onDismissOn
       )}
 
       {actions.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
+        // Une action par ligne : icône, puis titre et description côte à côte.
+        <div className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/70 bg-card shadow-[0_1px_2px_rgb(0_0_0/0.04)]">
           {actions.map((a) => (
             <button
               key={a.id}
               type="button"
               onClick={() => onQuickAction(a)}
-              className="group flex min-h-[92px] flex-col items-start justify-between gap-3 rounded-2xl border border-border/70 bg-card p-3.5 text-left shadow-[0_1px_2px_rgb(0_0_0/0.04)] transition-all hover:-translate-y-px hover:border-border hover:shadow-md active:translate-y-0 active:scale-[0.98]"
+              className="flex h-11 w-full items-center gap-3 px-3 text-left transition-colors hover:bg-muted/60 active:bg-muted"
             >
-              <span className={cn('flex h-9 w-9 items-center justify-center rounded-xl', a.tint)}>
-                <a.icon className="h-[18px] w-[18px]" strokeWidth={2.2} />
+              <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-lg', a.tint)}>
+                <a.icon className="h-4 w-4" strokeWidth={2.2} />
               </span>
-              <span className="min-w-0">
-                <span className="block text-[14px] font-semibold leading-tight">{a.label}</span>
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground">{a.sublabel}</span>
+              <span className="flex min-w-0 flex-1 items-baseline gap-2">
+                <span className="shrink-0 text-[14px] font-medium">{a.label}</span>
+                <span className="truncate text-[13px] text-muted-foreground">{a.sublabel}</span>
               </span>
             </button>
           ))}
