@@ -33,6 +33,21 @@ export interface PayoutDocumentLink {
   download_url: string;
 }
 
+/** Facture de commission mensuelle (et récapitulatif du mois). */
+export interface CommissionInvoice {
+  number: string;
+  /** 1er jour du mois facturé (ISO). */
+  period_month: string;
+  amount_ttc: number;
+  amount_ht: number;
+  payout_count: number;
+  issued_at: string;
+  has_invoice: boolean;
+  has_recap: boolean;
+}
+
+export type CommissionInvoiceKind = 'invoice' | 'recap';
+
 const ENDPOINT = '/accounting/payouts';
 
 export const payoutDocumentsService = {
@@ -43,6 +58,32 @@ export const payoutDocumentsService = {
       async () => {
         const response = await apiClient.get<{ id: string; data: { status: string; payouts: PayoutDocument[] } }>(ENDPOINT);
         return response.data.payouts ?? [];
+      }
+    );
+  },
+
+  /** Factures de commission mensuelles, de la plus récente à la plus ancienne. */
+  async listCommissionInvoices(): Promise<CommissionInvoice[]> {
+    const endpoint = '/accounting/commission-invoices';
+    logAPI('GET', endpoint);
+    return withMock<CommissionInvoice[]>(
+      () => [],
+      async () => {
+        const response = await apiClient.get<{ id: string; data: { status: string; invoices: CommissionInvoice[] } }>(endpoint);
+        return response.data.invoices ?? [];
+      }
+    );
+  },
+
+  /** Lien signé (une heure) vers la facture de commission ou le récapitulatif du mois. */
+  async getCommissionInvoiceLink(number: string, kind: CommissionInvoiceKind): Promise<PayoutDocumentLink> {
+    const endpoint = `/accounting/commission-invoices/${encodeURIComponent(number)}/${kind}/download`;
+    logAPI('GET', endpoint);
+    return withMock<PayoutDocumentLink>(
+      () => ({ payout_id: number, kind: 'invoice', filename: `${kind}_demo.pdf`, download_url: '#' }),
+      async () => {
+        const response = await apiClient.get<{ id: string; data: PayoutDocumentLink }>(endpoint);
+        return response.data;
       }
     );
   },

@@ -138,7 +138,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
       setWorking(true);
       const t0 = Date.now();
       try {
-        const result = await handler(scored.intent, scored.slots, { ...d.actions, runIntent: (key, slots) => runIntent(key, slots, 'followup') });
+        const result = await handler(scored.intent, scored.slots, { ...d.actions, query: turn.text, runIntent: (key, slots) => runIntent(key, slots, 'followup') });
         turn.succeeded = true;
         bumpOutcome(result.outcome);
 
@@ -154,7 +154,18 @@ export function useAssistantConversation(deps: ConversationDeps) {
         if (result.outcome === 'navigate') d.tracker.track('navigated', { ...meta, data: { path: scored.intent.params.path ?? null } });
 
         // L'apprentissage reste invisible pour l'utilisateur (signal envoyé à l'API).
-        const blocks = [...result.blocks];
+        const blocks = result.blocks.map((b) =>
+          b.type === 'downloads'
+            ? {
+                ...b,
+                onDownload: (item: { id: string; format: string; generated?: boolean }, ok: boolean, error?: string) =>
+                  d.tracker.track('download_clicked', {
+                    ...meta,
+                    data: { document: item.id.replace(/-[^-]+$/, ''), format: item.format, generated: !!item.generated, ok, error },
+                  }),
+              }
+            : b,
+        );
         if (result.outcome === 'info') {
           const feedbackId = uuid();
           blocks.push({

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { initialUrlDateRange, useUrlDateRange } from '@/lib/pageFilters';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { TabSystem } from '@/components/shared/TabSystem';
@@ -27,10 +28,12 @@ const formatCurrency = (cents: number) => {
 
 const FinancialReports = () => {
   const now = new Date();
-  const [dateRange, setDateRange] = useState({
+  // Période de l'URL (?from=…&to=…) sinon le mois en cours.
+  const [dateRange, setDateRange] = useState(() => initialUrlDateRange() ?? {
     from: startOfMonth(now),
     to: endOfMonth(now)
   });
+  useUrlDateRange(setDateRange);
   const [detailsTab, setDetailsTab] = useState<string>('vat');
 
   const { data: vatData, isLoading: vatLoading } = useQuery({

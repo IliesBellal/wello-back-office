@@ -265,3 +265,52 @@ it('les mots génériques ne déclenchent pas de canal', async () => {
     expect(understand(index, text, ctx, cat).entities.filter((e) => e.type === 'channel'), text).toEqual([]);
   }
 });
+
+describe('documents et liens filtrés', () => {
+  const navIndex = async () => {
+    const { withNavigation } = await import('@/components/assistant/navIntents');
+    const { normalizeAuthData } = await import('@/types/auth');
+    const { CHANNEL_RECORDS } = await import('../channels');
+    const auth = normalizeAuthData({ access: { admin: true }, session: { merchant_id: 'm1' } } as never);
+    const idx = prepareModel(withNavigation(buildSeedModel(), auth), SEED_BLACKLIST);
+    return { idx, cat: buildCatalog(idx, [...PRODUCTS, ...CHANNEL_RECORDS]) };
+  };
+
+  it('les demandes de documents vont aux téléchargements, mois précédent par défaut', async () => {
+    const { idx, cat } = await navIndex();
+    const cases: Array<[string, string]> = [
+      ["factures d'octobre", '2026-10-01'],
+      ['rapport comptable de septembre', '2026-09-01'],
+      ['relevés de virement du mois dernier', '2026-10-01'],
+      ['virements de janvier', '2026-01-01'],
+      ['documents comptables', '2026-10-01'],
+      ['export TVA de mars', '2026-03-01'],
+      ['télécharger la facture de commission', '2026-10-01'],
+    ];
+    for (const [text, from] of cases) {
+      const r = understand(idx, text, ctx, cat);
+      expect(bestKey(r), text).toBe('documents.download');
+      expect(best(r).slots.period.date?.from, text).toBe(from);
+    }
+  });
+
+  it('les pages filtrées restent accessibles', async () => {
+    const { idx, cat } = await navIndex();
+    const { filteredPath } = await import('@/components/assistant/actions');
+    const go = (text: string) => {
+      const r = understand(idx, text, ctx, cat);
+      // Compris, ou premier choix proposé quand deux pages sont aussi plausibles.
+      const s = r.understanding.status === 'matched' ? r.understanding.best : r.understanding.candidates[0];
+      return { key: s.intent.key, path: filteredPath(String(s.intent.params.nav_id), String(s.intent.params.path), s.slots, text) };
+    };
+    expect(go('commandes annulées hier')).toEqual({ key: 'nav.dashboard-order-history', path: '/dashboard/order-history?startDate=2026-11-08&endDate=2026-11-08&status=canceled' });
+    expect(go('commandes uber eats de la semaine dernière').path).toBe('/dashboard/order-history?startDate=2026-11-02&endDate=2026-11-08&brand=UBER_EATS');
+    expect(go('TVA de septembre')).toEqual({ key: 'nav.vat-declaration', path: '/accounting/vat?from=2026-09-01&to=2026-09-30' });
+    expect(go('pointages de la semaine dernière').path).toBe('/equipe/pointages?from=2026-11-02&to=2026-11-08');
+    expect(go('rapports financiers du mois dernier').path).toBe('/accounting/report?from=2026-10-01&to=2026-10-31');
+    const resa = understand(idx, 'liste des réservations de samedi', ctx, cat);
+    const page = [...(resa.understanding.status === 'matched' ? [resa.understanding.best] : []), ...resa.understanding.candidates].find((c) => c.intent.key === 'nav.reservations-list')!;
+    expect(filteredPath('reservations-list', '/reservations/list', page.slots, '')).toBe('/reservations/list?from=2026-11-14&to=2026-11-14');
+    expect(go('ouvre la TVA').path).toBe('/accounting/vat');
+  });
+});

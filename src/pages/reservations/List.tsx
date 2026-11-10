@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { initialUrlDateRange, toIsoDay, useUrlDateRange } from "@/lib/pageFilters";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -390,8 +391,10 @@ const ReservationsListPage = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [source, setSource] = useState<string>("all");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // Période de l'URL (?from=…&to=…), sinon aucune.
+  const [dateFrom, setDateFrom] = useState(() => { const r = initialUrlDateRange(); return r ? toIsoDay(r.from) : ""; });
+  const [dateTo, setDateTo] = useState(() => { const r = initialUrlDateRange(); return r ? toIsoDay(r.to) : ""; });
+  useUrlDateRange((r) => { setDateFrom(toIsoDay(r.from)); setDateTo(toIsoDay(r.to)); setPage(1); });
   const [partySize, setPartySize] = useState("");
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);

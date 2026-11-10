@@ -1,10 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownRight, ArrowUpRight, Check, ChevronRight, Loader2, Search, Sparkles, ThumbsDown, ThumbsUp, X } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Check, ChevronRight, Download, FileArchive, FileText, Loader2, Search, Sparkles, ThumbsDown, ThumbsUp, X } from 'lucide-react';
 import { normalize } from '@/lib/assistant/normalize';
 import type { EngineIndex } from '@/lib/assistant/engine';
 import { cn } from '@/lib/utils';
-import type { Block, Message } from './types';
+import type { Block, DownloadItem, Message } from './types';
 import { WelloAssistantMark } from './WelloAssistantMark';
 
 // ─── Avatar ─────────────────────────────────────────────────────────────────
@@ -101,6 +101,8 @@ function BlockView({ block, index, onExample }: { block: Block; index: EngineInd
       return <MetricsView block={block} />;
     case 'list':
       return <ListView block={block} />;
+    case 'downloads':
+      return <DownloadsView block={block} />;
     case 'capabilities':
       return <CapabilitiesView index={index} onExample={onExample} />;
     case 'learning':
@@ -382,6 +384,98 @@ function ListView({ block }: { block: Extract<Block, { type: 'list' }> }) {
         </ul>
       )}
       <CardLink link={block.link} />
+    </div>
+  );
+}
+
+
+// ─── Téléchargements ────────────────────────────────────────────────────────
+
+type DownloadState = 'idle' | 'loading' | 'done' | 'error';
+
+function DownloadsView({ block }: { block: Extract<Block, { type: 'downloads' }> }) {
+  const [states, setStates] = useState<Record<string, { state: DownloadState; error?: string }>>({});
+
+  const download = async (item: DownloadItem) => {
+    if (states[item.id]?.state === 'loading') return;
+    // Onglet ouvert pendant le clic (sinon bloqué par Safari après l'attente).
+    const win = item.mode === 'link' ? window.open('', '_blank') : null;
+    setStates((s) => ({ ...s, [item.id]: { state: 'loading' } }));
+    try {
+      const url = await item.get();
+      if (item.mode === 'link') {
+        if (!url) throw new Error('Document indisponible.');
+        if (win) win.location.href = url;
+        else window.open(url, '_blank');
+      }
+      setStates((s) => ({ ...s, [item.id]: { state: 'done' } }));
+      block.onDownload?.(item, true);
+    } catch (err) {
+      win?.close();
+      const message = err instanceof Error && err.message ? err.message : "Le document n'a pas pu être téléchargé.";
+      setStates((s) => ({ ...s, [item.id]: { state: 'error', error: message } }));
+      block.onDownload?.(item, false, message);
+    }
+  };
+
+  return (
+    <div className={cn(card, 'p-4')}>
+      <CardHeader title={block.title} subtitle={block.subtitle} />
+      {block.note && <p className="mt-2 text-xs text-muted-foreground">{block.note}</p>}
+      <div className="mt-2 space-y-3">
+        {block.groups.map((g) => (
+          <div key={g.id}>
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">{g.title}</p>
+            <ul className="divide-y divide-border/70">
+              {g.items.map((it) => {
+                const st = states[it.id];
+                const Icon = it.format === 'ZIP' ? FileArchive : FileText;
+                return (
+                  <li key={it.id}>
+                    <button
+                      type="button"
+                      onClick={() => void download(it)}
+                      disabled={st?.state === 'loading'}
+                      className="group flex w-full items-center gap-3 py-2.5 text-left"
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <Icon className="h-[18px] w-[18px]" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[14px] leading-[18px]">{it.label}</span>
+                        <span className={cn('block truncate text-xs leading-4', st?.state === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
+                          {st?.state === 'error'
+                            ? st.error
+                            : st?.state === 'loading' && it.generated
+                              ? 'Préparation du document…'
+                              : [it.sublabel, it.format].filter(Boolean).join(' · ')}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-colors',
+                          st?.state === 'done'
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600'
+                            : 'border-border text-muted-foreground group-hover:border-primary/40 group-hover:bg-primary/5 group-hover:text-primary',
+                        )}
+                        aria-label="Télécharger"
+                      >
+                        {st?.state === 'loading' ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : st?.state === 'done' ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          <Download className="h-4 w-4" />
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

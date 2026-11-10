@@ -353,6 +353,8 @@ export function defaultDate(def: string | undefined, now: Date, prefer: 'past' |
       return resolveDate({ spec: { kind: 'period', unit: 'week', offset: 0 } }, now, prefer);
     case 'month':
       return resolveDate({ spec: { kind: 'period', unit: 'month', offset: 0 } }, now, prefer);
+    case 'last_month':
+      return resolveDate({ spec: { kind: 'period', unit: 'month', offset: -1 } }, now, prefer);
     default:
       return resolveDate({ spec: { kind: 'offset', days: 0 } }, now, prefer);
   }

@@ -313,7 +313,8 @@ function scoreIntent(index: EngineIndex, pi: PreparedIntent, analysis: Analysis,
   if (pi.slotTypes.has('date') && analysis.dates.length > 0) score += BONUS_DATE_FIT;
   score -= missing.length * PENALTY_MISSING_SLOT;
   score += pi.intent.priority * PRIORITY_FACTOR;
-  score = Math.max(0, Math.min(100, score));
+  // Pas de plafond à 100 : deux intentions très sûres restent départagées.
+  score = Math.max(0, score);
 
   return { intent: pi.intent, score: Math.round(score * 10) / 10, matchedTerms, slots, missingSlots: missing, consumed: consumedIdx };
 }

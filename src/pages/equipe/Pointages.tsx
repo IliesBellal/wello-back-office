@@ -10,6 +10,7 @@
 
 import { useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
+import { initialUrlDateRange, useUrlDateRange } from "@/lib/pageFilters";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { endOfDay, format, parseISO, startOfDay } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -80,9 +81,13 @@ export default function Pointages() {
 function PointagesContent() {
   // ── Filters ──────────────────────────────────────────────────────────────
   const [range, setRange] = useState<{ from: Date; to: Date }>(() => {
+    // Période de l'URL (?from=…&to=…) sinon aujourd'hui.
+    const fromUrl = initialUrlDateRange();
+    if (fromUrl) return fromUrl;
     const today = new Date();
     return { from: today, to: today };
   });
+  useUrlDateRange(setRange);
   const [employeeFilter, setEmployeeFilter] = useState<string>("all");
 
   // ── Selection ────────────────────────────────────────────────────────────

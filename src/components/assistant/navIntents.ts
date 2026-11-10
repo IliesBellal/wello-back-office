@@ -13,12 +13,18 @@ import type { AssistantModel, ModelIntent, ModelTerm } from '@/lib/assistant/typ
 import type { AuthData } from '@/types/auth';
 
 /**
- * Pages qui savent ouvrir une période donnée (?from=…&to=…, voir
- * lib/pageFilters.ts) : « caisses de janvier » ouvre les registres de janvier.
+ * Pages qui savent s'ouvrir filtrées (voir lib/pageFilters.ts et l'action
+ * `navigate`) : « caisses de janvier », « commandes annulées hier »,
+ * « analyse borne de la semaine dernière ».
  */
-const DATE_PAGES: Record<string, { tab?: string }> = {
+const FILTERED_PAGES: Record<string, { channel?: boolean }> = {
   'cash-registers-history': {},
-  'dashboard-analysis': { tab: 'ca' },
+  'dashboard-analysis': { channel: true },
+  'dashboard-order-history': { channel: true },
+  'reservations-list': {},
+  'financial-report': {},
+  'vat-declaration': {},
+  pointages: {},
 };
 
 const GENERIC_TITLES = new Set(['Paramètres', 'Gestion', 'Activité', 'Hub', 'Statistiques', "Vue d'ensemble"]);
@@ -79,8 +85,13 @@ export function withNavigation(model: AssistantModel, authData: AuthData | null 
       label: page.label,
       kind: 'navigate',
       action: 'navigate',
-      params: { ...(existing?.params ?? {}), nav_id: page.id, path: page.path, ...(DATE_PAGES[page.id] ?? {}) },
-      slots: DATE_PAGES[page.id] ? [{ name: 'period', entity: 'date', required: false, prefer: 'past' }] : [],
+      params: { ...(existing?.params ?? {}), nav_id: page.id, path: page.path },
+      slots: FILTERED_PAGES[page.id]
+        ? [
+            { name: 'period', entity: 'date', required: false, prefer: page.id === 'reservations-list' ? 'future' : 'past' },
+            ...(FILTERED_PAGES[page.id].channel ? [{ name: 'channel', entity: 'channel' as const, required: false }] : []),
+          ]
+        : [],
       permission: null, // déjà filtré par navConfig
       module: null,
       confirm: false,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { initialUrlDateRange, useUrlDateRange } from '@/lib/pageFilters';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { MultiSelectDropdown } from '@/components/shared';
@@ -31,7 +32,10 @@ const vatOrderTypeLabels: Record<string, string> = {
 
 const VAT = () => {
   // State
+  // Période de l'URL (?from=…&to=…) sinon le dernier mois.
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>(() => {
+    const fromUrl = initialUrlDateRange();
+    if (fromUrl) return fromUrl;
     const to = new Date();
     const from = new Date();
     from.setMonth(from.getMonth() - 1);
@@ -45,6 +49,11 @@ const VAT = () => {
     vatOrderTypes.map((t) => t.id).join(',')
   );
   const [searchVersion, setSearchVersion] = useState(0);
+  // Nouveau lien alors que la page est ouverte : nouvelle période, nouvelle recherche.
+  useUrlDateRange((range) => {
+    setDateRange(range);
+    setSearchVersion((v) => v + 1);
+  });
   const [vatData, setVatData] = useState<VATCalculationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);

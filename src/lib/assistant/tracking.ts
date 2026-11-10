@@ -45,6 +45,7 @@ export const ASSISTANT_EVENT_TYPES = [
   'multi_request',
   'feedback',
   'learning_info_opened',
+  'download_clicked',
 ] as const;
 
 export type AssistantEventType = (typeof ASSISTANT_EVENT_TYPES)[number];

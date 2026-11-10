@@ -28,7 +28,7 @@ export interface SlotDef {
   required: boolean;
   /** Question posée quand le slot est requis et absent. */
   prompt?: string;
-  /** Valeur par défaut, pour `date` : 'today' | 'yesterday' | 'week' | 'month'. */
+  /** Valeur par défaut, pour `date` : 'today' | 'yesterday' | 'week' | 'month' | 'last_month'. */
   default?: string;
   /**
    * Pour `date` : sens d'un jour ambigu (« samedi »). 'past' pour un bilan

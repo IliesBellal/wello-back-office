@@ -1,8 +1,12 @@
 /**
  * Filtres de page portés par l'URL (?from=2026-01-01&to=2026-01-31&tab=ca
  * &sources=KIOSK&types=TAKE_AWAY) : un lien (assistant, notification, favori)
- * ouvre une page déjà filtrée. Lu par la page Analyse et les registres de caisse.
+ * ouvre une page déjà filtrée. Lu par l'analyse, les registres de caisse, les
+ * rapports financiers, la TVA, les pointages et les réservations (l'historique
+ * des commandes a ses propres paramètres : startDate, endDate, status, type, brand).
  */
+import { useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { DEFAULT_ORDER_FILTER, type OrderFilterSelection } from '@/utils/orderFilters';
 
 export interface PageFilters {
@@ -58,3 +62,33 @@ export function readOrderFilter(params: URLSearchParams): OrderFilterSelection |
     orderTypes: types.length ? types : DEFAULT_ORDER_FILTER.orderTypes,
   };
 }
+
+/** Période de l'URL au premier rendu (évite un chargement sur la période par défaut). */
+export function initialUrlDateRange(): { from: Date; to: Date } | null {
+  if (typeof window === 'undefined') return null;
+  return readDateRange(new URLSearchParams(window.location.search));
+}
+
+/**
+ * Applique la période de l'URL quand elle change ensuite (nouveau lien alors
+ * que la page est ouverte). À combiner avec initialUrlDateRange pour l'état initial.
+ */
+export function useUrlDateRange(apply: (range: { from: Date; to: Date }) => void) {
+  const [params] = useSearchParams();
+  const key = params.toString();
+  const applyRef = useRef(apply);
+  applyRef.current = apply;
+  const mounted = useRef(false);
+  useEffect(() => {
+    // Au montage, l'état initial a déjà lu l'URL (initialUrlDateRange).
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const range = readDateRange(new URLSearchParams(key));
+    if (range) applyRef.current(range);
+  }, [key]);
+}
+
+export const toIsoDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

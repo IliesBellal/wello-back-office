@@ -113,6 +113,7 @@ export default function AssistantPanel({ open, onClose }: Props) {
     actions: {
       merchantId: authData?.session.merchant_id ? String(authData.session.merchant_id) : undefined,
       merchantLabel: merchantLabel(authData),
+      can: (key) => checkPermission(authData, key as Parameters<typeof checkPermission>[1]),
       navigate,
       logout,
       queryClient,

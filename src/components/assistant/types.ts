@@ -24,6 +24,28 @@ export interface ListItem {
   action?: { label: string; run: () => void };
 }
 
+/** Un document téléchargeable en un clic. */
+export interface DownloadItem {
+  id: string;
+  label: string;
+  sublabel?: string;
+  format: 'PDF' | 'ZIP' | 'CSV';
+  /**
+   * 'link' : renvoie un lien signé, ouvert dans un nouvel onglet ;
+   * 'file' : télécharge le fichier lui-même (registres en ZIP).
+   */
+  mode: 'link' | 'file';
+  /** Généré à la demande (rapport comptable…) plutôt que déjà archivé. */
+  generated?: boolean;
+  get: () => Promise<string | void>;
+}
+
+export interface DownloadGroup {
+  id: string;
+  title: string;
+  items: DownloadItem[];
+}
+
 export type Block = { id: string } & (
   | { type: 'text'; text: string; tone?: Tone }
   | { type: 'suggestions'; items: Suggestion[]; hint?: string; used?: boolean }
@@ -49,6 +71,14 @@ export type Block = { id: string } & (
     }
   | { type: 'metrics'; title: string; subtitle?: string; items: MetricItem[]; note?: string; link?: { label: string; path: string } }
   | { type: 'list'; title: string; subtitle?: string; items: ListItem[]; empty: string; link?: { label: string; path: string } }
+  | {
+      type: 'downloads';
+      title: string;
+      subtitle?: string;
+      groups: DownloadGroup[];
+      note?: string;
+      onDownload?: (item: DownloadItem, ok: boolean, error?: string) => void;
+    }
   | { type: 'capabilities' }
   | { type: 'learning'; text: string }
   | { type: 'feedback'; value?: 'up' | 'down'; onRate: (v: 'up' | 'down') => void }

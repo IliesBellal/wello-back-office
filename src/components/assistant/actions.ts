@@ -16,8 +16,14 @@ import { listBookings } from '@/services/reservationsService';
 import { planningWeeksApi } from '@/services/welloApi';
 import { cachedEmployees, cachedProducts, patchProductStatus, productStatus } from './catalog';
 import { capitalize, deltaPct, formatEuros, formatNumber, hhmm } from './format';
-import type { Block } from './types';
+import type { Block, DownloadGroup, DownloadItem } from './types';
+import { financialReportsService } from '@/services/financialReportsService';
+import { fiscalArchivesService } from '@/services/fiscalArchivesService';
+import { payoutDocumentsService } from '@/services/payoutDocumentsService';
+import { subscriptionInvoicesService } from '@/services/subscriptionInvoicesService';
+import { exportRegistersPDF } from '@/services/cashRegisterHistoryService';
 import { uuid } from '@/lib/assistant/tracking';
+import { normalize } from '@/lib/assistant/normalize';
 import { channelMeta } from '@/lib/assistant/channels';
 import { withFilters, type PageFilters } from '@/lib/pageFilters';
 import { DEFAULT_ORDER_FILTER, type OrderFilterSelection } from '@/utils/orderFilters';
@@ -27,6 +33,10 @@ export interface ActionContext {
   merchantId?: string;
   /** « Le Bistrot » ou, si plusieurs établissements, « Le Bistrot · 12 rue X ». */
   merchantLabel?: string;
+  /** Phrase d'origine (statut de commande demandé, type de document mis en avant). */
+  query?: string;
+  /** Droit détenu par l'utilisateur (documents réservés aux gérants). */
+  can?: (permission: string) => boolean;
   navigate: (path: string) => void;
   logout: () => void;
   openCreateProduct: () => boolean;
@@ -62,6 +72,48 @@ function channelFilter(slots: Record<string, EntityMatch>): { filter?: OrderFilt
   return { filter, label: meta.label, url: meta.field === 'sources' ? { sources: [meta.value] } : { types: [meta.value] } };
 }
 
+/** Statut de commande demandé dans la phrase (historique des commandes). */
+const ORDER_STATUS_WORDS: Array<[RegExp, string]> = [
+  [/\bannul/, 'canceled'],
+  [/\brefus/, 'denied'],
+  [/\ben attente\b/, 'pending'],
+  [/\btermin/, 'done'],
+];
+
+/**
+ * Adresse filtrée d'une page : période dite dans la phrase, canal, statut.
+ * Sans précision, la page s'ouvre telle quelle.
+ */
+export function filteredPath(navId: string, base: string, slots: Record<string, EntityMatch>, query: string): string {
+  const period = slots.period && slots.period.start >= 0 ? slots.period.date : undefined;
+  const channel = channelMeta(slots.channel?.record);
+  if (navId === 'dashboard-order-history') {
+    // Paramètres propres à l'historique (useOrderHistorySearchParams).
+    const p = new URLSearchParams();
+    if (period) {
+      p.set('startDate', period.from);
+      p.set('endDate', period.to);
+    }
+    const q = normalize(query);
+    const statuses = ORDER_STATUS_WORDS.filter(([re]) => re.test(q)).map(([, v]) => v);
+    if (statuses.length) p.set('status', statuses.join(','));
+    if (channel?.field === 'orderTypes') p.set('type', channel.value);
+    if (channel?.field === 'sources') p.set('brand', channel.value === 'UBER_EATS' || channel.value === 'DELIVEROO' ? channel.value : 'WELLO_RESTO');
+    const qs = p.toString();
+    return qs ? `${base}?${qs}` : base;
+  }
+  const filters: PageFilters = {};
+  if (period) {
+    filters.from = period.from;
+    filters.to = period.to;
+  }
+  if (navId === 'dashboard-analysis' && (period || channel)) {
+    filters.tab = 'ca';
+    if (channel) Object.assign(filters, channel.field === 'sources' ? { sources: [channel.value] } : { types: [channel.value] });
+  }
+  return withFilters(base, filters);
+}
+
 const subtitleOf = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' · ');
 
 const DAYPART_NAME: Record<NonNullable<DateRange['daypart']>, string> = {
@@ -95,13 +147,153 @@ function inDaypart(time: string, daypart: NonNullable<DateRange['daypart']>): bo
   return m >= ds && m < de;
 }
 
+
+// ─── Documents ─────────────────────────────────────────────────────────────
+
+const DAY_FMT = new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' });
+const MONTH_FMT = new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' });
+const dayOf = (iso?: string) => (iso ? iso.slice(0, 10) : '');
+const settled = <T,>(r: PromiseSettledResult<T>, fallback: T): T => (r.status === 'fulfilled' ? r.value : fallback);
+
+/** Groupe mis en avant selon la demande (« virements de mars » → virements d'abord). */
+const DOC_FOCUS: Array<[RegExp, string]> = [
+  [/\b(virement|versement|releve)/, 'payouts'],
+  [/\b(facture|commission|abonnement|recapitulatif)/, 'invoices'],
+  [/\b(rapport|comptab|export|tva|reglement|registre)/, 'reports'],
+  [/\barchive/, 'archives'],
+];
+
+async function linkOf(p: Promise<{ download_url: string }>): Promise<string> {
+  const link = await p;
+  if (!link.download_url) throw new Error('Document indisponible.');
+  return link.download_url;
+}
+
+const documentsList: ActionHandler = async (_intent, slots, ctx) => {
+  const period = periodOf(slots)!;
+  const inPeriod = (iso?: string) => {
+    const d = dayOf(iso);
+    return !!d && d >= period.from && d <= period.to;
+  };
+  const can = ctx.can ?? (() => true);
+
+  const [payoutsR, commissionsR, subsR, archivesR] = await Promise.allSettled([
+    payoutDocumentsService.list(),
+    payoutDocumentsService.listCommissionInvoices(),
+    can('settings.manage') ? subscriptionInvoicesService.list() : Promise.resolve([]),
+    fiscalArchivesService.list(),
+  ]);
+
+  const item = (x: DownloadItem) => x;
+
+  // Rapports générés à la demande sur la période.
+  const reports: DownloadItem[] = [
+    item({
+      id: 'report-accounting',
+      label: 'Rapport comptable',
+      sublabel: 'Ventes, TVA, règlements',
+      format: 'PDF',
+      mode: 'link',
+      generated: true,
+      get: () => linkOf(financialReportsService.exportGlobal(period.from, period.to)),
+    }),
+    item({ id: 'report-vat', label: 'Rapport de TVA', format: 'PDF', mode: 'link', generated: true, get: () => linkOf(financialReportsService.exportVAT(period.from, period.to)) }),
+    item({ id: 'report-payments', label: 'Rapport des règlements', format: 'PDF', mode: 'link', generated: true, get: () => linkOf(financialReportsService.exportPayments(period.from, period.to)) }),
+    item({
+      id: 'report-registers',
+      label: 'Registres de caisse',
+      sublabel: 'Un PDF par registre clôturé',
+      format: 'ZIP',
+      mode: 'file',
+      generated: true,
+      get: async () => {
+        await exportRegistersPDF({ dateFrom: period.from, dateTo: period.to });
+      },
+    }),
+  ];
+
+  // Factures Wello Resto : commission mensuelle (+ récapitulatif), abonnement.
+  const commissions = settled(commissionsR, []).filter((c) => inPeriod(c.period_month));
+  const invoices: DownloadItem[] = [];
+  commissions.forEach((c) => {
+    const month = MONTH_FMT.format(new Date(c.period_month));
+    if (c.has_invoice) {
+      invoices.push(item({ id: `commission-${c.number}`, label: `Facture de commission ${c.number}`, sublabel: `${month} · ${formatEuros(c.amount_ttc, true)}`, format: 'PDF', mode: 'link', get: () => linkOf(payoutDocumentsService.getCommissionInvoiceLink(c.number, 'invoice')) }));
+    }
+    if (c.has_recap) {
+      invoices.push(item({ id: `recap-${c.number}`, label: 'Récapitulatif des commissions', sublabel: month, format: 'PDF', mode: 'link', get: () => linkOf(payoutDocumentsService.getCommissionInvoiceLink(c.number, 'recap')) }));
+    }
+  });
+  settled(subsR, [])
+    .filter((inv) => inv.has_pdf && (inPeriod(inv.paid_at) || inPeriod(inv.period_start)))
+    .forEach((inv) =>
+      invoices.push(item({ id: `sub-${inv.invoice_id}`, label: `Facture d'abonnement ${inv.number}`, sublabel: `${DAY_FMT.format(new Date(inv.paid_at))} · ${formatEuros(inv.amount_paid, true)}`, format: 'PDF', mode: 'link', get: () => linkOf(subscriptionInvoicesService.getLink(inv.invoice_id)) })),
+    );
+
+  // Virements reçus : relevé (et facture de commission si elle n'est pas déjà listée).
+  const listed = new Set(commissions.map((c) => c.number));
+  const payouts: DownloadItem[] = [];
+  settled(payoutsR, [])
+    .filter((p) => inPeriod(p.arrival_date))
+    .sort((a, b) => a.arrival_date.localeCompare(b.arrival_date))
+    .forEach((p) => {
+      const when = `${DAY_FMT.format(new Date(p.arrival_date))} · ${formatEuros(p.amount, true)}`;
+      if (p.has_statement) payouts.push(item({ id: `payout-${p.payout_id}`, label: 'Relevé de virement', sublabel: when, format: 'PDF', mode: 'link', get: () => linkOf(payoutDocumentsService.getLink(p, 'statement')) }));
+      if (p.has_invoice && p.invoice_number && !listed.has(p.invoice_number)) {
+        listed.add(p.invoice_number);
+        payouts.push(item({ id: `payout-inv-${p.payout_id}`, label: `Facture de commission ${p.invoice_number}`, sublabel: when, format: 'PDF', mode: 'link', get: () => linkOf(payoutDocumentsService.getLink(p, 'invoice')) }));
+      }
+    });
+
+  // Archive fiscale mensuelle (conformité caisse).
+  const archives: DownloadItem[] = settled(archivesR, [])
+    .filter((a) => a.kind === 'MONTH' && inPeriod(a.period_start))
+    .map((a) => item({ id: `archive-${a.id}`, label: 'Archive fiscale', sublabel: MONTH_FMT.format(new Date(a.period_start)), format: 'ZIP', mode: 'link', get: () => linkOf(fiscalArchivesService.getLink(a.id)) }));
+
+  const groups: DownloadGroup[] = [
+    { id: 'reports', title: 'Rapports', items: reports },
+    { id: 'invoices', title: 'Factures Wello Resto', items: invoices },
+    { id: 'payouts', title: 'Virements', items: payouts },
+    { id: 'archives', title: 'Archive fiscale', items: archives },
+  ].filter((g) => g.items.length > 0);
+
+  const q = normalize(ctx.query ?? '');
+  const focus = DOC_FOCUS.filter(([re]) => re.test(q)).map(([, id]) => id);
+  groups.sort((a, b) => {
+    const ia = focus.indexOf(a.id);
+    const ib = focus.indexOf(b.id);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+
+  const missing = focus.filter((f) => !groups.some((g) => g.id === f));
+  const NONE: Record<string, string> = {
+    payouts: 'aucun virement',
+    invoices: 'aucune facture',
+    archives: "pas encore d'archive fiscale",
+  };
+  const absent = missing.map((m) => NONE[m]).filter(Boolean);
+  return {
+    outcome: 'info',
+    blocks: [
+      b({
+        type: 'downloads',
+        title: 'Documents',
+        subtitle: subtitleOf(capitalize(period.label), ctx.merchantLabel),
+        groups,
+        note: absent.length ? `${capitalize(absent.join(', '))} sur cette période. Voici les autres documents disponibles.` : undefined,
+      }),
+    ],
+  };
+};
+
 export const ACTIONS: Record<string, ActionHandler> = {
+  'documents.list': documentsList,
+
   async navigate(intent, slots, ctx) {
-    // Période dite dans la phrase (« caisses de janvier ») : la page s'ouvre filtrée.
-    const period = slots.period && slots.period.start >= 0 ? slots.period.date : undefined;
     const base = String(intent.params.path ?? '/');
-    const path = period ? withFilters(base, { from: period.from, to: period.to, tab: intent.params.tab as string | undefined }) : base;
+    const path = filteredPath(String(intent.params.nav_id ?? ''), base, slots, ctx.query ?? '');
     ctx.navigate(path);
+    const period = slots.period && slots.period.start >= 0 ? slots.period.date : undefined;
     return {
       outcome: 'navigate',
       close: 'mobile',
@@ -298,7 +490,7 @@ export const ACTIONS: Record<string, ActionHandler> = {
             secondary: r.assigned_tables?.length ? `Table ${r.assigned_tables.join(', ')}` : undefined,
             trailing: `${period.grain === 'day' ? '' : `${new Date(r.booking_date_from).toLocaleDateString('fr-FR', { weekday: 'short' })} `}${hhmm(r.booking_date_from)} · ${r.party_size} pers.`,
           })),
-          link: { label: 'Toutes les réservations', path: '/reservations/list' },
+          link: { label: 'Toutes les réservations', path: withFilters('/reservations/list', { from: period.from, to: period.to }) },
         }),
       ],
     };
