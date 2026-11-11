@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   DndContext,
   DragEndEvent,
@@ -160,9 +161,18 @@ export function CourseStepsDialog({ open, onOpenChange, categories, onSave }: Co
             ))}
           </div>
 
-          <DragOverlay>
-            {activeCategory ? <CategoryChip name={categoryName(activeCategory)} isOverlay /> : null}
-          </DragOverlay>
+          {/*
+            La fenêtre est centrée par une transformation CSS : un élément
+            `position: fixed` placé dedans se positionne par rapport à elle et non
+            à l'écran, d'où le décalage avec le curseur. On l'affiche donc dans
+            `body`, au-dessus de la fenêtre.
+          */}
+          {createPortal(
+            <DragOverlay zIndex={100}>
+              {activeCategory ? <CategoryChip name={categoryName(activeCategory)} isOverlay /> : null}
+            </DragOverlay>,
+            document.body
+          )}
         </DndContext>
 
         <div>
