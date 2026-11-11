@@ -289,10 +289,12 @@ const CORE_INTENTS: SeedIntent[] = [
     action: 'order.open',
     slots: [
       { name: 'number', entity: 'number', required: true, prompt: 'Quel est le numéro de la commande ?' },
+      // « la 42 d'hier » : le numéro repart à zéro après 99, la date départage.
+      { name: 'period', entity: 'date', required: false, prefer: 'past' },
       { name: 'channel', entity: 'channel', required: false },
     ],
     priority: 6,
-    examples: ['Ouvre la commande 42098', 'Retrouve le ticket 1207'],
+    examples: ['Ouvre la commande 42', "La commande 42 d'hier", 'La commande 64 du 22 juin'],
     keywords: ['commande', 'ticket', ['numero', 0.5], ['retrouve', 0.6], ['cherche', 0.6], ['ouvre', 0.3], ['affiche', 0.3]],
     phrases: [
       ['ouvre la commande', 2],

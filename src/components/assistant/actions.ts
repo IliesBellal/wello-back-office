@@ -321,53 +321,70 @@ const documentsList: ActionHandler = async (_intent, slots, ctx) => {
 
 // ─── Fiches : commande, équipier, produit, client ──────────────────────────
 
+/** Numéros de commande affichés : de 0 à 99, puis la numérotation repart à zéro. */
+const MAX_ORDER_NUM = 99;
+/** Commandes listées au plus : la plus récente est ouverte, les autres proposées. */
+const ORDER_MATCHES = 5;
+
+/**
+ * « Ouvre la commande 42 », « la 42 d'hier », « la 64 du 22 juin ».
+ * Le numéro revient toutes les 100 commandes : sans date, la plus récente
+ * est ouverte et les précédentes proposées ; avec une date, seules celles du
+ * jour (ou de la période) comptent. Un nombre plus grand est un identifiant.
+ */
 const orderOpen: ActionHandler = async (_intent, slots, ctx) => {
-  const wanted = String(slots.number?.quantity ?? slots.number?.text ?? '').replace(/^#/, '');
-  const to = new Date();
-  const from = new Date(to);
-  from.setFullYear(from.getFullYear() - 1);
-  const res = await analyticsService.getOrderHistory(from, to, undefined, undefined, undefined, wanted, 1, 20);
-  const historyLink = `/dashboard/order-history?${new URLSearchParams({ search: wanted, startDate: toIsoDay(from), endDate: toIsoDay(to) })}`;
-  // Le numéro affiché (« #42098 ») ou l'identifiant ; la recherche est partielle.
-  const exact = res.orders.filter((o) => o.number.replace(/^#/, '') === wanted || o.id === wanted);
-  if (exact.length === 1) {
-    const o = exact[0];
-    const path = `/dashboard/order-history?${new URLSearchParams({ orderId: o.id, search: wanted, startDate: toIsoDay(from), endDate: toIsoDay(to) })}`;
-    ctx.navigate(path);
-    return {
-      outcome: 'navigate',
-      close: 'always',
-      redirectLabel: `Commande ${o.number}`,
-      blocks: [b({ type: 'text', tone: 'muted', text: `Voici la commande ${o.number} du ${o.date}${o.customer_name ? ` (${o.customer_name})` : ''}.` })],
-    };
-  }
-  const list = exact.length ? exact : res.orders;
-  if (!list.length) {
+  const wanted = String(slots.number?.quantity ?? slots.number?.text ?? '').replace(/^#/, '').trim();
+  const period = slots.period && slots.period.start >= 0 ? slots.period.date : undefined;
+  const to = period ? new Date(`${period.to}T12:00:00`) : new Date();
+  const from = period ? new Date(`${period.from}T12:00:00`) : new Date(to);
+  if (!period) from.setFullYear(from.getFullYear() - 1);
+  const when = period ? period.label : 'sur les 12 derniers mois';
+  const num = /^\d+$/.test(wanted) ? Number(wanted) : NaN;
+  const byNumber = Number.isInteger(num) && num <= MAX_ORDER_NUM;
+
+  const res = byNumber
+    ? await analyticsService.getOrderHistory(from, to, undefined, undefined, undefined, undefined, 1, ORDER_MATCHES, { orderNum: num })
+    : await analyticsService.getOrderHistory(from, to, undefined, undefined, undefined, wanted, 1, ORDER_MATCHES);
+  // Revérifié ici : seules les commandes portant exactement ce numéro (ou cet
+  // identifiant) comptent, de la plus récente à la plus ancienne.
+  const matches = res.orders.filter((o) => (byNumber ? o.number.replace(/^#/, '') === String(num) : o.id === wanted));
+  const pageFor = (id: string) =>
+    `/dashboard/order-history?${new URLSearchParams({ orderId: id, search: wanted, startDate: toIsoDay(from), endDate: toIsoDay(to) })}`;
+  const label = byNumber ? `#${num}` : `n° ${wanted}`;
+
+  if (!matches.length) {
     return {
       outcome: 'info',
-      blocks: [b({ type: 'text', text: `Je ne trouve pas de commande n° ${wanted} sur les 12 derniers mois.` })],
+      blocks: [b({ type: 'text', text: `Je ne trouve pas de commande ${label} ${period ? `pour ${period.label}` : when}.` })],
     };
   }
+
+  const [latest, ...others] = matches;
+  ctx.navigate(pageFor(latest.id));
+  const opened = `Voici la commande ${latest.number} du ${latest.date} à ${latest.time}${latest.customer_name && latest.customer_name !== '—' ? ` (${latest.customer_name})` : ''}.`;
+  if (!others.length) {
+    return { outcome: 'navigate', close: 'always', redirectLabel: `Commande ${latest.number}`, blocks: [b({ type: 'text', tone: 'muted', text: opened })] };
+  }
+  // Plusieurs commandes portent ce numéro : la plus récente est ouverte, les
+  // précédentes restent dans la conversation (sur mobile : « Revenir »).
   return {
-    outcome: 'info',
+    outcome: 'navigate',
+    close: 'mobile',
+    redirectLabel: `Commande ${latest.number} · ${latest.date}`,
     blocks: [
+      b({ type: 'text', tone: 'muted', text: `${opened} C'est la plus récente ; précisez le jour (« la ${wanted} d'hier ») pour une autre.` }),
       b({
         type: 'list',
-        title: exact.length ? `${exact.length} commandes n° ${wanted}` : `Commandes contenant « ${wanted} »`,
-        subtitle: 'Sur les 12 derniers mois',
+        title: `Précédentes commandes ${label}`,
+        subtitle: period ? period.label : undefined,
         empty: '',
-        items: list.slice(0, 8).map((o) => ({
+        items: others.map((o) => ({
           id: o.id,
-          primary: `${o.number}${o.customer_name ? ` · ${o.customer_name}` : ''}`,
+          primary: `${o.number}${o.customer_name && o.customer_name !== '—' ? ` · ${o.customer_name}` : ''}`,
           secondary: `${o.date} ${o.time}`.trim(),
           trailing: formatEuros(Math.round(o.total * 100), true),
-          action: {
-            label: 'Ouvrir',
-            run: () =>
-              ctx.openPage?.(`/dashboard/order-history?${new URLSearchParams({ orderId: o.id, search: wanted, startDate: toIsoDay(from), endDate: toIsoDay(to) })}`, `Commande ${o.number}`),
-          },
+          action: { label: 'Ouvrir', run: () => ctx.openPage?.(pageFor(o.id), `Commande ${o.number} · ${o.date}`) },
         })),
-        link: { label: "Voir dans l'historique", path: historyLink },
       }),
     ],
   };

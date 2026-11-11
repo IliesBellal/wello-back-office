@@ -159,6 +159,14 @@ const CORPUS: Array<[string, Expect]> = [
   ['factures', { ask: ['documents.download', 'nav.subscription'] }],
   ['TVA', 'nav.vat-declaration'],
   ['commande uber eats 4521', 'orders.open'],
+  ['ouvre la commande 42', 'orders.open'],
+  ["la commande 42 d'hier", 'orders.open'],
+  ['la commande 64 du 22 juin', 'orders.open'],
+  ["ouvre la commande 7 de samedi dernier", 'orders.open'],
+  ["commande 42 d'hier", 'orders.open'],
+  ["le ticket 15 de ce midi", 'orders.open'],
+  ["commandes d'hier", 'nav.dashboard-order-history'],
+  ['commandes annulées du 22 juin', 'nav.dashboard-order-history'],
   // ── Ambiguïtés voulues
   ['caisse', { ask: ['nav.cash-registers-history', 'nav.categories'] }],
   ['horaires', { ask: 'nav.planning' }],
@@ -219,6 +227,13 @@ describe('corpus de non-régression', () => {
       return { s: r.understanding.best, r };
     };
     expect(best('ouvre la commande 42098').s.slots.number.quantity).toBe(42098);
+    // Le numéro et la date ne se mélangent pas : « 22 juin » est la date, 64 le numéro.
+    const juin = best('la commande 64 du 22 juin').s;
+    expect(juin.slots.number.quantity).toBe(64);
+    expect(juin.slots.period.date).toMatchObject({ from: '2026-06-22', to: '2026-06-22' });
+    const hier = best("la commande 42 d'hier").s;
+    expect(hier.slots.number.quantity).toBe(42);
+    expect(hier.slots.period.start).toBeGreaterThanOrEqual(0);
     expect(best('ouvre la fiche de camille').s.slots.employee.record?.id).toBe('e1');
     const { s, r } = best('fiche client Hélène Dupont');
     expect(freeTextOf(index, r, s)).toBe('Hélène Dupont');

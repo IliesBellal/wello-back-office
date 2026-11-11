@@ -311,7 +311,9 @@ function scoreIntent(index: EngineIndex, pi: PreparedIntent, analysis: Analysis,
     if (slots[slot.name] && slots[slot.name].start >= 0) score += BONUS_SLOT;
     else if (slots[slot.name]) score += BONUS_SLOT / 2; // repris du contexte
   }
-  if (pi.slotTypes.has('date') && analysis.dates.length > 0) score += BONUS_DATE_FIT;
+  // La date ne conforte qu'une demande complète : « commandes d'hier » (sans
+  // numéro) va à l'historique, pas à « ouvrir la commande n° … ».
+  if (pi.slotTypes.has('date') && analysis.dates.length > 0 && missing.length === 0) score += BONUS_DATE_FIT;
   score -= missing.length * PENALTY_MISSING_SLOT;
   score += pi.intent.priority * PRIORITY_FACTOR;
   // Pas de plafond à 100 : deux intentions très sûres restent départagées.

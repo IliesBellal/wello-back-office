@@ -1831,7 +1831,9 @@ class AnalyticsService {
     statuses?: string[],
     search?: string,
     page: number = 1,
-    limit: number = 50
+    limit: number = 50,
+    /** orderNum : numéro affiché exact (#0 à #99, il repart à zéro). */
+    options: { orderNum?: number } = {}
   ): Promise<OrderHistoryResponse> {
     const start = toUtcBoundaryISOString(startDate);
     const end = toUtcBoundaryISOString(endDate, true);
@@ -1905,6 +1907,7 @@ class AnalyticsService {
       order_type: orderTypes && orderTypes.length > 0 ? orderTypes.map((orderType) => mapOrderTypeFilterForApi(orderType)).filter(Boolean) : undefined,
       status: statuses && statuses.length > 0 ? statuses : undefined,
       search,
+      order_num: options.orderNum,
       page,
       limit,
     };
@@ -1916,6 +1919,7 @@ class AnalyticsService {
           const matchesBrand = !brands || brands.length === 0 || brands.includes(order.brand);
           const matchesOrderType = !orderTypes || orderTypes.length === 0 || orderTypes.includes(order.order_type);
           const matchesStatus = !statuses || statuses.length === 0 || statuses.includes(order.status);
+          if (options.orderNum !== undefined && order.number.replace(/^#/, '') !== String(options.orderNum)) return false;
           const matchesSearch = !normalizedSearch
             || order.number.toLowerCase().includes(normalizedSearch)
             || order.customer_name.toLowerCase().includes(normalizedSearch);

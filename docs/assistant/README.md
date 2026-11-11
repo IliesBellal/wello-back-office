@@ -99,8 +99,8 @@ demandés. CA et meilleures ventes portent sur l'établissement de la session.
    (phrase → intention attendue, question attendue ou repli) : il vérifie que la
    nouvelle capacité ne vole pas les demandes des autres. Cas fins du moteur :
    `engine.test.ts`.
-4. Générer une nouvelle migration de l'API (numéro suivant, 210 est la dernière) :
-   `npm run assistant:seed-sql -- ../ib-welloresto-api/migrations/todo 211_assistant_seed_xxx`.
+4. Générer une nouvelle migration de l'API (numéro suivant, 211 est la dernière) :
+   `npm run assistant:seed-sql -- ../ib-welloresto-api/migrations/todo 212_assistant_seed_xxx`.
    Rejouable : nouveaux termes ajoutés, poids mis à jour pour les termes
    pré-remplis jamais modifiés par l'administration. Un terme retiré du seed
    n'est pas supprimé : ajouter le `DELETE` à la main (voir 209).
