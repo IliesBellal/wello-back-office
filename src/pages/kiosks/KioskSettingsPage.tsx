@@ -26,6 +26,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import { qk } from '@/lib/queryKeys';
 import { kioskService } from '@/services/kioskService';
+import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 import { KioskMarketingRotation } from '@/components/settings/kiosks/KioskMarketingRotation';
 import {
   KIOSK_MARKETING_DURATION_MAX,
@@ -573,14 +574,12 @@ function KioskSettingsPageContent() {
                         <FormItem>
                           <FormLabel>Couleur</FormLabel>
                           <div className="flex items-center gap-2">
-                            <FormControl>
-                              <input
-                                type="color"
-                                value={field.value}
-                                onChange={field.onChange}
-                                className="h-10 w-14 rounded-md border border-input cursor-pointer"
-                              />
-                            </FormControl>
+                            <ColorPresetPicker
+                              value={field.value}
+                              onChange={(hex) => field.onChange(hex)}
+                              label="la borne"
+                              compact
+                            />
                             <Input
                               value={field.value}
                               onChange={field.onChange}
