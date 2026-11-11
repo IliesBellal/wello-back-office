@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ColorPresetPicker } from "@/components/shared/ColorPresetPicker";
 import { franchisesService } from "@/services/franchisesService";
 import {
   FRANCHISE_ANNOUNCEMENT_MAX,
@@ -168,12 +169,13 @@ function HubPresentationCard({ detail }: { detail: FranchiseDetail }) {
         <div className="space-y-2">
           <Label htmlFor="franchise-color">Couleur de marque</Label>
           <div className="flex flex-wrap items-center gap-3">
-            <Input
+            <ColorPresetPicker
               id="franchise-color"
-              type="color"
-              value={brandColor || DEFAULT_COLOR}
-              onChange={(e) => setBrandColor(e.target.value.toUpperCase())}
-              className="h-12 w-20 cursor-pointer"
+              value={brandColor}
+              fallbackColor={DEFAULT_COLOR}
+              onChange={(hex) => setBrandColor(hex.toUpperCase())}
+              label="la marque"
+              compact
             />
             <span className="font-mono text-sm text-muted-foreground">{brandColor || "Thème par défaut"}</span>
             {brandColor && (

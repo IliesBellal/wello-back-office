@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
+import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 import { Loader2 } from 'lucide-react';
 import { User, usersService, UserActivity } from '@/services/usersService';
 import { permissionsConfig, activityTypeLabels } from '@/config/usersConfig';
@@ -247,11 +248,11 @@ export function UserEditSheet({ user, open, onOpenChange, onSuccess }: UserEditS
                         <FormLabel>Couleur (POS)</FormLabel>
                         <FormControl>
                           <div className="flex items-center gap-3">
-                            <input
-                              type="color"
+                            <ColorPresetPicker
                               value={field.value}
-                              onChange={field.onChange}
-                              className="w-10 h-10 rounded-md border cursor-pointer"
+                              onChange={(hex) => field.onChange(hex)}
+                              label="l'utilisateur sur la caisse"
+                              compact
                             />
                             <Input {...field} className="flex-1" />
                           </div>

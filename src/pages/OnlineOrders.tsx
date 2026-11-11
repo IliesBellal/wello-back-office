@@ -10,6 +10,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
@@ -254,13 +255,12 @@ export default function OnlineOrders() {
               </CardHeader>
               <CardContent>
                 <div className="flex items-center gap-4">
-                  <Input
-                    type="color"
+                  <ColorPresetPicker
                     value={config.primary_color}
-                    onChange={(e) =>
-                      handleConfigChange('primary_color', e.target.value)
-                    }
-                    className="h-12 w-20 cursor-pointer"
+                    fallbackColor={config.primary_color}
+                    onChange={(hex) => handleConfigChange('primary_color', hex)}
+                    label="la plateforme"
+                    compact
                   />
                   <span className="text-sm text-gray-600">
                     {config.primary_color}

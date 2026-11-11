@@ -27,6 +27,7 @@ import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { settingsService } from '@/services/settingsService';
 import { type UserProfile, type EstablishmentSettings } from '@/types/settings';
+import { ColorPresetPicker, TEXT_COLOR_PRESETS } from '@/components/shared/ColorPresetPicker';
 import { useToast } from '@/hooks/use-toast';
 import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
 
@@ -360,14 +361,13 @@ export default function ScanNOrder() {
                   Couleur principale
                 </Label>
                 <div className="flex items-center gap-3">
-                  <Input
+                  <ColorPresetPicker
                     id="primary-color"
-                    type="color"
-                    value={config?.primary_color || '#3b82f6'}
-                    onChange={(e) =>
-                      handleConfigChange('primary_color', e.target.value)
-                    }
-                    className="h-12 w-20 cursor-pointer"
+                    value={config?.primary_color}
+                    fallbackColor="#3b82f6"
+                    onChange={(hex) => handleConfigChange('primary_color', hex)}
+                    label="la couleur principale"
+                    compact
                   />
                   <span className="text-sm font-mono text-muted-foreground">
                     {config?.primary_color}
@@ -380,14 +380,14 @@ export default function ScanNOrder() {
                   Couleur de texte
                 </Label>
                 <div className="flex items-center gap-3">
-                  <Input
+                  <ColorPresetPicker
                     id="text-color"
-                    type="color"
-                    value={config?.text_color || '#ffffff'}
-                    onChange={(e) =>
-                      handleConfigChange('text_color', e.target.value)
-                    }
-                    className="h-12 w-20 cursor-pointer"
+                    value={config?.text_color}
+                    fallbackColor="#ffffff"
+                    presets={TEXT_COLOR_PRESETS}
+                    onChange={(hex) => handleConfigChange('text_color', hex)}
+                    label="le texte"
+                    compact
                   />
                   <span className="text-sm font-mono text-muted-foreground">
                     {config?.text_color}

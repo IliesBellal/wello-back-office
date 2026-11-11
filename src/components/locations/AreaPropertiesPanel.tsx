@@ -2,6 +2,7 @@ import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 import { MAX_AREA_NAME_LENGTH } from '@/lib/floorplan/validation';
 import type { Area } from '@/lib/floorplan/types';
 import { PropertiesShell } from './PropertiesShell';
@@ -34,12 +35,13 @@ export function AreaPropertiesPanel({ area, onUpdate, onDelete, onClose }: AreaP
         <div className="space-y-2">
           <Label htmlFor="area-color">Couleur de remplissage</Label>
           <div className="flex items-center gap-2">
-            <input
+            <ColorPresetPicker
               id="area-color"
-              type="color"
               value={area.color}
-              onChange={e => onUpdate({ color: e.target.value }, key('color'))}
-              className="h-9 w-14 cursor-pointer rounded-md border border-input"
+              fallbackColor={area.color}
+              onChange={hex => onUpdate({ color: hex }, key('color'))}
+              label="remplissage de la zone"
+              compact
             />
             <span className="font-mono text-xs text-muted-foreground">{area.color}</span>
           </div>
@@ -48,12 +50,13 @@ export function AreaPropertiesPanel({ area, onUpdate, onDelete, onClose }: AreaP
         <div className="space-y-2">
           <Label htmlFor="area-stroke-color">Couleur de contour</Label>
           <div className="flex items-center gap-2">
-            <input
+            <ColorPresetPicker
               id="area-stroke-color"
-              type="color"
               value={area.strokeColor}
-              onChange={e => onUpdate({ strokeColor: e.target.value }, key('stroke'))}
-              className="h-9 w-14 cursor-pointer rounded-md border border-input"
+              fallbackColor={area.strokeColor}
+              onChange={hex => onUpdate({ strokeColor: hex }, key('stroke'))}
+              label="contour de la zone"
+              compact
             />
             <span className="font-mono text-xs text-muted-foreground">{area.strokeColor}</span>
           </div>

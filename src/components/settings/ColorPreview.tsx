@@ -1,6 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { ColorPresetPicker, TEXT_COLOR_PRESETS } from "@/components/shared/ColorPresetPicker";
 
 interface ColorPreviewProps {
   primaryColor: string;
@@ -16,12 +17,13 @@ export const ColorPreview = ({ primaryColor, textColor, onPrimaryChange, onTextC
         <div className="space-y-2">
           <Label htmlFor="primary_color">Couleur principale</Label>
           <div className="flex gap-2">
-            <Input
+            <ColorPresetPicker
               id="primary_color"
-              type="color"
               value={primaryColor}
-              onChange={(e) => onPrimaryChange(e.target.value)}
-              className="w-16 h-10 p-1 cursor-pointer"
+              fallbackColor={primaryColor}
+              onChange={onPrimaryChange}
+              label="la couleur principale"
+              compact
             />
             <Input
               type="text"
@@ -34,12 +36,14 @@ export const ColorPreview = ({ primaryColor, textColor, onPrimaryChange, onTextC
         <div className="space-y-2">
           <Label htmlFor="text_color">Couleur du texte</Label>
           <div className="flex gap-2">
-            <Input
+            <ColorPresetPicker
               id="text_color"
-              type="color"
               value={textColor}
-              onChange={(e) => onTextChange(e.target.value)}
-              className="w-16 h-10 p-1 cursor-pointer"
+              fallbackColor={textColor}
+              presets={TEXT_COLOR_PRESETS}
+              onChange={onTextChange}
+              label="le texte"
+              compact
             />
             <Input
               type="text"

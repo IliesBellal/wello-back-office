@@ -31,6 +31,7 @@ export const useCategoryData = () => {
         categ_order: cat.categ_order || cat.order || 0,
         bg_color: cat.bg_color,
         image_url: cat.image_url,
+        course_step: cat.course_step ?? null,
         available: cat.available ?? cat.availability,
         products: cat.products || []
       }));
@@ -127,6 +128,51 @@ export const useCategoryData = () => {
     }
   };
 
+  /**
+   * Règle l'étape de plusieurs catégories d'un coup (fenêtre « Gérer les
+   * suites »). Les changements partent en parallèle ; ceux qui réussissent
+   * sont reflétés même si d'autres échouent, et les échecs sont renvoyés.
+   */
+  const updateCategoryCourseSteps = async (changes: Array<{ categoryId: string; step: number | null }>) => {
+    const results = await Promise.allSettled(
+      changes.map(({ categoryId, step }) => menuService.updateCategoryCourseStep(categoryId, step))
+    );
+    const succeeded = new Map<string, number | null>();
+    const failed: string[] = [];
+    results.forEach((result, index) => {
+      const { categoryId, step } = changes[index];
+      if (result.status === 'fulfilled') {
+        succeeded.set(categoryId, step);
+      } else {
+        failed.push(categoryId);
+      }
+    });
+    setMenuData(prev => ({
+      ...prev,
+      products_types: prev.products_types.map(c =>
+        succeeded.has(c.category_id) ? { ...c, course_step: succeeded.get(c.category_id) ?? null } : c
+      )
+    }));
+    return { updated: succeeded.size, failed };
+  };
+
+  /**
+   * Crée plusieurs catégories l'une après l'autre (il n'y a pas de route de
+   * création groupée) et renvoie le bilan : celles créées et celles en échec.
+   */
+  const createProductCategories = async (names: string[]) => {
+    const created: Category[] = [];
+    const failed: string[] = [];
+    for (const name of names) {
+      try {
+        created.push(await createProductCategory(name));
+      } catch {
+        failed.push(name);
+      }
+    }
+    return { created, failed };
+  };
+
   const deleteCategory = async (categoryId: string) => {
     try {
       await menuService.deleteCategory(categoryId);
@@ -182,6 +228,8 @@ export const useCategoryData = () => {
     createProductCategory,
     updateCategory,
     updateCategoryColor,
+    updateCategoryCourseSteps,
+    createProductCategories,
     deleteCategory,
     uploadCategoryImage,
     deleteCategoryImage,

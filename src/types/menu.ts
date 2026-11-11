@@ -338,6 +338,8 @@ export interface Category {
   categ_order?: number;  // Sort order for categories
   bg_color?: string;
   image_url?: string;
+  /** Étape de service (suites) : 1 = entrées, 2 = plats… ; absent = part tout de suite. */
+  course_step?: number | null;
   availability?: boolean;  // Availability status for the category
   available?: boolean;     // From new API format
   products: Product[];

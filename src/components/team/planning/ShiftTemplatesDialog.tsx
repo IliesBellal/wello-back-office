@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ColorPresetPicker } from "@/components/shared/ColorPresetPicker";
 import { cn } from "@/lib/utils";
 
 import { qk } from "@/lib/queryKeys";
@@ -311,37 +311,13 @@ export function ShiftTemplatesDialog({ open, onOpenChange }: ShiftTemplatesDialo
                 </div>
                 <div className="space-y-1.5">
                   <Label>Couleur</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className="flex h-10 w-10 items-center justify-center rounded-md border bg-background"
-                        aria-label="Choisir une couleur"
-                      >
-                        <span
-                          className="inline-block h-5 w-5 rounded-full ring-1 ring-border"
-                          style={{ backgroundColor: draft.color }}
-                        />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-2">
-                      <div className="grid grid-cols-5 gap-1.5">
-                        {PALETTE.map((c) => (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => setDraft((d) => ({ ...d, color: c }))}
-                            className={cn(
-                              "h-6 w-6 rounded-full ring-1 ring-border transition",
-                              draft.color === c && "ring-2 ring-foreground",
-                            )}
-                            style={{ backgroundColor: c }}
-                            aria-label={c}
-                          />
-                        ))}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <ColorPresetPicker
+                    value={draft.color}
+                    presets={PALETTE}
+                    onChange={(hex) => setDraft((d) => ({ ...d, color: hex }))}
+                    label="le modèle"
+                    compact
+                  />
                 </div>
               </div>
 

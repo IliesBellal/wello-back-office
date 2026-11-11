@@ -5,7 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCategoryData } from '@/hooks/useCategoryData';
 import { Category } from '@/types/menu';
-import { Plus, Pencil, Trash2, GripVertical, LinkIcon, ImageIcon, Upload, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, LinkIcon, ImageIcon, Upload, Loader2, ChevronDown, CopyPlus, ListChecks, MoreVertical } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { BulkCreateCategoriesDialog } from '@/components/menu/BulkCreateCategoriesDialog';
+import { CourseStepsDialog } from '@/components/menu/CourseStepsDialog';
 import {
   Dialog,
   DialogContent,
@@ -173,6 +176,8 @@ export default function CategoriesTable() {
     createProductCategory,
     updateCategory,
     updateCategoryColor,
+    updateCategoryCourseSteps,
+    createProductCategories,
     deleteCategory,
     uploadCategoryImage,
     deleteCategoryImage,
@@ -190,6 +195,8 @@ export default function CategoriesTable() {
   const [selectedCategoryForBulk, setSelectedCategoryForBulk] = useState<Category | null>(null);
   const [isAssigning, setIsAssigning] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [bulkCreateOpen, setBulkCreateOpen] = useState(false);
+  const [courseStepsOpen, setCourseStepsOpen] = useState(false);
   const [imageUploadingCategoryId, setImageUploadingCategoryId] = useState<string | null>(null);
   const saveOrderTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -227,6 +234,45 @@ export default function CategoriesTable() {
   };
 
   const handleCreateNewCategory = handleCreate;
+
+  const handleBulkCreate = async (names: string[]) => {
+    const { created, failed } = await createProductCategories(names);
+    if (created.length > 0) {
+      toast({
+        title: 'Succès',
+        description: `${created.length} catégorie${created.length > 1 ? 's' : ''} créée${created.length > 1 ? 's' : ''}`,
+      });
+    }
+    if (failed.length > 0) {
+      toast({
+        title: 'Création incomplète',
+        description: `Impossible de créer : ${failed.join(', ')}`,
+        variant: 'destructive',
+      });
+    }
+    return { created: created.length, failed };
+  };
+
+  const handleSaveCourseSteps = async (changes: Array<{ categoryId: string; step: number | null }>) => {
+    const result = await updateCategoryCourseSteps(changes);
+    if (result.updated > 0) {
+      toast({
+        title: 'Succès',
+        description: 'Suites enregistrées',
+      });
+    }
+    if (result.failed.length > 0) {
+      const names = categories
+        .filter((c) => result.failed.includes(c.category_id))
+        .map((c) => c.category_name || c.category);
+      toast({
+        title: 'Enregistrement incomplet',
+        description: `Impossible de modifier : ${names.join(', ')}`,
+        variant: 'destructive',
+      });
+    }
+    return result;
+  };
 
   const handleEdit = (category: Category) => {
     setEditingId(category.category_id);
@@ -469,10 +515,50 @@ export default function CategoriesTable() {
         header={
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <h1 className="text-3xl font-bold text-foreground">Catégories Caisse</h1>
-            <Button className="bg-gradient-primary" onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Nouvelle catégorie
-            </Button>
+            <div className="flex gap-2">
+              {/* Split button, comme « Nouveau produit » : le dégradé est porté
+                  par le conteneur pour rester continu d'une moitié à l'autre. */}
+              <div className="flex items-stretch rounded-md bg-gradient-primary">
+                <Button
+                  className="rounded-r-none bg-transparent hover:bg-white/10"
+                  onClick={() => setCreateDialogOpen(true)}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nouvelle catégorie
+                </Button>
+                <div className="my-2 w-px bg-primary-foreground/25" />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      size="icon"
+                      aria-label="Autres options de création"
+                      className="rounded-l-none bg-transparent hover:bg-white/10"
+                    >
+                      <ChevronDown className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="bg-popover">
+                    <DropdownMenuItem onClick={() => setBulkCreateOpen(true)}>
+                      <CopyPlus className="w-4 h-4 mr-2" />
+                      Créer plusieurs catégories
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Plus d'actions">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="bg-popover">
+                  <DropdownMenuItem onClick={() => setCourseStepsOpen(true)}>
+                    <ListChecks className="w-4 h-4 mr-2" />
+                    Gérer les suites
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         }
       >
@@ -625,6 +711,20 @@ export default function CategoriesTable() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <BulkCreateCategoriesDialog
+          open={bulkCreateOpen}
+          onOpenChange={setBulkCreateOpen}
+          existingNames={categories.map((c) => c.category_name || c.category)}
+          onSubmit={handleBulkCreate}
+        />
+
+        <CourseStepsDialog
+          open={courseStepsOpen}
+          onOpenChange={setCourseStepsOpen}
+          categories={categories}
+          onSave={handleSaveCourseSteps}
+        />
 
         {/* Delete Confirmation Dialog */}
         <ConfirmDialog
