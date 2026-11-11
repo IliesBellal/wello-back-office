@@ -15,6 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Edit, Save, X } from 'lucide-react';
+import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
 import { useProductData } from '@/hooks/useProductData';
@@ -298,11 +299,12 @@ export const ProductDetailsSheet = ({
                   <div>
                     <Label>Couleur de fond</Label>
                     <div className="flex items-center gap-2 mt-1">
-                      <input
-                        type="color"
-                        value={formData.bg_color || '#ffffff'}
-                        onChange={(e) => setFormData({ ...formData, bg_color: e.target.value })}
-                        className="w-12 h-10 rounded cursor-pointer"
+                      <ColorPresetPicker
+                        value={formData.bg_color}
+                        onChange={(hex) => setFormData({ ...formData, bg_color: hex })}
+                        label="fond du produit"
+                        description="Couleur du produit sur la caisse."
+                        compact
                       />
                       <Input
                         value={formData.bg_color || '#ffffff'}
