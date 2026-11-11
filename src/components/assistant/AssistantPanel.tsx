@@ -25,6 +25,7 @@ import { AssistantWelcome } from './AssistantWelcome';
 import { cachedProducts, loadCatalog } from './catalog';
 import { withNavigation } from './navIntents';
 import { useAssistantConversation } from './useAssistantConversation';
+import { AssistantNavContext, pageTitleFor, type AssistantNavigation } from './navigation';
 import { useIsMobileNow } from './useIsMobileNow';
 
 const ONBOARDED_KEY = 'wello.assistant.onboarded.v1';
@@ -62,9 +63,11 @@ function merchantLabel(authData: ReturnType<typeof useAuth>['authData']): string
 interface Props {
   open: boolean;
   onClose: () => void;
+  /** Redirection : le parent referme et, sur mobile, affiche « Vous êtes sur … ». */
+  onRedirect?: (label: string) => void;
 }
 
-export default function AssistantPanel({ open, onClose }: Props) {
+export default function AssistantPanel({ open, onClose, onRedirect }: Props) {
   const isMobile = useIsMobileNow();
   const { authData, logout } = useAuth();
   const navigate = useNavigate();
@@ -85,6 +88,7 @@ export default function AssistantPanel({ open, onClose }: Props) {
   // Produits et équipiers de l'établissement + canaux de vente (« CA borne »).
   const catalog = useMemo(() => buildCatalog(index, [...records, ...CHANNEL_RECORDS]), [index, records]);
   const products = useMemo(() => records.filter((r) => r.type === 'product'), [records]);
+  const employees = useMemo(() => records.filter((r) => r.type === 'employee'), [records]);
 
   // ─── Mesure d'usage : une session par ouverture ───────────────────────────
   const trackerRef = useRef<AssistantTracker | null>(null);
@@ -103,17 +107,22 @@ export default function AssistantPanel({ open, onClose }: Props) {
   const closedAt = useRef(0);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const onRedirectRef = useRef(onRedirect);
+  onRedirectRef.current = onRedirect;
+  const navRef = useRef<AssistantNavigation | null>(null);
 
   const conv = useAssistantConversation({
     index,
     catalog,
     products,
+    employees,
     baseContext: { permissions, path: location.pathname },
     tracker,
     actions: {
       merchantId: authData?.session.merchant_id ? String(authData.session.merchant_id) : undefined,
       merchantLabel: merchantLabel(authData),
       can: (key) => checkPermission(authData, key as Parameters<typeof checkPermission>[1]),
+      openPage: (path, label) => navRef.current?.go(path, label),
       navigate,
       logout,
       queryClient,
@@ -123,8 +132,10 @@ export default function AssistantPanel({ open, onClose }: Props) {
         return true;
       },
     },
-    closeAfter: (when) => {
-      if (when === 'always' || isMobile) window.setTimeout(() => onCloseRef.current(), 450);
+    closeAfter: (when, label) => {
+      if (!(when === 'always' || isMobile)) return;
+      if (onRedirectRef.current) onRedirectRef.current(label ?? 'la page demandée');
+      else onCloseRef.current();
     },
   });
   const convRef = useRef(conv);
@@ -164,7 +175,7 @@ export default function AssistantPanel({ open, onClose }: Props) {
       },
     });
     void store.refresh();
-    void loadCatalog({ employees: checkPermission(authData, 'staff.schedule.manage') }).then((r) => {
+    void loadCatalog({ employees: checkPermission(authData, 'staff.schedule.manage') || checkPermission(authData, 'staff.manage') }).then((r) => {
       if (r.length) setRecords(r);
     });
     if (!isMobile) window.setTimeout(() => composer.current?.focus(), 150);
@@ -222,7 +233,22 @@ export default function AssistantPanel({ open, onClose }: Props) {
   const firstName = authData?.user.first_name;
   const empty = conv.messages.length === 0;
 
+  // Liens des cartes : même règle que les demandes de page (fermeture + message sur mobile).
+  const assistantNav: AssistantNavigation = {
+    go: (path, label) => {
+      navigate(path);
+      tracker.track('navigated', { data: { path, from: 'card_link' } });
+      if (isMobile) {
+        if (onRedirectRef.current) onRedirectRef.current(label ?? pageTitleFor(path));
+        else onCloseRef.current();
+      }
+    },
+  };
+
+  navRef.current = assistantNav;
+
   return (
+    <AssistantNavContext.Provider value={assistantNav}>
     <AnimatePresence>
       {open && (
         <motion.div
@@ -334,6 +360,7 @@ export default function AssistantPanel({ open, onClose }: Props) {
         </motion.div>
       )}
     </AnimatePresence>
+    </AssistantNavContext.Provider>
   );
 }
 

@@ -6,6 +6,7 @@ import type { EngineIndex } from '@/lib/assistant/engine';
 import { cn } from '@/lib/utils';
 import type { Block, DownloadItem, Message } from './types';
 import { WelloAssistantMark } from './WelloAssistantMark';
+import { useAssistantNavigation } from './navigation';
 
 // ─── Avatar ─────────────────────────────────────────────────────────────────
 
@@ -308,11 +309,12 @@ function CardHeader({ title, subtitle }: { title: string; subtitle?: string }) {
 
 function CardLink({ link }: { link?: { label: string; path: string } }) {
   const navigate = useNavigate();
+  const assistantNav = useAssistantNavigation();
   if (!link) return null;
   return (
     <button
       type="button"
-      onClick={() => navigate(link.path)}
+      onClick={() => (assistantNav ? assistantNav.go(link.path) : navigate(link.path))}
       className="mt-3 inline-flex items-center gap-1 text-[13px] font-medium text-primary hover:underline"
     >
       {link.label}

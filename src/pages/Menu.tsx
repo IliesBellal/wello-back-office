@@ -169,6 +169,24 @@ export default function Menu() {
     setSheetOpen(true);
   }, []);
 
+  // `?product=<id>` (lien de l'assistant) : ouvre la fiche une fois la carte
+  // chargée, puis retire le paramètre pour qu'un rechargement ne la rouvre pas.
+  useEffect(() => {
+    const wanted = searchParams.get('product');
+    if (!wanted || !menuData?.products) return;
+    // Produit, ou produit parent d'une déclinaison demandée.
+    const product =
+      menuData.products.find((p) => p.product_id === wanted) ??
+      menuData.products.find((p) => p.sub_products?.some((sp) => sp.product_id === wanted));
+    if (product) {
+      setSelectedProduct(product);
+      setSheetOpen(true);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('product');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams, menuData]);
+
   // selectedProduct est un instantané pris au clic, pas une référence vivante
   // dans menuData : sans ce resync, la fiche ouverte (groupe ou produit)
   // resterait figée sur les anciennes valeurs après un enregistrement ou un

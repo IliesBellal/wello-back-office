@@ -134,7 +134,7 @@ function analyse(index: EngineIndex, normalized: string, catalog: EntityCatalog 
   const named = catalog ? catalog.find(tokens, blocked) : [];
   named.forEach((e) => mark(e, e.type));
   const quantities = findQuantities(tokens, blocked);
-  quantities.forEach((q) => mark(q, 'quantity'));
+  quantities.forEach((q) => mark(q, q.type));
 
   const entities = [...dateEntities, ...named, ...quantities].sort((a, b) => a.start - b.start);
   return { tokens, dates, entities, entityAt };
@@ -245,7 +245,8 @@ function scoreIntent(index: EngineIndex, pi: PreparedIntent, analysis: Analysis,
   const n = tokens.length;
   const consumed = new Array<boolean>(n).fill(false);
   // Positions neutres pour cette intention : dates, quantités, et entités qu'elle accepte en slot.
-  const unavailable = entityAt.map((t) => t === 'date' || t === 'quantity' || (t !== undefined && pi.slotTypes.has(t)));
+  // Dates, quantités et nombres sont des précisions : jamais pénalisants.
+  const unavailable = entityAt.map((t) => t === 'date' || t === 'quantity' || t === 'number' || (t !== undefined && pi.slotTypes.has(t)));
   const matchedTerms: ModelTerm[] = [];
   let evidence = 0;
 
@@ -333,7 +334,7 @@ function decide(index: EngineIndex, scored: ScoredIntent[], analysis: Analysis, 
   let candidates = ranked.filter((s) => s.score >= suggest).slice(0, MAX_CANDIDATES);
   // Une entité seule (« tiramisu ») : on propose ce qu'on peut faire avec elle.
   if (candidates.length === 0) {
-    const types = new Set(analysis.entities.filter((e) => e.type !== 'date' && e.type !== 'quantity').map((e) => e.type));
+    const types = new Set(analysis.entities.filter((e) => e.type !== 'date' && e.type !== 'quantity' && e.type !== 'channel').map((e) => e.type));
     if (types.size) {
       candidates = applicable
         .filter((pi) => pi.intent.slots.some((s) => types.has(s.entity) && s.required))

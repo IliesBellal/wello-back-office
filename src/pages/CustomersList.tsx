@@ -225,6 +225,7 @@ const CustomersList = () => {
       }
       
       setCustomers(results);
+      return results;
     } catch (error) {
       toast({
         title: 'Erreur',
@@ -256,7 +257,20 @@ const CustomersList = () => {
   }, [customers]);
 
   useEffect(() => {
-    loadCustomers();
+    // `?search=Dupont` (lien de l'assistant) : recherche pré-remplie ; avec
+    // `&open=1`, la fiche s'ouvre directement s'il n'y a qu'un client.
+    const initialSearch = searchParams.get('search')?.trim();
+    if (initialSearch) {
+      setSearchTerm(initialSearch);
+      void loadCustomers(initialSearch, undefined, 1).then((found) => {
+        if (searchParams.get('open') === '1' && found?.length === 1) {
+          setSelectedCustomer(found[0]);
+          setDetailsOpen(true);
+        }
+      });
+    } else {
+      loadCustomers();
+    }
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);

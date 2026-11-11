@@ -5,8 +5,9 @@
  *   npm run assistant:seed-sql -- ../ib-welloresto-api/migrations/todo 207_assistant_seed
  *
  * Écrit <dossier>/<nom>.up.sql et <nom>.down.sql. Rejouable : les intentions
- * sont mises à jour, les termes déjà présents ne sont pas touchés (une
- * décision d'administration — terme rejeté, poids modifié — est conservée).
+ * sont mises à jour ; un terme pré-rempli déjà présent prend le poids du seed
+ * tant qu'aucun administrateur n'y a touché (reviewed_at NULL) : une décision
+ * d'administration — terme rejeté, poids modifié — est conservée.
  */
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -83,9 +84,10 @@ const up = `${header}
 -- Pré-remplissage de l'assistant : ${intents.length} intentions, ${termRows.length} termes,
 -- ${lexiconRows.length} entrées de lexique. À appliquer après 206_assistant.
 --
--- Rejouable : les intentions sont mises à jour ; un terme déjà présent n'est
--- pas modifié (une décision d'administration est conservée) ; les nouveaux
--- termes sont ajoutés.
+-- Rejouable : les intentions sont mises à jour ; les nouveaux termes sont
+-- ajoutés ; un terme pré-rempli déjà présent prend le poids du seed tant
+-- qu'aucun administrateur n'y a touché (une décision d'administration est
+-- conservée).
 
 BEGIN;
 
@@ -112,7 +114,13 @@ ON CONFLICT (intent_key) DO UPDATE SET
 INSERT INTO assistant_terms (intent_key, text, kind, weight, source, status, merchant_id)
 VALUES
 ${termRows.join(',\n')}
-ON CONFLICT (intent_key, text, merchant_id) DO NOTHING;
+ON CONFLICT (intent_key, text, merchant_id) DO UPDATE SET
+    weight     = EXCLUDED.weight,
+    kind       = EXCLUDED.kind,
+    updated_at = now()
+WHERE assistant_terms.source = 'seed'
+  AND assistant_terms.reviewed_at IS NULL
+  AND (assistant_terms.weight IS DISTINCT FROM EXCLUDED.weight OR assistant_terms.kind IS DISTINCT FROM EXCLUDED.kind);
 
 INSERT INTO assistant_lexicon (kind, group_key, text, source)
 VALUES

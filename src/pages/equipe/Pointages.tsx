@@ -8,8 +8,8 @@
  *   - TODO (§8) : remplacer par GET /planning/time-entries dès qu'il existe.
  */
 
-import { useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Navigate, useSearchParams } from "react-router-dom";
 import { initialUrlDateRange, useUrlDateRange } from "@/lib/pageFilters";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { endOfDay, format, parseISO, startOfDay } from "date-fns";
@@ -88,7 +88,13 @@ function PointagesContent() {
     return { from: today, to: today };
   });
   useUrlDateRange(setRange);
-  const [employeeFilter, setEmployeeFilter] = useState<string>("all");
+  // `?employee=<id>` (lien de l'assistant) : pointages d'un seul équipier.
+  const [searchParams] = useSearchParams();
+  const urlEmployee = searchParams.get("employee");
+  const [employeeFilter, setEmployeeFilter] = useState<string>(() => urlEmployee || "all");
+  useEffect(() => {
+    if (urlEmployee) setEmployeeFilter(urlEmployee);
+  }, [urlEmployee]);
 
   // ── Selection ────────────────────────────────────────────────────────────
   const [selectedEntry, setSelectedEntry] = useState<PlanningTimeEntry | null>(null);

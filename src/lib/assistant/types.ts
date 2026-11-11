@@ -20,7 +20,8 @@ export type TermStatus = 'candidate' | 'active' | 'validated' | 'rejected';
 
 /** Types d'entités reconnues dans une phrase. */
 /** `channel` : canal de vente (borne, ScanNOrder, à emporter…), voir channels.ts. */
-export type EntityType = 'product' | 'employee' | 'customer' | 'channel' | 'date' | 'quantity' | 'text';
+/** `number` : un nombre écrit en chiffres (numéro de commande « 42098 », « 4 personnes »). */
+export type EntityType = 'product' | 'employee' | 'customer' | 'channel' | 'date' | 'quantity' | 'number' | 'text';
 
 export interface SlotDef {
   name: string;

@@ -95,10 +95,15 @@ demandés. CA et meilleures ventes portent sur l'établissement de la session.
 1. Ajouter l'intention dans `src/lib/assistant/seed.ts` (mots-clés, phrases,
    exemples, slots, droit requis, `confirm` si elle modifie quelque chose).
 2. Ajouter son gestionnaire dans `src/components/assistant/actions.ts` (clé = `action`).
-3. Ajouter des cas dans `src/lib/assistant/__tests__/engine.test.ts`.
-4. Régénérer la migration de l'API :
-   `npm run assistant:seed-sql -- ../ib-welloresto-api/migrations/todo 207_assistant_seed`
-   (ou un nouveau numéro si 207 est déjà appliquée en production : le script est rejouable).
+3. Ajouter ses phrases au corpus `src/lib/assistant/__tests__/corpus.test.ts`
+   (phrase → intention attendue, question attendue ou repli) : il vérifie que la
+   nouvelle capacité ne vole pas les demandes des autres. Cas fins du moteur :
+   `engine.test.ts`.
+4. Générer une nouvelle migration de l'API (numéro suivant, 210 est la dernière) :
+   `npm run assistant:seed-sql -- ../ib-welloresto-api/migrations/todo 211_assistant_seed_xxx`.
+   Rejouable : nouveaux termes ajoutés, poids mis à jour pour les termes
+   pré-remplis jamais modifiés par l'administration. Un terme retiré du seed
+   n'est pas supprimé : ajouter le `DELETE` à la main (voir 209).
 
 Une nouvelle page de `navConfig` est comprise automatiquement par son titre ;
 on ne l'ajoute au seed que pour lui donner des synonymes.

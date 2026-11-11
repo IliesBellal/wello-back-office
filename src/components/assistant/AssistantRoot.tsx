@@ -6,7 +6,7 @@
  * connectée. Le panneau est chargé au premier survol / toucher du bouton.
  * Raccourci : ⌘J / Ctrl+J.
  */
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -29,6 +29,13 @@ export function AssistantRoot() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  /** Page ouverte depuis l'assistant sur mobile : « Vous êtes sur … ». */
+  const [notice, setNotice] = useState<{ label: string; key: number } | null>(null);
+
+  const onRedirect = (label: string) => {
+    setOpen(false);
+    if (isMobile) setNotice({ label, key: Date.now() });
+  };
 
   const toggle = () => {
     setMounted(true);
@@ -58,9 +65,22 @@ export function AssistantRoot() {
   return (
     <>
       {visible && !(isMobile && open) && <AssistantFab open={open} onClick={toggle} />}
+      <AnimatePresence>
+        {notice && visible && !open && (
+          <RedirectNotice
+            key={notice.key}
+            label={notice.label}
+            onBack={() => {
+              setNotice(null);
+              setOpen(true);
+            }}
+            onDone={() => setNotice((n) => (n?.key === notice.key ? null : n))}
+          />
+        )}
+      </AnimatePresence>
       {mounted && (
         <Suspense fallback={null}>
-          <AssistantPanel open={open && visible} onClose={() => setOpen(false)} />
+          <AssistantPanel open={open && visible} onClose={() => setOpen(false)} onRedirect={onRedirect} />
         </Suspense>
       )}
     </>
@@ -137,5 +157,41 @@ function ChatBubbleIcon({ className }: { className?: string }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className={className}>
       <path d="M12 3.5a8.5 8.5 0 1 1-4.1 15.95L4 20.5l.91-3.81A8.5 8.5 0 0 1 12 3.5z" />
     </svg>
+  );
+}
+
+/**
+ * « Vous êtes sur … » après une redirection sur mobile, au-dessus de la barre
+ * de navigation et à gauche du bouton flottant ; « Revenir » rouvre la
+ * conversation là où elle en était.
+ */
+function RedirectNotice({ label, onBack, onDone }: { label: string; onBack: () => void; onDone: () => void }) {
+  const done = useRef(onDone);
+  done.current = onDone;
+  useEffect(() => {
+    const t = window.setTimeout(() => done.current(), 4500);
+    return () => window.clearTimeout(t);
+  }, []);
+  return (
+    <motion.div
+      role="status"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 12 }}
+      transition={{ duration: 0.2 }}
+      className="fixed left-4 right-[5.5rem] z-[55] flex min-h-[48px] items-center gap-3 rounded-2xl border border-border/70 bg-white py-2 pl-4 pr-2 shadow-[0_8px_24px_-8px_rgb(15_23_42/0.25)] bottom-[calc(4rem+env(safe-area-inset-bottom)+1rem)] dark:bg-card"
+    >
+      <p className="min-w-0 flex-1 text-[13px] leading-snug">
+        <span className="text-muted-foreground">Vous êtes sur </span>
+        <span className="font-medium">{label}</span>
+      </p>
+      <button
+        type="button"
+        onClick={onBack}
+        className="shrink-0 rounded-full px-3 py-1.5 text-[13px] font-semibold text-primary transition-colors hover:bg-primary/10"
+      >
+        Revenir
+      </button>
+    </motion.div>
   );
 }

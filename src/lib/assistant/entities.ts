@@ -178,13 +178,22 @@ const QUANTITY_WORDS: Record<string, number> = {
   onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16, vingt: 20,
 };
 
-/** Quantités explicites (« 2 », « trois »). « un » / « une » restent des articles. */
+/**
+ * Quantités en lettres (« deux », « trois ») et nombres en chiffres
+ * (« 42098 », « 4 ») : un nombre en chiffres est un `number` (numéro de
+ * commande, couverts…) ; une intention qui attend une quantité l'accepte
+ * aussi (prise de commande orale). « un » / « une » restent des articles.
+ */
 export function findQuantities(tokens: string[], blocked: boolean[] = []): EntityMatch[] {
   const out: EntityMatch[] = [];
   tokens.forEach((t, i) => {
     if (blocked[i]) return;
-    const q = /^\d{1,3}$/.test(t) ? Number(t) : QUANTITY_WORDS[t];
-    if (q && q > 0) out.push({ type: 'quantity', start: i, end: i + 1, text: t, score: 1, quantity: q });
+    if (/^\d{1,12}$/.test(t)) {
+      out.push({ type: 'number', start: i, end: i + 1, text: t, score: 1, quantity: Number(t) });
+      return;
+    }
+    const q = QUANTITY_WORDS[t];
+    if (q) out.push({ type: 'quantity', start: i, end: i + 1, text: t, score: 1, quantity: q });
   });
   return out;
 }

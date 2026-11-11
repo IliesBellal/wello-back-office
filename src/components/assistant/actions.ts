@@ -25,7 +25,7 @@ import { exportRegistersPDF } from '@/services/cashRegisterHistoryService';
 import { uuid } from '@/lib/assistant/tracking';
 import { normalize } from '@/lib/assistant/normalize';
 import { channelMeta } from '@/lib/assistant/channels';
-import { withFilters, type PageFilters } from '@/lib/pageFilters';
+import { toIsoDay, withFilters, type PageFilters } from '@/lib/pageFilters';
 import { DEFAULT_ORDER_FILTER, type OrderFilterSelection } from '@/utils/orderFilters';
 
 export interface ActionContext {
@@ -37,6 +37,13 @@ export interface ActionContext {
   query?: string;
   /** Droit détenu par l'utilisateur (documents réservés aux gérants). */
   can?: (permission: string) => boolean;
+  /**
+   * Mots de la phrase que l'intention n'explique pas, tels que tapés
+   * (« Fiche client Dupont » → « Dupont ») : terme de recherche libre.
+   */
+  freeText?: string;
+  /** Ouvre une page depuis un bouton de carte (mêmes règles de redirection). */
+  openPage?: (path: string, label: string) => void;
   navigate: (path: string) => void;
   logout: () => void;
   openCreateProduct: () => boolean;
@@ -53,6 +60,8 @@ export interface ExecResult {
    * ou 'always' (un panneau latéral s'ouvre et le panneau le masquerait).
    */
   close?: 'mobile' | 'always';
+  /** Page ouverte, pour le message « Vous êtes sur … » (mobile). */
+  redirectLabel?: string;
 }
 
 export type ActionHandler = (intent: ModelIntent, slots: Record<string, EntityMatch>, ctx: ActionContext) => Promise<ExecResult>;
@@ -78,6 +87,15 @@ const ORDER_STATUS_WORDS: Array<[RegExp, string]> = [
   [/\brefus/, 'denied'],
   [/\ben attente\b/, 'pending'],
   [/\btermin/, 'done'],
+];
+
+/** Statut de réservation demandé (« réservations en attente »). */
+const BOOKING_STATUS_WORDS: Array<[RegExp, string]> = [
+  [/\ben attente\b|\ba confirmer\b|\bnon confirmees?\b/, 'pending'],
+  [/\bconfirmees?\b(?<!non confirmees?)/, 'confirmed'],
+  [/\binstallees?\b|\bassis\b/, 'seated'],
+  [/\brefusees?\b/, 'denied'],
+  [/\bannulees?\b/, 'cancelled'],
 ];
 
 /**
@@ -107,11 +125,26 @@ export function filteredPath(navId: string, base: string, slots: Record<string, 
     filters.from = period.from;
     filters.to = period.to;
   }
+  const channelFilters: PageFilters = channel ? (channel.field === 'sources' ? { sources: [channel.value] } : { types: [channel.value] }) : {};
   if (navId === 'dashboard-analysis' && (period || channel)) {
     filters.tab = 'ca';
-    if (channel) Object.assign(filters, channel.field === 'sources' ? { sources: [channel.value] } : { types: [channel.value] });
+    Object.assign(filters, channelFilters);
   }
-  return withFilters(base, filters);
+  if (navId === 'vat-declaration') Object.assign(filters, channelFilters);
+  let path = withFilters(base, filters);
+  const extra = new URLSearchParams();
+  // Pointages d'un équipier : identifiant planning de l'équipier.
+  if (navId === 'pointages' && slots.employee?.record) extra.set('employee', slots.employee.record.id);
+  if (navId === 'reservations-list') {
+    const q = normalize(query);
+    const statuses = BOOKING_STATUS_WORDS.filter(([re]) => re.test(q)).map(([, v]) => v);
+    if (statuses.length) extra.set('status', statuses.join(','));
+    const party = q.match(/\b(\d{1,3}) (?:personnes?|pers|couverts?|convives?)\b/);
+    if (party) extra.set('party', party[1]);
+  }
+  const qs = extra.toString();
+  if (qs) path += (path.includes('?') ? '&' : '?') + qs;
+  return path;
 }
 
 const subtitleOf = (...parts: Array<string | undefined>) => parts.filter(Boolean).join(' · ');
@@ -286,8 +319,112 @@ const documentsList: ActionHandler = async (_intent, slots, ctx) => {
   };
 };
 
+// ─── Fiches : commande, équipier, produit, client ──────────────────────────
+
+const orderOpen: ActionHandler = async (_intent, slots, ctx) => {
+  const wanted = String(slots.number?.quantity ?? slots.number?.text ?? '').replace(/^#/, '');
+  const to = new Date();
+  const from = new Date(to);
+  from.setFullYear(from.getFullYear() - 1);
+  const res = await analyticsService.getOrderHistory(from, to, undefined, undefined, undefined, wanted, 1, 20);
+  const historyLink = `/dashboard/order-history?${new URLSearchParams({ search: wanted, startDate: toIsoDay(from), endDate: toIsoDay(to) })}`;
+  // Le numéro affiché (« #42098 ») ou l'identifiant ; la recherche est partielle.
+  const exact = res.orders.filter((o) => o.number.replace(/^#/, '') === wanted || o.id === wanted);
+  if (exact.length === 1) {
+    const o = exact[0];
+    const path = `/dashboard/order-history?${new URLSearchParams({ orderId: o.id, search: wanted, startDate: toIsoDay(from), endDate: toIsoDay(to) })}`;
+    ctx.navigate(path);
+    return {
+      outcome: 'navigate',
+      close: 'always',
+      redirectLabel: `Commande ${o.number}`,
+      blocks: [b({ type: 'text', tone: 'muted', text: `Voici la commande ${o.number} du ${o.date}${o.customer_name ? ` (${o.customer_name})` : ''}.` })],
+    };
+  }
+  const list = exact.length ? exact : res.orders;
+  if (!list.length) {
+    return {
+      outcome: 'info',
+      blocks: [b({ type: 'text', text: `Je ne trouve pas de commande n° ${wanted} sur les 12 derniers mois.` })],
+    };
+  }
+  return {
+    outcome: 'info',
+    blocks: [
+      b({
+        type: 'list',
+        title: exact.length ? `${exact.length} commandes n° ${wanted}` : `Commandes contenant « ${wanted} »`,
+        subtitle: 'Sur les 12 derniers mois',
+        empty: '',
+        items: list.slice(0, 8).map((o) => ({
+          id: o.id,
+          primary: `${o.number}${o.customer_name ? ` · ${o.customer_name}` : ''}`,
+          secondary: `${o.date} ${o.time}`.trim(),
+          trailing: formatEuros(Math.round(o.total * 100), true),
+          action: {
+            label: 'Ouvrir',
+            run: () =>
+              ctx.openPage?.(`/dashboard/order-history?${new URLSearchParams({ orderId: o.id, search: wanted, startDate: toIsoDay(from), endDate: toIsoDay(to) })}`, `Commande ${o.number}`),
+          },
+        })),
+        link: { label: "Voir dans l'historique", path: historyLink },
+      }),
+    ],
+  };
+};
+
+const staffOpen: ActionHandler = async (_intent, slots, ctx) => {
+  const employee = slots.employee.record!;
+  const userId = employee.meta?.user_id as string | undefined;
+  // La fiche s'ouvre sur le compte de connexion ; sans compte, la liste de l'équipe.
+  ctx.navigate(userId ? `/equipe/equipiers?${new URLSearchParams({ openMember: userId })}` : '/equipe/equipiers');
+  return {
+    outcome: 'navigate',
+    close: 'always',
+    redirectLabel: userId ? `Fiche de ${employee.name}` : 'Équipiers',
+    blocks: [
+      b({
+        type: 'text',
+        tone: 'muted',
+        text: userId ? `Voici la fiche de ${employee.name}.` : `${employee.name} n'a pas de compte de connexion : voici la liste de l'équipe.`,
+      }),
+    ],
+  };
+};
+
+const productOpen: ActionHandler = async (_intent, slots, ctx) => {
+  const product = slots.product.record!;
+  ctx.navigate(`/menu/products?${new URLSearchParams({ product: product.id })}`);
+  return {
+    outcome: 'navigate',
+    close: 'always',
+    redirectLabel: `Fiche ${product.name}`,
+    blocks: [b({ type: 'text', tone: 'muted', text: `Voici la fiche de ${product.name}.` })],
+  };
+};
+
+const customerSearch: ActionHandler = async (_intent, _slots, ctx) => {
+  const term = (ctx.freeText ?? '').trim();
+  if (!term) {
+    ctx.navigate('/customers/list');
+    return { outcome: 'navigate', close: 'mobile', redirectLabel: 'Liste clients', blocks: [b({ type: 'text', tone: 'muted', text: 'Voici la liste des clients.' })] };
+  }
+  // Fiche ouverte directement si la recherche ne donne qu'un client.
+  ctx.navigate(`/customers/list?${new URLSearchParams({ search: term, open: '1' })}`);
+  return {
+    outcome: 'navigate',
+    close: 'always',
+    redirectLabel: `Clients · « ${term} »`,
+    blocks: [b({ type: 'text', tone: 'muted', text: `Je cherche « ${term} » dans vos clients.` })],
+  };
+};
+
 export const ACTIONS: Record<string, ActionHandler> = {
   'documents.list': documentsList,
+  'order.open': orderOpen,
+  'staff.open': staffOpen,
+  'product.open': productOpen,
+  'customer.search': customerSearch,
 
   async navigate(intent, slots, ctx) {
     const base = String(intent.params.path ?? '/');
@@ -297,6 +434,7 @@ export const ACTIONS: Record<string, ActionHandler> = {
     return {
       outcome: 'navigate',
       close: 'mobile',
+      redirectLabel: period ? `${intent.label} · ${period.label}` : intent.label,
       blocks: [
         b({
           type: 'text',
@@ -334,6 +472,7 @@ export const ACTIONS: Record<string, ActionHandler> = {
     return {
       outcome: 'navigate',
       close: 'always',
+      redirectLabel: 'Produits',
       blocks: [b({ type: 'text', tone: 'muted', text: opened ? 'Le formulaire de création est ouvert.' : 'Voici la carte : cliquez sur « Nouveau produit ».' })],
     };
   },

@@ -16,7 +16,8 @@ export type DateSpec =
   | { kind: 'period'; unit: 'week' | 'month' | 'year'; offset: number }
   | { kind: 'lastDays'; days: number }
   | { kind: 'absolute'; day: number; month?: number; year?: number }
-  | { kind: 'month'; month: number; year?: number };
+  | { kind: 'month'; month: number; year?: number }
+  | { kind: 'year'; year: number };
 
 export interface DateMention {
   start: number;
@@ -169,6 +170,11 @@ const DAY_MATCHERS: Matcher = anyOf(
     }
     return { len, spec: { kind: 'absolute', day, month, year } };
   },
+  // Une année : « en 2025 », « de 2025 », « année 2025 » (pas « commande 2025 »).
+  (t, i) => {
+    if (!['en', 'de', 'd', 'depuis', 'annee'].includes(t[i]) || !/^20\d{2}$/.test(t[i + 1] ?? '')) return null;
+    return { len: 2, spec: { kind: 'year', year: Number(t[i + 1]) } };
+  },
   // Un mois seul : « janvier », « mois de mars », « septembre 2025 ».
   (t, i) => {
     const off = t[i] === 'mois' && (t[i + 1] === 'de' || t[i + 1] === 'd') ? 2 : 0;
@@ -309,6 +315,12 @@ export function resolveDate(mention: Pick<DateMention, 'spec' | 'daypart'>, now:
     case 'lastDays': {
       const from = addDays(today, -(spec.days - 1));
       return { from: toISODate(from), to: toISODate(today), label: `les ${spec.days} derniers jours`, grain: spec.days <= 7 ? 'week' : 'month' };
+    }
+    case 'year': {
+      const first = new Date(spec.year, 0, 1);
+      const last = new Date(spec.year, 11, 31);
+      const to = spec.year === today.getFullYear() && prefer === 'past' ? today : last;
+      return { from: toISODate(first), to: toISODate(to), label: String(spec.year), grain: 'year' };
     }
     case 'month': {
       let year = spec.year ?? today.getFullYear();

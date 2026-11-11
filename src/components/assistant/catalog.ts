@@ -53,7 +53,8 @@ async function loadEmployees(): Promise<EntityRecord[]> {
     type: 'employee',
     id: String(e.id),
     name: `${e.first_name} ${e.last_name}`.trim(),
-    meta: { position: e.position ?? '' },
+    // user_id : compte de connexion, ouvre la fiche dans Équipiers (openMember).
+    meta: { position: e.position ?? '', user_id: e.user_id ?? undefined },
   }));
   employees = { at: Date.now(), records };
   return records;

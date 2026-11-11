@@ -17,14 +17,14 @@ import type { AuthData } from '@/types/auth';
  * `navigate`) : « caisses de janvier », « commandes annulées hier »,
  * « analyse borne de la semaine dernière ».
  */
-const FILTERED_PAGES: Record<string, { channel?: boolean }> = {
+const FILTERED_PAGES: Record<string, { channel?: boolean; employee?: boolean }> = {
   'cash-registers-history': {},
   'dashboard-analysis': { channel: true },
   'dashboard-order-history': { channel: true },
   'reservations-list': {},
   'financial-report': {},
-  'vat-declaration': {},
-  pointages: {},
+  'vat-declaration': { channel: true },
+  pointages: { employee: true },
 };
 
 const GENERIC_TITLES = new Set(['Paramètres', 'Gestion', 'Activité', 'Hub', 'Statistiques', "Vue d'ensemble"]);
@@ -66,7 +66,14 @@ function titleTerms(page: NavPage, stopwords: Set<string>): ModelTerm[] {
   const title = normalize(page.title);
   const parent = page.parentTitle ? normalize(page.parentTitle) : '';
   const generic = GENERIC_TITLES.has(page.title);
-  title.split(' ').filter((t) => t && !stopwords.has(t)).forEach((t) => out.push(term(t, generic ? 0.5 : 1)));
+  // « Mon planning », « Mes droits » : le mot seul (« planning ») désigne d'abord
+  // la page générale ; le titre complet reste fort.
+  const personal = /^(mon|ma|mes)\b/.test(title);
+  // Un mot isolé d'un titre de plusieurs mots (« client » dans « Affichage
+  // client ») pèse moins que le titre entier : il ne vole pas « client Dupont ».
+  const words = title.split(' ').filter((t) => t && !stopwords.has(t));
+  const single = generic || personal ? 0.5 : words.length > 1 ? 0.7 : 1;
+  words.forEach((t) => out.push(term(t, single)));
   if (title.includes(' ')) out.push(term(title, 2));
   if (parent) {
     out.push(term(`${title} ${parent}`, 2.2), term(`${parent} ${title}`, 2.2));
@@ -90,6 +97,7 @@ export function withNavigation(model: AssistantModel, authData: AuthData | null 
         ? [
             { name: 'period', entity: 'date', required: false, prefer: page.id === 'reservations-list' ? 'future' : 'past' },
             ...(FILTERED_PAGES[page.id].channel ? [{ name: 'channel', entity: 'channel' as const, required: false }] : []),
+            ...(FILTERED_PAGES[page.id].employee ? [{ name: 'employee', entity: 'employee' as const, required: false }] : []),
           ]
         : [],
       permission: null, // déjà filtré par navConfig

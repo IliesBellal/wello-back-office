@@ -389,13 +389,20 @@ const ReservationsListPage = () => {
   const [limit, setLimit] = useState(20);
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  // `?status=pending,confirmed` et `?party=4` (liens de l'assistant).
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>(() => {
+    const raw = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("status");
+    return raw ? raw.split(",").filter((s) => STATUS_OPTIONS.some((o) => o.value === s)) : [];
+  });
   const [source, setSource] = useState<string>("all");
   // Période de l'URL (?from=…&to=…), sinon aucune.
   const [dateFrom, setDateFrom] = useState(() => { const r = initialUrlDateRange(); return r ? toIsoDay(r.from) : ""; });
   const [dateTo, setDateTo] = useState(() => { const r = initialUrlDateRange(); return r ? toIsoDay(r.to) : ""; });
   useUrlDateRange((r) => { setDateFrom(toIsoDay(r.from)); setDateTo(toIsoDay(r.to)); setPage(1); });
-  const [partySize, setPartySize] = useState("");
+  const [partySize, setPartySize] = useState(() => {
+    const raw = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("party");
+    return raw && /^\d{1,3}$/.test(raw) ? raw : "";
+  });
   const [selectedBookingId, setSelectedBookingId] = useState<string | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 

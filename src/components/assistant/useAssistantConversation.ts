@@ -13,9 +13,9 @@
 import { useCallback, useRef, useState } from 'react';
 import { buildLearningSignal, defaultSlots, understand, type EngineIndex } from '@/lib/assistant/engine';
 import type { EntityCatalog } from '@/lib/assistant/entities';
-import { normalize } from '@/lib/assistant/normalize';
+import { normalize, tokenize } from '@/lib/assistant/normalize';
 import { uuid, type AssistantTracker } from '@/lib/assistant/tracking';
-import type { EntityMatch, EntityRecord, LearningSignal, ScoredIntent, UnderstandContext, UnderstandResult } from '@/lib/assistant/types';
+import type { EntityMatch, EntityRecord, LearningSignal, ScoredIntent, SlotDef, UnderstandContext, UnderstandResult } from '@/lib/assistant/types';
 import { isApiHttpError } from '@/services/apiClient';
 import { ACTIONS, confirmationFor, suggestionLabel, type ActionContext } from './actions';
 import type { Block, Message, Suggestion } from './types';
@@ -40,11 +40,13 @@ export interface ConversationDeps {
   index: EngineIndex;
   catalog?: EntityCatalog;
   products: EntityRecord[];
+  /** Équipiers (sélecteur « Quel équipier ? »). */
+  employees: EntityRecord[];
   baseContext: Omit<UnderstandContext, 'lastEntity'>;
   tracker: AssistantTracker;
   actions: Omit<ActionContext, 'runIntent'>;
   /** Refermer après une navigation ('mobile' : seulement en plein écran). */
-  closeAfter: (when: 'mobile' | 'always') => void;
+  closeAfter: (when: 'mobile' | 'always', label?: string) => void;
 }
 
 const REPHRASE_WINDOW_MS = 30_000;
@@ -78,6 +80,8 @@ export function useAssistantConversation(deps: ConversationDeps) {
   const lastTurn = useRef<Turn | null>(null);
   const lastEntity = useRef<EntityMatch | undefined>(undefined);
   const bestOutcome = useRef<Outcome>('abandon');
+  /** Précision demandée par écrit, en attente de la réponse de l'utilisateur. */
+  const pendingSlot = useRef<{ turn: Turn; scored: ScoredIntent; slot: SlotDef; origin: Origin } | null>(null);
   const turns = useRef(0);
 
   const bumpOutcome = (o: Outcome) => {
@@ -138,7 +142,12 @@ export function useAssistantConversation(deps: ConversationDeps) {
       setWorking(true);
       const t0 = Date.now();
       try {
-        const result = await handler(scored.intent, scored.slots, { ...d.actions, query: turn.text, runIntent: (key, slots) => runIntent(key, slots, 'followup') });
+        const result = await handler(scored.intent, scored.slots, {
+          ...d.actions,
+          query: turn.text,
+          freeText: turn.result ? freeTextOf(d.index, turn.result, scored) : undefined,
+          runIntent: (key, slots) => runIntent(key, slots, 'followup'),
+        });
         turn.succeeded = true;
         bumpOutcome(result.outcome);
 
@@ -180,7 +189,7 @@ export function useAssistantConversation(deps: ConversationDeps) {
         const productSlot = Object.values(scored.slots).find((s) => s.type === 'product' && s.record);
         if (productSlot) lastEntity.current = productSlot;
         // Fermeture (plein écran mobile) seulement une fois la réponse affichée.
-        pushAssistant(blocks, result.close ? () => d.closeAfter(result.close!) : undefined);
+        pushAssistant(blocks, result.close ? () => d.closeAfter(result.close!, result.redirectLabel) : undefined);
       } catch (err) {
         const status = isApiHttpError(err) ? err.status : undefined;
         d.tracker.track('action_failed', { ...meta, data: { error: err instanceof Error ? err.message.slice(0, 200) : 'error', status } });
@@ -237,16 +246,19 @@ export function useAssistantConversation(deps: ConversationDeps) {
       const meta = { turn_id: turn.id, intent_key: scored.intent.key, score: scored.score };
 
       // 1. Entité ambiguë (« saumon » → pavé ou fumé ?) ou produit manquant.
-      const ambiguousSlot = picked ? undefined : scored.intent.slots.find((s) => s.entity === 'product' && scored.slots[s.name]?.alternatives?.length);
+      const pickable = (e: string) => e === 'product' || e === 'employee';
+      const ambiguousSlot = picked ? undefined : scored.intent.slots.find((s) => pickable(s.entity) && scored.slots[s.name]?.alternatives?.length);
       const missing = scored.missingSlots[0];
-      const slot = ambiguousSlot ?? (missing?.entity === 'product' ? missing : undefined);
+      const slot = ambiguousSlot ?? (missing && pickable(missing.entity) ? missing : undefined);
       if (!slot && missing) {
-        d.tracker.track('slot_requested', { ...meta, data: { slot: missing.name, entity: missing.entity, reason: 'unsupported' } });
+        // Précision à taper (numéro de commande…) : la réponse suivante la complète.
+        d.tracker.track('slot_requested', { ...meta, data: { slot: missing.name, entity: missing.entity, reason: 'typed' } });
+        pendingSlot.current = { turn, scored, slot: missing, origin };
         pushAssistant([block({ type: 'text', text: missing.prompt ?? 'Il me manque une précision pour faire ça.' })]);
         return;
       }
       if (slot) {
-        const pool = slot.entity === 'product' ? d.products : [];
+        const pool = slot.entity === 'product' ? d.products : slot.entity === 'employee' ? d.employees : [];
         const wantAvailable = scored.intent.action === 'product.set_availability' ? !scored.intent.params.available : undefined;
         const sorted = wantAvailable === undefined ? pool : [...pool].sort((a, b) => Number(b.meta?.available === wantAvailable) - Number(a.meta?.available === wantAvailable));
         const options = ambiguousSlot ? scored.slots[slot.name].alternatives! : sorted.slice(0, 6);
@@ -336,6 +348,24 @@ export function useAssistantConversation(deps: ConversationDeps) {
 
       const result = understand(d.index, text, { ...d.baseContext, lastEntity: lastEntity.current }, d.catalog);
       turn.result = result;
+
+      // Réponse à une précision demandée (« Quel est le numéro ? » → « 42098 »),
+      // sauf si la phrase est clairement une autre demande.
+      const pending = pendingSlot.current;
+      pendingSlot.current = null;
+      if (pending) {
+        const value = result.entities.find((e) => e.type === pending.slot.entity);
+        const other = result.understanding.status === 'matched' && result.understanding.best.intent.key !== pending.scored.intent.key;
+        if (value && !other) {
+          d.tracker.track('slot_filled', { turn_id: pending.turn.id, intent_key: pending.scored.intent.key, data: { slot: pending.slot.name, from: 'typed' } });
+          proceed(
+            pending.turn,
+            { ...pending.scored, slots: { ...pending.scored.slots, [pending.slot.name]: value }, missingSlots: pending.scored.missingSlots.filter((m) => m !== pending.slot) },
+            pending.origin,
+          );
+          return;
+        }
+      }
       turn.status = result.understanding.status;
       const queryNorm = normalize(text);
       d.tracker.track('query_submitted', {
@@ -466,6 +496,29 @@ export function useAssistantConversation(deps: ConversationDeps) {
     outcome: () => bestOutcome.current,
     turns: () => turns.current,
   };
+}
+
+/**
+ * Mots tapés que l'intention n'explique pas, avec leur casse et leurs accents
+ * d'origine (« Fiche client Hélène Dupont » → « Hélène Dupont »).
+ */
+export function freeTextOf(index: EngineIndex, result: UnderstandResult, scored: ScoredIntent): string {
+  const consumed = new Set(scored.consumed);
+  const entityPos = new Set<number>();
+  result.entities.forEach((e) => {
+    for (let k = e.start; k < e.end; k++) entityPos.add(k);
+  });
+  const keep = result.tokens.map(
+    (t, i) => !consumed.has(i) && !entityPos.has(i) && !index.stopwords.has(t) && !index.hintKinds.has(t),
+  );
+  const words: string[] = [];
+  let k = 0;
+  for (const raw of result.raw.split(/\s+/)) {
+    const n = tokenize(normalize(raw)).length;
+    if (n > 0 && keep.slice(k, k + n).every(Boolean)) words.push(raw.replace(/^[^\p{L}\p{N}@+]+|[^\p{L}\p{N}]+$/gu, ''));
+    k += n;
+  }
+  return words.filter(Boolean).join(' ');
 }
 
 /** Exemples variés, tirés des intentions autorisées. */

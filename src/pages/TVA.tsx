@@ -30,6 +30,19 @@ const vatOrderTypeLabels: Record<string, string> = {
   delivery: 'Livraison',
 };
 
+/** Canaux de l'URL, en identifiants de la page (mêmes valeurs que l'analyse). */
+const urlVatChannels = (params: URLSearchParams): string | null => {
+  const ids = (params.get('sources') ?? '').split(',').filter((v) => vatSalesChannelOptions.some((c) => c.id === v));
+  return ids.length ? ids.join(',') : null;
+};
+
+/** Types de l'URL (TAKE_AWAY, IN, DELIVERY) vers les identifiants de la page. */
+const urlVatOrderTypes = (params: URLSearchParams): string | null => {
+  const map: Record<string, string> = { IN: 'in', TAKE_AWAY: 'take_away', DELIVERY: 'delivery' };
+  const ids = (params.get('types') ?? '').split(',').map((v) => map[v]).filter(Boolean);
+  return ids.length ? ids.join(',') : null;
+};
+
 const VAT = () => {
   // State
   // Période de l'URL (?from=…&to=…) sinon le dernier mois.
@@ -42,16 +55,20 @@ const VAT = () => {
     return { from, to };
   });
 
-  const [selectedChannels, setSelectedChannels] = useState<string>(
-    vatSalesChannelOptions.map((c) => c.id).join(',')
+  // Canaux et types de l'URL (?sources=KIOSK&types=TAKE_AWAY), sinon tous.
+  const [selectedChannels, setSelectedChannels] = useState<string>(() =>
+    urlVatChannels(new URLSearchParams(window.location.search)) ?? vatSalesChannelOptions.map((c) => c.id).join(',')
   );
-  const [selectedOrderTypes, setSelectedOrderTypes] = useState<string>(
-    vatOrderTypes.map((t) => t.id).join(',')
+  const [selectedOrderTypes, setSelectedOrderTypes] = useState<string>(() =>
+    urlVatOrderTypes(new URLSearchParams(window.location.search)) ?? vatOrderTypes.map((t) => t.id).join(',')
   );
   const [searchVersion, setSearchVersion] = useState(0);
   // Nouveau lien alors que la page est ouverte : nouvelle période, nouvelle recherche.
   useUrlDateRange((range) => {
     setDateRange(range);
+    const params = new URLSearchParams(window.location.search);
+    setSelectedChannels(urlVatChannels(params) ?? vatSalesChannelOptions.map((c) => c.id).join(','));
+    setSelectedOrderTypes(urlVatOrderTypes(params) ?? vatOrderTypes.map((t) => t.id).join(','));
     setSearchVersion((v) => v + 1);
   });
   const [vatData, setVatData] = useState<VATCalculationResponse | null>(null);
