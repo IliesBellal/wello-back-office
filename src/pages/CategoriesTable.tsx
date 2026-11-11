@@ -138,32 +138,34 @@ const SortableCategoryRow = ({
         {productCount}
       </TableCell>
       <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onBulkAssign(category)}
-            title="Assigner des produits"
-          >
-            <LinkIcon className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(category)}
-            title="Éditer la catégorie"
-          >
-            <Pencil className="w-4 h-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onDelete(category.category_id)}
-            title="Supprimer la catégorie"
-          >
-            <Trash2 className="w-4 h-4 text-destructive" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={`Actions de la catégorie ${category.category_name || category.category}`}
+            >
+              <MoreVertical className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-popover">
+            <DropdownMenuItem onClick={() => onBulkAssign(category)}>
+              <LinkIcon className="w-4 h-4 mr-2" />
+              Assigner des produits
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEdit(category)}>
+              <Pencil className="w-4 h-4 mr-2" />
+              Éditer la catégorie
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onDelete(category.category_id)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Supprimer la catégorie
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   );
@@ -576,7 +578,9 @@ export default function CategoriesTable() {
                   <TableHead className="w-64">Image</TableHead>
                   <TableHead className="w-20">Ordre</TableHead>
                   <TableHead className="w-32 text-center">Produits</TableHead>
-                  <TableHead className="w-32 text-right">Actions</TableHead>
+                  <TableHead className="w-16">
+                    <span className="sr-only">Actions</span>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
