@@ -36,6 +36,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { BulkAssignProductsDialog } from '@/components/shared/BulkAssignProductsDialog';
+import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 
 interface SortableTagRowProps {
   tag: Tag;
@@ -138,8 +139,6 @@ export default function TagsTable() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const saveOrderTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const editingColorRef = useRef('');
-  const newTagColorRef = useRef('#ffffff');
   const { toast } = useToast();
 
   const loadTags = React.useCallback(async () => {
@@ -229,9 +228,7 @@ export default function TagsTable() {
   const handleEdit = (tag: Tag) => {
     setEditingId(tag.id);
     setEditingName(tag.name);
-    const color = tag.color || '#ffffff';
-    setEditingColor(color);
-    editingColorRef.current = color;
+    setEditingColor(tag.color || '#ffffff');
     setEditingOrder(tag.display_order ?? 0);
   };
 
@@ -396,12 +393,11 @@ export default function TagsTable() {
                           <TableRow key={tag.id}>
                             <TableCell></TableCell>
                             <TableCell>
-                              <input
-                                type="color"
+                              <ColorPresetPicker
                                 value={editingColor}
-                                onChange={(e) => (editingColorRef.current = e.target.value)}
-                                onBlur={() => setEditingColor(editingColorRef.current)}
-                                className="w-10 h-8 rounded cursor-pointer border border-input"
+                                onChange={setEditingColor}
+                                label="l'étiquette"
+                                compact
                               />
                             </TableCell>
                             <TableCell>
@@ -496,12 +492,11 @@ export default function TagsTable() {
               <div>
                 <label className="text-sm font-medium">Couleur</label>
                 <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="color"
-                    defaultValue={newTagColor}
-                    onChange={(e) => (newTagColorRef.current = e.target.value)}
-                    onBlur={() => setNewTagColor(newTagColorRef.current)}
-                    className="w-12 h-10 rounded cursor-pointer border border-input"
+                  <ColorPresetPicker
+                    value={newTagColor}
+                    onChange={setNewTagColor}
+                    label="la nouvelle étiquette"
+                    compact
                   />
                   <Input
                     value={newTagColor}
