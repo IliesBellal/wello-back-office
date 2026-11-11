@@ -62,7 +62,8 @@ let mockEstablishmentSettings: EstablishmentSettings = {
     auto_accept_takeaway: true,
     allow_scheduled: true,
     max_schedule_days: 2,
-    enable_rating: true
+    enable_rating: true,
+    course_delay_minutes: 0
   },
   security: {
     pos_auto_lock_enabled: false,

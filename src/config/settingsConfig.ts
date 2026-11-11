@@ -54,6 +54,7 @@ export const establishmentScanOrderFields: FieldConfig[] = [
   { key: 'allow_scheduled', label: 'Autoriser commandes programmées', type: 'switch', group: 'scan_order' },
   { key: 'max_schedule_days', label: 'Jours de programmation max', type: 'number', group: 'scan_order', min: 1, max: 30 },
   { key: 'enable_rating', label: 'Activer les avis', type: 'switch', group: 'scan_order' },
+  { key: 'course_delay_minutes', label: 'Suites sur place : envoi automatique après (minutes, 0 = réclamées depuis la caisse)', type: 'number', group: 'scan_order', min: 0, max: 240 },
 ];
 
 export const establishmentSecurityFields: FieldConfig[] = [

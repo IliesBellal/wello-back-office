@@ -72,6 +72,8 @@ export interface EstablishmentScanOrder {
   allow_scheduled: boolean;
   max_schedule_days: number;
   enable_rating: boolean;
+  /** Suites sur place : délai d'envoi automatique en minutes, 0 = réclamées depuis la caisse. */
+  course_delay_minutes: number;
 }
 
 export interface EstablishmentSecurity {
