@@ -59,6 +59,7 @@ import { useObjectUrlPreview } from '@/hooks/useObjectUrlPreview';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 import { cn } from '@/lib/utils';
+import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 import { DuplicateNameDialog } from '@/components/shared/DuplicateNameDialog';
 import { useDuplicateNameConfirm } from '@/hooks/useDuplicateNameConfirm';
 
@@ -1222,11 +1223,12 @@ export const SimpleProductSheet = ({
                         <div>
                           <Label className="text-xs">Couleur fond</Label>
                           <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="color"
-                              value={formData.bg_color || '#ffffff'}
-                              onChange={(e) => setFormData({ ...formData, bg_color: e.target.value })}
-                              className="w-10 h-9 rounded cursor-pointer border border-input"
+                            <ColorPresetPicker
+                              value={formData.bg_color}
+                              onChange={(hex) => setFormData({ ...formData, bg_color: hex })}
+                              label="fond du produit"
+                              description="Couleur du produit sur la caisse."
+                              compact
                             />
                             <Input
                               value={formData.bg_color || '#ffffff'}
@@ -1238,11 +1240,13 @@ export const SimpleProductSheet = ({
                         <div>
                           <Label className="text-xs">Couleur production</Label>
                           <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="color"
-                              value={formData.production_color || '#ffffff'}
-                              onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
-                              className="w-10 h-9 rounded cursor-pointer border border-input"
+                            <ColorPresetPicker
+                              value={formData.production_color}
+                              onChange={(hex) => setFormData({ ...formData, production_color: hex })}
+                              onClear={() => setFormData({ ...formData, production_color: '' })}
+                              label="production du produit"
+                              description="Couleur du produit sur l'écran de production."
+                              compact
                             />
                             <Input
                               value={formData.production_color || '#ffffff'}
@@ -1965,11 +1969,12 @@ export const SimpleProductSheet = ({
                         <div>
                           <Label>Couleur fond</Label>
                           <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="color"
-                              value={formData.bg_color || '#ffffff'}
-                              onChange={(e) => setFormData({ ...formData, bg_color: e.target.value })}
-                              className="w-12 h-10 rounded cursor-pointer border border-input"
+                            <ColorPresetPicker
+                              value={formData.bg_color}
+                              onChange={(hex) => setFormData({ ...formData, bg_color: hex })}
+                              label="fond du produit"
+                              description="Couleur du produit sur la caisse."
+                              compact
                             />
                             <Input
                               value={formData.bg_color || '#ffffff'}
@@ -1981,11 +1986,13 @@ export const SimpleProductSheet = ({
                         <div>
                           <Label>Couleur production</Label>
                           <div className="flex items-center gap-2 mt-1">
-                            <input
-                              type="color"
-                              value={formData.production_color || '#ffffff'}
-                              onChange={(e) => setFormData({ ...formData, production_color: e.target.value })}
-                              className="w-12 h-10 rounded cursor-pointer border border-input"
+                            <ColorPresetPicker
+                              value={formData.production_color}
+                              onChange={(hex) => setFormData({ ...formData, production_color: hex })}
+                              onClear={() => setFormData({ ...formData, production_color: '' })}
+                              label="production du produit"
+                              description="Couleur du produit sur l'écran de production."
+                              compact
                             />
                             <Input
                               value={formData.production_color || '#ffffff'}
