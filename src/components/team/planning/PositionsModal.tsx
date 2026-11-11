@@ -20,7 +20,8 @@ import { cn } from "@/lib/utils";
 import { qk } from "@/lib/queryKeys";
 import { planningPositionsApi } from "@/services/welloApi";
 import type { EmployeePosition } from "@/types/planning";
-import { PositionColorPicker } from "./PositionColorPicker";
+import { ColorPresetPicker } from "@/components/shared/ColorPresetPicker";
+import { POSITION_COLOR_PRESETS } from "@/lib/planningShiftColor";
 
 interface PositionsModalProps {
   open: boolean;
@@ -209,10 +210,14 @@ export function PositionsModal({ open, onOpenChange }: PositionsModalProps) {
                           }}
                           className="h-8 text-sm"
                         />
-                        <PositionColorPicker
+                        <ColorPresetPicker
                           value={editColor}
+                          presets={POSITION_COLOR_PRESETS}
+                          fallbackColor={p.color}
                           onChange={setEditColor}
                           disabled={updateMut.isPending}
+                          label="le poste"
+                          compact
                         />
                       </div>
                     ) : (
@@ -292,10 +297,14 @@ export function PositionsModal({ open, onOpenChange }: PositionsModalProps) {
                 onChange={(e) => setNewLabel(e.target.value)}
                 className="h-8 text-sm"
               />
-              <PositionColorPicker
+              <ColorPresetPicker
                 value={newColor}
+                presets={POSITION_COLOR_PRESETS}
+                fallbackColor="#cccccc"
                 onChange={setNewColor}
                 disabled={createMut.isPending}
+                label="le nouveau poste"
+                emptyLabel="Choisir une couleur"
               />
               <div className="flex items-center gap-2">
                 <Button
