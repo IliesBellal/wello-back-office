@@ -1046,6 +1046,20 @@ export const menuService = {
     );
   },
 
+  /**
+   * Étape de service de la catégorie caisse pour les suites (1 = entrées,
+   * 2 = plats…, jusqu'à 20). `null` ou 0 retire l'étape : ses produits partent
+   * tout de suite. Les catégories de même étape forment la même suite.
+   */
+  async updateCategoryCourseStep(categoryId: string, step: number | null): Promise<void> {
+    const payload = { course_step: step ?? 0 };
+    logAPI('PATCH', `/menu/products/categories/${categoryId}`, payload);
+    return withMock(
+      () => undefined,
+      () => apiClient.patch<void>(`/menu/products/categories/${categoryId}`, payload)
+    );
+  },
+
   async updateMarketingCategory(categoryId: string, name: string): Promise<void> {
     logAPI('PATCH', `/menu/marketing-categories/${categoryId}`, { name });
     return withMock(
