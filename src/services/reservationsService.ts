@@ -402,14 +402,14 @@ export const assignBookingLocations = async (
 
 export const getBookingSettings = async (): Promise<BookingSettings> => {
   const response = await apiClient.get<WelloApiResponse<Record<string, unknown>>>(`${BOOKINGS_BASE}/settings`);
-  const data = unwrapBookingsData<{ settings: BookingSettings }>(response);
-  return data.settings;
+  const data = unwrapBookingsData<Record<string, unknown>>(response);
+  return ((data.settings as BookingSettings | undefined) ?? (data as unknown as BookingSettings));
 };
 
 export const putBookingSettings = async (payload: PutBookingSettingsRequest): Promise<BookingSettings> => {
   const response = await apiClient.put<WelloApiResponse<Record<string, unknown>>>(`${BOOKINGS_BASE}/settings`, payload);
-  const data = unwrapBookingsData<{ settings: BookingSettings }>(response);
-  return data.settings;
+  const data = unwrapBookingsData<Record<string, unknown>>(response);
+  return ((data.settings as BookingSettings | undefined) ?? (data as unknown as BookingSettings));
 };
 
 export const listBookingDurationRules = async (): Promise<BookingDurationRule[]> => {
