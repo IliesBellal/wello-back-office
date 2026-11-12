@@ -879,6 +879,16 @@ export interface ClientsSegmentCount {
   avg_basket_ttc_cents?: number;
 }
 
+// Commandes d'un jour local, ventilées par segment du client. Une entrée par
+// jour de la période (zéros inclus) ; seuls les 3 segments pouvant porter des
+// commandes sur la période existent (inactif/dormant n'en ont aucune).
+export interface ClientsOrdersDayPoint {
+  local_day: string;
+  nouveau: number;
+  recurrent: number;
+  fidele: number;
+}
+
 // recurring_rate est absent sous min_customers_for_rate identified_customers
 // (seuil de matérialité, PROMPT 18 §6, même seuil que
 // CancellationsByStaffResponse.min_orders_for_rate) — recurring_count et
@@ -899,6 +909,8 @@ export interface ClientsAnalyticsResponse {
   avg_orders_per_active_customer: number;
   segment_rates_available: boolean;
   segments: ClientsSegmentCount[];
+  // Optionnel : absent d'une réponse servie par un serveur plus ancien.
+  orders_timeline?: ClientsOrdersDayPoint[];
 }
 
 // lifetime_value_cents/lifetime_orders/avg_basket_ttc_cents sont calculés sur
@@ -1763,6 +1775,16 @@ class AnalyticsService {
           { segment: 'inactif', count: 1010 },
           { segment: 'dormant', count: 0 },
         ],
+        orders_timeline: Array.from({ length: 7 }, (_, i): ClientsOrdersDayPoint => {
+          const day = new Date(`${dateFrom}T00:00:00`);
+          day.setDate(day.getDate() + i);
+          return {
+            local_day: toLocalDateString(day),
+            nouveau: 20 + ((i * 7) % 11),
+            recurrent: 6 + ((i * 3) % 5),
+            fidele: 3 + (i % 4),
+          };
+        }),
       }),
       async () => {
         const response = await apiClient.post<{ id: string; data: ClientsAnalyticsResponse }>(

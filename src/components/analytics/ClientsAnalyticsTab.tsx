@@ -4,6 +4,10 @@ import { Tile } from '@/components/shared/Tile';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ExportButton } from '@/components/analytics';
 import { ExpandableDataTable, ColumnConfig } from '@/components/shared/ExpandableDataTable';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip, Legend, ResponsiveContainer,
+} from 'recharts';
+import { chartTooltipProps } from '@/components/analytics/chartTooltip';
 import { ChannelFilter } from '@/components/analytics/ChannelFilter';
 import {
   analyticsService,
@@ -73,6 +77,21 @@ const SEGMENT_EXTRA_NOTES: Record<string, string> = {
   recurrent: 'Clients déjà connus avant la période, revenus pendant celle-ci.',
   inactif: 'Ce client n\'a commandé à aucun moment de la période.',
   dormant: 'Ce segment n\'apparaît que sur les périodes plus courtes que le seuil d\'inactivité.',
+};
+
+// Les 3 segments qui portent des commandes sur la période (inactif et dormant
+// n'en ont par définition aucune), de bas en haut de la pile. Couleurs alignées
+// sur les badges SEGMENT_BADGE_CLASS (violet / bleu / vert).
+const ORDERS_CHART_SERIES = [
+  { key: 'nouveau', color: '#a855f7' },
+  { key: 'recurrent', color: '#3b82f6' },
+  { key: 'fidele', color: '#22c55e' },
+] as const;
+
+// 'YYYY-MM-DD' → 'DD/MM' sans passer par Date (évite tout décalage de fuseau).
+const formatLocalDay = (day: string) => {
+  const [, month, dayOfMonth] = day.split('-');
+  return month && dayOfMonth ? `${dayOfMonth}/${month}` : day;
 };
 
 const CHANNEL_FILTER_OPTIONS =CHANNEL_ORDER.map((c) => ({ id: c, label: CHANNEL_LABELS[c] ?? c }));
@@ -181,6 +200,8 @@ export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
   const coveragePct = (data.coverage.coverage_ratio * 100).toFixed(1);
   const segmentTotal = data.segments.reduce((sum: number, s: ClientsSegmentCount) => sum + s.count, 0);
   const segmentDefinitions = parseSegmentDefinitions(data.definitions.segments);
+  const ordersTimeline = data.orders_timeline ?? [];
+  const hasTimelineOrders = ordersTimeline.some((p) => p.nouveau + p.recurrent + p.fidele > 0);
 
   return (
     <div className="space-y-6">
@@ -287,6 +308,43 @@ export const ClientsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMod
               </Card>
             ))}
           </div>
+
+          <Card className="bg-card border border-border">
+            <CardHeader>
+              <CardTitle className="text-sm font-semibold">Commandes par type de client</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Nombre de commandes par jour, selon le segment du client sur la période (nouveau, récurrent, fidèle).
+              </p>
+            </CardHeader>
+            <CardContent>
+              {!hasTimelineOrders ? (
+                <div className="text-center py-8 text-muted-foreground">Aucune commande sur cette période</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={ordersTimeline}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="local_day" stroke="#6b7280" tickFormatter={formatLocalDay} />
+                    <YAxis stroke="#6b7280" allowDecimals={false} />
+                    <ChartTooltip
+                      {...chartTooltipProps}
+                      labelFormatter={formatLocalDay}
+                      formatter={(value: number) => value.toLocaleString('fr-FR')}
+                    />
+                    <Legend />
+                    {ORDERS_CHART_SERIES.map(({ key, color }) => (
+                      <Bar
+                        key={key}
+                        dataKey={key}
+                        stackId="orders"
+                        fill={color}
+                        name={SEGMENT_LABELS[key]}
+                      />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
 
