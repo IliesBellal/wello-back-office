@@ -30,6 +30,7 @@ import {
   putBookingSettings,
   type BookingHour,
   type BookingHourPatch,
+  type BookingSettings,
   type PutBookingSettingsRequest,
 } from "@/services/reservationsService";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
@@ -340,13 +341,43 @@ const ReservationsSettingsPageContent = () => {
     settingsMutation.mutate(payload);
   };
 
-  const toggleSms = (checked: boolean) => {
+  const channelMutation = useMutation({
+    mutationFn: (payload: PutBookingSettingsRequest) => putBookingSettings(payload),
+    onMutate: async (payload) => {
+      await queryClient.cancelQueries({ queryKey: qk.reservations.settings });
+      const previous = queryClient.getQueryData<BookingSettings>(qk.reservations.settings);
+      if (previous) {
+        queryClient.setQueryData(qk.reservations.settings, {
+          ...previous,
+          sms_enabled: payload.sms_enabled,
+          email_enabled: payload.email_enabled ?? previous.email_enabled,
+        });
+      }
+      return { previous };
+    },
+    onSuccess: (updated) => {
+      toast({ title: "Canaux de communication enregistrés" });
+      queryClient.setQueryData(qk.reservations.settings, updated);
+    },
+    onError: (_error, _payload, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(qk.reservations.settings, context.previous);
+      }
+      toast({
+        title: "Erreur",
+        description: "Impossible d'enregistrer les canaux de communication.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const saveChannels = (channels: { sms_enabled?: boolean; email_enabled?: boolean }) => {
     const current = settingsQuery.data;
     if (!current) {
       return;
     }
 
-    settingsMutation.mutate({
+    channelMutation.mutate({
       enabled: current.enabled,
       code: current.code,
       auto_accept_reserve_bookings: current.auto_accept_reserve_bookings,
@@ -361,7 +392,8 @@ const ReservationsSettingsPageContent = () => {
       cancelable_by_customer: current.cancelable_by_customer,
       cancel_booking_limit_offset_hours: current.cancel_booking_limit_offset_hours,
       pending_expiration_hours: current.pending_expiration_hours,
-      sms_enabled: checked,
+      sms_enabled: channels.sms_enabled ?? current.sms_enabled,
+      email_enabled: channels.email_enabled ?? current.email_enabled,
       waitlist_enabled: current.waitlist_enabled,
       waitlist_max_size: current.waitlist_max_size,
       waitlist_slot_expiry_minutes: current.waitlist_slot_expiry_minutes,
@@ -803,12 +835,16 @@ const ReservationsSettingsPageContent = () => {
               <CardDescription>Gestion des notifications client.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="flex items-center justify-between rounded-md border px-4 py-3 opacity-70">
+              <div className="flex items-center justify-between rounded-md border px-4 py-3">
                 <div>
                   <p className="font-medium">Email</p>
-                  <p className="text-sm text-muted-foreground">Toujours activé pour les confirmations et rappels.</p>
+                  <p className="text-sm text-muted-foreground">Confirmations, rappels et annulations envoyés par email.</p>
                 </div>
-                <Switch checked disabled />
+                <Switch
+                  checked={settingsQuery.data?.email_enabled ?? true}
+                  onCheckedChange={(checked) => saveChannels({ email_enabled: checked })}
+                  disabled={channelMutation.isPending || !settingsQuery.data}
+                />
               </div>
 
               <Separator />
@@ -820,8 +856,8 @@ const ReservationsSettingsPageContent = () => {
                 </div>
                 <Switch
                   checked={settingsQuery.data?.sms_enabled ?? false}
-                  onCheckedChange={toggleSms}
-                  disabled={settingsMutation.isPending || !settingsQuery.data}
+                  onCheckedChange={(checked) => saveChannels({ sms_enabled: checked })}
+                  disabled={channelMutation.isPending || !settingsQuery.data}
                 />
               </div>
             </CardContent>
