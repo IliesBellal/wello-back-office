@@ -120,6 +120,7 @@ export interface BookingSettings {
   cancel_booking_limit_offset_hours: number;
   pending_expiration_hours: number;
   sms_enabled: boolean;
+  email_enabled: boolean;
   waitlist_enabled: boolean;
   waitlist_max_size: number;
   waitlist_slot_expiry_minutes: number;
@@ -144,6 +145,7 @@ export interface PutBookingSettingsRequest {
   cancel_booking_limit_offset_hours: number;
   pending_expiration_hours: number;
   sms_enabled: boolean;
+  email_enabled?: boolean;
   waitlist_enabled: boolean;
   waitlist_max_size: number;
   waitlist_slot_expiry_minutes: number;
