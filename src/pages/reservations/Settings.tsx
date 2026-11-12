@@ -200,7 +200,6 @@ const ReservationsSettingsPageContent = () => {
 
   const [durationRules, setDurationRules] = useState<EditableDurationRule[]>([]);
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
-  const [smsEnabled, setSmsEnabled] = useState(false);
 
   const settingsQuery = useQuery({
     queryKey: qk.reservations.settings,
@@ -324,6 +323,10 @@ const ReservationsSettingsPageContent = () => {
       last_booking_offset_minutes: settingsQuery.data.last_booking_offset_minutes,
       cancel_booking_limit_offset_hours: settingsQuery.data.cancel_booking_limit_offset_hours,
       pending_expiration_hours: settingsQuery.data.pending_expiration_hours,
+      sms_enabled: settingsQuery.data.sms_enabled,
+      waitlist_enabled: settingsQuery.data.waitlist_enabled,
+      waitlist_max_size: settingsQuery.data.waitlist_max_size,
+      waitlist_slot_expiry_minutes: settingsQuery.data.waitlist_slot_expiry_minutes,
       default_booking_duration: values.default_booking_duration,
       min_booking_notice_minutes: values.min_booking_notice_minutes,
       max_booking_horizon_days: values.max_booking_horizon_days,
@@ -335,6 +338,34 @@ const ReservationsSettingsPageContent = () => {
     };
 
     settingsMutation.mutate(payload);
+  };
+
+  const toggleSms = (checked: boolean) => {
+    const current = settingsQuery.data;
+    if (!current) {
+      return;
+    }
+
+    settingsMutation.mutate({
+      enabled: current.enabled,
+      code: current.code,
+      auto_accept_reserve_bookings: current.auto_accept_reserve_bookings,
+      slot_interval_minutes: current.slot_interval_minutes,
+      default_booking_duration: current.default_booking_duration,
+      reserve_maximum_party_size: current.reserve_maximum_party_size,
+      reserve_minimum_party_size: current.reserve_minimum_party_size,
+      last_booking_offset_minutes: current.last_booking_offset_minutes,
+      min_booking_notice_minutes: current.min_booking_notice_minutes,
+      max_booking_horizon_days: current.max_booking_horizon_days,
+      overbooking_percent: current.overbooking_percent,
+      cancelable_by_customer: current.cancelable_by_customer,
+      cancel_booking_limit_offset_hours: current.cancel_booking_limit_offset_hours,
+      pending_expiration_hours: current.pending_expiration_hours,
+      sms_enabled: checked,
+      waitlist_enabled: current.waitlist_enabled,
+      waitlist_max_size: current.waitlist_max_size,
+      waitlist_slot_expiry_minutes: current.waitlist_slot_expiry_minutes,
+    });
   };
 
   const addRule = () => {
@@ -596,7 +627,8 @@ const ReservationsSettingsPageContent = () => {
             </Alert>
           )}
 
-          <Card>
+          <div className="grid gap-6 xl:grid-cols-3">
+          <Card className="xl:col-span-2">
             <CardHeader>
               <CardTitle>Général</CardTitle>
               <CardDescription>Règles globales de prise de réservation.</CardDescription>
@@ -765,6 +797,37 @@ const ReservationsSettingsPageContent = () => {
             </CardContent>
           </Card>
 
+          <Card className="self-start">
+            <CardHeader>
+              <CardTitle>Canaux de communication</CardTitle>
+              <CardDescription>Gestion des notifications client.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between rounded-md border px-4 py-3 opacity-70">
+                <div>
+                  <p className="font-medium">Email</p>
+                  <p className="text-sm text-muted-foreground">Toujours activé pour les confirmations et rappels.</p>
+                </div>
+                <Switch checked disabled />
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between rounded-md border px-4 py-3">
+                <div>
+                  <p className="font-medium">SMS</p>
+                  <p className="text-sm text-muted-foreground">L'activation du SMS peut entraîner une surfacturation.</p>
+                </div>
+                <Switch
+                  checked={settingsQuery.data?.sms_enabled ?? false}
+                  onCheckedChange={toggleSms}
+                  disabled={settingsMutation.isPending || !settingsQuery.data}
+                />
+              </div>
+            </CardContent>
+          </Card>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>Durées par tranche</CardTitle>
@@ -904,32 +967,6 @@ const ReservationsSettingsPageContent = () => {
                 <Button onClick={saveHours} disabled={saveHoursMutation.isPending}>
                   {saveHoursMutation.isPending ? "Enregistrement..." : "Enregistrer les horaires"}
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Canaux de communication</CardTitle>
-              <CardDescription>Gestion des notifications client.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between rounded-md border px-4 py-3 opacity-70">
-                <div>
-                  <p className="font-medium">Email</p>
-                  <p className="text-sm text-muted-foreground">Toujours activé pour les confirmations et rappels.</p>
-                </div>
-                <Switch checked disabled />
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between rounded-md border px-4 py-3">
-                <div>
-                  <p className="font-medium">SMS</p>
-                  <p className="text-sm text-muted-foreground">L'activation du SMS peut entraîner une surfacturation.</p>
-                </div>
-                <Switch checked={smsEnabled} onCheckedChange={setSmsEnabled} />
               </div>
             </CardContent>
           </Card>
