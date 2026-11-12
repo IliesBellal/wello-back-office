@@ -119,6 +119,10 @@ export interface BookingSettings {
   cancelable_by_customer: boolean;
   cancel_booking_limit_offset_hours: number;
   pending_expiration_hours: number;
+  sms_enabled: boolean;
+  waitlist_enabled: boolean;
+  waitlist_max_size: number;
+  waitlist_slot_expiry_minutes: number;
   duration_rules: BookingDurationRule[];
   capacity_warning: boolean;
   physical_capacity: number;
@@ -139,6 +143,10 @@ export interface PutBookingSettingsRequest {
   cancelable_by_customer: boolean;
   cancel_booking_limit_offset_hours: number;
   pending_expiration_hours: number;
+  sms_enabled: boolean;
+  waitlist_enabled: boolean;
+  waitlist_max_size: number;
+  waitlist_slot_expiry_minutes: number;
 }
 
 export interface BookingDurationRule {
@@ -492,6 +500,10 @@ export const updateReservationSettings = async (
     cancelable_by_customer: current.cancelable_by_customer,
     cancel_booking_limit_offset_hours: current.cancel_booking_limit_offset_hours,
     pending_expiration_hours: Math.max(1, nextSettings.reminderLeadHours),
+    sms_enabled: current.sms_enabled,
+    waitlist_enabled: current.waitlist_enabled,
+    waitlist_max_size: current.waitlist_max_size,
+    waitlist_slot_expiry_minutes: current.waitlist_slot_expiry_minutes,
   };
 
   const updated = await putBookingSettings(payload);
