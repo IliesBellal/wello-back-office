@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { X, Check } from 'lucide-react';
+import { getMerchantCurrency } from '@/lib/money';
 
 /**
  * PriceTPEInput - Input de prix de type TPE (Terminal de Paiement)
@@ -59,7 +60,7 @@ export const PriceTPEInput = React.forwardRef<HTMLInputElement, PriceTPEInputPro
     const updateDisplay = (cents: number) => {
       const formatted = new Intl.NumberFormat('fr-FR', {
         style: 'currency',
-        currency: 'EUR',
+        currency: getMerchantCurrency(),
       }).format(cents / 100);
       setDisplayValue(formatted);
     };

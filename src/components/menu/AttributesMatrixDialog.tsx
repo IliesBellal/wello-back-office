@@ -21,6 +21,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { menuService } from '@/services/menuService';
 import { cn } from '@/lib/utils';
+import { formatCents } from '@/lib/money';
 
 interface AttributesMatrixDialogProps {
   open: boolean;
@@ -263,7 +264,7 @@ export const AttributesMatrixDialog = ({
                                   >
                                     <span className="text-xs">{option.title}</span>
                                     <span className="text-xs font-medium text-primary whitespace-nowrap">
-                                      {option.price > 0 ? `+${formatOptionPrice(option.price)} €` : 'Gratuit'}
+                                      {option.price > 0 ? `+${formatCents(option.price)}` : 'Gratuit'}
                                     </span>
                                   </div>
                                 ))}

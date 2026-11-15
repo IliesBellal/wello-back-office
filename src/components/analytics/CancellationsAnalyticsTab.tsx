@@ -21,6 +21,7 @@ import { CHANNEL_COLORS, CHANNEL_LABELS } from '@/utils/channels';
 import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
+import { formatCents as eur } from '@/lib/money';
 
 interface CancellationsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -30,7 +31,6 @@ interface CancellationsAnalyticsTabProps {
   orderFilter?: OrderFilterSelection;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 // author_type est un enum stable (STAFF/CUSTOMER/SYSTEM/PLATFORM/UNKNOWN),
 // pas un référentiel mutable comme les motifs — un libellé FR figé ici ne

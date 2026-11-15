@@ -20,6 +20,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog';
 import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
 import type { IntegrationStatus } from '@/services/integrationsService';
 import { Loader2, AlertCircle, RefreshCw, Power } from 'lucide-react';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface IntegrationCardProps {
   name: string;
@@ -230,7 +231,7 @@ export const IntegrationCard = ({
             <div className="text-2xl font-bold">
               {new Intl.NumberFormat('fr-FR', {
                 style: 'currency',
-                currency: 'EUR',
+                currency: getMerchantCurrency(),
                 minimumFractionDigits: 0,
               }).format(status.kpis.revenue / 100)}
             </div>
@@ -262,7 +263,7 @@ export const IntegrationCard = ({
             <div className="text-2xl font-bold">
               {new Intl.NumberFormat('fr-FR', {
                 style: 'currency',
-                currency: 'EUR',
+                currency: getMerchantCurrency(),
                 minimumFractionDigits: 0,
               }).format(status.kpis.avg_basket / 100)}
             </div>

@@ -13,6 +13,7 @@ import { EstablishmentOperationsModal } from '@/components/integrations/Establis
 import { useAuth } from '@/contexts/AuthContext';
 import { hasModuleAccess } from '@/lib/moduleAccess';
 import { usePermissions } from '@/hooks/usePermissions';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface IntegrationOverviewProps {
   platform: string;
@@ -88,7 +89,7 @@ const IntegrationOverview = ({ platform, status, loading, icon, path }: Integrat
               <div className="font-semibold">
                 {new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
-                  currency: 'EUR',
+                  currency: getMerchantCurrency(),
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 }).format(status.kpis.revenue / 100)}
@@ -113,7 +114,7 @@ const IntegrationOverview = ({ platform, status, loading, icon, path }: Integrat
               <div className="font-semibold">
                 {new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
-                  currency: 'EUR',
+                  currency: getMerchantCurrency(),
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 }).format(status.kpis.avg_basket / 100)}
@@ -220,7 +221,7 @@ const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scann
               <div className="font-semibold">
                 {new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
-                  currency: 'EUR',
+                  currency: getMerchantCurrency(),
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 }).format(status.kpis.revenue / 100)}
@@ -245,7 +246,7 @@ const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scann
               <div className="font-semibold">
                 {new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
-                  currency: 'EUR',
+                  currency: getMerchantCurrency(),
                   minimumFractionDigits: 0,
                   maximumFractionDigits: 0,
                 }).format(status.kpis.avg_basket / 100)}
@@ -368,7 +369,7 @@ function IntegrationsOverviewPageContent() {
                 <div className="text-3xl font-bold">
                   {new Intl.NumberFormat('fr-FR', {
                     style: 'currency',
-                    currency: 'EUR',
+                    currency: getMerchantCurrency(),
                     minimumFractionDigits: 0,
                     maximumFractionDigits: 0,
                   }).format(totalRevenue / 100)}

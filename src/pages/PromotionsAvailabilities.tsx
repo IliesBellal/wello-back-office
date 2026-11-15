@@ -53,6 +53,7 @@ import { Promotion, Availability, DayOfWeek, TimeSlot } from '@/types/promotions
 import { Category } from '@/types/menu';
 import { CategorizedProductPicker } from '@/components/shared/CategorizedProductPicker';
 import { useToast } from '@/hooks/use-toast';
+import { formatCents } from '@/lib/money';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -67,9 +68,6 @@ const ALL_DAYS: { key: DayOfWeek; label: string; short: string }[] = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-const formatCents = (cents: number) =>
-  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
 
 const emptyPromotion = (): Omit<Promotion, 'id'> => ({
   name: '',

@@ -26,6 +26,7 @@ import {
 } from "@/utils/orderUtils";
 import { CardSkeleton } from "@/components/shared/CardSkeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { getMerchantCurrency } from '@/lib/money';
 
 export const OrderDetailsSheet = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -61,7 +62,7 @@ export const OrderDetailsSheet = () => {
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "EUR",
+      currency: getMerchantCurrency(),
     }).format(cents / 100);
   };
 

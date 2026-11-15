@@ -62,6 +62,7 @@ import { cn } from '@/lib/utils';
 import { ColorPresetPicker } from '@/components/shared/ColorPresetPicker';
 import { DuplicateNameDialog } from '@/components/shared/DuplicateNameDialog';
 import { useDuplicateNameConfirm } from '@/hooks/useDuplicateNameConfirm';
+import { formatCents } from '@/lib/money';
 
 interface SimpleProductSheetProps {
   /** Product ID to load - if provided, product data will be fetched automatically */
@@ -1274,7 +1275,7 @@ export const SimpleProductSheet = ({
                       <CardContent className="space-y-2 text-xs">
                         {!isEditMode ? (
                           <>
-                            <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{((product.price || 0) / 100).toFixed(2)} €</span></p>
+                            <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{formatCents((product.price || 0))}</span></p>
                             <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{onSiteTvaLabel}</span></p>
                             <p className="text-muted-foreground">Disponible: <Badge variant={product.available_in ? "default" : "secondary"} className="ml-1 text-xs">{product.available_in ? '✓' : '✗'}</Badge></p>
                           </>
@@ -1326,7 +1327,7 @@ export const SimpleProductSheet = ({
                       <CardContent className="space-y-2 text-xs">
                         {!isEditMode ? (
                           <>
-                            <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{((product.price_take_away || 0) / 100).toFixed(2)} €</span></p>
+                            <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{formatCents((product.price_take_away || 0))}</span></p>
                             <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{takeawayTvaLabel}</span></p>
                             <p className="text-muted-foreground">Disponible: <Badge variant={product.available_take_away ? "default" : "secondary"} className="ml-1 text-xs">{product.available_take_away ? '✓' : '✗'}</Badge></p>
                           </>
@@ -1378,7 +1379,7 @@ export const SimpleProductSheet = ({
                       <CardContent className="space-y-2 text-xs">
                         {!isEditMode ? (
                           <>
-                            <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{((product.price_delivery || 0) / 100).toFixed(2)} €</span></p>
+                            <p className="text-muted-foreground">Prix: <span className="font-semibold text-foreground">{formatCents((product.price_delivery || 0))}</span></p>
                             <p className="text-muted-foreground">TVA: <span className="font-semibold text-foreground">{deliveryTvaLabel}</span></p>
                             <p className="text-muted-foreground">Disponible: <Badge variant={product.available_delivery ? "default" : "secondary"} className="ml-1 text-xs">{product.available_delivery ? '✓' : '✗'}</Badge></p>
                           </>
@@ -1459,7 +1460,7 @@ export const SimpleProductSheet = ({
                                   className="mt-1 h-8 text-xs" 
                                 />
                               ) : (
-                                <p className="mt-1 font-semibold">{((product.integrations?.uber_eats?.price_override || 0) / 100).toFixed(2)} €</p>
+                                <p className="mt-1 font-semibold">{formatCents((product.integrations?.uber_eats?.price_override || 0))}</p>
                               )}
                             </div>
                           )}
@@ -1502,7 +1503,7 @@ export const SimpleProductSheet = ({
                                   className="mt-1 h-8 text-xs" 
                                 />
                               ) : (
-                                <p className="mt-1 font-semibold">{((product.integrations?.deliveroo?.price_override || 0) / 100).toFixed(2)} €</p>
+                                <p className="mt-1 font-semibold">{formatCents((product.integrations?.deliveroo?.price_override || 0))}</p>
                               )}
                             </div>
                           )}
@@ -1720,7 +1721,7 @@ export const SimpleProductSheet = ({
                     <div className="flex items-center justify-between gap-4">
                       <div className="text-xs">
                         <span className="text-muted-foreground">Prix reviens:</span>
-                        <span className="ml-2 font-semibold text-foreground">{(product.cost_price / 100).toFixed(2)} €</span>
+                        <span className="ml-2 font-semibold text-foreground">{formatCents(product.cost_price)}</span>
                       </div>
                       <div className="text-xs">
                         <span className="text-muted-foreground">Marge FC:</span>
@@ -2026,7 +2027,7 @@ export const SimpleProductSheet = ({
                         <>
                           <div>
                             <p className="text-xs text-muted-foreground">Prix</p>
-                            <p className="text-lg font-semibold text-foreground">{((product.price || 0) / 100).toFixed(2)} €</p>
+                            <p className="text-lg font-semibold text-foreground">{formatCents((product.price || 0))}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">TVA</p>
@@ -2097,7 +2098,7 @@ export const SimpleProductSheet = ({
                         <>
                           <div>
                             <p className="text-xs text-muted-foreground">Prix</p>
-                            <p className="text-lg font-semibold text-foreground">{((product.price_take_away || 0) / 100).toFixed(2)} €</p>
+                            <p className="text-lg font-semibold text-foreground">{formatCents((product.price_take_away || 0))}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">TVA</p>
@@ -2168,7 +2169,7 @@ export const SimpleProductSheet = ({
                         <>
                           <div>
                             <p className="text-xs text-muted-foreground">Prix</p>
-                            <p className="text-lg font-semibold text-foreground">{((product.price_delivery || 0) / 100).toFixed(2)} €</p>
+                            <p className="text-lg font-semibold text-foreground">{formatCents((product.price_delivery || 0))}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">TVA</p>
@@ -2286,7 +2287,7 @@ export const SimpleProductSheet = ({
                               className="mt-1 text-sm font-semibold h-9"
                             />
                           ) : (
-                            <p className="mt-1 text-sm font-semibold">{((product.integrations?.uber_eats?.price_override || 0) / 100).toFixed(2)} €</p>
+                            <p className="mt-1 text-sm font-semibold">{formatCents((product.integrations?.uber_eats?.price_override || 0))}</p>
                           )}
                         </div>
                       )}
@@ -2348,7 +2349,7 @@ export const SimpleProductSheet = ({
                               className="mt-1 text-sm font-semibold h-9"
                             />
                           ) : (
-                            <p className="mt-1 text-sm font-semibold">{((product.integrations?.deliveroo?.price_override || 0) / 100).toFixed(2)} €</p>
+                            <p className="mt-1 text-sm font-semibold">{formatCents((product.integrations?.deliveroo?.price_override || 0))}</p>
                           )}
                         </div>
                       )}

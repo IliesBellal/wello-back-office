@@ -17,11 +17,12 @@ import { PaymentChart } from '@/components/reports/PaymentChart';
 import { VATChart } from '@/components/reports/VATChart';
 import { VATDetailTable } from '@/components/reports/VATDetailTable';
 import { PaymentDetailTable } from '@/components/reports/PaymentDetailTable';
+import { getMerchantCurrency } from '@/lib/money';
 
 const formatCurrency = (cents: number) => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR'
+    currency: getMerchantCurrency()
   }).format(cents / 100);
 };
 

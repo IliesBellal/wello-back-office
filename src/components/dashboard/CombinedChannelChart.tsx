@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import type { DashboardChannels } from '@/services/dashboardService';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface CombinedChannelChartProps {
   data: DashboardChannels;
@@ -26,7 +27,7 @@ const CHANNEL_COLORS: Record<string, string> = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: getMerchantCurrency(),
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);

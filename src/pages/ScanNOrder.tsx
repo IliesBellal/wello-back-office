@@ -30,6 +30,7 @@ import { type UserProfile, type EstablishmentSettings } from '@/types/settings';
 import { ColorPresetPicker, TEXT_COLOR_PRESETS } from '@/components/shared/ColorPresetPicker';
 import { useToast } from '@/hooks/use-toast';
 import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
+import { getMerchantCurrency } from '@/lib/money';
 
 // ════════════════════════════════════════════════════════════════════════════
 // ImageUploadField Component
@@ -903,7 +904,7 @@ export default function ScanNOrder() {
               <div className="text-2xl font-bold text-white">
                 {kpis !== null ? new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
-                  currency: 'EUR',
+                  currency: getMerchantCurrency(),
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
                 }).format(kpis.revenue / 100) : '—'}
@@ -935,7 +936,7 @@ export default function ScanNOrder() {
                 {stripeBalance !== null
                   ? new Intl.NumberFormat('fr-FR', {
                       style: 'currency',
-                      currency: 'EUR',
+                      currency: getMerchantCurrency(),
                       minimumFractionDigits: 0,
                     }).format(stripeBalance.available / 100)
                   : '—'}
@@ -945,7 +946,7 @@ export default function ScanNOrder() {
                 {stripeBalance !== null
                   ? ` ${new Intl.NumberFormat('fr-FR', {
                       style: 'currency',
-                      currency: 'EUR',
+                      currency: getMerchantCurrency(),
                       minimumFractionDigits: 0,
                     }).format(stripeBalance.pending / 100)}`
                   : ' —'}
@@ -977,7 +978,7 @@ export default function ScanNOrder() {
               <div className="text-2xl font-bold">
                 {kpis !== null ? new Intl.NumberFormat('fr-FR', {
                   style: 'currency',
-                  currency: 'EUR',
+                  currency: getMerchantCurrency(),
                   minimumFractionDigits: 0,
                 }).format(kpis.avg_basket / 100) : '—'}
               </div>

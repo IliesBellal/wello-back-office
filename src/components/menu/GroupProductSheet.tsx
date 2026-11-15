@@ -36,6 +36,7 @@ import { useObjectUrlPreview } from '@/hooks/useObjectUrlPreview';
 import { useProductEditData } from '@/hooks/useProductEditData';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
+import { formatCents } from '@/lib/money';
 
 interface GroupProductSheetProps {
   /** null en mode création (rien à afficher tant que le groupe n'existe pas). */
@@ -513,7 +514,7 @@ export const GroupProductSheet = ({
                   <div className="min-w-0">
                     <p className="font-medium truncate">{subProduct.name}</p>
                     <p className="text-sm text-muted-foreground">
-                      {((subProduct.price || 0) / 100).toFixed(2)} €
+                      {formatCents((subProduct.price || 0))}
                     </p>
                   </div>
                 </button>

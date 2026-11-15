@@ -16,6 +16,7 @@ import {
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_ORDER, CHANNEL_LABELS } from '@/utils/channels';
 import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
+import { formatCents as eur } from '@/lib/money';
 
 interface ClientsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -24,7 +25,6 @@ interface ClientsAnalyticsTabProps {
   merchantsById?: Record<string, string>;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 // Libellés d'affichage des 5 segments — les clés elles-mêmes viennent du
 // serveur (ClientsSegmentCount.segment), jamais devinées côté front.

@@ -2,6 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { PaymentDayData } from '@/services/financialReportsService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface PaymentChartProps {
   data: PaymentDayData[];
@@ -10,7 +11,7 @@ interface PaymentChartProps {
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR'
+    currency: getMerchantCurrency()
   }).format(value / 100);
 };
 

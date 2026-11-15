@@ -10,6 +10,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { convertQuantity, convertUnitPrice, findUnitById } from '@/utils/unitConversions';
+import { formatCents } from '@/lib/money';
 
 type SortKey = 'name' | 'category' | 'price' | 'unit';
 type SortDir = 'asc' | 'desc';
@@ -33,7 +34,7 @@ const SortIcon = ({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
 
 const formatPrice = (cents: number | undefined): string => {
   if (cents === undefined || cents === null) return '—';
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+  return formatCents(cents);
 };
 
 const getUnitLabel = (unitId: string | number | undefined, units: UnitOfMeasure[]): string => {

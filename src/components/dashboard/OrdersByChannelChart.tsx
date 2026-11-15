@@ -3,6 +3,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DashboardChannels } from '@/services/dashboardService';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface OrdersByChannelChartProps {
   data: DashboardChannels;
@@ -19,7 +20,7 @@ const CHANNEL_COLORS: Record<string, string> = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: getMerchantCurrency(),
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);

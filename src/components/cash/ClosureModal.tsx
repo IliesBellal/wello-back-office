@@ -36,6 +36,7 @@ import { CashRegisterHistoryRecord, exportRegisterPDF } from '@/services/cashReg
 import { CashRegisterTvaDetailsDialog } from '@/components/cash/CashRegisterTvaDetailsDialog';
 import { cn } from '@/lib/utils';
 import { getCashRegisterStatus } from '@/lib/cashRegisterStatus';
+import { formatCents } from '@/lib/money';
 
 interface ClosureModalProps {
   register: CashRegisterHistoryRecord | null;
@@ -55,7 +56,7 @@ const PRESETS: Preset[] = [
   { code: 'OTHER', label: 'Autre', apiLabel: '' },
 ];
 
-const formatCurrency = (cents: number) => `${(cents / 100).toFixed(2)} €`;
+const formatCurrency = (cents: number) => formatCents(cents);
 
 const parseEuroToCents = (value: string): number => {
   const normalized = value.replace(',', '.').trim();

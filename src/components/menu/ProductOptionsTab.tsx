@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { formatCents } from '@/lib/money';
 
 interface ProductOptionsTabProps {
   productAttributes: ProductAttribute[];
@@ -124,7 +125,7 @@ export const ProductOptionsTab = ({
                       >
                         <span className="text-sm">{option.title}</span>
                         <span className="text-sm font-medium text-primary">
-                          {option.price > 0 ? `+${formatPrice(option.price)} €` : 'Gratuit'}
+                          {option.price > 0 ? `+${formatCents(option.price)}` : 'Gratuit'}
                         </span>
                       </div>
                     ))}

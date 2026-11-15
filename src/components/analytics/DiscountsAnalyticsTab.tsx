@@ -14,6 +14,7 @@ import {
 import { isApiHttpError } from '@/services/apiClient';
 import { CHANNEL_ORDER, CHANNEL_LABELS } from '@/utils/channels';
 import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
+import { formatCents as eur } from '@/lib/money';
 
 interface DiscountsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -22,7 +23,6 @@ interface DiscountsAnalyticsTabProps {
   merchantsById?: Record<string, string>;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const CHANNEL_FILTER_OPTIONS = CHANNEL_ORDER.map((c) => ({ id: c, label: CHANNEL_LABELS[c] ?? c }));
 

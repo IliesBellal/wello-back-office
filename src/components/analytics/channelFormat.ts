@@ -1,7 +1,7 @@
 // Formats partagés des vues de canal et d'audience : onglets ScanNOrder et
 // Borne de la page Analyse, Franchise → Statistiques.
 
-export const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+export { formatCents as eur } from '@/lib/money';
 
 /** Part de part dans total, « — » si total est nul. */
 export const pct = (part: number, total: number) => (total > 0 ? `${((part / total) * 100).toFixed(1)} %` : '—');

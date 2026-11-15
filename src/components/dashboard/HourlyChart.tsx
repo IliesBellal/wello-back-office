@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Area, AreaChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from 'recharts';
 import type { HourlyData } from '@/services/dashboardService';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface HourlyChartProps {
   data: HourlyData[];
@@ -10,7 +11,7 @@ export const HourlyChart = ({ data }: HourlyChartProps) => {
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'EUR',
+      currency: getMerchantCurrency(),
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);

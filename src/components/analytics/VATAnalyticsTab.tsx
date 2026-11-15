@@ -15,6 +15,7 @@ import { CHANNEL_COLORS, CHANNEL_LABELS } from '@/utils/channels';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle, CumulativeSectionTitle } from '@/components/analytics/ChartSync';
+import { formatCents as eur, formatMoney as eurValue, formatMoney } from '@/lib/money';
 
 interface VATAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -23,10 +24,8 @@ interface VATAnalyticsTabProps {
   merchantsById?: Record<string, string>;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 // byChannelPieDataOf's `value` is already in euros (cents / 100 applied once)
 // — unlike `eur` above, this formats it as-is, no second division.
-const eurValue = (value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 // Unlike CA/Commandes/Règlements, VATMerchantTotal already carries this
 // establishment's own by_rate/by_channel (apportioned per establishment,
@@ -131,7 +130,7 @@ export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 
                   <YAxis stroke="#6b7280" />
                   <Tooltip
                     {...chartTooltipProps}
-                    formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                    formatter={(value: number) => formatMoney(value)}
                   />
                   <Legend />
                   <Bar dataKey="base_ht" fill="#3b82f6" name="Base HT" />
@@ -166,7 +165,7 @@ export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 
                     </Pie>
                     <Tooltip
                       {...chartTooltipProps}
-                      formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      formatter={(value: number) => formatMoney(value)}
                     />
                     <Legend />
                   </PieChart>
@@ -223,7 +222,7 @@ export const VATAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 
                             <YAxis stroke="#6b7280" />
                             <Tooltip
                               {...chartTooltipProps}
-                              formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                              formatter={(value: number) => formatMoney(value)}
                             />
                             <Legend />
                             <Bar dataKey="base_ht" fill="#3b82f6" name="Base HT" />

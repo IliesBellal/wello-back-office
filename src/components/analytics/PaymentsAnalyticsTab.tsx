@@ -15,6 +15,7 @@ import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle, CumulativeSectionTitle } from '@/components/analytics/ChartSync';
 import { usePerMerchantAnalytics } from '@/hooks/usePerMerchantAnalytics';
+import { formatCents as eur, formatMoney as eurValue, formatMoney } from '@/lib/money';
 
 interface PaymentsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -23,10 +24,8 @@ interface PaymentsAnalyticsTabProps {
   merchantsById?: Record<string, string>;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 // methodPieDataOf's `value` is already in euros (cents / 100 applied once) —
 // unlike `eur` above, this formats it as-is, no second division.
-const eurValue = (value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const EvolutionBadge = ({ percent }: { percent: number }) => (
   <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
@@ -200,7 +199,7 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                             <YAxis stroke="#6b7280" />
                             <Tooltip
                               {...chartTooltipProps}
-                              formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                              formatter={(value: number) => formatMoney(value)}
                             />
                             <Legend />
                             {merchantPresentMethods.map((method) => (
@@ -257,7 +256,7 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                   <YAxis stroke="#6b7280" />
                   <Tooltip
                     {...chartTooltipProps}
-                    formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                    formatter={(value: number) => formatMoney(value)}
                   />
                   <Legend />
                   {presentMethods.map((method) => (
@@ -302,7 +301,7 @@ export const PaymentsAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMo
                     </Pie>
                     <Tooltip
                       {...chartTooltipProps}
-                      formatter={(value: number) => value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                      formatter={(value: number) => formatMoney(value)}
                     />
                     <Legend />
                   </PieChart>

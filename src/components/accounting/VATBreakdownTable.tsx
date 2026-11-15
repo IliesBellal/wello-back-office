@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MonthlyBreakdown } from '@/services/vatService';
 import { format, parse } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface VATBreakdownTableProps {
   data: MonthlyBreakdown[];
@@ -19,7 +20,7 @@ interface VATBreakdownTableProps {
 const formatCurrency = (centimes: number): string => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: getMerchantCurrency(),
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(centimes / 100);

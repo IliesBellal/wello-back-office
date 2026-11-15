@@ -17,6 +17,7 @@ import { DollarSign, AlertTriangle, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CashRegisterHistoryRecord, closeRegisterX } from '@/services/cashRegisterHistoryService';
 import { toast } from 'sonner';
+import { formatCents } from '@/lib/money';
 
 interface RegisterXClosureDialogProps {
   register: CashRegisterHistoryRecord | null;
@@ -131,7 +132,7 @@ export const RegisterXClosureDialog = ({
                             : 'text-red-700'
                       }`}
                     >
-                      {finalVariance >= 0 ? '+' : ''}{(finalVariance / 100).toFixed(2)} €
+                      {finalVariance >= 0 ? '+' : ''}{formatCents(finalVariance)}
                     </span>
                   </div>
                 </div>
@@ -180,7 +181,7 @@ export const RegisterXClosureDialog = ({
                     </div>
                     <div className="flex justify-between border-b pb-2">
                       <span className="text-muted-foreground">CA attendu :</span>
-                      <span className="font-medium">{(expectedAmount / 100).toFixed(2)} €</span>
+                      <span className="font-medium">{formatCents(expectedAmount)}</span>
                     </div>
                     <div className="flex justify-between border-b pb-2">
                       <span className="text-muted-foreground">Moyens de paiement :</span>
@@ -227,7 +228,7 @@ export const RegisterXClosureDialog = ({
                             : 'text-red-700'
                       }
                     >
-                      Variance : {variance >= 0 ? '+' : ''}{(variance / 100).toFixed(2)} € ({variancePercent}%)
+                      Variance : {variance >= 0 ? '+' : ''}{formatCents(variance)} ({variancePercent}%)
                     </AlertDescription>
                   </Alert>
                 )}
@@ -292,16 +293,16 @@ export const RegisterXClosureDialog = ({
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">CA attendu :</span>
-                    <span className="font-medium">{(expectedAmount / 100).toFixed(2)} €</span>
+                    <span className="font-medium">{formatCents(expectedAmount)}</span>
                   </div>
                   <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Montant observé :</span>
-                    <span className="font-medium">{(observed / 100).toFixed(2)} €</span>
+                    <span className="font-medium">{formatCents(observed)}</span>
                   </div>
                   <div className="flex justify-between border-b pb-2">
                     <span className="text-muted-foreground">Total ajustements :</span>
                     <span className={cn("font-medium", totalAdjustments >= 0 ? 'text-green-600' : 'text-red-600')}>
-                      {totalAdjustments >= 0 ? '+' : ''}{(totalAdjustments / 100).toFixed(2)} €
+                      {totalAdjustments >= 0 ? '+' : ''}{formatCents(totalAdjustments)}
                     </span>
                   </div>
                   <div
@@ -319,7 +320,7 @@ export const RegisterXClosureDialog = ({
                             : 'text-red-700'
                       }`}
                     >
-                      {finalVariance >= 0 ? '+' : ''}{(finalVariance / 100).toFixed(2)} €
+                      {finalVariance >= 0 ? '+' : ''}{formatCents(finalVariance)}
                     </span>
                   </div>
                 </div>

@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { formatCents } from '@/lib/money';
 
 interface AttributesManagerProps {
   open: boolean;
@@ -133,7 +134,7 @@ export const AttributesManager = ({
                         <div key={opt.id} className="flex justify-between text-sm">
                           <span>{opt.title}</span>
                           <span className="text-primary font-medium">
-                            {opt.price > 0 ? `+${formatPrice(opt.price)} €` : 'Gratuit'}
+                            {opt.price > 0 ? `+${formatCents(opt.price)}` : 'Gratuit'}
                           </span>
                         </div>
                       ))}

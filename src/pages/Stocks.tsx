@@ -17,6 +17,7 @@ import { Tile } from "@/components/shared/Tile";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { getMerchantCurrency } from '@/lib/money';
 
 const Stocks = () => {
   type SortDirection = "asc" | "desc";
@@ -97,7 +98,7 @@ const Stocks = () => {
   const formatPrice = (cents: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "EUR",
+      currency: getMerchantCurrency(),
     }).format(cents / 100);
   };
 

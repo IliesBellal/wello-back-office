@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Layers } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { formatCents } from '@/lib/money';
 
 interface ProductCardProps {
   product: Product;
@@ -27,7 +28,7 @@ export const ProductCard = ({ product, onClick }: ProductCardProps) => {
 
   const formatPrice = (price?: number) => {
     if (!price) return '';
-    return `${(price / 100).toFixed(2)} €`;
+    return formatCents(price);
   };
 
   return (

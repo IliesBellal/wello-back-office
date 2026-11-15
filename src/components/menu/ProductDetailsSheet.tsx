@@ -20,6 +20,7 @@ import { ProductCompositionTab } from './ProductCompositionTab';
 import { ProductOptionsTab } from './ProductOptionsTab';
 import { useProductData } from '@/hooks/useProductData';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
+import { formatCents } from '@/lib/money';
 
 interface ProductDetailsSheetProps {
   /** Product ID to load - if provided, product data will be fetched automatically */
@@ -323,7 +324,7 @@ export const ProductDetailsSheet = ({
             <div className="space-y-4">
               <div>
                 <Label>Prix Standard</Label>
-                <p className="mt-1 text-foreground font-medium">{((product.price || 0) / 100).toFixed(2)} €</p>
+                <p className="mt-1 text-foreground font-medium">{formatCents((product.price || 0))}</p>
               </div>
               
               {isEditMode && (
@@ -362,7 +363,7 @@ export const ProductDetailsSheet = ({
                     ) : (
                       <>
                         <span>{product.availability?.on_site ? '✓' : '✗'}</span>
-                        <span className="font-medium">{((product.price || 0) / 100).toFixed(2)} €</span>
+                        <span className="font-medium">{formatCents((product.price || 0))}</span>
                       </>
                     )}
                   </div>
@@ -390,7 +391,7 @@ export const ProductDetailsSheet = ({
                     ) : (
                       <>
                         <span>{product.availability?.takeaway ? '✓' : '✗'}</span>
-                        <span className="font-medium">{((product.price || 0) / 100).toFixed(2)} €</span>
+                        <span className="font-medium">{formatCents((product.price || 0))}</span>
                       </>
                     )}
                   </div>
@@ -418,7 +419,7 @@ export const ProductDetailsSheet = ({
                     ) : (
                       <>
                         <span>{product.availability?.delivery ? '✓' : '✗'}</span>
-                        <span className="font-medium">{((product.price || 0) / 100).toFixed(2)} €</span>
+                        <span className="font-medium">{formatCents((product.price || 0))}</span>
                       </>
                     )}
                   </div>
@@ -481,7 +482,7 @@ export const ProductDetailsSheet = ({
                         })}
                       />
                     ) : (
-                      <p className="mt-1 text-foreground font-medium">{((product.integrations?.uber_eats?.price_override || product.price || 0) / 100).toFixed(2)} €</p>
+                      <p className="mt-1 text-foreground font-medium">{formatCents((product.integrations?.uber_eats?.price_override || product.price || 0))}</p>
                     )}
                   </div>
                 )}
@@ -544,7 +545,7 @@ export const ProductDetailsSheet = ({
                         })}
                       />
                     ) : (
-                      <p className="mt-1 text-foreground font-medium">{((product.integrations?.deliveroo?.price_override || product.price || 0) / 100).toFixed(2)} €</p>
+                      <p className="mt-1 text-foreground font-medium">{formatCents((product.integrations?.deliveroo?.price_override || product.price || 0))}</p>
                     )}
                   </div>
                 )}
