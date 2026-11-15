@@ -1,4 +1,5 @@
 import { apiClient, isApiHttpError, logAPI, unwrapErrorData, withMock } from '@/services/apiClient';
+import { getMerchantCurrency } from '@/lib/money';
 
 /**
  * Synchronisation comptable (API : docs/accounting-sync.md) : l'établissement
@@ -320,7 +321,7 @@ export const accountingErrorCode = (error: unknown): string | undefined => {
 /** Écart ventes − encaissements (centimes) en euros, avec signe. */
 export const formatDifference = (cents: number): string => {
   if (!cents) return '—';
-  const euros = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(Math.abs(cents) / 100);
+  const euros = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: getMerchantCurrency() }).format(Math.abs(cents) / 100);
   return `${cents > 0 ? '+' : '−'}${euros}`;
 };
 

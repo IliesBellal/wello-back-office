@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Crown, Flame } from "lucide-react";
 import { Customer, acquisitionSourceLabels } from "@/services/customersService";
+import { getMerchantCurrency } from '@/lib/money';
 
 interface CustomerCardProps {
   customer: Customer;
@@ -15,7 +16,7 @@ const CustomerCard = ({ customer, onClick }: CustomerCardProps) => {
   
   const totalSpentFormatted = new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: "EUR"
+    currency: getMerchantCurrency()
   }).format(customer.customer_total_spent / 100);
 
   const isVIP = customer.customer_total_spent > 50000; // > 500€

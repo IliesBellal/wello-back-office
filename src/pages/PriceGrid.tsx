@@ -33,12 +33,13 @@ import {
   isChannelEnabled,
   isMarketplaceChannel,
 } from '@/utils/salesChannelAvailability';
+import { formatCents } from '@/lib/money';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const formatPrice = (cents: number | undefined): string => {
   if (cents === undefined || cents === null) return '—';
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+  return formatCents(cents);
 };
 
 const PLATFORM_LABEL: Record<MarketplacePlatform, string> = {
@@ -647,7 +648,7 @@ function marginColor(marginCents: number): string {
 }
 
 function fmt(cents: number): string {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+  return formatCents(cents);
 }
 
 function fmtPct(v: number): string {

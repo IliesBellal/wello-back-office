@@ -46,6 +46,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatCents } from '@/lib/money';
 
 const PAGE_LIMIT = 31;
 
@@ -126,7 +127,7 @@ const CashRegisterHistory = () => {
   }, [loadRegisters, page]);
 
   const formatCurrency = (cents: number) => {
-    return `${(cents / 100).toFixed(2)}€`;
+    return formatCents(cents);
   };
 
   const handleCloseRegister = async () => {

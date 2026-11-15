@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AuthData, normalizeAuthData, parseStoredAuthData } from '@/types/auth';
 import { rolesApi } from '@/services/welloApi';
 import { qk } from '@/lib/queryKeys';
+import { setMerchantCurrency } from '@/lib/money';
 
 interface AuthContextType {
   authData: AuthData | null;
@@ -14,11 +15,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [authData, setAuthDataState] = useState<AuthData | null>(() => {
-    return parseStoredAuthData(localStorage.getItem('authData'));
+    const stored = parseStoredAuthData(localStorage.getItem('authData'));
+    setMerchantCurrency(stored?.merchant.currency);
+    return stored;
   });
 
   const setAuthData = (data: AuthData | null) => {
     const normalizedData = data ? normalizeAuthData(data) : null;
+    // Devise de tous les prix affichés (formatMoney / formatCents).
+    setMerchantCurrency(normalizedData?.merchant.currency);
     setAuthDataState(normalizedData);
     if (normalizedData) {
       localStorage.setItem('authData', JSON.stringify(normalizedData));

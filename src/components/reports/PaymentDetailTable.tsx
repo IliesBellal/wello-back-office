@@ -2,6 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PaymentDayData } from '@/services/financialReportsService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface PaymentDetailTableProps {
   data: PaymentDayData[];
@@ -10,7 +11,7 @@ interface PaymentDetailTableProps {
 const formatCurrency = (cents: number) => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR'
+    currency: getMerchantCurrency()
   }).format(cents / 100);
 };
 

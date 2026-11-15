@@ -2,6 +2,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { VATDayData } from '@/services/financialReportsService';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface VATDetailTableProps {
   data: VATDayData[];
@@ -10,7 +11,7 @@ interface VATDetailTableProps {
 const formatCurrency = (cents: number) => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR'
+    currency: getMerchantCurrency()
   }).format(cents / 100);
 };
 

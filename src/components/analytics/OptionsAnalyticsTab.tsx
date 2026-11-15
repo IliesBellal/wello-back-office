@@ -18,6 +18,7 @@ import {
 import { isApiHttpError } from '@/services/apiClient';
 import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
+import { formatCents as eur } from '@/lib/money';
 
 interface OptionsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -27,7 +28,6 @@ interface OptionsAnalyticsTabProps {
   orderFilter?: OrderFilterSelection;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const OPTION_TYPE_LABELS: Record<string, string> = {
   [OPTION_TYPE_PAID]: 'Payante',

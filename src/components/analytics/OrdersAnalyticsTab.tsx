@@ -16,6 +16,7 @@ import { ScopeSummary } from '@/components/analytics/ScopeNotice';
 import { EstablishmentComparisonChart } from '@/components/analytics/EstablishmentComparisonChart';
 import { PieSyncGroup, SyncedPie, EstablishmentSectionTitle, CumulativeSectionTitle } from '@/components/analytics/ChartSync';
 import { usePerMerchantAnalytics } from '@/hooks/usePerMerchantAnalytics';
+import { formatCents as eur } from '@/lib/money';
 
 interface OrdersAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -25,7 +26,6 @@ interface OrdersAnalyticsTabProps {
   orderFilter?: OrderFilterSelection;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const EvolutionBadge = ({ percent }: { percent: number }) => (
   <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>

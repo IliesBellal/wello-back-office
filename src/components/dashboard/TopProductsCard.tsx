@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { TopProduct } from '@/services/dashboardService';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface TopProductsCardProps {
   products: TopProduct[];
@@ -11,7 +12,7 @@ interface TopProductsCardProps {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: getMerchantCurrency(),
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);

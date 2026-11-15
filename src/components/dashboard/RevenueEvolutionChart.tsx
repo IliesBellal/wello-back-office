@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { HourlyChannelData } from '@/services/dashboardService';
+import { getMerchantCurrency } from '@/lib/money';
 
 type ChannelType = 'sur_place' | 'emporter' | 'livraison' | 'uber_eats' | 'deliveroo';
 type DisplayMode = 'global' | 'channels';
@@ -46,7 +47,7 @@ const channelLabels: Record<string, string> = {
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: getMerchantCurrency(),
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value / 100);

@@ -140,8 +140,8 @@ export interface CreateUserRequest {
   last_name: string;
   username?: string;
   email: string;
-  /** May be empty: backend generates a random password when blank. */
-  password?: string;
+  /** Required, 8 characters minimum (the API rejects it with `password_too_short`). */
+  password: string;
   tel?: string;
   merchant_id?: string | null;
   admin?: boolean;

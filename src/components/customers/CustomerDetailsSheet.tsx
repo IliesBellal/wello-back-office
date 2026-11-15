@@ -25,6 +25,7 @@ import {
 } from "@/services/customersService";
 import { CustomerBlockDialog } from "@/components/customers/CustomerBlockDialog";
 import { useCustomerBlockReasons } from "@/hooks/useCustomerBlockReasons";
+import { formatCents } from '@/lib/money';
 
 const ORDERS_PAGE_SIZE = 10;
 
@@ -228,10 +229,10 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick, canM
   const memberSince = format(new Date(customer.created_at), "MMMM yyyy", { locale: fr });
   const isVIP = customer.customer_total_spent > 50000;
 
-  const totalSpent = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(customer.customer_total_spent / 100);
+  const totalSpent = formatCents(customer.customer_total_spent);
   const avgBasket = customer.customer_total_orders > 0 
-    ? new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format((customer.customer_total_spent / customer.customer_total_orders) / 100)
-    : "0,00 €";
+    ? formatCents(customer.customer_total_spent / customer.customer_total_orders)
+    : formatCents(0);
 
   const fullAddress = customer.address 
     ? `${customer.address.street_number || ""} ${customer.address.street || ""}, ${customer.address.zip_code || ""} ${customer.address.city || ""}`.trim()
@@ -443,7 +444,7 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick, canM
                       </div>
                       <div className="text-right">
                         <p className="font-semibold">
-                          {new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" }).format(order.total / 100)}
+                          {formatCents(order.total)}
                         </p>
                         <Badge variant={order.status === "COMPLETED" ? "default" : "secondary"} className="text-xs">
                           {order.status === "COMPLETED" ? "Terminée" : order.status}
@@ -584,7 +585,7 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick, canM
                               <div>
                                 <p className="font-medium flex items-center gap-2">
                                   {reward.reward_type === "percent_discount" && `${reward.reward_value}% de réduction`}
-                                  {reward.reward_type === "fixed_discount" && `${(reward.reward_value / 100).toFixed(2)}€ de réduction`}
+                                  {reward.reward_type === "fixed_discount" && `${formatCents(reward.reward_value)} de réduction`}
                                   {reward.reward_type === "free_product" && `Produit offert`}
                                   {reward.is_used && <Check className="h-4 w-4 text-muted-foreground" />}
                                 </p>

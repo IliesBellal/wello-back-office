@@ -1,5 +1,6 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { VATDayData } from '@/services/financialReportsService';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface VATChartProps {
   data: VATDayData[];
@@ -8,7 +9,7 @@ interface VATChartProps {
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR'
+    currency: getMerchantCurrency()
   }).format(value / 100);
 };
 

@@ -22,6 +22,7 @@ import {
   Legend,
 } from 'recharts';
 import type { HourlyChannelData } from '@/services/dashboardService';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface RevenueByChannelChartProps {
   data: HourlyChannelData[];
@@ -38,7 +39,7 @@ const CHANNELS = [
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: getMerchantCurrency(),
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);

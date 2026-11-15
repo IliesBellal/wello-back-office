@@ -25,6 +25,7 @@ import {
 import { Link2, AlertCircle, UserPlus } from "lucide-react";
 
 import { usersApi, planningPositionsApi, planningRefsApi, rolesApi } from "@/services/welloApi";
+import { getUserErrorMessage, isApiHttpError } from "@/services/apiClient";
 import { qk } from "@/lib/queryKeys";
 import type { CreateUserRequest } from "@/types/adminUsers";
 
@@ -110,7 +111,6 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [tel, setTel] = useState("");
   const [password, setPassword] = useState("");
-  const [admin, setAdmin] = useState(false);
   const [loginEnabled, setLoginEnabled] = useState(true);
   const [positionId, setPositionId] = useState("");
   const [hrRole, setHrRole] = useState("");
@@ -152,6 +152,12 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
       onSuccess();
     },
     onError: (err) => {
+      // Une erreur HTTP a déjà été annoncée par le toast global d'apiClient ;
+      // son `message` contient le corps de réponse brut, à ne pas montrer.
+      if (isApiHttpError(err)) {
+        setError(getUserErrorMessage(err) ?? "Impossible de créer le membre. Vérifiez les informations saisies.");
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Erreur lors de la création";
       setError(msg);
       toast.error(msg);
@@ -164,15 +170,23 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
       setError("Prénom, nom et email sont obligatoires.");
       return;
     }
+    // Même seuil que l'API (8 caractères).
+    if (!password) {
+      setError("Le mot de passe est obligatoire.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Le mot de passe doit contenir au moins 8 caractères.");
+      return;
+    }
 
     const payload: CreateUserRequest = {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       email: email.trim(),
       tel: tel.trim() || undefined,
-      password: password ? password : undefined,
+      password,
       rights: {
-        admin,
         login_enabled: loginEnabled,
       },
       role_id: roleId || undefined,
@@ -230,7 +244,7 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
           </div>
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="create-pw" className="text-xs">
-              Mot de passe (laisser vide pour générer automatiquement)
+              Mot de passe * (8 caractères minimum)
             </Label>
             <Input
               id="create-pw"
@@ -271,12 +285,6 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="create-admin" className="text-sm cursor-pointer">
-              Administrateur
-            </Label>
-            <Switch id="create-admin" checked={admin} onCheckedChange={setAdmin} />
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="create-login" className="text-sm cursor-pointer">

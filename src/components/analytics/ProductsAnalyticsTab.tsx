@@ -16,6 +16,7 @@ import { isApiHttpError } from '@/services/apiClient';
 import { orderFilterKey, type OrderFilterSelection } from '@/utils/orderFilters';
 import { merchantColor } from '@/utils/merchantColors';
 import { ScopeSummary } from '@/components/analytics/ScopeNotice';
+import { formatCents as eur } from '@/lib/money';
 
 interface ProductsAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -25,7 +26,6 @@ interface ProductsAnalyticsTabProps {
   orderFilter?: OrderFilterSelection;
 }
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 const EvolutionBadge = ({ percent }: { percent: number }) => (
   <div className={`flex items-center gap-1 text-sm ${percent >= 0 ? 'text-green-600' : 'text-red-600'}`}>

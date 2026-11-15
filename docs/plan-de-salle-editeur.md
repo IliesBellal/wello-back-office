@@ -39,7 +39,7 @@ haut-gauche, un **obstacle** son centre ; les deux pivotent autour de leur centr
   exige deux clics rapprochés dans le temps **et** l'espace (`FloorPlanCanvas`).
 - **Zones** : conservées et masquées (`SHOW_ZONES` dans `ToolBar.tsx`) ; les obstacles sont actifs.
 - **Le POS Flutter** n'affiche pas les obstacles : à adapter (types `wall`, `door`, `window`,
-  `stairs`, `plant`, `bar`, `pillar`).
+  `stairs`, `plant`, `bar`, `pillar`, `cash_register`).
 
 ## Raccourcis
 

@@ -20,6 +20,7 @@ import {
 } from '@/services/vatService';
 import { toLocalDateString } from '@/utils/apiDate';
 import { Download, AlertCircle, DollarSign, Percent, Search } from 'lucide-react';
+import { getMerchantCurrency } from '@/lib/money';
 
 // Mêmes canaux que l'export comptable (orders.order_source).
 const vatSalesChannelOptions = vatChannels;
@@ -190,7 +191,7 @@ const VAT = () => {
   const formatCurrency = (centimes: number): string => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
-      currency: 'EUR',
+      currency: getMerchantCurrency(),
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }).format(centimes / 100);

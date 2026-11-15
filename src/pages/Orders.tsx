@@ -19,6 +19,7 @@ import {
 } from "@/utils/orderUtils";
 import { Loader2, ChevronRight, Search, X } from "lucide-react";
 import { CardSkeleton } from "@/components/shared/CardSkeleton";
+import { getMerchantCurrency } from '@/lib/money';
 
 export default function Orders() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -141,7 +142,7 @@ export default function Orders() {
   const formatCurrency = (cents: number) => {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
-      currency: "EUR",
+      currency: getMerchantCurrency(),
     }).format(cents / 100);
   };
 

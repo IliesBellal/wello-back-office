@@ -17,6 +17,7 @@ import {
 import { isApiHttpError } from '@/services/apiClient';
 import { orderFilterKey, ORDER_TYPE_OPTIONS, type OrderFilterSelection } from '@/utils/orderFilters';
 import { ScopeSummary, AggregationNotice } from '@/components/analytics/ScopeNotice';
+import { formatCents as eur } from '@/lib/money';
 
 interface UpsellAnalyticsTabProps {
   dateRange: { from: Date; to: Date };
@@ -29,7 +30,6 @@ interface UpsellAnalyticsTabProps {
 const UPSELL_BAR_COLOR = '#8b5cf6';
 const TOP_SERVERS_LIMIT = 10;
 
-const eur = (cents: number) => (cents / 100).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
 export const UpsellAnalyticsTab = ({ dateRange, merchantIds = [], comparisonMode = 'cumule', merchantsById = {}, orderFilter }: UpsellAnalyticsTabProps) => {
   const filterKey = orderFilterKey(orderFilter);

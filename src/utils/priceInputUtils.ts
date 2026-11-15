@@ -1,3 +1,4 @@
+import { formatCents } from '@/lib/money';
 /**
  * Price input utility functions for consistent price handling across components
  * Handles conversion between display format (euros with comma separator) and cents
@@ -55,8 +56,7 @@ export const priceToDisplayValue = (cents: number | undefined): string => {
  * @example 1000 → "10,00 €"
  */
 export const formatPrice = (cents: number | undefined): string => {
-  if (cents === undefined || cents === null) return '0,00 €';
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(cents / 100);
+  return formatCents(cents ?? 0);
 };
 
 /**

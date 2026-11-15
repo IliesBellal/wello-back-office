@@ -47,6 +47,7 @@ import {
   encloseCashRegister,
 } from "@/services/cashRegisterService";
 import { getCashRegisterStatus } from "@/lib/cashRegisterStatus";
+import { getMerchantCurrency } from '@/lib/money';
 
 interface CashRegisterDetailsSheetProps {
   register: CashRegister | null;
@@ -58,7 +59,7 @@ interface CashRegisterDetailsSheetProps {
 const formatCurrency = (cents: number) => {
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: "EUR",
+    currency: getMerchantCurrency(),
   }).format(cents / 100);
 };
 

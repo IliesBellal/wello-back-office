@@ -29,6 +29,7 @@ import {
   resolveOrderHistoryType,
 } from '@/utils/orderHistory';
 import { Search, ChevronLeft, ChevronRight, CheckCircle2, Clock3, XCircle, ShieldX } from 'lucide-react';
+import { formatMoney } from '@/lib/money';
 
 const ORDER_STATUS_COLORS: Record<string, { bg: string; text: string; label: string; icon: React.ComponentType<{ className?: string }> }> = {
   done: { bg: 'bg-green-100', text: 'text-green-700', label: 'Terminée', icon: CheckCircle2 },
@@ -126,7 +127,7 @@ const STATUS_FILTER_OPTIONS = [
 ];
 
 const formatCurrency = (value: number): string => {
-  return value.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
+  return formatMoney(value);
 };
 
 const formatCents = (value: number): string => {
@@ -283,7 +284,7 @@ const RefundModal = ({ isOpen, onClose, onRefund, maxAmount, zIndex = 70 }: Refu
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">€</span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Montant max: {maxAmount.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</p>
+            <p className="text-xs text-muted-foreground mt-1">Montant max: {formatMoney(maxAmount)}</p>
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-2 block">Motif</label>
@@ -765,7 +766,7 @@ export const DashboardOrderHistory = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {resolvedOrderHistory.total_revenue.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                {formatMoney(resolvedOrderHistory.total_revenue)}
               </div>
             </CardContent>
           </Card>
@@ -775,7 +776,7 @@ export const DashboardOrderHistory = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {resolvedOrderHistory.avg_basket.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                {formatMoney(resolvedOrderHistory.avg_basket)}
               </div>
             </CardContent>
           </Card>
@@ -852,7 +853,7 @@ export const DashboardOrderHistory = () => {
                         </span>
                       </TableCell>
                       <TableCell className="text-right font-semibold">
-                        {order.total.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}
+                        {formatMoney(order.total)}
                       </TableCell>
                     </TableRow>
                     );

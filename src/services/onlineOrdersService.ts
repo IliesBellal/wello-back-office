@@ -49,11 +49,15 @@ export const updateOnlineOrdersConfig = async (
   config: OnlineOrdersConfig
 ): Promise<OnlineOrdersConfig> => {
   try {
-    // Remove forbidden fields from payload
+    // Remove forbidden fields from payload. `active` / `storefront_enabled`
+    // (commutateurs commande et affichage) ont leur propre appel
+    // (integrationsService.updateScanNOrderSwitches) : les renvoyer ici avec
+    // la valeur lue au chargement annulerait une bascule faite entre-temps.
     const {
       auto_accept_orders, commission_rate, logo_url, banner_url, // eslint-disable-line @typescript-eslint/no-unused-vars
+      active, storefront_enabled, // eslint-disable-line @typescript-eslint/no-unused-vars
       ...allowedConfig
-    } = config;
+    } = config as OnlineOrdersConfig & Record<string, unknown>;
     const response = await apiClient.patch('/integrations/scannorder', allowedConfig);
     // API returns { id, data: { integration: { ... } } }
     return response.data.integration;

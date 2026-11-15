@@ -20,6 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { getCompatibleUnits as getCompatibleUnitsForBaseUnit } from '@/utils/unitConversions';
+import { formatMoney } from '@/lib/money';
 
 interface ProductCompositionTabProps {
   composition: ProductComposition[];
@@ -231,7 +232,7 @@ export const ProductCompositionTab = ({
                     <TableCell>{item.quantity}</TableCell>
                     <TableCell>{unit || 'Inconnu'}</TableCell>
                     <TableCell className="text-muted-foreground">
-                      {item.cost !== undefined ? `${item.cost.toFixed(2)} €` : '-'}
+                      {item.cost !== undefined ? formatMoney(item.cost) : '-'}
                     </TableCell>
                     <TableCell>
                       <Button

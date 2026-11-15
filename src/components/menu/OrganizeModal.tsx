@@ -24,6 +24,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useToast } from '@/hooks/use-toast';
+import { formatCents } from '@/lib/money';
 
 interface OrganizeModalProps {
   open: boolean;
@@ -105,7 +106,7 @@ const SortableProductItem = ({ product }: { product: Product }) => {
         <h3 className="font-semibold">{product.name}</h3>
       </div>
       {product.price && (
-        <p className="text-sm opacity-80">{(product.price / 100).toFixed(2)} €</p>
+        <p className="text-sm opacity-80">{formatCents(product.price)}</p>
       )}
     </div>
   );

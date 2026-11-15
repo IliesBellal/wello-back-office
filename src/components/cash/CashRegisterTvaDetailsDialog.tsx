@@ -21,6 +21,7 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { formatCents } from '@/lib/money';
 
 interface CashRegisterTvaDetailsDialogProps {
   registerId: string | null;
@@ -28,7 +29,7 @@ interface CashRegisterTvaDetailsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const formatCurrency = (cents: number) => `${(cents / 100).toFixed(2)} €`;
+const formatCurrency = (cents: number) => formatCents(cents);
 
 const formatDate = (value: string) => {
   const date = new Date(value);

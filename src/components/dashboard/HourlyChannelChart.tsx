@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import type { HourlyChannelData } from '@/services/dashboardService';
+import { getMerchantCurrency } from '@/lib/money';
 
 interface HourlyChannelChartProps {
   data: HourlyChannelData[];
@@ -34,7 +35,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('fr-FR', {
     style: 'currency',
-    currency: 'EUR',
+    currency: getMerchantCurrency(),
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value);

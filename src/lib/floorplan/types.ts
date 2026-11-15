@@ -49,7 +49,7 @@ export interface Location {
   attributes?: TableAttributes | null;
 }
 
-export type ObstacleType = 'wall' | 'door' | 'window' | 'stairs' | 'plant' | 'bar' | 'pillar';
+export type ObstacleType = 'wall' | 'door' | 'window' | 'stairs' | 'plant' | 'bar' | 'pillar' | 'cash_register';
 
 /** Un obstacle. `x`/`y` : CENTRE (différent des tables), `angle` pivote autour du centre. */
 export interface Obstacle {
