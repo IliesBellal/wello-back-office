@@ -16,6 +16,7 @@ import {
   PLANNING_PRODUCTIVITY_TARGET_CENTS_PER_HOUR,
   PLANNING_PRODUCTIVITY_TARGET_EUR_PER_HOUR,
 } from "./planningPerformanceTargets";
+import { getMerchantCurrency } from '@/lib/money';
 
 interface PerformanceSheetProps {
   open: boolean;
@@ -507,7 +508,7 @@ function fmtMoney(cents: number | null): string {
   if (cents == null) return "—";
   return new Intl.NumberFormat("fr-FR", {
     style: "currency",
-    currency: "EUR",
+    currency: getMerchantCurrency(),
     maximumFractionDigits: 0,
   }).format(cents / 100);
 }
