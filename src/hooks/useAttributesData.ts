@@ -21,9 +21,17 @@ export const useAttributesData = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadData = async () => {
+  /**
+   * `silent` : rechargement en arrière-plan, sans repasser `loading` à `true`.
+   * La page remplace tout son contenu par un squelette tant que `loading` est
+   * vrai : un rechargement non silencieux déclenché depuis le formulaire
+   * d'édition (ex. après l'upload d'une image d'option) le démonte, puis le
+   * recrée à partir de l'attribut figé à l'ouverture — la nouvelle image
+   * disparaît de l'écran et les modifications non enregistrées sont perdues.
+   */
+  const loadData = async ({ silent = false }: { silent?: boolean } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       // Load only attributes, components and units - no products needed
       const [attributesData, componentsData, unitsData] = await Promise.all([
         menuService.getAttributes(),
@@ -45,7 +53,7 @@ export const useAttributesData = () => {
         variant: "destructive"
       });
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -74,6 +82,8 @@ export const useAttributesData = () => {
     createAttribute,
     updateAttributeData,
     deleteAttribute,
-    refreshAttributes: loadData,
+    // Toujours silencieux : seul appelant, le formulaire d'édition (voir
+    // `loadData`).
+    refreshAttributes: () => loadData({ silent: true }),
   };
 };
