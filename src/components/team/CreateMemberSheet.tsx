@@ -111,7 +111,6 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState("");
   const [tel, setTel] = useState("");
   const [password, setPassword] = useState("");
-  const [admin, setAdmin] = useState(false);
   const [loginEnabled, setLoginEnabled] = useState(true);
   const [positionId, setPositionId] = useState("");
   const [hrRole, setHrRole] = useState("");
@@ -188,7 +187,6 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
       tel: tel.trim() || undefined,
       password,
       rights: {
-        admin,
         login_enabled: loginEnabled,
       },
       role_id: roleId || undefined,
@@ -287,12 +285,6 @@ function CreateForm({ onSuccess }: { onSuccess: () => void }) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="flex items-center justify-between">
-            <Label htmlFor="create-admin" className="text-sm cursor-pointer">
-              Administrateur
-            </Label>
-            <Switch id="create-admin" checked={admin} onCheckedChange={setAdmin} />
           </div>
           <div className="flex items-center justify-between">
             <Label htmlFor="create-login" className="text-sm cursor-pointer">
