@@ -243,10 +243,39 @@ const ROLE_ERROR_MESSAGES: Record<string, { title: string; description: string }
   },
 };
 
+// Création / modification d'un utilisateur (POST /users, POST /users/create).
+// L'API répond { id, data: { status, message, error } } : le message est
+// imbriqué sous `data` et en anglais ou tronqué, d'où cette table française.
+const USER_ERROR_MESSAGES: Record<string, { title: string; description: string }> = {
+  password_too_short: {
+    title: "Mot de passe trop court",
+    description: "Le mot de passe doit contenir au moins 8 caractères.",
+  },
+  email_already_used: {
+    title: "E-mail déjà utilisé",
+    description: "Un compte existe déjà avec cette adresse e-mail.",
+  },
+};
+
+/**
+ * Message français lisible pour une erreur de création/modification
+ * d'utilisateur, ou `undefined` si le code n'est pas connu. Les appelants qui
+ * affichent l'erreur dans leur formulaire l'utilisent à la place de
+ * `error.message`, qui contient le corps de réponse brut.
+ */
+export const getUserErrorMessage = (error: unknown): string | undefined => {
+  if (!isApiHttpError(error)) {
+    return undefined;
+  }
+  const body = error.responseBody as { status?: unknown } | undefined;
+  const code = typeof body?.status === "string" ? body.status : undefined;
+  return code ? USER_ERROR_MESSAGES[code]?.description : undefined;
+};
+
 const handleApiError = (status: number, message?: string, errorCode?: string) => {
   switch (status) {
     case 400: {
-      const roleError = errorCode ? ROLE_ERROR_MESSAGES[errorCode] : undefined;
+      const roleError = errorCode ? ROLE_ERROR_MESSAGES[errorCode] ?? USER_ERROR_MESSAGES[errorCode] : undefined;
       toast({
         title: roleError?.title || "Données incorrectes",
         description: roleError?.description || message || "Veuillez vérifier les informations saisies.",
@@ -283,7 +312,7 @@ const handleApiError = (status: number, message?: string, errorCode?: string) =>
         break;
       }
       const duplicate = errorCode ? DUPLICATE_NAME_MESSAGES[errorCode] : undefined;
-      const roleError = errorCode ? ROLE_ERROR_MESSAGES[errorCode] : undefined;
+      const roleError = errorCode ? ROLE_ERROR_MESSAGES[errorCode] ?? USER_ERROR_MESSAGES[errorCode] : undefined;
       toast({
         title: duplicate?.title || roleError?.title || "Conflit",
         description: duplicate?.description || roleError?.description || message || "Cette action entre en conflit avec une ressource existante.",
