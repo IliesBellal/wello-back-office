@@ -49,10 +49,21 @@ export interface IntegrationStatus {
   synced_items: number;
   /**
    * Lien public de la boutique ScanNOrder ({BASE_URL}/restaurant/{slug}).
-   * Renvoyé par GET/PATCH /integrations/scannorder. `null` si le marchand n'a
-   * pas de QR code principal ou si l'intégration n'est pas active.
+   * Renvoyé par GET/PATCH /integrations/scannorder dès la création de
+   * l'établissement, Stripe ou non. `null` si le marchand n'a pas de QR code
+   * principal.
    */
   access_url?: string | null;
+  /**
+   * ScanNOrder uniquement. `active` = commutateur de la commande en ligne,
+   * `storefront_enabled` = carte affichée, `stripe_account_status` = null sans
+   * compte Stripe Connect (sinon "verified" / "action_required"),
+   * `online_ordering_enabled` = les clients peuvent réellement commander.
+   * Règles : ib-welloresto-api docs/scannorder-carte-sans-stripe.md.
+   */
+  storefront_enabled?: boolean;
+  stripe_account_status?: string | null;
+  online_ordering_enabled?: boolean;
   logo_url?: string | null;
   banner_url?: string | null;
   primary_color?: string | null;
@@ -112,6 +123,9 @@ const mockIntegrations: Record<string, IntegrationStatus> = {
     last_sync: '2024-04-08T09:45:00Z',
     synced_items: 94,
     access_url: 'https://scannorder.welloresto.fr/restaurant/le-bistrot',
+    storefront_enabled: true,
+    stripe_account_status: 'verified',
+    online_ordering_enabled: true,
   },
 };
 
@@ -163,6 +177,24 @@ export const integrationsService = {
     return withMock(
       () => mockIntegrations.scanorder,
       () => apiClient.get<GetIntegrationResponse>('/integrations/scannorder').then(res => res.data.integration)
+    );
+  },
+
+  /**
+   * Commutateurs ScanNOrder : `active` = commande en ligne, `storefront_enabled`
+   * = carte affichée. Envoyés seuls, jamais avec la configuration de la page
+   * (updateOnlineOrdersConfig les exclut), pour qu'un « Sauvegarder » ne
+   * rétablisse pas une valeur lue avant la bascule.
+   */
+  updateScanNOrderSwitches: async (data: {
+    active?: boolean;
+    storefront_enabled?: boolean;
+  }): Promise<IntegrationStatus> => {
+    logAPI('PATCH', '/integrations/scannorder', data);
+
+    return withMock(
+      () => ({ ...mockIntegrations.scanorder, ...data }),
+      () => apiClient.patch<PatchIntegrationResponse>('/integrations/scannorder', data).then(res => res.data.integration)
     );
   },
 

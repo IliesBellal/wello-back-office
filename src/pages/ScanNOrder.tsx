@@ -22,7 +22,7 @@ import {
   uploadBanner,
   OnlineOrdersConfig,
 } from '@/services/onlineOrdersService';
-import { AlertCircle, Upload, Copy, ExternalLink, Power, Euro, ShoppingCart, TrendingUp, Wallet, Loader2, Store, User, Phone, FileText, MapPin, Globe, Mail, Calendar } from 'lucide-react';
+import { AlertCircle, Upload, Copy, ExternalLink, Wallet, Loader2, Store, User, Phone, FileText, MapPin, Globe, Mail, Calendar } from 'lucide-react';
 import { InfoTooltip } from '@/components/ui/InfoTooltip';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
 import { settingsService } from '@/services/settingsService';
@@ -30,6 +30,13 @@ import { type UserProfile, type EstablishmentSettings } from '@/types/settings';
 import { ColorPresetPicker, TEXT_COLOR_PRESETS } from '@/components/shared/ColorPresetPicker';
 import { useToast } from '@/hooks/use-toast';
 import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { getMerchantCurrency } from '@/lib/money';
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -104,6 +111,14 @@ function ImageUploadField({
   );
 }
 
+// Compte Stripe Connect enregistré. API antérieure (champ absent) : `active`
+// en tenait lieu.
+function hasStripeAccount(status: IntegrationStatus | null): boolean {
+  if (!status) return false;
+  if (status.stripe_account_status !== undefined) return !!status.stripe_account_status;
+  return status.active;
+}
+
 export default function ScanNOrder() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -120,7 +135,9 @@ export default function ScanNOrder() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [establishment, setEstablishment] = useState<EstablishmentSettings | null>(null);
   const [showDisableDialog, setShowDisableDialog] = useState(false);
-  const [disabling, setDisabling] = useState(false);
+  const [showHideStorefrontDialog, setShowHideStorefrontDialog] = useState(false);
+  const [showActivationDialog, setShowActivationDialog] = useState(false);
+  const [switching, setSwitching] = useState<'ordering' | 'storefront' | null>(null);
   const [activating, setActivating] = useState(false);
 
 
@@ -139,11 +156,10 @@ export default function ScanNOrder() {
       .then(status => {
         setScanStatus(status);
         setKpis(status.kpis);
-        if (status.active) {
+        if (hasStripeAccount(status)) {
           integrationsService.getStripeBalance()
             .then(setStripeBalance)
             .catch(() => {/* balance stays null */});
-          // Si besoin d'appeler getStripeStatus, ajouter ici
         }
       })
       .catch(() => {/* kpis stay null */});
@@ -167,6 +183,12 @@ export default function ScanNOrder() {
   // Lien public de la boutique, fourni par GET /integrations/scannorder.
   // `null` tant que le marchand n'a pas de QR code principal.
   const accessUrl = scanStatus?.access_url || '';
+
+  const stripeReady = hasStripeAccount(scanStatus);
+  const orderingSwitchOn = !!scanStatus?.active;
+  const storefrontOn = scanStatus?.storefront_enabled !== false;
+  // API antérieure (champ absent) : le commutateur faisait foi.
+  const canOrder = scanStatus?.online_ordering_enabled ?? orderingSwitchOn;
 
   const closureDate = (() => {
     const closedUntil = scanStatus?.closed_until;
@@ -263,14 +285,45 @@ export default function ScanNOrder() {
     window.open(accessUrl, '_blank');
   };
 
-  const handleDisable = async () => {
-    setDisabling(true);
+  // Commutateurs commande en ligne (`active`) et affichage de la carte
+  // (`storefront_enabled`) : appel dédié, la réponse remplace le statut.
+  const updateSwitch = async (
+    which: 'ordering' | 'storefront',
+    data: { active?: boolean; storefront_enabled?: boolean },
+    successMessage: string,
+  ) => {
+    setSwitching(which);
     try {
-      // TODO: Implement disable functionality
-      console.log('ScanNOrder integration disabled');
+      const status = await integrationsService.updateScanNOrderSwitches(data);
+      setScanStatus(status);
+      toast({ title: successMessage });
+    } catch {
+      toast({
+        title: 'Erreur',
+        description: 'La modification n\'a pas pu être enregistrée. Réessayez.',
+        variant: 'destructive',
+      });
     } finally {
-      setDisabling(false);
+      setSwitching(null);
+      setShowDisableDialog(false);
+      setShowHideStorefrontDialog(false);
     }
+  };
+
+  const handleOrderingToggle = (checked: boolean) => {
+    if (!checked) {
+      setShowDisableDialog(true);
+      return;
+    }
+    updateSwitch('ordering', { active: true }, 'Commande en ligne réactivée');
+  };
+
+  const handleStorefrontToggle = (checked: boolean) => {
+    if (!checked) {
+      setShowHideStorefrontDialog(true);
+      return;
+    }
+    updateSwitch('storefront', { storefront_enabled: true }, 'Carte de nouveau visible');
   };
 
   const handleActivate = async () => {
@@ -700,26 +753,20 @@ export default function ScanNOrder() {
     );
   }
 
-  if (scanStatus && !scanStatus.active) {
-    return (
-      <DashboardLayout>
-        <PageContainer
-          header={
-            <div className="space-y-2">
-              <h1 className="text-3xl font-bold">ScanNOrder</h1>
-              <p className="text-sm text-muted-foreground">
-                Vérifiez les informations avant d'activer l'intégration.
-              </p>
-            </div>
-          }
-          className="space-y-6"
-        >
-          <Card className="border-yellow-300/60 bg-yellow-100/60 dark:border-yellow-800 dark:bg-yellow-950/30">
-            <CardContent className="pt-6 text-sm text-yellow-900 dark:text-yellow-200">
-              Merci de vous assurer que les données ci-dessous sont correctes. Si nécessaire, modifiez-les dans les paramètres avant activation.
-            </CardContent>
-          </Card>
-
+  // Activation de l'encaissement (onboarding Stripe) : vérification des
+  // informations transmises à Stripe, puis redirection. La carte, elle, est
+  // consultable sans cette étape (ib-welloresto-api
+  // docs/scannorder-carte-sans-stripe.md).
+  const activationDialog = (
+    <Dialog open={showActivationDialog} onOpenChange={setShowActivationDialog}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Activer la commande en ligne</DialogTitle>
+          <DialogDescription>
+            Vérifiez les informations ci-dessous : elles sont transmises à notre plateforme de paiement sécurisée. Si nécessaire, modifiez-les dans les paramètres avant activation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <Card>
               <CardHeader>
@@ -766,17 +813,17 @@ export default function ScanNOrder() {
             <div className="flex flex-col items-start gap-2 sm:items-end">
               <Button onClick={handleActivate} disabled={activating}>
                 {activating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                {activating ? 'Redirection vers Stripe...' : 'Activer ScanNOrder'}
+                {activating ? 'Redirection vers Stripe...' : 'Activer la commande en ligne'}
               </Button>
               <p className="max-w-sm text-xs text-muted-foreground sm:text-right">
                 Vous allez être redirigé vers notre plateforme de paiement sécurisée.
               </p>
             </div>
           </div>
-        </PageContainer>
-      </DashboardLayout>
-    );
-  }
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 
   return (
     <DashboardLayout>
@@ -816,38 +863,73 @@ export default function ScanNOrder() {
                 </div>
               </div>
               <p className="text-sm text-muted-foreground md:hidden">
-                Configurez votre plateforme de commande en ligne
+                Votre carte en ligne, et la commande en ligne une fois l'encaissement activé
               </p>
             </div>
             <p className="text-sm text-muted-foreground hidden md:block">
-              Configurez votre plateforme de commande en ligne
+              Votre carte en ligne, et la commande en ligne une fois l'encaissement activé
             </p>
           </div>
         }
       >
-        <div className="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+          {/* Commande en ligne : Stripe sert uniquement à encaisser */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="h-3 w-3 rounded-full bg-green-500"></div>
-                  <CardTitle className="text-foreground">
-                    Intégration active
-                  </CardTitle>
+                  <div className={`h-3 w-3 rounded-full ${canOrder ? 'bg-green-500' : 'bg-muted-foreground/40'}`}></div>
+                  <CardTitle className="text-base text-foreground">Commande en ligne</CardTitle>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowDisableDialog(true)}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
-                  title="Désactiver ScanNOrder"
-                  aria-label="Désactiver ScanNOrder"
-                  disabled={disabling}
-                >
-                  {disabling ? <Loader2 className="h-4 w-4 animate-spin" /> : <Power className="h-4 w-4" />}
-                </Button>
+                {stripeReady && (
+                  <Switch
+                    checked={orderingSwitchOn}
+                    onCheckedChange={handleOrderingToggle}
+                    disabled={switching !== null}
+                    aria-label="Commande en ligne"
+                  />
+                )}
               </div>
             </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              {!stripeReady ? (
+                <>
+                  <p>Votre carte est déjà consultable. Activez l'encaissement pour recevoir des commandes payées en ligne.</p>
+                  <Button size="sm" onClick={() => setShowActivationDialog(true)}>
+                    Activer la commande en ligne
+                  </Button>
+                </>
+              ) : canOrder ? (
+                <p>Vos clients peuvent commander et payer en ligne.</p>
+              ) : orderingSwitchOn ? (
+                <p>Commande indisponible : vérifiez votre compte de paiement (ci-dessous) ou votre abonnement.</p>
+              ) : (
+                <p>Commande coupée : vos clients consultent la carte et vous contactent pour commander.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Affichage de la carte, indépendant de la commande */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`h-3 w-3 rounded-full ${storefrontOn ? 'bg-green-500' : 'bg-muted-foreground/40'}`}></div>
+                  <CardTitle className="text-base text-foreground">Affichage de la carte</CardTitle>
+                </div>
+                <Switch
+                  checked={storefrontOn}
+                  onCheckedChange={handleStorefrontToggle}
+                  disabled={switching !== null}
+                  aria-label="Affichage de la carte"
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground">
+              {storefrontOn
+                ? "Votre carte est visible à l'URL d'accès ci-dessus."
+                : 'Carte masquée : le lien affiche « Carte indisponible » et rien ne peut être commandé.'}
+            </CardContent>
           </Card>
 
           <Card>
@@ -871,8 +953,10 @@ export default function ScanNOrder() {
                     })}
                   </div>
                 </>
-              ) : (
+              ) : canOrder ? (
                   <div className="text-xl font-semibold text-green-600">Accepte les commandes</div>
+              ) : (
+                  <div className="text-xl font-semibold text-muted-foreground">Carte seule</div>
               )}
             </CardContent>
           </Card>
@@ -881,15 +965,27 @@ export default function ScanNOrder() {
           <ConfirmDialog
             open={showDisableDialog}
             onOpenChange={setShowDisableDialog}
-            title="Désactiver l'intégration ScanNOrder"
-            description="Êtes-vous sûr de vouloir désactiver ScanNOrder ? Les commandes ne seront plus reçues de cette plateforme."
-            onConfirm={handleDisable}
-            isLoading={disabling}
+            title="Couper la commande en ligne"
+            description="Vos clients ne pourront plus commander ni payer sur ScanNOrder. Votre carte reste visible, avec l'invitation à vous contacter pour commander."
+            onConfirm={() => updateSwitch('ordering', { active: false }, 'Commande en ligne coupée')}
+            isLoading={switching === 'ordering'}
             isDangerous={true}
           />
 
+          <ConfirmDialog
+            open={showHideStorefrontDialog}
+            onOpenChange={setShowHideStorefrontDialog}
+            title="Masquer la carte"
+            description="Le lien et les QR codes ScanNOrder afficheront « Carte indisponible » et plus aucune commande ne sera possible. Vous pourrez la réafficher à tout moment."
+            onConfirm={() => updateSwitch('storefront', { storefront_enabled: false }, 'Carte masquée')}
+            isLoading={switching === 'storefront'}
+            isDangerous={true}
+          />
+
+          {activationDialog}
+
         {/* ═══ Stripe Status Card ═══ */}
-        {scanStatus?.active && <StripeStatusCard active={true} />}
+        {stripeReady && <StripeStatusCard active={true} />}
 
         {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8 mb-8">
