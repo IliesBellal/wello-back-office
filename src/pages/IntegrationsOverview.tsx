@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { integrationsService, type IntegrationStatus } from '@/services/integrationsService';
-import { CheckCircle, AlertCircle, ArrowRight, Euro, ShoppingCart, TrendingUp, Copy, ExternalLink } from 'lucide-react';
+import { CheckCircle, AlertCircle, ArrowRight, Euro, ShoppingCart, TrendingUp, Copy, ExternalLink, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { EstablishmentOperationsModal } from '@/components/integrations/EstablishmentOperationsModal';
 import { useAuth } from '@/contexts/AuthContext';
@@ -159,7 +159,11 @@ const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scann
     return null;
   }
 
-  const isActive = status.active;
+  // Commande en ligne réellement possible (Stripe compris) ; API antérieure
+  // sans le champ : le commutateur faisait foi. La carte, elle, est en ligne
+  // dès la création de l'établissement (storefront_enabled).
+  const isActive = status.online_ordering_enabled ?? status.active;
+  const storefrontOn = status.storefront_enabled !== false;
   // Lien public de la boutique, fourni par GET /integrations/scannorder.
   const accessUrl = status.access_url || '';
 
@@ -191,6 +195,11 @@ const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scann
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Actif
                   </Badge>
+                ) : storefrontOn ? (
+                  <Badge variant="secondary">
+                    <Eye className="h-3 w-3 mr-1" />
+                    Carte seule
+                  </Badge>
                 ) : (
                   <Badge variant="secondary" className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300">
                     <AlertCircle className="h-3 w-3 mr-1" />
@@ -210,8 +219,9 @@ const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scann
         </div>
       </CardHeader>
 
-      {isActive && (
+      {(isActive || (storefrontOn && accessUrl)) && (
         <CardContent>
+          {isActive && (
           <div className="grid grid-cols-3 gap-2 text-sm">
             {/* Revenue */}
             <div className="text-center">
@@ -254,10 +264,11 @@ const ScanNOrderOverview = ({ status, loading, icon, path = '/integrations/scann
               <div className="text-xs text-muted-foreground">Panier moyen</div>
             </div>
           </div>
+          )}
 
           {/* Access URL */}
           {accessUrl && (
-            <div className="mt-4 pt-4 border-t">
+            <div className={isActive ? 'mt-4 pt-4 border-t' : ''}>
               <p className="text-sm text-muted-foreground mb-2">URL d'accès:</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 px-3 py-2 bg-muted rounded text-sm font-mono text-foreground truncate">
