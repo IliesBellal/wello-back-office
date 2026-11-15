@@ -170,6 +170,38 @@ function PillarBody({ w, h }: BodyProps) {
   );
 }
 
+function CashRegisterBody({ w, h }: BodyProps) {
+  const screenH = Math.max(0, h * 0.4);
+  return (
+    <>
+      {/* Comptoir de la caisse */}
+      <Rect x={-w / 2} y={-h / 2} width={w} height={h} fill="#CBD5E1" stroke="#475569" strokeWidth={1.2} cornerRadius={3} />
+      {/* Écran */}
+      <Rect
+        x={-w / 2 + w * 0.15}
+        y={-h / 2 + h * 0.12}
+        width={w * 0.7}
+        height={screenH}
+        fill="#1E293B"
+        stroke="#0F172A"
+        strokeWidth={1}
+        cornerRadius={2}
+      />
+      {/* Touches */}
+      <Rect
+        x={-w / 2 + w * 0.15}
+        y={-h / 2 + h * 0.12 + screenH + h * 0.1}
+        width={w * 0.7}
+        height={Math.max(0, h * 0.28)}
+        fill="#94A3B8"
+        stroke="#475569"
+        strokeWidth={0.8}
+        cornerRadius={1}
+      />
+    </>
+  );
+}
+
 const BODIES: Record<Obstacle['type'], (props: BodyProps) => JSX.Element> = {
   wall: WallBody,
   door: DoorBody,
@@ -177,7 +209,8 @@ const BODIES: Record<Obstacle['type'], (props: BodyProps) => JSX.Element> = {
   stairs: StairsBody,
   plant: PlantBody,
   bar: BarBody,
-  pillar: PillarBody
+  pillar: PillarBody,
+  cash_register: CashRegisterBody
 };
 
 /** Zone cliquable minimale : un mur de 12 unités de large serait sinon presque impossible à saisir. */

@@ -3,6 +3,7 @@ import {
   BrickWall,
   DoorOpen,
   GlassWater,
+  Landmark,
   MoveUpRight,
   Sprout,
   Square,
@@ -18,5 +19,6 @@ export const OBSTACLE_ICONS: Record<ObstacleType, LucideIcon> = {
   stairs: MoveUpRight,
   plant: Sprout,
   bar: GlassWater,
-  pillar: Square
+  pillar: Square,
+  cash_register: Landmark
 };

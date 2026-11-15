@@ -98,6 +98,16 @@ export const OBSTACLE_CATALOG: readonly ObstacleDefinition[] = [
     height: 30,
     snapsToWall: false,
     keepRatio: true
+  },
+  {
+    type: 'cash_register',
+    label: 'Caisse',
+    hint: "Poste d'encaissement",
+    placement: 'place',
+    width: 60,
+    height: 40,
+    snapsToWall: false,
+    keepRatio: false
   }
 ];
 
