@@ -28,6 +28,24 @@ const MAX_LOGO_BYTES = 2 * 1024 * 1024;
 const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 // Même exigence que l'API (PATCH /pos/settings) : une adresse seule, avec un domaine.
 const EMAIL_PATTERN = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
+// Colonne merchant.web_site : varchar(100), mêmes règles que l'API.
+const MAX_WEBSITE_LENGTH = 100;
+
+/** Ajoute https:// si le schéma est omis ; renvoie null si l'URL est invalide. */
+const normalizeWebsite = (raw: string): string | null => {
+  const value = raw.trim();
+  if (!value) return "";
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
+  if (withScheme.length > MAX_WEBSITE_LENGTH) return null;
+  try {
+    const url = new URL(withScheme);
+    const isWeb = url.protocol === "http:" || url.protocol === "https:";
+    return isWeb && url.hostname.includes(".") ? withScheme : null;
+  } catch {
+    return null;
+  }
+};
+
 const nameSiretFields = establishmentInfoFields.filter((field) => field.key === "name" || field.key === "siret");
 const otherInfoFields = establishmentInfoFields.filter((field) => field.key !== "name" && field.key !== "siret");
 
@@ -200,6 +218,16 @@ export const EstablishmentTab = () => {
       return;
     }
 
+    const normalizedWebsite = normalizeWebsite(formData.info.website ?? "");
+    if (normalizedWebsite === null) {
+      toast({
+        title: "Site web invalide",
+        description: `Saisissez une adresse complète (ex. https://www.restaurant.fr), ${MAX_WEBSITE_LENGTH} caractères maximum.`,
+        variant: "destructive"
+      });
+      return;
+    }
+
     const securityDelayError = getSecurityDelayError(formData.security.pos_auto_lock_delay_minutes);
     if (securityDelayError) {
       toast({
@@ -232,6 +260,7 @@ export const EstablishmentTab = () => {
         ...formData.info,
         phone: normalizedPhone,
         email: trimmedEmail,
+        website: normalizedWebsite,
         logo_url: logoUrl
       }
     });

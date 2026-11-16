@@ -170,7 +170,7 @@ export const DEFAULT_CUSTOMER_FORM_REQUIREMENTS: CustomerFormRequirements = {
   email: { dine_in: false, take_away: false, delivery: false },
 };
 
-export type FieldType = 'text' | 'email' | 'tel' | 'number' | 'color' | 'switch' | 'select';
+export type FieldType = 'text' | 'email' | 'url' | 'tel' | 'number' | 'color' | 'switch' | 'select';
 
 export interface FieldConfig {
   key: string;
