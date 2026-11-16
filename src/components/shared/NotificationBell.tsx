@@ -84,11 +84,12 @@ export const NotificationBell = ({ authData }: NotificationBellProps) => {
         const defaultAction =
           notif.type === 'STOCK_RUPTURE'
             ? () => { window.location.href = '/stocks'; }
-            : () => { window.location.href = '/settings?tab=account'; };
+            : () => { window.location.href = '/settings/profile'; };
 
         return {
           ...notif,
-          onAction: notif.actionLabel ? defaultAction : undefined,
+          // Les vérifications email/SMS ouvrent toujours le profil, même sans libellé d'action.
+          onAction: notif.actionLabel || notif.type !== 'STOCK_RUPTURE' ? defaultAction : undefined,
         };
       }),
     [authData, notificationsData]
@@ -145,8 +146,18 @@ export const NotificationBell = ({ authData }: NotificationBellProps) => {
                 return (
                   <div
                     key={notif.id}
+                    role={notif.onAction ? 'button' : undefined}
+                    tabIndex={notif.onAction ? 0 : undefined}
+                    onClick={notif.onAction}
+                    onKeyDown={(e) => {
+                      if (notif.onAction && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        notif.onAction();
+                      }
+                    }}
                     className={cn(
                       'flex items-start gap-3 p-3 rounded-xl border transition-colors',
+                      notif.onAction && 'cursor-pointer hover:brightness-95',
                       styles.bg
                     )}
                   >
@@ -164,16 +175,15 @@ export const NotificationBell = ({ authData }: NotificationBellProps) => {
                         {notif.description}
                       </p>
                       {notif.actionLabel && notif.onAction && (
-                        <button
-                          onClick={notif.onAction}
+                        <span
                           className={cn(
-                            'inline-flex items-center gap-0.5 mt-1.5 text-xs font-semibold hover:underline',
+                            'inline-flex items-center gap-0.5 mt-1.5 text-xs font-semibold',
                             styles.icon
                           )}
                         >
                           {notif.actionLabel}
                           <ChevronRight className="h-3 w-3" />
-                        </button>
+                        </span>
                       )}
                     </div>
                   </div>
