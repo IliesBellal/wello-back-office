@@ -26,6 +26,7 @@ import { useState } from 'react';
 import { NotificationBell } from '@/components/shared/NotificationBell';
 import { CreateEstablishmentDialog } from '@/components/dashboard/CreateEstablishmentDialog';
 import { checkPermission } from '@/lib/permissions';
+import { getGreeting } from '@/lib/greeting';
 
 export const Header = () => {
   const { authData, setAuthData, logout } = useAuth();
@@ -104,7 +105,7 @@ export const Header = () => {
       {/* Left Section - Greeting */}
       <div className="flex-shrink-0 min-w-max">
         <h2 className="text-lg font-semibold text-foreground">
-          Bonjour, {authData.user.first_name}
+          {getGreeting()}, {authData.user.first_name}
         </h2>
         <p className="text-sm text-muted-foreground">
           {new Date().toLocaleDateString('fr-FR', { 

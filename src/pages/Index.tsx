@@ -8,6 +8,7 @@ import { QuickProductSheet } from '@/components/dashboard/QuickProductSheet';
 import { MenuPhotoImportBanner } from '@/components/dashboard/MenuPhotoImportBanner';
 import { isApiHttpError } from '@/services/apiClient';
 import { getDashboardSummary } from '@/services/dashboardService';
+import { getGreeting } from '@/lib/greeting';
 
 const Index = () => {
   const [productSheetOpen, setProductSheetOpen] = useState(false);
@@ -24,13 +25,6 @@ const Index = () => {
     retry: false,
   });
   const isForbidden = isApiHttpError(error) && error.status === 403;
-
-  const getGreeting = () => {
-    const h = new Date().getHours();
-    if (h < 12) return 'Bonjour';
-    if (h < 18) return 'Bon après-midi';
-    return 'Bonsoir';
-  };
 
   const today = new Date().toLocaleDateString('fr-FR', {
     weekday: 'long',
