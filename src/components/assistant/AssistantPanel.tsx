@@ -17,6 +17,7 @@ import { CHANNEL_RECORDS } from '@/lib/assistant/channels';
 import { AssistantTracker, detectDevice, detectPlatform } from '@/lib/assistant/tracking';
 import type { EntityRecord } from '@/lib/assistant/types';
 import { checkPermission } from '@/lib/permissions';
+import { isIntentAvailable } from '@/lib/assistant/availability';
 import { cn } from '@/lib/utils';
 import { AssistantMessage, AssistantOrb, TypingIndicator, UserBubble } from './AssistantBlocks';
 import { AssistantComposer, type ComposerHandle } from './AssistantComposer';
@@ -83,7 +84,24 @@ export default function AssistantPanel({ open, onClose, onRedirect }: Props) {
     () => (authData?.access?.admin ? '*' : new Set<string>(authData?.permissions ?? [])),
     [authData],
   );
-  const index = useMemo(() => prepareModel(withNavigation(model, authData), SEED_BLACKLIST), [model, authData]);
+  // Modules souscrits par l'établissement (capabilities.modules) : une fonction
+  // d'un module absent (planning, réservations…) n'est ni proposée ni comprise.
+  const modules = useMemo<Set<string>>(
+    () =>
+      new Set(
+        Object.entries(authData?.capabilities?.modules ?? {})
+          .filter(([, enabled]) => enabled)
+          .map(([name]) => name),
+      ),
+    [authData],
+  );
+  // Seules les intentions disponibles (droit + module) entrent dans l'index : les
+  // actions rapides, les exemples et « que sais-tu faire » en héritent.
+  const index = useMemo(() => {
+    const full = withNavigation(model, authData);
+    const available = { ...full, intents: full.intents.filter((i) => isIntentAvailable(i, { permissions, modules })) };
+    return prepareModel(available, SEED_BLACKLIST);
+  }, [model, authData, permissions, modules]);
   const [records, setRecords] = useState<EntityRecord[]>(() => cachedProducts());
   // Produits et équipiers de l'établissement + canaux de vente (« CA borne »).
   const catalog = useMemo(() => buildCatalog(index, [...records, ...CHANNEL_RECORDS]), [index, records]);
@@ -116,7 +134,7 @@ export default function AssistantPanel({ open, onClose, onRedirect }: Props) {
     catalog,
     products,
     employees,
-    baseContext: { permissions, path: location.pathname },
+    baseContext: { permissions, modules, path: location.pathname },
     tracker,
     actions: {
       merchantId: authData?.session.merchant_id ? String(authData.session.merchant_id) : undefined,

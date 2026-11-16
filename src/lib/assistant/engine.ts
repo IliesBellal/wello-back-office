@@ -11,6 +11,7 @@
  *      aux fautes), couverture de la demande, slots remplis ou manquants ;
  *   4. décision : compris / à préciser (ambiguïté) / repli avec suggestions.
  */
+import { isIntentAvailable } from './availability';
 import { currentDaypart, defaultDate, findDates, resolveDate, type DateMention } from './dates';
 import { EntityCatalog, findQuantities } from './entities';
 import { MIN_TOKEN_SIMILARITY, normalize, tokenize, tokenSimilarity } from './normalize';
@@ -142,9 +143,7 @@ function analyse(index: EngineIndex, normalized: string, catalog: EntityCatalog 
 
 function isApplicable(intent: ModelIntent, model: AssistantModel, ctx: UnderstandContext): boolean {
   if (!intent.surfaces.includes(model.surface)) return false;
-  if (intent.permission && ctx.permissions !== '*' && !ctx.permissions.has(intent.permission)) return false;
-  if (intent.module && ctx.modules && !ctx.modules.has(intent.module)) return false;
-  return true;
+  return isIntentAvailable(intent, ctx);
 }
 
 function termSimilarity(input: string, termToken: string, stopwords: Set<string>): number {
