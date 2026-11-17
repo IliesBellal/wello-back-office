@@ -85,6 +85,17 @@ export interface OrderPayment {
   operation_type?: string;
 }
 
+/**
+ * Moyen de paiement annoncé par le client (« je paierai en espèces à la
+ * livraison »). Une intention, pas un paiement : le statut payé se déduit de
+ * `payments`. `tender_amount` : espèces seulement, montant que le client
+ * compte donner (centimes).
+ */
+export interface ExpectedPayment {
+  mop: string;
+  tender_amount: number | null;
+}
+
 export interface OrderCustomer {
   customer_id: string;
   customer_code: string | null;
@@ -146,6 +157,8 @@ export interface Order {
   customer: OrderCustomer | null;
   comments: unknown[];
   payments: OrderPayment[];
+  /** Paiement annoncé à l'encaissement, null / absent si rien n'a été annoncé. */
+  expected_payment?: ExpectedPayment | null;
   responsible: unknown;
   location: unknown[];
   products: OrderProduct[];
