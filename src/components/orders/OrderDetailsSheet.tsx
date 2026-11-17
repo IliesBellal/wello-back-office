@@ -11,6 +11,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { UpsellBadge } from "@/components/orders/UpsellBadge";
+import { ExpectedPaymentNotice } from "@/components/orders/ExpectedPayment";
 import { Button } from "@/components/ui/button";
 import { Phone, Calendar, MapPin, X } from "lucide-react";
 import { ordersService, Order } from "@/services/ordersService";
@@ -264,6 +265,7 @@ export const OrderDetailsSheet = () => {
                 {/* Payment Section */}
                 <div className="bg-card rounded-xl p-3 md:p-4 shadow-soft space-y-3">
                   <h3 className="font-semibold text-foreground">Paiements</h3>
+                  <ExpectedPaymentNotice order={order} />
                   <div className="space-y-2">
                     {order.payments.map((payment, idx) => {
                       const isCancelled = payment.enabled === 0;

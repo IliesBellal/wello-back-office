@@ -4,6 +4,7 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ExpectedPaymentBadge } from "@/components/orders/ExpectedPayment";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ordersService, Order } from "@/services/ordersService";
@@ -179,6 +180,7 @@ export default function Orders() {
                 <Badge className={`${sourceConfig.className} text-xs`}>
                   {sourceConfig.label}
                 </Badge>
+                <ExpectedPaymentBadge order={order} />
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {formatDateShort(order.creation_date)}
@@ -226,6 +228,7 @@ export default function Orders() {
                   {getOrderTypeLabel(order.order_type)}
                 </Badge>
               )}
+              <ExpectedPaymentBadge order={order} />
             </div>
             <p className="text-sm text-muted-foreground">
               {formatDate(order.creation_date)}

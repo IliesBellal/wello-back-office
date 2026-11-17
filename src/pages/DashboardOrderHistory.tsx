@@ -22,6 +22,7 @@ import { analyticsService, type OrderHistoryResponse } from '@/services/analytic
 import { useOrderHistorySearchParams } from '@/hooks/useOrderHistorySearchParams';
 import { ordersService, type Order } from '@/services/ordersService';
 import { UpsellBadge } from '@/components/orders/UpsellBadge';
+import { ExpectedPaymentNotice } from '@/components/orders/ExpectedPayment';
 import {
   ORDER_HISTORY_BRAND_LABELS,
   ORDER_HISTORY_TYPE_LABELS,
@@ -493,6 +494,7 @@ export const OrderDetailModal = ({ isOpen, onClose, orderId, zIndex = 50 }: Orde
           <div className="border-t border-border pt-6">
             <h3 className="font-semibold mb-3">Paiements</h3>
             <div className="space-y-4">
+              <ExpectedPaymentNotice order={orderDetail} />
               {orderDetail.payments.map((payment) => (
                 <div key={payment.payment_id} className="border border-border rounded p-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
