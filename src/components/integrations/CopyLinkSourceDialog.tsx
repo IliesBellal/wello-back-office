@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { SourceIcon } from '@/components/integrations/SourceIcon';
 import { SOURCE_NONE, SOURCE_OTHER, SOURCE_PRESETS, normalizeSource, withSource } from '@/lib/sourceLink';
 
 interface CopyLinkSourceDialogProps {
@@ -65,6 +66,7 @@ export function CopyLinkSourceDialog({ open, onOpenChange, url, onCopy }: CopyLi
               className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 font-normal hover:bg-muted/50"
             >
               <RadioGroupItem id={`src-${preset.id}`} value={preset.id} />
+              <SourceIcon id={preset.id} />
               {preset.label}
             </Label>
           ))}
