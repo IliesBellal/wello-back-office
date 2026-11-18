@@ -71,7 +71,8 @@
       "Bash(python \"C:/Users/Ilies/AppData/Local/Temp/claude/f65db5e958a229e2/7152edbd-36eb-417a-b4a5-0bbdbeec0daf/scratchpad/bo_scannorder_cards.py\" src/pages/ScanNOrder.tsx)",
       "Bash(python \"C:/Users/Ilies/AppData/Local/Temp/claude/f65db5e958a229e2/7152edbd-36eb-417a-b4a5-0bbdbeec0daf/scratchpad/bo_overview.py\" src/pages/IntegrationsOverview.tsx)",
       "Bash(awk '/r.Route\\\\\\(\"\\\\/scannorder\"/,/^\\\\t}\\\\\\)/' cmd/api/routes.go)",
-      "Bash(gofmt -l internal/modules/pos internal/models)"
+      "Bash(gofmt -l internal/modules/pos internal/models)",
+      "Bash(git -C ../wello-back-office-import-photon log -1)"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",
