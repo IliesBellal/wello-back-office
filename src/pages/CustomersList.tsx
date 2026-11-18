@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { usePermissions } from '@/hooks/usePermissions';
 import {
   Customer,
+  CustomerAccountFilter,
   CustomerListMetadata,
   CustomerSortDirection,
   CustomerSortField,
@@ -22,6 +23,8 @@ import {
   searchCustomers,
 } from '@/services/customersService';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AccountBalanceBadge } from '@/components/customers/CustomerAccountPanel';
 import CustomerDetailsSheet from '@/components/customers/CustomerDetailsSheet';
 import { CustomerCreateSheet } from '@/components/customers/CustomerCreateSheet';
 import { CustomerBlockDialog } from '@/components/customers/CustomerBlockDialog';
@@ -198,11 +201,17 @@ const CustomersList = () => {
     }
   };
 
+  // Filtre du compte client (avance / ardoise) ; appliqué à la liste, pas à la recherche.
+  const [accountFilter, setAccountFilter] = useState<CustomerAccountFilter | 'all'>('all');
+  const accountFilterRef = useRef(accountFilter);
+  accountFilterRef.current = accountFilter;
+
   const loadCustomers = async (searchVal?: string, sortOverride?: SortState, pageOverride?: number) => {
     setLoading(true);
     try {
       const term = searchVal !== undefined ? searchVal : searchTerm;
-      const apiSort = toApiSort(sortOverride ?? sort);
+      const account = accountFilterRef.current === 'all' ? undefined : accountFilterRef.current;
+      const apiSort = { ...(toApiSort(sortOverride ?? sort) ?? {}), account };
       const targetPage = pageOverride ?? page;
       
       let results: Customer[];
@@ -388,14 +397,33 @@ const CustomersList = () => {
       >
         <div className="space-y-8">
         {/* Search */}
-        <div className="relative w-full sm:max-w-xs">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Rechercher un client..."
-            value={searchTerm}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10"
-          />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher un client..."
+              value={searchTerm}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select
+            value={accountFilter}
+            onValueChange={(value) => {
+              accountFilterRef.current = value as CustomerAccountFilter | 'all';
+              setAccountFilter(value as CustomerAccountFilter | 'all');
+              void loadCustomers(undefined, undefined, 1);
+            }}
+          >
+            <SelectTrigger className="w-full sm:w-48" aria-label="Filtrer par compte client">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les clients</SelectItem>
+              <SelectItem value="debt">Avec ardoise</SelectItem>
+              <SelectItem value="credit">Avec avance</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Customers Table */}
@@ -432,6 +460,7 @@ const CustomersList = () => {
                     <TableHead className="text-right cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="customer_total_orders" label="Nombre de commandes" />
                     </TableHead>
+                    <TableHead className="text-right font-semibold">Compte</TableHead>
                     <TableHead className="cursor-pointer hover:bg-muted font-semibold">
                       <SortButton field="created_at" label="Client depuis" />
                     </TableHead>
@@ -488,6 +517,9 @@ const CustomersList = () => {
                       </TableCell>
                       <TableCell className="text-right text-sm font-semibold tabular-nums">
                         {customer.customer_total_orders || 0}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {customer.account_balance ? <AccountBalanceBadge balance={customer.account_balance} /> : '-'}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {formatCustomerDate(customer.created_at)}

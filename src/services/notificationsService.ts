@@ -1,6 +1,6 @@
 import { apiClient, logAPI, withMock, WelloApiResponse } from '@/services/apiClient';
 
-export type NotificationType = 'STOCK_RUPTURE' | 'EMAIL_UNVERIFIED' | 'PHONE_UNVERIFIED';
+export type NotificationType = 'STOCK_RUPTURE' | 'EMAIL_UNVERIFIED' | 'PHONE_UNVERIFIED' | 'CUSTOMER_ACCOUNT_LIMIT';
 export type NotificationSeverity = 'warning' | 'info' | 'danger';
 
 export interface UserNotification {

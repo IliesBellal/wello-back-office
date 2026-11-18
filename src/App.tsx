@@ -35,6 +35,7 @@ import VAT from './pages/TVA';
 import Customers from './pages/Customers';
 import CustomersList from './pages/CustomersList';
 import LoyaltyPrograms from './pages/LoyaltyPrograms';
+import CustomerAccounts from './pages/CustomerAccounts';
 import Stocks from './pages/Stocks';
 import PriceGrid from './pages/PriceGrid';
 import AttributesPage from './pages/Attributes';
@@ -112,6 +113,7 @@ const App = () => (
               <Route path="/reservations/settings" element={<ProtectedRoute requiredModule="bookings" accessCheck={(authData) => checkPermission(authData, 'bookings.manage')}><ReservationsSettingsPage /></ProtectedRoute>} />
               <Route path="/customers/list" element={<ProtectedRoute><CustomersList /></ProtectedRoute>} />
               <Route path="/customers/loyalty-programs" element={<ProtectedRoute><LoyaltyPrograms /></ProtectedRoute>} />
+              <Route path="/customers/accounts" element={<ProtectedRoute><CustomerAccounts /></ProtectedRoute>} />
               
               {/* Stocks */}
               <Route path="/stocks" element={<ProtectedRoute requiredModule="stock"><Stocks /></ProtectedRoute>} />

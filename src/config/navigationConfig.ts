@@ -189,6 +189,12 @@ export const navigationConfig: NavigationItem[] = [
         icon: Gift,
         path: '/customers/loyalty-programs',
       },
+      {
+        id: 'customer-accounts',
+        label: 'Comptes clients',
+        icon: Wallet,
+        path: '/customers/accounts',
+      },
     ],
   },
   // ═══ TEAM ═══
