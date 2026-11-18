@@ -63,7 +63,10 @@ export const DashboardAnalysis = () => {
 const DashboardAnalysisContent = () => {
   const isMobile = useIsMobile();
   const { authData } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabType>('ca');
+  // ?tab=scannorder ouvre directement l'onglet (lien depuis la copie de l'URL ScanNOrder)
+  const [activeTab, setActiveTab] = useState<TabType>(() =>
+    new URLSearchParams(window.location.search).get('tab') === 'scannorder' ? 'scannorder' : 'ca',
+  );
   const [dateRange, setDateRange] = useState<DateRange>({
     from: subDays(new Date(), 30),
     to: new Date(),

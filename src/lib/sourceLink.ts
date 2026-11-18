@@ -1,4 +1,4 @@
-// Source ajoutée au lien ScanNOrder (`?src=`). ScanNOrder n'accepte que
+// Source ajoutée au lien ScanNOrder (`?utm_source=`). ScanNOrder n'accepte que
 // ^[a-z0-9_-]{1,32}$ (wello-resto-scannorder, lib/tracking/visit.ts) : toute
 // autre valeur est ignorée, d'où la normalisation de la saisie libre.
 
@@ -29,12 +29,12 @@ export function normalizeSource(input: string): string {
     .replace(/_+$/g, '');
 }
 
-/** Lien avec `src` (remplace un `src` existant) ; lien inchangé si la source est vide. */
+/** Lien avec `utm_source` (remplace une valeur existante) ; lien inchangé si la source est vide. */
 export function withSource(url: string, source: string): string {
   if (!source) return url;
   try {
     const u = new URL(url);
-    u.searchParams.set('src', source);
+    u.searchParams.set('utm_source', source);
     return u.toString();
   } catch {
     return url;
