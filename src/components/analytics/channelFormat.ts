@@ -32,6 +32,12 @@ const SOURCE_LABELS: Record<string, string> = {
   search: 'Moteur de recherche',
   social: 'Réseaux sociaux',
   referral: 'Autre site',
+  google_maps: 'Fiche Google',
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  tiktok: 'TikTok',
+  flyer: 'Flyer',
+  site: 'Site web',
   unknown: 'Origine inconnue',
 };
 
