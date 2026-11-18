@@ -8,9 +8,9 @@ describe('sourceLink', () => {
     expect(normalizeSource('a'.repeat(40))).toHaveLength(32);
   });
 
-  it('withSource : ajoute ou remplace src, garde les autres paramètres', () => {
-    expect(withSource('https://x.fr/resto', 'flyer')).toBe('https://x.fr/resto?src=flyer');
-    expect(withSource('https://x.fr/resto?a=1&src=old', 'flyer')).toBe('https://x.fr/resto?a=1&src=flyer');
+  it('withSource : ajoute ou remplace utm_source, garde les autres paramètres', () => {
+    expect(withSource('https://x.fr/resto', 'flyer')).toBe('https://x.fr/resto?utm_source=flyer');
+    expect(withSource('https://x.fr/resto?a=1&utm_source=old', 'flyer')).toBe('https://x.fr/resto?a=1&utm_source=flyer');
     expect(withSource('https://x.fr/resto', '')).toBe('https://x.fr/resto');
   });
 });

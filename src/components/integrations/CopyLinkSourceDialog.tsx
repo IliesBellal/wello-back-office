@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -42,7 +43,17 @@ export function CopyLinkSourceDialog({ open, onOpenChange, url, onCopy }: CopyLi
         <DialogHeader>
           <DialogTitle>Copier le lien</DialogTitle>
           <DialogDescription>
-            Repérez d'où viennent vos clients : la source apparaît dans les statistiques.
+            Repérez d'où viennent vos clients : la source apparaît dans les{' '}
+            <a
+              href="/dashboard/analysis?tab=scannorder"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-primary underline underline-offset-2"
+            >
+              statistiques
+              <ExternalLink className="h-3 w-3" aria-label="s'ouvre dans un nouvel onglet" />
+            </a>
+            .
           </DialogDescription>
         </DialogHeader>
 
