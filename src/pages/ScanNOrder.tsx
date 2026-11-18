@@ -38,6 +38,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { getMerchantCurrency } from '@/lib/money';
+import { CopyLinkSourceDialog } from '@/components/integrations/CopyLinkSourceDialog';
 
 // ════════════════════════════════════════════════════════════════════════════
 // ImageUploadField Component
@@ -183,6 +184,7 @@ export default function ScanNOrder() {
   // Lien public de la boutique, fourni par GET /integrations/scannorder.
   // `null` tant que le marchand n'a pas de QR code principal.
   const accessUrl = scanStatus?.access_url || '';
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
 
   const stripeReady = hasStripeAccount(scanStatus);
   const orderingSwitchOn = !!scanStatus?.active;
@@ -271,9 +273,8 @@ export default function ScanNOrder() {
     }
   };
 
-  const copyToClipboard = () => {
-    if (!accessUrl) return;
-    navigator.clipboard.writeText(accessUrl);
+  const copyToClipboard = (link: string) => {
+    navigator.clipboard.writeText(link);
     toast({
       title: 'Copié !',
       description: 'L\'URL d\'accès a été copiée dans le presse-papiers.',
@@ -843,13 +844,19 @@ export default function ScanNOrder() {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={copyToClipboard}
+                    onClick={() => setCopyDialogOpen(true)}
                     disabled={!accessUrl}
                     title="Copier l'URL"
                     className="flex-shrink-0"
                   >
                     <Copy className="h-4 w-4" />
                   </Button>
+                  <CopyLinkSourceDialog
+                    open={copyDialogOpen}
+                    onOpenChange={setCopyDialogOpen}
+                    url={accessUrl}
+                    onCopy={copyToClipboard}
+                  />
                   <Button
                     variant="ghost"
                     size="icon"
