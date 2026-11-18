@@ -1,6 +1,7 @@
 import { useState, useEffect, type UIEvent } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CustomerAccountPanel } from "@/components/customers/CustomerAccountPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -283,10 +284,11 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick, canM
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex min-h-0 flex-1 flex-col px-6 pb-6">
-          <TabsList className="mt-4 grid w-full grid-cols-3 shrink-0">
+          <TabsList className="mt-4 grid w-full grid-cols-4 shrink-0">
             <TabsTrigger value="general">Général</TabsTrigger>
             <TabsTrigger value="orders">Commandes</TabsTrigger>
             <TabsTrigger value="loyalty">Fidélité</TabsTrigger>
+            <TabsTrigger value="account">Compte</TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="mt-4 flex-1 min-h-0 overflow-y-auto space-y-4">
@@ -612,6 +614,11 @@ const CustomerDetailsSheet = ({ customer, open, onOpenChange, onOrderClick, canM
                 </div>
               </>
             )}
+          </TabsContent>
+
+          {/* Compte client (avance et ardoise) : chargé à l'ouverture de l'onglet. */}
+          <TabsContent value="account" className="mt-4 flex-1 min-h-0 overflow-y-auto">
+            {activeTab === "account" && <CustomerAccountPanel customerId={customer.id} />}
           </TabsContent>
         </Tabs>
 

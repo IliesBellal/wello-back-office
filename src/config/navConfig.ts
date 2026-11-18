@@ -250,6 +250,12 @@ export const NAV_ITEMS: NavItem[] = [
         icon: Gift,
         href: '/customers/loyalty-programs',
       },
+      {
+        id: 'customer-accounts',
+        title: 'Comptes clients',
+        icon: Wallet,
+        href: '/customers/accounts',
+      },
     ],
   },
 

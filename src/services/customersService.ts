@@ -35,6 +35,8 @@ export interface Customer {
   blocked_at?: string;
   blocked_reason_id?: string;
   blocked_comment?: string;
+  /** Solde du compte client (centimes ; > 0 avance, < 0 ardoise). */
+  account_balance?: number;
 }
 
 export type CustomerSortField =
@@ -48,9 +50,13 @@ export type CustomerSortField =
 
 export type CustomerSortDirection = "asc" | "desc";
 
+/** Filtre du compte client : avec ardoise (debt) ou avec avance (credit). */
+export type CustomerAccountFilter = "debt" | "credit";
+
 interface CustomerSortOptions {
   sortField?: CustomerSortField;
   sortDir?: CustomerSortDirection;
+  account?: CustomerAccountFilter;
 }
 
 export interface CustomerListMetadata {
@@ -185,6 +191,7 @@ export interface RawApiCustomer {
   blocked_at?: string | null;
   blocked_reason_id?: string | null;
   blocked_comment?: string | null;
+  account_balance?: number;
 }
 
 /** Response envelope from GET /customers/list and /customer/search */
@@ -321,6 +328,7 @@ const normalizeCustomer = (raw: RawApiCustomer): Customer => ({
   blocked_at: raw.blocked_at ?? undefined,
   blocked_reason_id: raw.blocked_reason_id ?? undefined,
   blocked_comment: raw.blocked_comment ?? undefined,
+  account_balance: raw.account_balance ?? 0,
 });
 
 const toOrderDateIsoString = (value: string | number | null | undefined): string => {
@@ -612,6 +620,9 @@ const buildCustomerQuery = (
   if (options?.sortField && options?.sortDir) {
     query.set("sort_field", options.sortField);
     query.set("sort_dir", options.sortDir);
+  }
+  if (options?.account) {
+    query.set("account", options.account);
   }
 
   return query.toString();

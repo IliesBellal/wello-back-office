@@ -23,6 +23,9 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CURRENCY: 'Devise étrangère',
   UBER_EATS: 'Uber Eats',
   DELIVEROO: 'Deliveroo',
+  ACCOUNT: 'Compte client',
+  CHEQUE: 'Chèque',
+  TRANSFER: 'Virement',
   other: 'Autre',
 };
 

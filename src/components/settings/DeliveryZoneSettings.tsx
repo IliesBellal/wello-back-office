@@ -40,14 +40,19 @@ const parseRanges = (csv: string): RangeBand[] => {
 
 const serializeRanges = (bands: RangeBand[]): string => bands.map((band) => `${band.min}-${band.max}`).join(",");
 
-const RangeBandsEditor = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
-  const bands = useMemo(() => parseRanges(value), [value]);
+// Les plages sont jointives : la borne max d'une plage est la borne min de la
+// suivante, et la première commence à 0 : aucune borne min n'est saisie.
+const chainBands = (bands: RangeBand[]): RangeBand[] =>
+  bands.map((band, i) => ({ ...band, min: i === 0 ? 0 : bands[i - 1].max }));
 
-  const updateBands = (next: RangeBand[]) => onChange(serializeRanges(next));
+const RangeBandsEditor = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => {
+  const bands = useMemo(() => chainBands(parseRanges(value)), [value]);
+
+  const updateBands = (next: RangeBand[]) => onChange(serializeRanges(chainBands(next)));
 
   const handleAdd = () => {
     const last = bands[bands.length - 1];
-    const nextMin = last ? last.max : 0;
+    const nextMin = last ? last.max : 0; // recalé par chainBands
     updateBands([...bands, { min: nextMin, max: nextMin + 1 }]);
   };
 
@@ -55,9 +60,9 @@ const RangeBandsEditor = ({ value, onChange }: { value: string; onChange: (value
     updateBands(bands.filter((_, i) => i !== index));
   };
 
-  const handleFieldChange = (index: number, field: "min" | "max", raw: string) => {
+  const handleMaxChange = (index: number, raw: string) => {
     const numeric = Number(raw);
-    updateBands(bands.map((band, i) => (i === index ? { ...band, [field]: Number.isFinite(numeric) ? numeric : 0 } : band)));
+    updateBands(bands.map((band, i) => (i === index ? { ...band, max: Number.isFinite(numeric) ? numeric : 0 } : band)));
   };
 
   return (
@@ -72,7 +77,8 @@ const RangeBandsEditor = ({ value, onChange }: { value: string; onChange: (value
             min={0}
             className="w-24"
             value={band.min}
-            onChange={(e) => handleFieldChange(index, "min", e.target.value)}
+            disabled
+            title={index > 0 ? "Égale à la borne supérieure de la plage précédente" : "La première plage commence à 0 km"}
           />
           <span className="text-sm text-muted-foreground">à</span>
           <Input
@@ -80,7 +86,7 @@ const RangeBandsEditor = ({ value, onChange }: { value: string; onChange: (value
             min={0}
             className="w-24"
             value={band.max}
-            onChange={(e) => handleFieldChange(index, "max", e.target.value)}
+            onChange={(e) => handleMaxChange(index, e.target.value)}
           />
           <span className="text-sm text-muted-foreground">km</span>
           <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleRemove(index)}>

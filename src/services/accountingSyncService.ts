@@ -233,6 +233,13 @@ export const PAYMENT_MOP_OPTIONS: ReadonlyArray<{ key: string; label: string }> 
   { key: 'KIOSK', label: 'Borne de commande' },
   { key: 'UBER_EATS', label: 'Uber Eats' },
   { key: 'DELIVEROO', label: 'Deliveroo' },
+  { key: 'CHEQUE', label: 'Chèque' },
+  { key: 'TRANSFER', label: 'Virement' },
+  // Compte client (avance et ardoise) : compte des soldes clients (4191
+  // avances, 411 ardoises) et charge des abandons de créance (654). Sans eux,
+  // le compte d'écart.
+  { key: 'ACCOUNT', label: 'Compte client (avances / ardoises)' },
+  { key: 'WRITE_OFF', label: 'Abandons de créance clients' },
 ];
 
 const ACCOUNT_NUMBER = /^[0-9]{1,20}$/;

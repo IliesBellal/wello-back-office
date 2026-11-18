@@ -16,7 +16,7 @@
  *    authData.phone_verified — à ajouter dans AuthData type quand disponibles)
  */
 
-import { Bell, MailWarning, Phone, AlertTriangle, CheckCircle2, ChevronRight } from 'lucide-react';
+import { Bell, MailWarning, Phone, AlertTriangle, CheckCircle2, ChevronRight, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,7 @@ const NOTIF_ICONS: Record<UserNotification['type'], typeof Bell> = {
   STOCK_RUPTURE:    AlertTriangle,
   EMAIL_UNVERIFIED: MailWarning,
   PHONE_UNVERIFIED: Phone,
+  CUSTOMER_ACCOUNT_LIMIT: Wallet,
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -84,7 +85,9 @@ export const NotificationBell = ({ authData }: NotificationBellProps) => {
         const defaultAction =
           notif.type === 'STOCK_RUPTURE'
             ? () => { window.location.href = '/stocks'; }
-            : () => { window.location.href = '/settings/profile'; };
+            : notif.type === 'CUSTOMER_ACCOUNT_LIMIT'
+              ? () => { window.location.href = '/customers/accounts'; }
+              : () => { window.location.href = '/settings/profile'; };
 
         return {
           ...notif,
