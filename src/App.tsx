@@ -71,6 +71,7 @@ import CdsDisplaysPage from './pages/cds/CdsDisplaysPage';
 import CdsSettingsPage from './pages/cds/CdsSettingsPage';
 import NotImplementedPage from './pages/NotImplementedPage';
 import NotFound from './pages/NotFound';
+import NavigateTo from './pages/NavigateTo';
 
 const queryClient = new QueryClient();
 
@@ -94,6 +95,8 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPassword />} />
               {/* Public: pre-account self-onboarding tunnel (LOT A Semaine 3, Chantier 14) — no session exists yet. */}
               <Route path="/creer-mon-compte" element={<CreerMonCompte />} />
+              {/* Public: QR code of delivery tickets — the driver picks a GPS app. No API call (see pages/NavigateTo.tsx). */}
+              <Route path="/nav" element={<NavigateTo />} />
               {/* Protected: forced on first POS access for a Google account with no password yet — see ProtectedRoute's own needsPasswordSet check. */}
               <Route path="/set-password" element={<ProtectedRoute><SetPassword /></ProtectedRoute>} />
               <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
