@@ -37,9 +37,36 @@ export interface ScanNOrderSeoSettings {
   /** Suggestion par IA ouverte sur cet environnement. */
   suggest_available: boolean;
   updated_at: string | null;
+  /** Fiche Google de l'établissement (chaînes vides si non renseignée). */
+  google: GoogleProfile;
+  /** Recherche de la fiche par l'API Google disponible ; sinon saisie seule. */
+  google_search_available: boolean;
+  /** Demande d'avis Google par e-mail après chaque commande ScanNOrder. */
+  review_request_enabled: boolean;
+  review_requests_sent_30d: number;
 }
 
-export type ScanNOrderSeoUpdate = Partial<Pick<ScanNOrderSeoSettings, 'title' | 'description' | 'cuisine_types' | 'links'>>;
+export interface GoogleProfile {
+  place_id: string;
+  maps_url: string;
+  review_url: string;
+}
+
+export interface GoogleCandidate extends GoogleProfile {
+  name: string;
+  address: string;
+}
+
+export interface ScanNOrderSeoUpdate {
+  title?: string;
+  description?: string;
+  cuisine_types?: string[];
+  links?: string[];
+  google_place_id?: string;
+  google_maps_url?: string;
+  google_review_url?: string;
+  review_request_enabled?: boolean;
+}
 
 export interface ScanNOrderSeoSuggestion {
   description: string;
@@ -61,6 +88,18 @@ export const scannorderSeoService = {
     const response = await apiClient.post<Envelope<ScanNOrderSeoSuggestion>>(`${ENDPOINT}/suggest`, undefined, OWN_ERRORS);
     return response.data;
   },
+
+  /** Fiches Google correspondant au nom et à l'adresse de l'établissement. */
+  async searchGoogle(): Promise<GoogleCandidate[]> {
+    const response = await apiClient.post<Envelope<{ candidates: GoogleCandidate[] }>>(`${ENDPOINT}/google-search`, undefined, OWN_ERRORS);
+    return response.data.candidates ?? [];
+  },
+
+  /** Demande d'avis de test, envoyée à l'utilisateur connecté. */
+  async sendReviewTest(): Promise<{ sent_to: string }> {
+    const response = await apiClient.post<Envelope<{ sent_to: string }>>(`${ENDPOINT}/review-request/test`, undefined, OWN_ERRORS);
+    return response.data;
+  },
 };
 
 const FIELD_MESSAGES: Record<string, string> = {
@@ -70,18 +109,27 @@ const FIELD_MESSAGES: Record<string, string> = {
   'cuisine_types:unknown_cuisine': 'Type de cuisine inconnu.',
   'links:too_many': 'Trop de liens.',
   'links:invalid_link': "Ce lien n'est pas une adresse web valide",
+  'google_maps_url:invalid_google_link': "Le lien de la fiche doit être un lien Google (google.com, g.page, maps.app.goo.gl)",
+  'google_review_url:invalid_google_link': "Le lien d'avis doit être un lien Google (g.page, search.google.com…)",
+  'google_place_id:invalid': 'Identifiant de fiche Google invalide.',
+  'review_request_enabled:missing_review_url': "Renseignez d'abord le lien pour laisser un avis.",
 };
 
 const SUGGEST_MESSAGES: Record<string, string> = {
   seo_suggest_disabled: "La suggestion automatique n'est pas disponible pour le moment.",
   menu_too_small: 'Votre carte ScanNOrder compte trop peu de produits visibles pour proposer une description.',
   seo_suggest_failed: "La suggestion n'a pas abouti. Réessayez dans un instant.",
+  google_search_unavailable: 'La recherche Google est indisponible : collez les liens à la main.',
+  missing_review_url: "Enregistrez d'abord le lien pour laisser un avis.",
+  missing_user_email: "Votre compte n'a pas d'adresse e-mail pour recevoir le test.",
+  review_requests_not_configured: "L'envoi d'e-mails n'est pas disponible pour le moment.",
+  send_failed: "L'e-mail n'a pas pu partir. Réessayez dans un instant.",
 };
 
 /** Message en français pour une erreur d'enregistrement ou de suggestion. */
 export const seoErrorMessage = (error: unknown): string => {
   if (isApiHttpError(error)) {
-    if (error.status === 429) return 'Trop de suggestions demandées. Réessayez dans une heure.';
+    if (error.status === 429) return 'Trop de demandes en une heure. Réessayez plus tard.';
     const body = unwrapErrorData(error.responseBody as Record<string, unknown> | undefined);
     const code = typeof body?.error === 'string' ? body.error : '';
     if (code === 'invalid_field') {

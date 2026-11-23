@@ -5,11 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { SelectableChip } from '@/components/ui/selectable-chip';
-import { AlertCircle, Copy, Loader2, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { AlertCircle, Copy, ExternalLink, Loader2, Mail, Plus, Search, Sparkles, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   scannorderSeoService,
   seoErrorMessage,
+  type GoogleCandidate,
   type ScanNOrderSeoSettings,
 } from '@/services/scannorderSeoService';
 
@@ -33,6 +35,10 @@ interface Draft {
   description: string;
   cuisineTypes: string[];
   links: string[];
+  googlePlaceId: string;
+  googleMapsUrl: string;
+  googleReviewUrl: string;
+  reviewRequestEnabled: boolean;
 }
 
 const META_DESCRIPTION_LENGTH = 160;
@@ -42,13 +48,21 @@ const toDraft = (s: ScanNOrderSeoSettings): Draft => ({
   description: s.description,
   cuisineTypes: [...s.cuisine_types],
   links: s.links.length ? [...s.links] : [''],
+  googlePlaceId: s.google.place_id,
+  googleMapsUrl: s.google.maps_url,
+  googleReviewUrl: s.google.review_url,
+  reviewRequestEnabled: s.review_request_enabled,
 });
 
 const sameDraft = (a: Draft, b: Draft) =>
   a.title === b.title &&
   a.description === b.description &&
   a.cuisineTypes.join(',') === b.cuisineTypes.join(',') &&
-  a.links.filter(Boolean).join('\n') === b.links.filter(Boolean).join('\n');
+  a.links.filter(Boolean).join('\n') === b.links.filter(Boolean).join('\n') &&
+  a.googlePlaceId === b.googlePlaceId &&
+  a.googleMapsUrl.trim() === b.googleMapsUrl.trim() &&
+  a.googleReviewUrl.trim() === b.googleReviewUrl.trim() &&
+  a.reviewRequestEnabled === b.reviewRequestEnabled;
 
 export function ScanNOrderSeoPanel({
   accessUrl,
@@ -63,6 +77,9 @@ export function ScanNOrderSeoPanel({
   const [loadError, setLoadError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [suggesting, setSuggesting] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const [candidates, setCandidates] = useState<GoogleCandidate[] | null>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,6 +197,10 @@ export function ScanNOrderSeoPanel({
         description: draft.description,
         cuisine_types: draft.cuisineTypes,
         links: draft.links.map((l) => l.trim()).filter(Boolean),
+        google_place_id: draft.googlePlaceId,
+        google_maps_url: draft.googleMapsUrl.trim(),
+        google_review_url: draft.googleReviewUrl.trim(),
+        review_request_enabled: draft.reviewRequestEnabled && draft.googleReviewUrl.trim() !== '',
       });
       setSettings(saved);
       setDraft(toDraft(saved));
@@ -193,6 +214,40 @@ export function ScanNOrderSeoPanel({
       setSaving(false);
     }
   };
+
+  const handleSearchGoogle = async () => {
+    setSearching(true);
+    try {
+      setCandidates(await scannorderSeoService.searchGoogle());
+    } catch (error) {
+      setCandidates(null);
+      toast({ title: 'Recherche impossible', description: seoErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const pickCandidate = (c: GoogleCandidate) => {
+    update({ googlePlaceId: c.place_id, googleMapsUrl: c.maps_url, googleReviewUrl: c.review_url });
+    setCandidates(null);
+    toast({ title: 'Fiche Google reliée', description: 'Vérifiez les liens, puis enregistrez.' });
+  };
+
+  const handleReviewTest = async () => {
+    setTesting(true);
+    try {
+      const { sent_to } = await scannorderSeoService.sendReviewTest();
+      toast({ title: 'E-mail de test envoyé', description: `Envoyé à ${sent_to}.` });
+    } catch (error) {
+      toast({ title: 'Envoi impossible', description: seoErrorMessage(error), variant: 'destructive' });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  // Le test part avec le lien d'avis enregistré : il faut l'avoir enregistré.
+  const savedReviewUrl = settings.google.review_url;
+  const reviewUrlDraft = draft.googleReviewUrl.trim();
 
   const copyLink = () => {
     if (!accessUrl) return;
@@ -326,8 +381,8 @@ export function ScanNOrderSeoPanel({
           <CardHeader>
             <CardTitle>Vos pages sur internet</CardTitle>
             <CardDescription>
-              Ajoutez en priorité le lien de votre fiche Google : il aide Google à relier cette page à votre établissement.
-              Puis Instagram, Facebook, Tripadvisor, votre site…
+              Instagram, Facebook, Tripadvisor, votre site… Ces liens aident les moteurs de recherche à reconnaître votre
+              établissement. La fiche Google se renseigne plus bas.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -337,7 +392,7 @@ export function ScanNOrderSeoPanel({
                   value={link}
                   type="url"
                   inputMode="url"
-                  placeholder={index === 0 ? 'https://maps.app.goo.gl/… (fiche Google)' : 'https://www.instagram.com/…'}
+                  placeholder={index === 0 ? 'https://www.instagram.com/…' : 'https://www.facebook.com/…'}
                   onChange={(e) => setLink(index, e.target.value)}
                 />
                 <Button
@@ -360,27 +415,172 @@ export function ScanNOrderSeoPanel({
         </Card>
 
         {/* Fiche Google */}
-        {accessUrl && (
-          <Card className="md:col-span-2">
-            <CardHeader>
-              <CardTitle>Votre fiche Google</CardTitle>
-              <CardDescription>
-                Sur Google Maps, ce sont les fiches Google qui ressortent. Dans votre fiche Google (Google Business Profile),
-                collez ce lien dans « Commander en ligne » et « Menu » : vos clients commandent chez vous, sans commission de
-                plateforme.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex gap-2">
-                <Input value={accessUrl} readOnly />
-                <Button variant="outline" onClick={copyLink}>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copier
-                </Button>
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="space-y-1.5">
+                <CardTitle>Votre fiche Google</CardTitle>
+                <CardDescription>
+                  Sur Google Maps, ce sont les fiches Google qui ressortent. Relier votre fiche à cette page aide Google à
+                  reconnaître votre établissement, et permet de demander des avis à vos clients.
+                </CardDescription>
               </div>
-            </CardContent>
-          </Card>
-        )}
+              {settings.google_search_available && (
+                <Button variant="outline" onClick={handleSearchGoogle} disabled={searching}>
+                  {searching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+                  Retrouver ma fiche Google
+                </Button>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {candidates !== null && (
+              <div className="rounded-lg border p-3 space-y-2">
+                {candidates.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    Aucune fiche trouvée avec le nom et l'adresse de l'établissement. Collez les liens ci-dessous.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">Choisissez votre établissement :</p>
+                    {candidates.map((c) => (
+                      <div key={c.place_id} className="flex flex-wrap items-center justify-between gap-3 rounded-md bg-muted/40 p-3">
+                        <div className="min-w-0">
+                          <p className="font-medium">{c.name}</p>
+                          <p className="text-sm text-muted-foreground">{c.address}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" asChild>
+                            <a href={c.maps_url} target="_blank" rel="noopener noreferrer">
+                              Voir <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                            </a>
+                          </Button>
+                          <Button size="sm" onClick={() => pickCandidate(c)}>
+                            C'est mon établissement
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="seo-google-maps">Lien de votre fiche Google</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="seo-google-maps"
+                  type="url"
+                  inputMode="url"
+                  value={draft.googleMapsUrl}
+                  placeholder="https://maps.app.goo.gl/…"
+                  onChange={(e) => update({ googleMapsUrl: e.target.value, googlePlaceId: '' })}
+                />
+                {draft.googleMapsUrl.trim() && (
+                  <Button variant="outline" size="icon" aria-label="Ouvrir la fiche Google" asChild>
+                    <a href={draft.googleMapsUrl.trim()} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="seo-google-review">Lien pour laisser un avis</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="seo-google-review"
+                  type="url"
+                  inputMode="url"
+                  value={draft.googleReviewUrl}
+                  placeholder="https://g.page/r/…/review"
+                  onChange={(e) => update({ googleReviewUrl: e.target.value, googlePlaceId: '' })}
+                />
+                {reviewUrlDraft && (
+                  <Button variant="outline" size="icon" aria-label="Tester le lien d'avis" asChild>
+                    <a href={reviewUrlDraft} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="h-4 w-4" />
+                    </a>
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Rempli automatiquement quand vous choisissez votre fiche. Sinon, dans votre fiche Google (Google Business
+                Profile) : « Demander des avis », puis copiez le lien.
+              </p>
+            </div>
+
+            {accessUrl && (
+              <div className="space-y-2 border-t pt-5">
+                <Label>Votre lien de commande, à coller dans la fiche Google</Label>
+                <p className="text-xs text-muted-foreground">
+                  Dans votre fiche Google, collez ce lien dans « Commander en ligne » et « Menu » : vos clients commandent
+                  chez vous, sans commission de plateforme.
+                </p>
+                <div className="flex gap-2">
+                  <Input value={accessUrl} readOnly />
+                  <Button variant="outline" onClick={copyLink}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copier
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Demande d'avis */}
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Demande d'avis par e-mail</CardTitle>
+            <CardDescription>
+              Plus d'avis Google, c'est plus de visibilité sur Google Maps. Après chaque commande ScanNOrder, le client
+              reçoit un e-mail à votre nom et à vos couleurs avec un bouton « Laisser un avis sur Google ».
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="seo-review-request" className="text-sm font-medium">
+                  Demander un avis après chaque commande en ligne
+                </Label>
+                {!reviewUrlDraft && (
+                  <p className="text-xs text-muted-foreground">Renseignez d'abord le lien pour laisser un avis.</p>
+                )}
+              </div>
+              <Switch
+                id="seo-review-request"
+                checked={draft.reviewRequestEnabled && reviewUrlDraft !== ''}
+                disabled={!reviewUrlDraft}
+                onCheckedChange={(checked) => update({ reviewRequestEnabled: checked })}
+              />
+            </div>
+            <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+              <li>Envoyé environ 1 h 30 après la clôture de la commande, entre 9 h et 21 h.</li>
+              <li>Au plus une demande par client tous les 90 jours.</li>
+              <li>Chaque e-mail contient un lien pour ne plus en recevoir.</li>
+              <li>Tous les clients reçoivent la même demande, sans contrepartie : c'est la règle de Google sur les avis.</li>
+            </ul>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+              <p className="text-sm text-muted-foreground">
+                {settings.review_requests_sent_30d > 0
+                  ? `${settings.review_requests_sent_30d} demande${settings.review_requests_sent_30d > 1 ? 's' : ''} envoyée${settings.review_requests_sent_30d > 1 ? 's' : ''} ces 30 derniers jours.`
+                  : 'Aucune demande envoyée ces 30 derniers jours.'}
+              </p>
+              <Button
+                variant="outline"
+                onClick={handleReviewTest}
+                disabled={testing || !savedReviewUrl || reviewUrlDraft !== savedReviewUrl}
+                title={reviewUrlDraft !== savedReviewUrl ? "Enregistrez d'abord le lien pour laisser un avis" : undefined}
+              >
+                {testing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Mail className="mr-2 h-4 w-4" />}
+                M'envoyer un e-mail de test
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex justify-end">

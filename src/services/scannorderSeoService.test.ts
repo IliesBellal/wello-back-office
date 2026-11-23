@@ -16,7 +16,10 @@ describe('seoErrorMessage', () => {
   it('erreurs de suggestion, enveloppe { id, data } comprise', () => {
     expect(seoErrorMessage(httpError(422, { id: 'x', data: { error: 'menu_too_small' } })))
       .toContain('trop peu de produits');
-    expect(seoErrorMessage(httpError(429, 'Too Many Requests'))).toContain('Réessayez dans une heure');
+    expect(seoErrorMessage(httpError(429, 'Too Many Requests'))).toContain('Trop de demandes');
+    expect(seoErrorMessage(httpError(503, { error: 'google_search_unavailable' }))).toContain('collez les liens');
+    expect(seoErrorMessage(httpError(400, { error: 'invalid_field', field: 'review_request_enabled', reason: 'missing_review_url' })))
+      .toBe("Renseignez d'abord le lien pour laisser un avis.");
   });
 
   it('erreur inconnue : message générique', () => {
