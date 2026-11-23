@@ -15,6 +15,7 @@ import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { TabSystem, PageContainer, ConfirmDialog } from '@/components/shared';
 import { StripeStatusCard } from '@/components/integrations/StripeStatusCard';
 import { BankAccountsTab } from '@/components/integrations/BankAccountsTab';
+import { ScanNOrderSeoPanel } from '@/components/integrations/ScanNOrderSeoPanel';
 import {
   getOnlineOrdersConfig,
   updateOnlineOrdersConfig,
@@ -705,6 +706,16 @@ export default function ScanNOrder() {
         return renderModesTab();
       case 'bank-accounts':
         return <BankAccountsTab />;
+      case 'seo':
+        return (
+          <ScanNOrderSeoPanel
+            accessUrl={accessUrl || null}
+            establishmentName={establishmentInfo?.name}
+            city={establishmentInfo?.city}
+            takeawayEnabled={config?.takeaway_enabled}
+            deliveryEnabled={config?.delivery_enabled}
+          />
+        );
       default:
         return null;
     }
@@ -713,6 +724,7 @@ export default function ScanNOrder() {
   const tabs = [
     { id: 'appearance', label: 'Apparence' },
     { id: 'modes', label: 'Commandes' },
+    { id: 'seo', label: 'Référencement' },
     { id: 'bank-accounts', label: 'Compte bancaire' },
   ];
 
@@ -1100,7 +1112,8 @@ export default function ScanNOrder() {
           />
         </div>
 
-        {/* Actions */}
+        {/* Actions — l'onglet Référencement a son propre enregistrement */}
+        {activeTab !== 'seo' && (
         <div className="flex justify-end gap-3">
           <Button
             variant="outline"
@@ -1116,6 +1129,7 @@ export default function ScanNOrder() {
             {saving ? 'Sauvegarde...' : 'Sauvegarder'}
           </Button>
         </div>
+        )}
       </PageContainer>
     </DashboardLayout>
   );
