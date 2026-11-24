@@ -193,6 +193,7 @@ function HubPresentationCard({ detail }: { detail: FranchiseDetail }) {
             url={franchise.banner_url}
             uploading={uploadImage.isPending && uploadImage.variables?.type === "banner"}
             onFile={(file) => uploadImage.mutate({ type: "banner", file })}
+            onPick={(picked) => uploadImage.mutate({ type: "banner", file: picked })}
           />
           <p className="text-xs text-muted-foreground">Image d'en-tête du hub, au format 4:1. Enregistrée dès l'envoi.</p>
         </div>

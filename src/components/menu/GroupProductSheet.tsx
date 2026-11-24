@@ -33,6 +33,8 @@ import { CategorySelector } from '@/components/shared/CategorySelector';
 import { BulkAssignProductsDialog } from '@/components/shared/BulkAssignProductsDialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useObjectUrlPreview } from '@/hooks/useObjectUrlPreview';
+import { ImageSourceMenu } from '@/components/shared/ImageSourceMenu';
+import { pickedImageFile, pickedImageUrl, type ImageInput } from '@/lib/imageInput';
 import { useProductEditData } from '@/hooks/useProductEditData';
 import { menuService } from '@/services/menuService';
 import { useToast } from '@/hooks/use-toast';
@@ -104,7 +106,8 @@ export const GroupProductSheet = ({
   const [formData, setFormData] = useState<Partial<Product>>({});
   const [createdProduct, setCreatedProduct] = useState<Product | null>(null);
   const [activeTab, setActiveTab] = useState('general');
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  // Fichier de l'appareil ou image de la banque / « Mes images ».
+  const [selectedImageFile, setSelectedImageFile] = useState<ImageInput | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -116,7 +119,7 @@ export const GroupProductSheet = ({
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const { tvaRates } = useProductEditData(open);
-  const imagePreviewUrl = useObjectUrlPreview(selectedImageFile);
+  const imagePreviewUrl = useObjectUrlPreview(pickedImageFile(selectedImageFile)) ?? pickedImageUrl(selectedImageFile);
 
   // Le groupe créé prend le relais dès que la création aboutit : la fiche
   // reste ouverte et se comporte alors comme une fiche d'édition normale.
@@ -397,9 +400,11 @@ export const GroupProductSheet = ({
         </div>
       ) : (
         <div className="space-y-4">
+          <ImageSourceMenu onDevice={() => fileInputRef.current?.click()} onPick={setSelectedImageFile}>
           <div
             className="cursor-pointer w-full h-32 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30 relative"
-            onClick={() => fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
           >
             {imagePreviewUrl ? (
               <img src={imagePreviewUrl} alt="Preview" className="w-full h-full object-cover" />
@@ -412,6 +417,7 @@ export const GroupProductSheet = ({
               </div>
             )}
           </div>
+          </ImageSourceMenu>
           <input
             ref={fileInputRef}
             type="file"

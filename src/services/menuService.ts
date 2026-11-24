@@ -1,6 +1,44 @@
 import { apiClient, withMock, logAPI, WelloApiResponse, API_BASE_URL } from "@/services/apiClient";
 import { TvaRateGroup, Menu, UnitOfMeasure, UnitConversion, Component, Attribute, Product, ProductStatus, Category, ComponentCategory, Tag, Allergen, ProductCreatePayload, BulkAvailabilityFields, BulkDuplicateProductsResult, ProductComposition } from "@/types/menu";
 import { getStoredAuthToken } from "@/types/auth";
+import { describeImageInput, pickedImageUrl, toUploadBody, type ImageInput } from "@/lib/imageInput";
+
+/**
+ * Envoie l'image d'un élément du menu : fichier en multipart (champ `photo`)
+ * ou image de la banque / « Mes images » en JSON { image_url }. fetch direct
+ * plutôt qu'apiClient : l'appelant affiche lui-même l'erreur.
+ */
+async function sendMenuImage<T>(endpoint: string, image: ImageInput): Promise<T> {
+  const token = getStoredAuthToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  const body = toUploadBody(image, 'photo');
+  if (!(body instanceof FormData)) {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}${endpoint}`, {
+    method: 'PUT',
+    headers,
+    body: body instanceof FormData ? body : JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    let errorMessage = 'Upload failed';
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData.message || errorData.data?.message || errorData.error || errorData.data?.error || errorMessage;
+    } catch {
+      // ignore
+    }
+    throw new Error(errorMessage);
+  }
+
+  const data = await response.json() as WelloApiResponse<T>;
+  return data.data;
+}
 
 interface MarketingCategoryApiItem {
   category_id: string;
@@ -667,48 +705,21 @@ export const menuService = {
     );
   },
 
-  async uploadProductCategoryImage(categoryId: string, file: File): Promise<{ image_url: string }> {
-    logAPI('PUT', `/menu/products/categories/${categoryId}/image`, { fileName: file.name, fileSize: file.size });
+  async uploadProductCategoryImage(categoryId: string, image: ImageInput): Promise<{ image_url: string }> {
+    const endpoint = `/menu/products/categories/${categoryId}/image`;
+    logAPI('PUT', endpoint, describeImageInput(image));
 
     return withMock(
       async () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return { image_url: `https://storage.welloresto.fr/merchants/2/categories/mock_${Date.now()}.jpg` };
+        return { image_url: pickedImageUrl(image) ?? `https://storage.welloresto.fr/merchants/2/categories/mock_${Date.now()}.jpg` };
       },
       async () => {
-        const formData = new FormData();
-        formData.append('photo', file);
-
-        const token = getStoredAuthToken();
-
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/products/categories/${categoryId}/image`, {
-          method: 'PUT',
-          headers,
-          body: formData
-        });
-
-        if (!response.ok) {
-          let errorMessage = 'Upload failed';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorMessage;
-          } catch {
-            // ignore
-          }
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json() as WelloApiResponse<{ image_url?: string; photo_url?: string }>;
-        const imageUrl = data.data?.image_url || data.data?.photo_url;
+        const data = await sendMenuImage<{ image_url?: string; photo_url?: string }>(endpoint, image);
+        const imageUrl = data?.image_url || data?.photo_url;
         if (!imageUrl) {
           throw new Error('Image URL not returned by API');
         }
-
         return { image_url: imageUrl };
       }
     );
@@ -1256,91 +1267,31 @@ export const menuService = {
     );
   },
 
-  async uploadProductImage(productId: string, file: File): Promise<{ photo_url: string }> {
-    logAPI('PUT', `/menu/product/${productId}/img`, { fileName: file.name, fileSize: file.size });
-    
+  async uploadProductImage(productId: string, image: ImageInput): Promise<{ photo_url: string }> {
+    const endpoint = `/menu/products/${productId}/image`;
+    logAPI('PUT', endpoint, describeImageInput(image));
+
     return withMock(
       async () => {
         // Mock: simulate upload delay and return fake URL
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return { photo_url: `https://storage.welloresto.fr/merchants/2/products/mock_${Date.now()}.jpg` };
+        return { photo_url: pickedImageUrl(image) ?? `https://storage.welloresto.fr/merchants/2/products/mock_${Date.now()}.jpg` };
       },
-      async () => {
-        // Real upload: use FormData and fetch directly (bypassing JSON serialization)
-        const formData = new FormData();
-        formData.append('photo', file);
-        
-        const token = getStoredAuthToken();
-
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/products/${productId}/image`, {
-          method: 'PUT',
-          headers,
-          body: formData
-        });
-
-        if (!response.ok) {
-          let errorMessage = 'Upload failed';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorMessage;
-          } catch {
-            // ignore
-          }
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json() as WelloApiResponse<{ photo_url: string }>;
-        return data.data;
-      }
+      () => sendMenuImage<{ photo_url: string }>(endpoint, image)
     );
   },
 
-  async uploadAttributeOptionImage(optionId: string, file: File): Promise<{ image_url: string }> {
-    logAPI('PUT', `/menu/attribute_options/${optionId}/image`, { fileName: file.name, fileSize: file.size });
+  async uploadAttributeOptionImage(optionId: string, image: ImageInput): Promise<{ image_url: string }> {
+    const endpoint = `/menu/attribute_options/${optionId}/image`;
+    logAPI('PUT', endpoint, describeImageInput(image));
 
     return withMock(
       async () => {
         // Mock: simulate upload delay and return fake URL
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return { image_url: `https://storage.welloresto.fr/merchants/2/attribute_options/mock_${Date.now()}.jpg` };
+        return { image_url: pickedImageUrl(image) ?? `https://storage.welloresto.fr/merchants/2/attribute_options/mock_${Date.now()}.jpg` };
       },
-      async () => {
-        // Real upload: use FormData and fetch directly (bypassing JSON serialization)
-        const formData = new FormData();
-        formData.append('photo', file);
-
-        const token = getStoredAuthToken();
-
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/attribute_options/${optionId}/image`, {
-          method: 'PUT',
-          headers,
-          body: formData
-        });
-
-        if (!response.ok) {
-          let errorMessage = 'Upload failed';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorMessage;
-          } catch {
-            // ignore
-          }
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json() as WelloApiResponse<{ image_url: string }>;
-        return data.data;
-      }
+      () => sendMenuImage<{ image_url: string }>(endpoint, image)
     );
   },
 
@@ -1633,48 +1584,21 @@ export const menuService = {
     );
   },
 
-  async uploadMarketingCategoryImage(categoryId: string, file: File): Promise<{ image_url: string }> {
-    logAPI('PUT', `/menu/marketing-categories/${categoryId}/image`, { fileName: file.name, fileSize: file.size });
+  async uploadMarketingCategoryImage(categoryId: string, image: ImageInput): Promise<{ image_url: string }> {
+    const endpoint = `/menu/marketing-categories/${categoryId}/image`;
+    logAPI('PUT', endpoint, describeImageInput(image));
 
     return withMock(
       async () => {
         await new Promise(resolve => setTimeout(resolve, 1000));
-        return { image_url: `https://storage.welloresto.fr/merchants/2/marketing_categories/mock_${Date.now()}.jpg` };
+        return { image_url: pickedImageUrl(image) ?? `https://storage.welloresto.fr/merchants/2/marketing_categories/mock_${Date.now()}.jpg` };
       },
       async () => {
-        const formData = new FormData();
-        formData.append('photo', file);
-
-        const token = getStoredAuthToken();
-
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL || "https://welloresto-api-prod.onrender.com"}/menu/marketing-categories/${categoryId}/image`, {
-          method: 'PUT',
-          headers,
-          body: formData
-        });
-
-        if (!response.ok) {
-          let errorMessage = 'Upload failed';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorMessage;
-          } catch {
-            // ignore
-          }
-          throw new Error(errorMessage);
-        }
-
-        const data = await response.json() as WelloApiResponse<{ image_url?: string; photo_url?: string }>;
-        const imageUrl = data.data?.image_url || data.data?.photo_url;
+        const data = await sendMenuImage<{ image_url?: string; photo_url?: string }>(endpoint, image);
+        const imageUrl = data?.image_url || data?.photo_url;
         if (!imageUrl) {
           throw new Error('Image URL not returned by API');
         }
-
         return { image_url: imageUrl };
       }
     );

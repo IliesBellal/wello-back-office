@@ -1,4 +1,5 @@
 import { apiClient, isApiHttpError, logAPI } from "@/services/apiClient";
+import { toUploadBody, type ImageInput } from "@/lib/imageInput";
 import type {
   FranchiseCandidate,
   FranchiseDetail,
@@ -122,12 +123,11 @@ export const franchisesService = {
     });
   },
 
-  uploadImage(franchiseId: string, imageType: "logo" | "banner", file: File): Promise<string> {
-    const formData = new FormData();
-    formData.append("photo", file);
+  /** Fichier de l'appareil ou image de la banque / « Mes images » (JSON). */
+  uploadImage(franchiseId: string, imageType: "logo" | "banner", image: ImageInput): Promise<string> {
     logAPI("PUT", path(franchiseId, `/${imageType}`));
     return call(async () => {
-      const response = await apiClient.put<Envelope<{ photo_url: string }>>(path(franchiseId, `/${imageType}`), formData, OWN_ERRORS);
+      const response = await apiClient.put<Envelope<{ photo_url: string }>>(path(franchiseId, `/${imageType}`), toUploadBody(image, "photo"), OWN_ERRORS);
       return response.data.photo_url;
     });
   },

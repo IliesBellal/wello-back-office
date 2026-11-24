@@ -1,4 +1,5 @@
 import { apiClient, WelloApiResponse } from "@/services/apiClient";
+import { isImageFile, type ImageInput } from "@/lib/imageInput";
 import {
   cdsApiErrorMessages,
   type CdsApiErrorPayload,
@@ -139,20 +140,33 @@ export const cdsService = {
   //
   // La durée est facultative : absente, le média suit la durée par défaut de
   // l'écran, ce qui est presque toujours ce qu'on veut à l'ajout.
+  //
+  // Une image de la banque / « Mes images » part en JSON { kind, url } : l'API
+  // la reprend (banque) ou la copie (image de l'établissement).
   async uploadMedia(
     displayId: string,
-    file: File,
+    media: ImageInput,
     durationSeconds?: number,
   ): Promise<CdsMediaItem> {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (durationSeconds !== undefined) {
-      formData.append('duration_seconds', String(durationSeconds));
+    let body: FormData | Record<string, unknown>;
+    if (isImageFile(media)) {
+      const formData = new FormData();
+      formData.append('file', media);
+      if (durationSeconds !== undefined) {
+        formData.append('duration_seconds', String(durationSeconds));
+      }
+      body = formData;
+    } else {
+      body = {
+        kind: 'image',
+        url: media.imageUrl,
+        ...(durationSeconds !== undefined ? { duration_seconds: durationSeconds } : {}),
+      };
     }
 
     const response = await apiClient.post<WelloApiResponse<CdsMediaItem>>(
       `${CDS_BASE}/displays/${displayId}/media`,
-      formData,
+      body,
     );
     assertNoCdsApiError(response.data);
     return response.data;

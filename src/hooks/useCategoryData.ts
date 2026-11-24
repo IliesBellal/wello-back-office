@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { ImageInput } from '@/lib/imageInput';
 import { menuService } from '@/services/menuService';
 import { Category, MenuData } from '@/types/menu';
 import { useToast } from '@/hooks/use-toast';
@@ -187,7 +188,7 @@ export const useCategoryData = () => {
     }
   };
 
-  const uploadCategoryImage = async (categoryId: string, file: File) => {
+  const uploadCategoryImage = async (categoryId: string, file: ImageInput) => {
     try {
       const result = await menuService.uploadProductCategoryImage(categoryId, file);
       setMenuData(prev => ({

@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { ImageSourceMenu } from "@/components/shared/ImageSourceMenu";
+import type { ImageInput } from "@/lib/imageInput";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -72,7 +74,7 @@ export function KioskMarketingRotation({ defaultDuration }: KioskMarketingRotati
   };
 
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => kioskService.uploadMarketingMedia(file),
+    mutationFn: (file: ImageInput) => kioskService.uploadMarketingMedia(file),
     onSuccess: () => {
       toast({ title: "Média ajouté" });
       invalidate();
@@ -154,20 +156,21 @@ export function KioskMarketingRotation({ defaultDuration }: KioskMarketingRotati
           className="hidden"
           onChange={handleFileSelected}
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
+        <ImageSourceMenu
+          format="banner"
+          onDevice={() => fileInputRef.current?.click()}
+          onPick={(picked) => uploadMutation.mutate(picked)}
           disabled={uploadMutation.isPending}
         >
-          {uploadMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Upload className="w-4 h-4 mr-2" />
-          )}
-          Ajouter une image ou une vidéo
-        </Button>
+          <Button type="button" variant="outline" size="sm" disabled={uploadMutation.isPending}>
+            {uploadMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4 mr-2" />
+            )}
+            Ajouter une image ou une vidéo
+          </Button>
+        </ImageSourceMenu>
       </div>
 
       <p className="text-xs text-muted-foreground">

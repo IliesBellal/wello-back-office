@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { ImageSourceMenu } from '@/components/shared/ImageSourceMenu';
+import type { ImageInput, PickedImageUrl } from '@/lib/imageInput';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Card,
@@ -49,6 +51,8 @@ interface ImageUploadFieldProps {
   preview: string;
   isLogo?: boolean;
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  /** Si fourni, le clic propose aussi la banque d'images (bannière). */
+  onPick?: (picked: PickedImageUrl) => void;
 }
 
 function ImageUploadField({
@@ -56,6 +60,7 @@ function ImageUploadField({
   preview,
   isLogo = false,
   onUpload,
+  onPick,
 }: ImageUploadFieldProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -63,45 +68,62 @@ function ImageUploadField({
     fileInputRef.current?.click();
   };
 
-  return (
-    <div className="space-y-2">
-      <Label className="text-sm font-medium">{label}</Label>
-      <div
-        onClick={handleClick}
-        className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary hover:bg-muted/50"
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
+  // Sans banque d'images, la zone ouvre directement le sélecteur de fichier ;
+  // avec, c'est le menu déroulant qui s'en charge.
+  const zoneHandlers = onPick
+    ? {}
+    : {
+        onClick: handleClick,
+        onKeyDown: (e: React.KeyboardEvent) => {
           if (e.key === 'Enter' || e.key === ' ') {
             handleClick();
           }
-        }}
-      >
-        {preview ? (
-          <img
-            src={preview}
-            alt={label}
-            // Bannière : recadrage 4:1 identique à l'affichage desktop du ScanNOrder.
-            className={
-              isLogo
-                ? 'h-20 w-20 max-h-full max-w-full rounded-lg object-contain'
-                : 'aspect-[4/1] w-full rounded-lg object-cover'
-            }
-          />
-        ) : (
-          <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-            <Upload className="h-8 w-8 text-muted-foreground" />
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-foreground">
-                Cliquez pour télécharger
-              </p>
-              <p className="text-xs text-muted-foreground">
-                PNG, JPG ou GIF (max 5 MB)
-              </p>
-            </div>
+        },
+      };
+  const zone = (
+    <div
+      className="relative flex cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-muted/30 p-8 transition-colors hover:border-primary hover:bg-muted/50"
+      role="button"
+      tabIndex={0}
+      {...zoneHandlers}
+    >
+      {preview ? (
+        <img
+          src={preview}
+          alt={label}
+          // Bannière : recadrage 4:1 identique à l'affichage desktop du ScanNOrder.
+          className={
+            isLogo
+              ? 'h-20 w-20 max-h-full max-w-full rounded-lg object-contain'
+              : 'aspect-[4/1] w-full rounded-lg object-cover'
+          }
+        />
+      ) : (
+        <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
+          <Upload className="h-8 w-8 text-muted-foreground" />
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              Cliquez pour télécharger
+            </p>
+            <p className="text-xs text-muted-foreground">
+              PNG, JPG ou GIF (max 5 MB)
+            </p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-sm font-medium">{label}</Label>
+      {onPick ? (
+        <ImageSourceMenu format="banner" onDevice={handleClick} onPick={onPick}>
+          {zone}
+        </ImageSourceMenu>
+      ) : (
+        zone
+      )}
       <input
         ref={fileInputRef}
         type="file"
@@ -252,8 +274,18 @@ export default function ScanNOrder() {
     };
     reader.readAsDataURL(file);
 
+    await saveBanner(file);
+  };
+
+  // Image de la banque / « Mes images » : l'aperçu est l'URL choisie.
+  const handleBannerPick = async (picked: PickedImageUrl) => {
+    setBannerPreview(picked.imageUrl);
+    await saveBanner(picked);
+  };
+
+  const saveBanner = async (image: ImageInput) => {
     try {
-      const url = await uploadBanner(file);
+      const url = await uploadBanner(image);
       handleConfigChange('banner_url', url);
     } catch (error) {
       console.error('Error uploading banner:', error);
@@ -399,6 +431,7 @@ export default function ScanNOrder() {
               preview={bannerPreview}
               isLogo={false}
               onUpload={handleBannerUpload}
+              onPick={handleBannerPick}
             />
           </CardContent>
         </Card>

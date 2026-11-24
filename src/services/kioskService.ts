@@ -1,4 +1,5 @@
 import { apiClient, WelloApiResponse } from "@/services/apiClient";
+import { toUploadBody, type ImageInput } from "@/lib/imageInput";
 import {
   kioskApiErrorMessages,
   type EnrollmentCode,
@@ -161,12 +162,11 @@ export const kioskService = {
     return response.data;
   },
 
-  async uploadIdleImage(file: File): Promise<{ idle_image_url: string }> {
-    const formData = new FormData();
-    formData.append('file', file);
+  // Fichier de l'appareil ou image de la banque / « Mes images » (JSON).
+  async uploadIdleImage(image: ImageInput): Promise<{ idle_image_url: string }> {
     const response = await apiClient.post<WelloApiResponse<{ idle_image_url: string }>>(
       `${KIOSK_BASE}/settings/idle-image`,
-      formData,
+      toUploadBody(image, 'file'),
     );
     return response.data;
   },
@@ -195,13 +195,12 @@ export const kioskService = {
     return response.data ?? [];
   },
 
-  // Le `kind` n'est pas envoyé : l'API le déduit du contenu du fichier.
-  async uploadMarketingMedia(file: File): Promise<KioskMarketingMedia> {
-    const formData = new FormData();
-    formData.append("file", file);
+  // Le `kind` n'est pas envoyé : l'API le déduit du contenu du fichier. Une
+  // image de la banque / « Mes images » part en JSON { image_url }.
+  async uploadMarketingMedia(media: ImageInput): Promise<KioskMarketingMedia> {
     const response = await apiClient.post<WelloApiResponse<KioskMarketingMedia>>(
       `${KIOSK_BASE}/marketing/media`,
-      formData,
+      toUploadBody(media, "file"),
     );
     return response.data;
   },

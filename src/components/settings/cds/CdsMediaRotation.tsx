@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { ImageSourceMenu } from "@/components/shared/ImageSourceMenu";
+import type { ImageInput } from "@/lib/imageInput";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +95,7 @@ export function CdsMediaRotation({
   // veut un restaurateur qui enchaîne dix visuels d'une même campagne, et il
   // peut ensuite ajuster celui qui mérite plus de temps.
   const uploadMutation = useMutation({
-    mutationFn: (file: File) => cdsService.uploadMedia(displayId, file),
+    mutationFn: (file: ImageInput) => cdsService.uploadMedia(displayId, file),
     onSuccess: () => {
       toast({ title: "Média ajouté" });
       invalidate();
@@ -223,20 +225,21 @@ export function CdsMediaRotation({
           className="hidden"
           onChange={handleFileSelected}
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => fileInputRef.current?.click()}
+        <ImageSourceMenu
+          format="banner"
+          onDevice={() => fileInputRef.current?.click()}
+          onPick={(picked) => uploadMutation.mutate(picked)}
           disabled={uploadMutation.isPending}
         >
-          {uploadMutation.isPending ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          ) : (
-            <Upload className="w-4 h-4 mr-2" />
-          )}
-          Ajouter une image ou une vidéo
-        </Button>
+          <Button type="button" variant="outline" size="sm" disabled={uploadMutation.isPending}>
+            {uploadMutation.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <Upload className="w-4 h-4 mr-2" />
+            )}
+            Ajouter une image ou une vidéo
+          </Button>
+        </ImageSourceMenu>
         <Button
           type="button"
           variant="outline"

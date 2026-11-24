@@ -2,6 +2,8 @@ import { useRef } from "react";
 import { Loader2, Upload } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { ImageSourceMenu } from "@/components/shared/ImageSourceMenu";
+import type { PickedImageUrl } from "@/lib/imageInput";
 
 interface FranchiseImageFieldProps {
   label: string;
@@ -9,21 +11,28 @@ interface FranchiseImageFieldProps {
   isLogo?: boolean;
   uploading: boolean;
   onFile: (file: File) => void;
+  /** Si fourni, le clic propose aussi la banque d'images (bannière). */
+  onPick?: (picked: PickedImageUrl) => void;
 }
 
 /** Même champ que les images ScanNOrder d'un établissement (bannière en 4:1). */
-export function FranchiseImageField({ label, url, isLogo = false, uploading, onFile }: FranchiseImageFieldProps) {
+export function FranchiseImageField({ label, url, isLogo = false, uploading, onFile, onPick }: FranchiseImageFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const open = () => !uploading && inputRef.current?.click();
 
   return (
     <div className="space-y-2">
       <Label className="text-sm font-medium">{label}</Label>
+      <ZoneWrapper onPick={onPick} onDevice={open} disabled={uploading}>
       <div
-        onClick={open}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") open();
-        }}
+        {...(onPick
+          ? {}
+          : {
+              onClick: open,
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") open();
+              },
+            })}
         role="button"
         tabIndex={0}
         className={cn(
@@ -50,6 +59,7 @@ export function FranchiseImageField({ label, url, isLogo = false, uploading, onF
           </div>
         )}
       </div>
+      </ZoneWrapper>
       <input
         ref={inputRef}
         type="file"
@@ -62,5 +72,25 @@ export function FranchiseImageField({ label, url, isLogo = false, uploading, onF
         }}
       />
     </div>
+  );
+}
+
+/** Menu « banque d'images / cet appareil » autour de la zone, si onPick. */
+function ZoneWrapper({
+  onPick,
+  onDevice,
+  disabled,
+  children,
+}: {
+  onPick?: (picked: PickedImageUrl) => void;
+  onDevice: () => void;
+  disabled: boolean;
+  children: React.ReactNode;
+}) {
+  if (!onPick) return <>{children}</>;
+  return (
+    <ImageSourceMenu format="banner" onDevice={onDevice} onPick={onPick} disabled={disabled}>
+      {children}
+    </ImageSourceMenu>
   );
 }

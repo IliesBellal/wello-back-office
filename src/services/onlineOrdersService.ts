@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { toUploadBody, type ImageInput } from '@/lib/imageInput';
 
 export interface OnlineOrdersConfig {
   logo_url?: string;
@@ -80,11 +81,10 @@ export const uploadLogo = async (file: File): Promise<string> => {
   }
 };
 
-export const uploadBanner = async (file: File): Promise<string> => {
+// Fichier de l'appareil ou image de la banque / « Mes images » (JSON).
+export const uploadBanner = async (image: ImageInput): Promise<string> => {
   try {
-    const formData = new FormData();
-    formData.append('photo', file);
-    const response = await apiClient.put('/integrations/scannorder/banner', formData);
+    const response = await apiClient.put('/integrations/scannorder/banner', toUploadBody(image, 'photo'));
     return response.data.photo_url;
   } catch (error) {
     console.error('Failed to upload banner:', error);

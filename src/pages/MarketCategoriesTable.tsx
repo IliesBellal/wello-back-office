@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { ImageSourceMenu } from '@/components/shared/ImageSourceMenu';
+import { isImageFile, type ImageInput, type PickedImageUrl } from '@/lib/imageInput';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer } from '@/components/shared';
 import { Button } from '@/components/ui/button';
@@ -44,6 +46,8 @@ interface SortableCategoryRowProps {
   onDelete: (categoryId: string) => void;
   onBulkAssign: (category: Category) => void;
   onImageUpload: (categoryId: string) => void;
+  /** Image choisie dans la banque / « Mes images ». */
+  onImagePick: (categoryId: string, picked: PickedImageUrl) => void;
   onImageDelete: (categoryId: string) => void;
   isImageUploading: boolean;
   canDeleteImage: boolean;
@@ -56,6 +60,7 @@ const SortableCategoryRow = ({
   onDelete,
   onBulkAssign,
   onImageUpload,
+  onImagePick,
   onImageDelete,
   isImageUploading,
   canDeleteImage,
@@ -97,15 +102,20 @@ const SortableCategoryRow = ({
             )}
           </div>
           <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => onImageUpload(category.category_id)}
+            <ImageSourceMenu
+              onDevice={() => onImageUpload(category.category_id)}
+              onPick={(picked) => onImagePick(category.category_id, picked)}
               disabled={isImageUploading}
-              title={category.image_url ? 'Remplacer l\'image' : 'Ajouter une image'}
             >
-              {isImageUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-            </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={isImageUploading}
+                title={category.image_url ? 'Remplacer l\'image' : 'Ajouter une image'}
+              >
+                {isImageUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+              </Button>
+            </ImageSourceMenu>
             <Button
               variant="ghost"
               size="sm"
@@ -321,10 +331,10 @@ export default function MarketCategoriesTable() {
     fileInputRefs.current[categoryId]?.click();
   };
 
-  const handleImageFileChange = async (categoryId: string, file: File | null) => {
+  const handleImageFileChange = async (categoryId: string, file: ImageInput | null) => {
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (isImageFile(file) && !file.type.startsWith('image/')) {
       toast({
         title: 'Format invalide',
         description: 'Veuillez sélectionner un fichier JPG, PNG ou WebP.',
@@ -334,7 +344,7 @@ export default function MarketCategoriesTable() {
     }
 
     const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
+    if (isImageFile(file) && file.size > maxSize) {
       toast({
         title: 'Fichier trop volumineux',
         description: `La taille maximale autorisée est de 5 Mo. Votre fichier fait ${(file.size / 1024 / 1024).toFixed(2)} Mo.`,
@@ -532,6 +542,7 @@ export default function MarketCategoriesTable() {
                             onDelete={handleDelete}
                             onBulkAssign={handleBulkAssign}
                             onImageUpload={handleImageUploadClick}
+                            onImagePick={handleImageFileChange}
                             onImageDelete={handleImageDelete}
                             isImageUploading={imageUploadingCategoryId === category.category_id}
                             canDeleteImage={Boolean(category.image_url)}

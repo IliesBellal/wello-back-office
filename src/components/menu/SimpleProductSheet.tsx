@@ -56,6 +56,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useProductEditData } from '@/hooks/useProductEditData';
 import { useProductData } from '@/hooks/useProductData';
 import { useObjectUrlPreview } from '@/hooks/useObjectUrlPreview';
+import { ImageSourceMenu } from '@/components/shared/ImageSourceMenu';
+import { isImageBankUrl, pickedImageFile, pickedImageUrl, type ImageInput } from '@/lib/imageInput';
 import { parsePriceInput, priceToDisplayValue } from '@/utils/priceInputUtils';
 import { useIntegrationStatus } from '@/hooks/useIntegrationStatus';
 import { cn } from '@/lib/utils';
@@ -239,7 +241,9 @@ export const SimpleProductSheet = ({
   const [activeTab, setActiveTab] = useState('general');
   const [hasAttemptedCreate, setHasAttemptedCreate] = useState(false);
   const [tvaSelection, setTvaSelection] = useState({ in: '', takeAway: '', delivery: '' });
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  // Fichier de l'appareil ou image de la banque / « Mes images », envoyé à
+  // l'enregistrement.
+  const [selectedImageFile, setSelectedImageFile] = useState<ImageInput | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
@@ -266,7 +270,7 @@ export const SimpleProductSheet = ({
   const { runWithDuplicateConfirm, duplicateDialogProps } = useDuplicateNameConfirm();
   const isMobile = useIsMobile();
   const { statuses } = useIntegrationStatus();
-  const imagePreviewUrl = useObjectUrlPreview(selectedImageFile);
+  const imagePreviewUrl = useObjectUrlPreview(pickedImageFile(selectedImageFile)) ?? pickedImageUrl(selectedImageFile);
   
   // Use loaded product if available, otherwise use initial product prop.
   // createdProduct prend le relais dès que la création a abouti : la fiche
@@ -481,7 +485,10 @@ export const SimpleProductSheet = ({
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      if (copySource.image_url) {
+      if (copySource.image_url && isImageBankUrl(copySource.image_url)) {
+        // Image de la banque : partagée, l'URL suffit (aucun fichier à copier).
+        setSelectedImageFile({ imageUrl: copySource.image_url });
+      } else if (copySource.image_url) {
         fetch(copySource.image_url)
           .then((res) => res.blob())
           .then((blob) => {
@@ -1056,9 +1063,15 @@ export const SimpleProductSheet = ({
                     <>
                       {/* Edit Mode - Mobile optimized */}
                       {/* Image Upload */}
+                      <ImageSourceMenu
+                        onDevice={handleImageClick}
+                        onPick={setSelectedImageFile}
+                        disabled={isUploadingImage}
+                      >
                       <div 
                         className="cursor-pointer"
-                        onClick={handleImageClick}
+                        role="button"
+                        tabIndex={0}
                       >
                         <div className="w-full h-40 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30 relative">
                           {isUploadingImage && (
@@ -1086,6 +1099,7 @@ export const SimpleProductSheet = ({
                           )}
                         </div>
                       </div>
+                      </ImageSourceMenu>
 
                       <input
                         ref={fileInputRef}
@@ -1804,9 +1818,15 @@ export const SimpleProductSheet = ({
                     <CardContent className="pt-6">
                       <div className="flex gap-5">
                         {/* Image Upload */}
+                        <ImageSourceMenu
+                          onDevice={handleImageClick}
+                          onPick={setSelectedImageFile}
+                          disabled={isUploadingImage}
+                        >
                         <div 
                           className="flex-shrink-0 cursor-pointer"
-                          onClick={handleImageClick}
+                          role="button"
+                          tabIndex={0}
                         >
                           <div className="w-40 h-40 rounded-lg border-2 border-dashed border-muted-foreground/30 hover:border-primary/50 transition-colors flex items-center justify-center overflow-hidden bg-muted/30 relative">
                             {isUploadingImage && (
@@ -1834,6 +1854,7 @@ export const SimpleProductSheet = ({
                             )}
                           </div>
                         </div>
+                        </ImageSourceMenu>
                         
                         {/* Form Fields */}
                         <div className="flex-1 space-y-4">

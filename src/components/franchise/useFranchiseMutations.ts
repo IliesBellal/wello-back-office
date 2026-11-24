@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import type { ImageInput } from "@/lib/imageInput";
 import { useToast } from "@/hooks/use-toast";
 import { qk } from "@/lib/queryKeys";
 import { franchiseErrorMessage, franchisesService } from "@/services/franchisesService";
@@ -29,7 +30,7 @@ export function useFranchiseMutations(franchiseId: string) {
   });
 
   const uploadImage = useMutation({
-    mutationFn: ({ type, file }: { type: "logo" | "banner"; file: File }) => franchisesService.uploadImage(franchiseId, type, file),
+    mutationFn: ({ type, file }: { type: "logo" | "banner"; file: ImageInput }) => franchisesService.uploadImage(franchiseId, type, file),
     onSuccess: (url, { type }) => {
       const current = queryClient.getQueryData<FranchiseDetail>(qk.franchises.detail(franchiseId));
       if (current) {

@@ -1,4 +1,6 @@
 import { useState, useRef, useMemo } from 'react';
+import { ImageSourceMenu } from '@/components/shared/ImageSourceMenu';
+import type { ImageInput } from '@/lib/imageInput';
 import { DashboardLayout } from '@/components/dashboard/DashboardLayout';
 import { PageContainer, ConfirmDialog } from '@/components/shared';
 import { DuplicateNameDialog } from '@/components/shared/DuplicateNameDialog';
@@ -261,9 +263,15 @@ function SortableOptionRow({
       return;
     }
 
+    await uploadOptionImage(file);
+  };
+
+  // Fichier validé ci-dessus, ou image de la banque / « Mes images ».
+  const uploadOptionImage = async (image: ImageInput) => {
+    if (!option.id) return;
     setIsUploadingImage(true);
     try {
-      const result = await menuService.uploadAttributeOptionImage(option.id, file);
+      const result = await menuService.uploadAttributeOptionImage(option.id, image);
       onUpdate('image_url', result.image_url);
       onImageUploaded?.();
     } catch (error) {
@@ -296,17 +304,22 @@ function SortableOptionRow({
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="w-8 h-8 flex-shrink-0"
+            <ImageSourceMenu
+              onDevice={() => fileInputRef.current?.click()}
+              onPick={uploadOptionImage}
               disabled={!option.id}
-              title={option.id ? "Changer l'image de l'option" : "Enregistrez l'option avant d'ajouter une image"}
-              onClick={() => fileInputRef.current?.click()}
             >
-              <ImagePlus className="w-4 h-4 text-muted-foreground" />
-            </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="w-8 h-8 flex-shrink-0"
+                disabled={!option.id}
+                title={option.id ? "Changer l'image de l'option" : "Enregistrez l'option avant d'ajouter une image"}
+              >
+                <ImagePlus className="w-4 h-4 text-muted-foreground" />
+              </Button>
+            </ImageSourceMenu>
           )}
           <input
             ref={fileInputRef}

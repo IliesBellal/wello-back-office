@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ImageSourceMenu } from '@/components/shared/ImageSourceMenu';
+import type { PickedImageUrl } from '@/lib/imageInput';
 import { Navigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -121,6 +123,7 @@ function KioskSettingsPageContent() {
   const [deleteVideoDialogOpen, setDeleteVideoDialogOpen] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingIdleImage, setUploadingIdleImage] = useState(false);
+  const idleImageInputRef = useRef<HTMLInputElement | null>(null);
   const [uploadingIdleVideo, setUploadingIdleVideo] = useState(false);
 
   const { data: settings, isLoading } = useQuery({
@@ -284,6 +287,25 @@ function KioskSettingsPageContent() {
       (f) => kioskService.uploadIdleImage(f),
       'Image de veille mise à jour',
     );
+  };
+
+  // Image de la banque / « Mes images » : pas de contrôle de taille, le
+  // fichier est déjà dans notre stockage.
+  const handleIdleImagePick = async (picked: PickedImageUrl) => {
+    setUploadingIdleImage(true);
+    try {
+      await kioskService.uploadIdleImage(picked);
+      toast({ title: 'Image de veille mise à jour' });
+      queryClient.invalidateQueries({ queryKey: qk.kiosks.settings });
+    } catch {
+      toast({
+        title: 'Erreur',
+        description: "Impossible d'enregistrer l'image.",
+        variant: 'destructive',
+      });
+    } finally {
+      setUploadingIdleImage(false);
+    }
   };
 
   const handleIdleVideoChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -650,13 +672,23 @@ function KioskSettingsPageContent() {
                     )}
                   </div>
                   <div className="space-y-1">
-                    <Label htmlFor="kiosk-idle-image-upload" className="text-sm font-medium cursor-pointer">
-                      <span className="inline-flex items-center rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent">
+                    <ImageSourceMenu
+                      format="banner"
+                      onDevice={() => idleImageInputRef.current?.click()}
+                      onPick={handleIdleImagePick}
+                      disabled={uploadingIdleImage}
+                    >
+                      <button
+                        type="button"
+                        disabled={uploadingIdleImage}
+                        className="inline-flex items-center rounded-md border border-input bg-background px-3 py-2 text-sm font-medium hover:bg-accent disabled:opacity-50"
+                      >
                         {uploadingIdleImage && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Changer l'image de veille
-                      </span>
-                    </Label>
+                      </button>
+                    </ImageSourceMenu>
                     <input
+                      ref={idleImageInputRef}
                       id="kiosk-idle-image-upload"
                       type="file"
                       accept="image/jpeg,image/png,image/webp"
