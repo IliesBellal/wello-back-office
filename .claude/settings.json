@@ -72,7 +72,11 @@
       "Bash(python \"C:/Users/Ilies/AppData/Local/Temp/claude/f65db5e958a229e2/7152edbd-36eb-417a-b4a5-0bbdbeec0daf/scratchpad/bo_overview.py\" src/pages/IntegrationsOverview.tsx)",
       "Bash(awk '/r.Route\\\\\\(\"\\\\/scannorder\"/,/^\\\\t}\\\\\\)/' cmd/api/routes.go)",
       "Bash(gofmt -l internal/modules/pos internal/models)",
-      "Bash(git -C ../wello-back-office-import-photon log -1)"
+      "Bash(git -C ../wello-back-office-import-photon log -1)",
+      "Bash(sed -i \"s/searchParams.set\\('src', source\\)/searchParams.set\\('utm_source', source\\)/; s#\\(\\\\`?src=\\\\`\\)#\\(\\\\`?utm_source=\\\\`\\)#; s#// Source ajoutée au lien ScanNOrder \\(\\\\`?src=\\\\`\\)#// Source ajoutée au lien ScanNOrder \\(\\\\`?utm_source=\\\\`, norme UTM\\)#; s#ajoute ou remplace src#ajoute ou remplace utm_source#; s#Lien avec \\\\`src\\\\` \\(remplace un \\\\`src\\\\` existant\\)#Lien avec \\\\`utm_source\\\\` \\(remplace une valeur existante\\)#\" src/lib/sourceLink.ts)",
+      "Bash(sed -i \"s/&src=old/\\\\&utm_source=old/; s#resto?src=flyer#resto?utm_source=flyer#; s#a=1&src=flyer#a=1\\\\&utm_source=flyer#; s/ajoute ou remplace src/ajoute ou remplace utm_source/\" src/lib/sourceLink.test.ts)",
+      "Bash(git branch *)",
+      "PowerShell(cd d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects; foreach\\($d in 'wello-back-office','wello-back-office-staging'\\){ $i=Get-Item \"$d\\\\node_modules\" -Force -ErrorAction SilentlyContinue; \"$d : $\\($i.Attributes\\) target=$\\($i.Target\\) items=$\\(\\(Get-ChildItem \"$d\\\\node_modules\" -Force -ErrorAction SilentlyContinue | Measure-Object\\).Count\\)\" }; Test-Path wello-back-office-import-photo)"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",
@@ -90,7 +94,8 @@
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\franchises",
       "d:\\Desktop\\DTL\\Project\\git-projects\\wello-resto-scannorder\\src\\lib",
       "d:\\Desktop\\DTL\\Project\\git-projects\\wello-resto-scannorder\\src\\components\\franchise",
-      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-resto-scannorder\\src\\pages"
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-resto-scannorder\\src\\pages",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-back-office-staging\\src\\components\\integrations"
     ]
   }
 }

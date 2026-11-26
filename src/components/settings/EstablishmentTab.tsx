@@ -24,7 +24,7 @@ import { isValidPhoneNumber, parsePhoneNumber } from "react-phone-number-input";
 import { toast } from "@/hooks/use-toast";
 import { AddressAutocomplete, ParsedAddress } from "@/components/shared/AddressAutocomplete";
 
-const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 const ALLOWED_LOGO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 // Même exigence que l'API (PATCH /pos/settings) : une adresse seule, avec un domaine.
 const EMAIL_PATTERN = /^[^\s@<>,]+@[^\s@<>,]+\.[^\s@<>,]+$/;
@@ -182,7 +182,7 @@ export const EstablishmentTab = () => {
     if (file.size > MAX_LOGO_BYTES) {
       toast({
         title: "Fichier trop volumineux",
-        description: "Le logo doit faire moins de 2 Mo.",
+        description: "Le logo doit faire moins de 5 Mo.",
         variant: "destructive"
       });
       return;
@@ -351,7 +351,7 @@ export const EstablishmentTab = () => {
                   </div>
                 </div>
                 <p className="text-xs text-muted-foreground -mt-2">
-                  Logo : JPG, PNG ou WebP. Max 2 Mo.
+                  Logo : JPG, PNG ou WebP. Max 5 Mo.
                 </p>
 
                 <SettingsSection

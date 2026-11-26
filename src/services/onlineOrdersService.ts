@@ -34,11 +34,24 @@ const mockOnlineOrdersConfig: OnlineOrdersConfig = {
   delivery_distance_limit: 5,
 };
 
+// L'API et la DB (merchant_parameters.delivery_distance_limit, INTEGER) parlent en
+// MÈTRES ; l'interface en KM. La conversion se fait ici, à la frontière.
+const metersToKm = (meters: number | null | undefined): number =>
+  Number.isFinite(meters) ? (meters as number) / 1000 : 0;
+
+const kmToMeters = (km: number | null | undefined): number =>
+  Number.isFinite(km) ? Math.max(0, Math.round((km as number) * 1000)) : 0;
+
+const fromApi = (integration: OnlineOrdersConfig): OnlineOrdersConfig => ({
+  ...integration,
+  delivery_distance_limit: metersToKm(integration.delivery_distance_limit),
+});
+
 export const getOnlineOrdersConfig = async (): Promise<OnlineOrdersConfig> => {
   try {
     const response = await apiClient.get('/integrations/scannorder');
     // API returns { id, data: { integration: { ... } } }
-    return response.data.integration;
+    return fromApi(response.data.integration);
   } catch (error) {
     console.error('Failed to fetch online orders config:', error);
     // Return mock data as fallback
@@ -59,9 +72,12 @@ export const updateOnlineOrdersConfig = async (
       active, storefront_enabled, // eslint-disable-line @typescript-eslint/no-unused-vars
       ...allowedConfig
     } = config as OnlineOrdersConfig & Record<string, unknown>;
-    const response = await apiClient.patch('/integrations/scannorder', allowedConfig);
+    const response = await apiClient.patch('/integrations/scannorder', {
+      ...allowedConfig,
+      delivery_distance_limit: kmToMeters(allowedConfig.delivery_distance_limit),
+    });
     // API returns { id, data: { integration: { ... } } }
-    return response.data.integration;
+    return fromApi(response.data.integration);
   } catch (error) {
     console.error('Failed to update online orders config:', error);
     // Return the config that was attempted to be saved as fallback
