@@ -58,7 +58,25 @@
       "Bash(git rev-list *)",
       "Bash(echo \"vet exit: $?\")",
       "Bash(grep -n -B1 -A1 \"^ *editing$\" src/components/menu/SimpleProductSheet.tsx)",
-      "Bash(awk 'NR>=296 && NR<=500 && /async \\\\\\(\\\\\\) =>|apiClient|return |normalize/ {print NR\": \"$0}' src/services/menuService.ts)"
+      "Bash(awk 'NR>=296 && NR<=500 && /async \\\\\\(\\\\\\) =>|apiClient|return |normalize/ {print NR\": \"$0}' src/services/menuService.ts)",
+      "Bash(git -C ../wello-back-office-staging status --short)",
+      "PowerShell(cd d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\wello-back-office-staging; $after = \\(npx tsc --noEmit -p tsconfig.app.json | Select-String \"error TS\"\\).Count; git stash | Out-Null; $before = \\(npx tsc --noEmit -p tsconfig.app.json | Select-String \"error TS\"\\).Count; git stash pop | Out-Null; \"before=$before after=$after\"; git status --short)",
+      "PowerShell(cd d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects\\\\wello-back-office-staging; npx tsc --noEmit -p tsconfig.app.json | Select-String \"^src\" | ForEach-Object { \\($_ -replace '\\\\\\(\\\\d+,\\\\d+\\\\\\)',''\\).Substring\\(0,[Math]::Min\\(120,\\($_ -replace '\\\\\\(\\\\d+,\\\\d+\\\\\\)',''\\).Length\\)\\) } | Group-Object | Where-Object { $_.Name -match \"Clients|ClientsAnalytics\" }; sed -n 1765,1800p src/services/analyticsService.ts 2>$null; Get-Content src/services/analyticsService.ts | Select-Object -Skip 1768 -First 40)",
+      "Bash(grep -i \"'/\\\\|\\\\\"/\")",
+      "Bash(grep -v \"^$\")",
+      "Bash(grep -n -i \"AccountID\\\\|MenuOnly\\\\|InAvailable\\\\|EnableAdvance\\\\|^.*}$\")",
+      "Bash(gofmt -l internal/modules/scannorder/online_ordering_guard.go internal/modules/scannorder/online_ordering_guard_test.go internal/modules/scannorder/franchise_hub.go)",
+      "Bash(gofmt -d internal/modules/scannorder/franchise_hub.go)",
+      "Bash(awk 'NR>=1100 && NR<=1177 && /Route\\\\\\(/' cmd/api/routes.go)",
+      "Bash(python \"C:/Users/Ilies/AppData/Local/Temp/claude/f65db5e958a229e2/7152edbd-36eb-417a-b4a5-0bbdbeec0daf/scratchpad/bo_scannorder_cards.py\" src/pages/ScanNOrder.tsx)",
+      "Bash(python \"C:/Users/Ilies/AppData/Local/Temp/claude/f65db5e958a229e2/7152edbd-36eb-417a-b4a5-0bbdbeec0daf/scratchpad/bo_overview.py\" src/pages/IntegrationsOverview.tsx)",
+      "Bash(awk '/r.Route\\\\\\(\"\\\\/scannorder\"/,/^\\\\t}\\\\\\)/' cmd/api/routes.go)",
+      "Bash(gofmt -l internal/modules/pos internal/models)",
+      "Bash(git -C ../wello-back-office-import-photon log -1)",
+      "Bash(sed -i \"s/searchParams.set\\('src', source\\)/searchParams.set\\('utm_source', source\\)/; s#\\(\\\\`?src=\\\\`\\)#\\(\\\\`?utm_source=\\\\`\\)#; s#// Source ajoutée au lien ScanNOrder \\(\\\\`?src=\\\\`\\)#// Source ajoutée au lien ScanNOrder \\(\\\\`?utm_source=\\\\`, norme UTM\\)#; s#ajoute ou remplace src#ajoute ou remplace utm_source#; s#Lien avec \\\\`src\\\\` \\(remplace un \\\\`src\\\\` existant\\)#Lien avec \\\\`utm_source\\\\` \\(remplace une valeur existante\\)#\" src/lib/sourceLink.ts)",
+      "Bash(sed -i \"s/&src=old/\\\\&utm_source=old/; s#resto?src=flyer#resto?utm_source=flyer#; s#a=1&src=flyer#a=1\\\\&utm_source=flyer#; s/ajoute ou remplace src/ajoute ou remplace utm_source/\" src/lib/sourceLink.test.ts)",
+      "Bash(git branch *)",
+      "PowerShell(cd d:\\\\Desktop\\\\DTL\\\\Project\\\\git-projects; foreach\\($d in 'wello-back-office','wello-back-office-staging'\\){ $i=Get-Item \"$d\\\\node_modules\" -Force -ErrorAction SilentlyContinue; \"$d : $\\($i.Attributes\\) target=$\\($i.Target\\) items=$\\(\\(Get-ChildItem \"$d\\\\node_modules\" -Force -ErrorAction SilentlyContinue | Measure-Object\\).Count\\)\" }; Test-Path wello-back-office-import-photo)"
     ],
     "additionalDirectories": [
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\permission",
@@ -68,7 +86,16 @@
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\webhook\\deliveroo_orders",
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\ubereats",
       "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\deliveroo",
-      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\integrations"
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\integrations",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-back-office-staging\\src\\services",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-back-office-staging\\src\\lib\\assistant",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-back-office-staging\\src\\components\\assistant",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\infrastructure\\stripe",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\ib-welloresto-api\\internal\\modules\\franchises",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-resto-scannorder\\src\\lib",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-resto-scannorder\\src\\components\\franchise",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-resto-scannorder\\src\\pages",
+      "d:\\Desktop\\DTL\\Project\\git-projects\\wello-back-office-staging\\src\\components\\integrations"
     ]
   }
 }
