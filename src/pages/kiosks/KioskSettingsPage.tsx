@@ -45,7 +45,7 @@ const INACTIVITY_TIMEOUT_OPTIONS: Array<{ value: number; label: string }> = [
   { value: 180, label: '3 min' },
 ];
 
-const MAX_LOGO_SIZE = 2 * 1024 * 1024;
+const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 const MAX_IDLE_IMAGE_SIZE = 5 * 1024 * 1024;
 const MAX_IDLE_VIDEO_SIZE = 50 * 1024 * 1024;
 
@@ -265,7 +265,7 @@ function KioskSettingsPageContent() {
     uploadFile(
       file,
       MAX_LOGO_SIZE,
-      'Le logo ne doit pas dépasser 2 Mo.',
+      'Le logo ne doit pas dépasser 5 Mo.',
       setUploadingLogo,
       (f) => kioskService.uploadLogo(f),
       'Logo mis à jour',
@@ -633,7 +633,7 @@ function KioskSettingsPageContent() {
                       disabled={uploadingLogo}
                       onChange={handleLogoChange}
                     />
-                    <p className="text-xs text-muted-foreground">JPEG, PNG ou WebP, 2 Mo max.</p>
+                    <p className="text-xs text-muted-foreground">JPEG, PNG ou WebP, 5 Mo max.</p>
                   </div>
                 </div>
               </div>
