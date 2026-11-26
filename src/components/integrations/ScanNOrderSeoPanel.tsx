@@ -507,8 +507,35 @@ export function ScanNOrderSeoPanel({
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Rempli automatiquement quand vous choisissez votre fiche. Sinon, dans votre fiche Google (Google Business
-                Profile) : « Demander des avis », puis copiez le lien.
+                Rempli automatiquement quand vous choisissez votre fiche. Sinon, récupérez-le vous-même :
+              </p>
+              <ol className="list-decimal space-y-1 pl-5 text-xs text-muted-foreground">
+                <li>
+                  Accédez à votre fiche d'établissement sur{' '}
+                  <a
+                    href="https://business.google.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    business.google.com
+                  </a>
+                  .
+                </li>
+                <li>
+                  Sélectionnez « Voir les avis », puis « Recevoir plus d'avis » (icône « Partager »).
+                </li>
+                <li>Sélectionnez « Copier » pour copier le lien vers les avis, puis collez-le ci-dessus.</li>
+              </ol>
+              <p className="text-xs text-muted-foreground">
+                <a
+                  href="https://support.google.com/business/answer/16816815?hl=fr"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary underline-offset-2 hover:underline"
+                >
+                  Aide Google <ExternalLink className="h-3 w-3" />
+                </a>
               </p>
             </div>
 
